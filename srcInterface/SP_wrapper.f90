@@ -417,7 +417,6 @@ contains
        else
           iLoop = Lo_
        end if
-
        PARTICLE: do while(iParticle_I(1) < iParticle_I(2))
           iParticle = iParticle_I(iLoop)
           !\
@@ -643,10 +642,14 @@ contains
          iOffset_B(iBlock)  = 1
          State_VIB(       LagrID_:Z_,2:nParticle_B(iBlock) + 1, iBlock)&
               = State_VIB(LagrID_:Z_,1:nParticle_B(iBlock),     iBlock)
+         State_VIB(       R_        ,2:nParticle_B(iBlock) + 1, iBlock)&
+              = State_VIB(R_        ,1:nParticle_B(iBlock),     iBlock)
          nParticle_B(iBlock) = nParticle_B(iBlock) + 1
          ! put the new particle just above the lower boundary
          State_VIB(LagrID_:Z_,  1, iBlock) = &
               FootPoint_VB(LagrID_:Z_, iBlock)*(1.0 + cTol)
+         State_VIB(R_,          1, iBlock) = &
+              sqrt(sum((State_VIB(X_:Z_,  1, iBlock))**2))
          State_VIB(LagrID_,1, iBlock) = State_VIB(LagrID_, 2, iBlock) - 1.0
          FootPoint_VB(LagrID_,iBlock) = State_VIB(LagrID_, 1, iBlock) - 1.0
          call offset(iBlock, iOffset=iOffset_B(iBlock))
