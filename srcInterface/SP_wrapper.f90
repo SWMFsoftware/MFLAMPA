@@ -380,23 +380,25 @@ contains
   ! received from the other component (SC, IH). Determines whether some
   ! grid points should be added/deleted
   !/
-  subroutine SP_adjust_lines(DoInit, DoAdjustStart, DoAdjustEnd)
+  subroutine SP_adjust_lines(DoInit)
     use SP_ModDistribution, ONLY: offset
-    !\
-    ! If DoAdjustStart, the points in the starting portion of the line are
-    ! processed, if DoAdjustEnd - the same for the end points
-    !/
-    logical, intent(in) :: DoInit, DoAdjustStart, DoAdjustEnd
+    logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
     ! exiting the domain (can happen both at the beginning and the end)
     integer:: iParticle, iBlock, iBegin,  iEnd, iOffset ! loop variables
-    logical:: IsMissingCurr, IsMissingPrev
-    real   :: R2
-    
+    integer:: iParticle_I(2), iLoop
+    logical:: DoAdjustLo, DoAdjustUp
+    logical:: IsMissing
+
+    integer, parameter:: Lo_ = 1, Up_ = 2
+    integer, parameter:: iIncrement_II(2,2) =reshape((/1,0,0,-1/),(/2,2/))
+
     character(len=*), parameter:: NameSub = "SP_adjust_lines"
     character(len=100):: StringError
     !--------------------------------------------------------------------
-    if(DoInit.and.DoAdjustStart)then
+    DoAdjustLo = RBufferLo == RInterfaceMin
+    DoAdjustUp = RBufferUp == RInterfaceMax
+    if(DoInit.and.DoAdjustLo)then
        do iBlock = 1, nBlock
           call SP_set_line_foot_b(iBlock)
        end do
@@ -406,47 +408,125 @@ contains
        ! Called after the grid points are received from the 
        ! component, nullify offset
        !/
-       if(DoAdjustStart)iOffset_B(iBlock) = 0
+       if(DoAdjustLo)iOffset_B(iBlock) = 0
        iBegin = 1
        iEnd   = nParticle_B(  iBlock)
-       R2 = sum(State_VIB(X_:Z_,1,iBlock)**2)
-       IsMissingPrev = all(State_VIB(X_:Z_,1,iBlock)==0.0)
-       PARTICLE:do iParticle = 2, iEnd
-          IsMissingCurr = all(State_VIB(X_:Z_,iParticle,iBlock)==0.0)
-          ! Exception for particles in the upper buffer zone:
-          ! not necessarily the outer most particle in the buffer exits 
-          ! to the model located above;
-          ! in this case we need to AVOID cutting beginning of the line
-          ! before this particle; 
-          ! use previously known value for heliocentric distance to determine,
-          ! whether the particle was in the buffer until now
-          if(  .not. DoAdjustEnd &
-               .and. IsMissingCurr .and. &
-               is_in_buffer_r(Upper_, State_VIB(R_, iParticle, iBlock)))then
-             IsMissingPrev = .false.
-             R2 = State_VIB(R_, iParticle, iBlock)**2
+       iParticle_I(:) = (/iBegin, iEnd/)
+       if(DoAdjustUp) then
+          iLoop = Up_
+       else
+          iLoop = Lo_
+       end if
+
+       PARTICLE: do while(iParticle_I(1) < iParticle_I(2))
+          iParticle = iParticle_I(iLoop)
+          !\
+          ! account for all missing partiles along the line;
+          ! --------------------------------------------------------
+          ! particle import MUST be performed in order from lower to upper
+          ! components (w/respect to radius), e.g. SC, then IH, then OH
+          ! adjustment are made after each import;
+          ! --------------------------------------------------------
+          ! lines are assumed to start in lowest model
+          ! lowest model should NOT have the Lo buffer,
+          ! while the upper most should NOT have Up buffer,
+          ! buffer are REQUIRED between models
+          ! --------------------------------------------------------
+          ! adjust as follows:
+          ! LOWEST model may loose particles at the start of lines
+          ! and (if line ends in the model) in the tail;
+          ! loop over particles Lo-2-Up and mark losses (increase iBegin) 
+          ! until particles reach UP buffer;
+          ! if line ends in the model, loop over particles Up-2-Lo
+          ! and mark losses (decrease nParticle_B) until UP buffer is reached;
+          ! after that, if line reenters the model, 
+          ! particles within the model may not be lost,
+          ! 
+          ! MIDDLE models are not allowed to loose particles
+          !
+          ! HIGHEST model may only loose particles in the tail;
+          ! loop Up-2-Lo and mark losses  (decrease nParticle_B)
+          ! until the bottom of Lo buffer is reaced
+          ! --------------------------------------------------------
+          ! whenever a particle is lost in lower models -> ERROR
+          !/
+          
+          ! when looping Up-2-Lo and particle is in other model ->
+          ! adjustments are no longer allowed
+          if(iLoop == Up_ .and. (&
+               State_VIB(R_,iParticle,iBlock) <  RInterfaceMin&
+               .or.&
+               State_VIB(R_,iParticle,iBlock) >= RInterfaceMax)&
+               )then
+             DoAdjustLo = .false.
+             DoAdjustUp = .false.
+          end if
+
+          ! determine whether particle is missing
+          IsMissing = all(State_VIB(X_:Z_,iParticle,iBlock)==0.0)
+          if(.not.IsMissing) then
+             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
              CYCLE PARTICLE
           end if
 
-          if(IsMissingCurr .and. R2 > RInterfaceMin**2)then
-             if(DoAdjustEnd)&
-                  nParticle_B(  iBlock) = iParticle - 1
-             EXIT PARTICLE
+          ! missing point in the lower part of the domain -> ERROR
+          if(State_VIB(R_,iParticle,iBlock) < RInterfaceMin)&
+               call CON_stop(NameSub//": particle has been lost")
+
+          ! missing point in the upper part of the domain -> IGNORE;
+          ! if needed to adjust beginning, then it is done,
+          ! switch left -> right end of range and start adjusting
+          ! tail of the line, if it has reentered current part of the domain
+          if(State_VIB(R_,iParticle,iBlock) >= RInterfaceMax)then
+             if(iLoop == Lo_)&
+                  iLoop = Up_
+             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
+             if(DoAdjustLo)then
+                DoAdjustLo = .false.
+                DoAdjustUp = .true.
+             end if
+             CYCLE PARTICLE
           end if
 
-          if(.not.IsMissingCurr)then
-             R2 = sum(State_VIB(X_:Z_,iParticle,iBlock)**2)
-             if(IsMissingPrev)then
-                iBegin = iParticle
-             end if
-             if(DoAdjustEnd.and.R2> RMax**2)then
-                nParticle_B(iBlock) = iParticle - 1
-                EXIT PARTICLE
-             end if
+          ! if point used to be in a upper buffer -> IGNORE
+          if(is_in_buffer_r(Upper_, State_VIB(R_, iParticle, iBlock)))then
+             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
+             CYCLE PARTICLE
           end if
-          IsMissingPrev = IsMissingCurr
+
+          ! if need to adjust lower, but not upper boundary -> ADJUST
+          if(DoAdjustLo .and. .not.DoAdjustUp)then
+             ! push iBegin in front of current particle;
+             ! it will be pushed until it finds a non-missing particle
+             iBegin = iParticle + 1
+             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
+             CYCLE PARTICLE
+          end if
+
+          ! if need to adjust upper, but not lower boundary -> ADJUST
+          if(DoAdjustUp .and. .not.DoAdjustLo)then
+             ! push nParticle_B() below current particle;
+             ! it will be pushed until it finds a non-missing particle
+             nParticle_B(iBlock) = iParticle - 1
+             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
+             CYCLE PARTICLE
+          end if
+
+          ! remaining case:
+          ! need to adjust both boudnaries -> ADJUST,but keep longest range
+          if(iParticle - iBegin > nParticle_B(iBlock) - iParticle)then
+             nParticle_B(iBlock) = iParticle - 1
+             EXIT PARTICLE
+          else
+             iBegin = iParticle + 1
+          end if
+          iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
        end do PARTICLE
-       if(DoAdjustStart.and.iBegin/=1)then
+
+       DoAdjustLo = RBufferLo == RInterfaceMin
+       DoAdjustUp = RBufferUp == RInterfaceMax
+
+       if(iBegin/=1)then
           !\
           ! Offset particle arrays
           !/
@@ -462,7 +542,7 @@ contains
        end if
     end do BLOCK
     ! may need to add particles to the beginning of lines
-    if(DoAdjustStart) call append_particles
+    if(DoAdjustLo) call append_particles
     !\
     ! Called after the grid points are received from the 
     ! component, nullify offset. Alternatively, if the points
@@ -470,7 +550,7 @@ contains
     ! need to apply offset in IH, because there are no points
     ! in IH yet and no need to correct their ID 
     !/
-    if(DoAdjustEnd.or.DoInit)iOffset_B(1:nBlock) = 0
+    if(DoAdjustUp.or.DoInit)iOffset_B(1:nBlock) = 0
   contains
     subroutine SP_set_line_foot_b(iBlock)
       integer, intent(in) :: iBlock
