@@ -52,6 +52,7 @@ module SP_ModTime
 
   ! StartTime converted to real
   real(Real8_) :: StartTime
+  real(Real8_) :: StartTimeJulian
   ! In the stand-alone mode StartTime is read from PARAM.in file 
   ! in the format iYear, iMonth, iDay, iHour, iMinute, iSecond
   ! Function time_int_to_real is used then to assign the value
@@ -85,6 +86,13 @@ contains
           call read_var('iSecond',iStartTime_I(6))
           iStartTime_I(7) = 0
           call time_int_to_real(iStartTime_I, StartTime)
+          ! also save the start time in Julian days;
+          ! formula is valid for date after March, 1900 to yar 2099
+          StartTimeJulian = 367*iStartTime_I(1) - &
+               floor(7*(iStartTime_I(1)+floor((iStartTime_I(2)+9)/12.))/4.)+&
+               floor(275 * iStartTime_I(2) / 9.) + &
+               iStartTime_I(3) + 1721013.5 +&
+               (iStartTime_I(4)+iStartTime_I(5)/60.+iStartTime_I(6)/3600.)/24.
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select

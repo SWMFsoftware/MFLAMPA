@@ -13,7 +13,7 @@ module SP_ModPlot
        Flux_VIB
   use SP_ModDistribution, ONLY: nP, Energy_I, Momentum_I,         &
        Distribution_IIB
-  use SP_ModTime, ONLY: SPTime, iIter
+  use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
   use SP_ModProc, ONLY: iProc
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, remove_file
@@ -274,7 +274,8 @@ contains
                      ' '//NameVar_V(iVar)  
              end do
              File_I(iFile) % NameVarPlot = &
-                  trim(File_I(iFile) % NameVarPlot)//' iShock RShock'
+                  trim(File_I(iFile) % NameVarPlot)//&
+                  ' iShock RShock StartTime StartTimeJulian'
              TypeMHDataFile = File_I(iFile) % TypeFile
              DoWriteHeader = .true.
           case(MH2D_)
@@ -285,7 +286,8 @@ contains
                   nNode))
              ! add line index to variable names
              File_I(iFile) % NameVarPlot = &
-                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)
+                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
+                  ' StartTime StartTimeJulian'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
           case(MHTime_)
@@ -296,7 +298,8 @@ contains
                   1 + File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot, 1))
              ! add time interval index to variable names
              File_I(iFile) % NameVarPlot = &
-                  'Time '//trim(File_I(iFile) % NameVarPlot)
+                  'Time '//trim(File_I(iFile) % NameVarPlot)//&
+                  ' StartTime StartTimeJulian'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
              ! reset indicator of the first call
@@ -498,8 +501,10 @@ contains
       ! shock location
       integer:: iShock
       real   :: RShock
-      integer, parameter:: RShock_ = Z_ + 2
-      real :: Param_I(LagrID_:RShock_)
+      integer, parameter:: RShock_     = Z_ + 2
+      integer, parameter:: StartTime_  = RShock_ + 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      real :: Param_I(LagrID_:StartJulian_)
       ! timetag
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub='write_mh_1d'
@@ -571,6 +576,10 @@ contains
          else
             Param_I(RShock_-1:RShock_) = -1.0
          end if
+         ! start time in seconds from base year
+         Param_I(StartTime_)  = StartTime
+         ! start time in Julian date
+         Param_I(StartJulian_)= StartTimeJulian
          ! print data to file
          call save_plot_file(&
               NameFile      = NameFile, &
@@ -584,7 +593,7 @@ contains
               NameVarIn     = File_I(iFile) % NameVarPlot, &
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nVarPlot + nFluxPlot,1:iLast),&
-              ParamIn_I    = Param_I(LagrID_:RShock_))
+              ParamIn_I    = Param_I(LagrID_:StartJulian_))
       end do
     end subroutine write_mh_1d
     !=============================================================
@@ -617,6 +626,10 @@ contains
       integer:: iError
       ! skip a field line not reaching radius of output sphere
       logical:: DoPrint_I(nNode)
+      ! additional parameters
+      integer, parameter:: StartTime_  = 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      real :: Param_I(1:StartJulian_)
       ! timetag
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub='write_mh_2d'
@@ -720,6 +733,11 @@ contains
          end if
       end if
 
+      ! start time in seconds from base year
+      Param_I(StartTime_)  = StartTime
+      ! start time in Julian date
+      Param_I(StartJulian_)= StartTimeJulian
+
       if(iProc==0)&
            ! print data to file
            call save_plot_file(&
@@ -729,6 +747,7 @@ contains
            nDimIn        = 1, &
            TimeIn        = SPTime, &
            nStepIn       = iIter, &
+           ParamIn_I     = Param_I, &
            Coord1In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)),&
            NameVarIn     = File_I(iFile) % NameVarPlot, &
            VarIn_VI      = &
@@ -768,6 +787,10 @@ contains
       integer:: nBufferSize
       ! whether the output file already exists
       logical:: IsPresent
+      ! additional parameters
+      integer, parameter:: StartTime_  = 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      real :: Param_I(1:StartJulian_)
       ! header for the file
       character(len=200):: StringHeader
       character(len=*), parameter:: NameSub='write_mh_time'
@@ -887,6 +910,10 @@ contains
                  Flux_VIB(iVarIndex, iAbove,   iBlock) *    Weight
          end do
 
+         ! start time in seconds from base year
+         Param_I(StartTime_)  = StartTime
+         ! start time in Julian date
+         Param_I(StartJulian_)= StartTimeJulian
          ! reprint data to file
          call save_plot_file(&
               NameFile      = NameFile, &
@@ -895,6 +922,7 @@ contains
               nDimIn        = 1, &
               TimeIn        = SPTime, &
               nStepIn       = iIter, &
+              ParamIn_I     = Param_I, &
               Coord1In_I    = &
               File_I(iFile) % Buffer_II(1+nVarPlot+nFluxPlot,1:nDataLine), &
               NameVarIn     = File_I(iFile) % NameVarPlot, &
