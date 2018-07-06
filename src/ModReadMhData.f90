@@ -117,8 +117,10 @@ contains
     ! auxilary variables to apply positive offset for appended particles
     ! auxilary parameter index
     integer, parameter:: RShock_ = Z_ + 2
+    integer, parameter:: StartTime_  = RShock_ + 1
+    integer, parameter:: StartJulian_= StartTime_ + 1 
     ! additional parameters of lines
-    real:: Param_I(LagrID_:RShock_)
+    real:: Param_I(LagrID_:StartJulian_)
     ! data input time before reading new data file
     real:: DataInputTimeOld
     ! timetag
@@ -152,7 +154,7 @@ contains
             TypeFileIn = TypeMhDataFile      ,&
             TimeOut    = DataInputTime       ,&
             n1out      = nParticle_B(iBlock) ,&
-            ParamOut_I = Param_I(LagrID_:RShock_))
+            ParamOut_I = Param_I(LagrID_:StartJulian_))
        ! find offset in data between new and old states
        if(DoOffset)then
           ! check consistency: time counter MUST advance
