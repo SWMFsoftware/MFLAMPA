@@ -150,6 +150,13 @@ module SP_ModGrid
        'EFlux     '  /)
   !/
   logical:: DoInit = .true.
+
+  ! whether to use smoothing of length along lines,
+  ! e.g. when random walking lines are used
+  logical:: DoSmooth = .false.
+  ! size of groups used for smoothing
+  integer:: nSmooth = -1
+
 contains  
   !================================================================
   subroutine read_param(NameCommand)
@@ -176,6 +183,12 @@ contains
     case('#COORDSYSTEM','#COORDINATESYSTEM')
        call read_var('TypeCoordSystem', TypeCoordSystem, &
             IsUpperCase=.true.)
+    case('#DOSMOOTH')
+       call read_var('DoSmooth', DoSmooth)
+       if(DoSmooth)&
+            call read_var('nSmooth', nSmooth)
+       if(nSmooth < 1)&
+            call CON_stop(NameSub//': Invalid setting for line smoothing')
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -286,6 +299,8 @@ contains
   !================================================================
   subroutine get_other_state_var
     integer:: iBlock, iParticle, iEnd
+    integer:: iAux1, iAux2
+    real   :: XyzAux1_D(1:nDim), XyzAux2_D(1:nDim)
     !---------------------------------------------------------
     do iBlock = 1, nBlock
        iEnd   = nParticle_B(  iBlock)
@@ -297,10 +312,26 @@ contains
           State_VIB(B_,iParticle, iBlock) = &
                sqrt(sum(State_VIB(Bx_:Bz_,iParticle,iBlock)**2))
           ! distances between particles
-          if(iParticle /=nParticle_B(iBlock))&
-               State_VIB(D_, iParticle, iBlock) = sqrt(sum((&
-               State_VIB(X_:Z_, iParticle    , iBlock) - &
-               State_VIB(X_:Z_, iParticle + 1, iBlock))**2))
+          if(.not.DoSmooth)then
+             if(iParticle /=nParticle_B(iBlock))&
+                  State_VIB(D_, iParticle, iBlock) = sqrt(sum((&
+                  State_VIB(X_:Z_, iParticle    , iBlock) - &
+                  State_VIB(X_:Z_, iParticle + 1, iBlock))**2))
+          else
+             ! smoothing is done by groups: 
+             ! nSmooth particles are aggeregated into single effective one, 
+             ! find length increment between effective particles are used
+             ! to find length increment between regular particles
+             iAux1 = nSmooth * max(1, &
+                  min(iParticle/nSmooth,nParticle_B(iBlock)/nSmooth-1))
+             iAux2 = iAux1 + nSmooth
+             XyzAux1_D = &
+                  sum(State_VIB(X_:Z_,iAux1-nSmooth+1:iAux1,iBlock),DIM=2)/nSmooth
+             XyzAux2_D = &
+                  sum(State_VIB(X_:Z_,iAux2-nSmooth+1:iAux2,iBlock),DIM=2)/nSmooth
+             State_VIB(D_, iParticle, iBlock) = &
+                  sqrt(sum((XyzAux2_D-XyzAux1_D)**2)) / nSmooth
+          end if
           ! distance from the beginning of the line
           if(iParticle == 1)then
              State_VIB(S_, iParticle, iBlock) = 0.0

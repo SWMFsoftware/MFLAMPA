@@ -130,7 +130,7 @@ contains
           call read_var('RScMax', RScMax)
           call read_var('RIhMax',RIhMax)
        case('#COORDSYSTEM', '#COORDINATESYSTEM',&
-            '#CHECKGRIDSIZE')
+            '#CHECKGRIDSIZE','#DOSMOOTH')
           if(i_session_read() /= 1)CYCLE
           call read_param_grid(NameCommand)
        case('#PARTICLEENERGYUNIT')
