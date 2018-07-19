@@ -139,7 +139,7 @@ contains
        case('#MOMENTUMGRID')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL')
+       case('#INJECTION','#CFL','#DIFFUSION')
           call read_param_adv(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)

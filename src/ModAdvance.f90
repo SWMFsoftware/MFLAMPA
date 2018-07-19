@@ -37,7 +37,11 @@ module SP_ModAdvance
   integer, public, parameter :: nWidth = 50
   !/
   !\
+  ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical:: UseRealDiffusionUpstream = .false.
+  real:: MeanFreePathScale = 1.0
+  !/
+  !\
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
   !/
   logical :: DoInit = .true.
@@ -61,6 +65,12 @@ contains
        call read_var('Efficiency',   CInj)
     case('#CFL')
        call read_var('Cfl',CFL)
+    case('#DIFFUSION')
+       call read_var('UseRealDiffusionUpstream',UseRealDiffusionUpstream)
+       if(UseRealDiffusionUpstream)then
+          ! see Li et al. (2003), doi:10.1029/2002JA009666
+          call read_var('MeanFreePathScale [AU]', MeanFreePathScale)
+       end if
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -347,9 +357,10 @@ contains
          ! Sokolov et al. 2004, paragraphs before and after eq (4)
          where(Radius_I(1:iEnd) > 0.9 * Radius_I(iShock))
             ! upstream: reset the diffusion coefficient to 
-            ! (1/6)(0.4AU)*(R/1AU)*v*(pc/1GeV)^(1/3) 
+            ! MeanFreePathScale[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
+            ! see Li et al. (2003), doi:10.1029/2002JA009666
             DInnerInj_I(1:iEnd) = &
-                 0.20/3.0 * Radius_I(1:iEnd)/RSun*&
+                 MeanFreePathScale * Radius_I(1:iEnd)/RSun*&
                  (MomentumInj*cLightSpeed**2)/(B_I(1:iEnd)*TotalEnergyInj)*&
                  (MomentumInj*cLightSpeed/energy_in('GeV'))**(1.0/3)
          elsewhere
