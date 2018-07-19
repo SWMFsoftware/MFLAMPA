@@ -185,10 +185,11 @@ contains
             IsUpperCase=.true.)
     case('#DOSMOOTH')
        call read_var('DoSmooth', DoSmooth)
-       if(DoSmooth)&
-            call read_var('nSmooth', nSmooth)
-       if(nSmooth < 1)&
-            call CON_stop(NameSub//': Invalid setting for line smoothing')
+       if(DoSmooth)then
+          call read_var('nSmooth', nSmooth)
+          if(nSmooth < 1)&
+               call CON_stop(NameSub//': Invalid setting for line smoothing')
+       end if
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
