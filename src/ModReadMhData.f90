@@ -5,7 +5,8 @@
 module SP_ModReadMhData
   ! This module contains methods for reading input MH data
   use SP_ModSize,    ONLY: nDim, nParticleMax
-  use SP_ModGrid,    ONLY: get_node_indexes, nMHData,  nBlock, Z_,&
+  use SP_ModGrid,    ONLY: get_node_indexes, get_other_state_var,&
+       nMHData,  nBlock, Z_,&
        iNode_B, FootPoint_VB, nParticle_B, State_VIB,  LagrID_
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
@@ -77,16 +78,26 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine init
+    use SP_ModPLot, ONLY: nTag
     ! initialize by setting the time and interation index of input files
     character (len=*), parameter :: NameSub='SP:init_read_mh_data'
+    integer:: iTag
+    character(len=50):: StringAux
     !-------------------------------------------------------------------------
     if(.not.DoReadMhData) RETURN
     ! open the file with the list of tags
     iIOTag = io_unit_new()
     call open_file(iUnitIn=iIOTag, &
          file=trim(NameInputDir)//trim(NameTagFile), status='old')
+    ! if nTag > 0, need to skip nTag lines
+    if(nTag>0)then
+       do iTag = 1, nTag-1
+          read(iIOTag,'(a)') StringAux
+       end do
+    end if
     ! read the first input file
     call read_mh_data(DoOffsetIn = .false.)
+    call get_other_state_var
     SPTime = DataInputTime
   end subroutine init
   !============================================================================
