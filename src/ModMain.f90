@@ -136,7 +136,7 @@ contains
        case('#PARTICLEENERGYUNIT')
           if(i_session_read() /= 1)CYCLE
           call read_param_unit(NameCommand)
-       case('#MOMENTUMGRID')
+       case('#MOMENTUMGRID','#FLUXINITIAL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
        case('#INJECTION','#CFL','#DIFFUSION')

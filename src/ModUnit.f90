@@ -18,6 +18,7 @@ module SP_ModUnit
   public :: init               ! Initialize
   public :: read_param         ! Read particle energy unit
   public :: UnitParticleEnergy ! Energy unit is SI
+  public :: UnitParticleFlux   ! Integral flux unit is SI
   public :: NameVarUnit_V      ! Units for state vector components
   ! Convert particle momentum to energy or kinetic energy and
   ! kinetic energy to momnetum, for proton
@@ -27,6 +28,9 @@ module SP_ModUnit
   ! unit of SEP energy is also applicable for ion temperature
   character(len=3)            :: NameEnergyUnit = 'kev'
   real                        :: UnitParticleEnergy ! In SI
+  ! unit of SEP intergral flux
+  character(len=6), parameter :: NameFluxUnit = 'p.f.u.'
+  real,             parameter :: UnitParticleFlux = 10000.0
   ! simulated particles, used for converting momentum to energy
   ! is back. For different sorts of ions the sqrt(A) factor needs
   ! to be used in these relations.
@@ -55,13 +59,13 @@ module SP_ModUnit
        'none  ', &
        'amu/m3', &
        'T     ', &
-       'p.f.u.', &
-       'p.f.u.', &
-       'p.f.u.', &
-       'p.f.u.', &
-       'p.f.u.', &
-       'p.f.u.', &
-       'p.f.u.', &
+       NameFluxUnit, &
+       NameFluxUnit, &
+       NameFluxUnit, &
+       NameFluxUnit, &
+       NameFluxUnit, &
+       NameFluxUnit, &
+       NameFluxUnit, &
        '??????'  /) ! TBD
   logical :: DoInit = .true.
 contains

@@ -9,6 +9,7 @@ module SP_ModDistribution
   use ModConst,   ONLY: cLightSpeed, energy_in
   use SP_ModSize, ONLY: nParticleMax, nP=>nMomentum
   use SP_ModUnit, ONLY: UnitEnergy=>UnitParticleEnergy, &
+       UnitFlux=>UnitParticleFlux,&
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid, ONLY: nBlock, nParticle_B
   implicit none
@@ -62,6 +63,8 @@ module SP_ModDistribution
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
   real, public, allocatable:: Distribution_IIB(:,:,:)
+  ! distribution is initialized to have integral flux:
+  real:: FluxInitIo = 0.01 ! [PFU]
   !/
   logical :: DoInit = .true.
 contains
@@ -101,8 +104,9 @@ contains
           ! of 10^-6 m^-3. Integral flux is less than 100 per
           ! (m^2 ster s). Differential background flux is constant.
           do iP = 0, nP +1
-             Distribution_IIB(iP,iParticle,iBlock) = 0.10*&
-                  cTiny/(MomentumMax*Momentum_I(iP)**2)
+             Distribution_IIB(iP,iParticle,iBlock) = &
+                  UnitFlux/UnitEnergy * &
+                  FluxInitIo / (EnergyMaxIo-EnergyInjIo) / Momentum_I(iP)**2
           end do
        end do
     end do
@@ -127,6 +131,10 @@ contains
                ' while value read from PARAM.in is nP=',nPCheck 
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
+    case('#FLUXINITIAL')
+       call read_var('FluxInit [p.f.u.]',FluxInitIo)
+       ! check correctness
+       if(FluxInitIo<=0)call CON_stop(NameSub//': flux value must be positive')
     case default
        call CON_stop(NameSub//'Unknown command '//NameCommand)
     end select
