@@ -246,17 +246,8 @@ contains
                 DInner_I(1:iEnd) = &
                      DInnerInj_I(1:iEnd)*Momentum_I(iP)**2*    &
                      TotalEnergyInj/(TotalEnergy_I(iP)*MomentumInj**2)
-                if(UseRealDiffusionUpstream)then
-                   where(Radius_I(1:iEnd) > 0.9*Radius_I(iShock))
-                      ! upstream: reset the diffusion coefficient to
-                      ! (1/6)(0.4AU)*(R/1AU)*v*(pc/1GeV)^(1/3) 
-                      DInner_I(1:iEnd) = DInner_I(1:iEnd)/&
-                           (Momentum_I(iP)/MomentumInj)**(2.0/3)
-                   end where
-                else
-                   DInner_I(1:iEnd) = DInner_I(1:iEnd)/&
-                        (Momentum_I(iP)/MomentumInj)**(2.0/3)
-                end if
+                DInner_I(1:iEnd) = DInner_I(1:iEnd)/&
+                     (Momentum_I(iP)/MomentumInj)**(2.0/3)
                 DInner_I(1:iEnd) = max(DInner_I(1:iEnd),&
                      DiffCoeffMin/DOuter_I(1:iEnd))
                 call advance_diffusion(Dt, iEnd,&
@@ -364,17 +355,25 @@ contains
                  (MomentumInj*cLightSpeed**2)/(B_I(1:iEnd)*TotalEnergyInj)*&
                  (MomentumInj*cLightSpeed/energy_in('GeV'))**(1.0/3)
          elsewhere
+            DInnerInj_I(1:iEnd) = &
+                 B_I(1:iEnd)/&
+                 (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*&
+                 10*(RSun**2*cGyroRadius*MomentumInj/B_I(1:iEnd))**(1.0/3)*&
+                 MomentumInj*cLightSpeed**2/TotalEnergyInj/RSun**2
+            !\
+            ! LEGACY MODEL PREVIOUSLY USED DOWNSTREAM
+            !-------------------------------------------------
             ! downstream we use the estimate for (\delta B/B) 
             ! (see detail in Sokolov, 2004):
             ! (\delta B/B)**2 = (\delta B/B)**2_SW*(R/R_SW)
             ! where SW means "shock wave". For the SW we use an
             ! estimate from  from Lee (1983): 
             ! (\delta B/B)**2_SW = const(=10 below)*CInj*MachAlfven
-            DInnerInj_I(1:iEnd)=&
-                 cGyroRadius*(MomentumInj*cLightSpeed)**2/RSun**2/&
-                 (B_I(1:iEnd)**2*TotalEnergyInj)/&
-                 (10.0*CInj*MachAlfven)/&
-                 min(1.0, 1.0/0.9 * Radius_I(1:iEnd)/Radius_I(iShock))
+            !!DInnerInj_I(1:iEnd)=&
+            !!     cGyroRadius*(MomentumInj*cLightSpeed)**2/RSun**2/&
+            !!     (B_I(1:iEnd)**2*TotalEnergyInj)/&
+            !!     (10.0*CInj*MachAlfven)/&
+            !!     min(1.0, 1.0/0.9 * Radius_I(1:iEnd)/Radius_I(iShock))
          end where
       end if
 
