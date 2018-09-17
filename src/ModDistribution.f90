@@ -46,6 +46,18 @@ module SP_ModDistribution
   real, public:: Energy_I(0:nP+1)
   ! Total energy, including the rest mass energy
   real, public:: TotalEnergy_I(0:nP+1)
+
+  ! Total integral (simulated) particle flux
+  integer, parameter, public :: Flux0_ = 0
+  integer, parameter, public :: FluxFirst_ =1  ! The first channel
+  integer, public :: nFluxChannel = 6          ! GOES by default, 6 channels
+  integer, public :: FluxLast_ = 6             ! The last channel
+  integer, public :: EFlux_    = 7             ! Total integral energy flux
+  integer, public :: FluxMax_  = 7
+  real, allocatable :: EChannel_I(:) ! energy limits of the instrument
+  real, public, allocatable  :: Flux_VIB( :,:,:)
+  character(len=10), public, allocatable  :: NameFluxChannel_I(:)
+
   !/
   !\
 !!!!!!!!!!!!!!Grid in the momentum space                 !!!!!!
@@ -74,6 +86,7 @@ contains
     use ModUtilities, ONLY: check_allocate
     ! set the initial distribution on all lines
     integer:: iBlock, iParticle, iP, iError
+    character(len=*), parameter :: NameSub = 'SP_init'
     !----------------------------------------------------------
     if(.not.DoInit)RETURN
     DoInit = .false.
@@ -110,6 +123,24 @@ contains
           end do
        end do
     end do
+
+    if (.not. allocated(EChannel_I)) then
+       if (nFluxChannel == 6) then
+          allocate (EChannel_I(nFluxChannel))
+          EChannel_I = (/5,10,30,50,60,100/)
+       else
+          call CON_stop(NameSub//' check nFluxChannel ')
+       end if
+    end if
+
+    if (.not. allocated(Flux_VIB)) then
+       allocate(Flux_VIB(Flux0_:FluxMax_,1:nParticleMax,nBlock), &
+            stat=iError); call check_allocate(iError, 'Flux_VIB')
+       Flux_VIB = -1.0
+    else
+       call CON_stop(NameSub//' Flux_VIB already allocated')
+    end if
+
   end subroutine init
   !================================================================
   subroutine read_param(NameCommand)
@@ -117,7 +148,8 @@ contains
     use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
     character(len=*), parameter :: NameSub='SP:read_param_dist'
-    integer:: nPCheck = nP
+    integer:: nPCheck = nP, iFluxChannel
+    character(len=5) :: NameFluxChannel
     !--------------------------------------------------------------
     select case(NameCommand)
     case('#MOMENTUMGRID')
@@ -135,8 +167,26 @@ contains
        call read_var('FluxInit [p.f.u.]',FluxInitIo)
        ! check correctness
        if(FluxInitIo<=0)call CON_stop(NameSub//': flux value must be positive')
+    case('#FLUXCHANNEL')
+       call read_var('nFluxChannel', nFluxChannel)
+       FluxLast_ = nFluxChannel
+       EFlux_    = FluxLast_ + 1
+       FluxMax_    =EFlux_
+       if (allocated(EChannel_I)) deallocate(EChannel_I)
+       allocate(EChannel_I(nFluxChannel))
+       if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
+       allocate(NameFluxChannel_I(0:nFluxChannel+1))
+
+       NameFluxChannel_I(0) = 'flux_total'
+       NameFluxChannel_I(nFluxChannel+1) = 'eflux'
+
+       do iFluxChannel=1,nFluxChannel
+          call read_var('EChannel_I', EChannel_I(iFluxChannel))
+          write(NameFluxChannel,'(I5.5)') int(EChannel_I(iFluxChannel))
+          NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
+       end do
     case default
-       call CON_stop(NameSub//'Unknown command '//NameCommand)
+       call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
   end subroutine read_param
   !================================================================
@@ -197,21 +247,24 @@ contains
   end subroutine offset
   !===========================================================================
   subroutine get_integral_flux
-    use SP_ModGrid, ONLY: EFlux_, Flux0_, Flux1_, Flux2_, Flux3_, Flux4_,&
-         Flux5_, Flux6_, FluxMax_, Flux_VIB 
     use ModConst, ONLY: energy_in
     ! compute the total (simulated) integral flux of particles as well as
     ! particle flux in the 6 GOES channels; also compute total energy flux
     !------------------------------------------------------------------------
     integer:: iBlock, iParticle, iP, iFlux ! loop variables
     real   :: EFlux ! the value of energy flux
-    real   :: EChannel_I(6) ! energy limits of GOES channels
     real   :: dFlux, dFlux1 ! increments
-    real   :: Flux, Flux_I(6) ! the value of particle flux
+    real   :: Flux          ! the value of particle flux
     real   :: Norm            ! normalization factor
+    real, allocatable :: Flux_I(:), EChannelIO_I(:)
     !-------------------------------------------------------------------------
     ! energy limits of GOES channels
-    EChannel_I = (/5,10,30,50,60,100/) * energy_in('MeV')
+
+
+    if (.not.allocated(Flux_I)) allocate(Flux_I(nFluxChannel))
+    if (.not.allocated(EChannelIO_I)) allocate(EChannelIO_I(nFluxChannel))
+
+    EChannelIO_I = EChannel_I * energy_in('MeV')
     do iBlock = 1, nBlock
        do iParticle = 1, nParticle_B( iBlock)
           !\
@@ -236,25 +289,25 @@ contains
              Flux = Flux + dFlux
 
              ! increase FOES channels' fluxes
-             do iFlux = 1, 6
+             do iFlux = 1, nFluxChannel
                 ! check whether reached the channel's cut-off level
-                if(Energy_I(iP+1) < EChannel_I(iFlux))&
+                if(Energy_I(iP+1) < EChannelIO_I(iFlux))&
                      CYCLE
 
-                if(Energy_I(iP) >= EChannel_I(iFlux))then
+                if(Energy_I(iP) >= EChannelIO_I(iFlux))then
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux
                 else
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
                    dFlux1 =&
-                        ((-0.50*(Energy_I(iP) + EChannel_I(iFlux)) + &
+                        ((-0.50*(Energy_I(iP) + EChannelIO_I(iFlux)) + &
                         Energy_I(iP+1) )*&
                         Distribution_IIB(iP,iParticle,iBlock)*&
                         Momentum_I(iP)**2  &
-                        -0.50*(Energy_I(iP)-EChannel_I(iFlux))*&
+                        -0.50*(Energy_I(iP)-EChannelIO_I(iFlux))*&
                         Distribution_IIB(iP+1,iParticle,iBlock)*&
                         Momentum_I(iP+1)**2)*&
-                        (Energy_I(iP)-EChannel_I(iFlux))/&
+                        (Energy_I(iP)-EChannelIO_I(iFlux))/&
                         (Energy_I(iP+1)-Energy_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 end if
@@ -283,9 +336,12 @@ contains
 
           ! store the results
           Flux_VIB(Flux0_,       iParticle, iBlock) = Flux
-          Flux_VIB(Flux1_:Flux6_,iParticle, iBlock) = Flux_I(1:6)
+          Flux_VIB(FluxFirst_:FluxLast_,iParticle, iBlock) = Flux_I
           Flux_VIB(EFlux_,       iParticle, iBlock) = EFlux
        end do
     end do
+
+    deallocate(Flux_I, EChannelIO_I)
+
   end subroutine get_integral_flux
 end module SP_ModDistribution
