@@ -7,12 +7,11 @@ module SP_ModPlot
   ! Methods for saving plots
   !/
   use SP_ModSize, ONLY: nNode, nParticleMax
-  use SP_ModGrid, ONLY: get_node_indexes, nVar, nMHData, nBlock,  &
-       State_VIB, iShock_IB, iNode_B, nParticle_B, Shock_, X_, Z_,&
-       R_, NameVar_V, TypeCoordSystem, LagrID_, Flux0_, FluxMax_, &
-       Flux_VIB
-  use SP_ModDistribution, ONLY: nP, Energy_I, Momentum_I,         &
-       Distribution_IIB
+  use SP_ModGrid, ONLY: get_node_indexes, nVar, nMHData, nBlock,   &
+       State_VIB, iShock_IB, iNode_B, nParticle_B, Shock_, X_, Z_, &
+       R_, NameVar_V, TypeCoordSystem, LagrID_
+  use SP_ModDistribution, ONLY: nP, Energy_I, Momentum_I, Distribution_IIB,  &
+       Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
   use SP_ModProc, ONLY: iProc
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
@@ -71,7 +70,9 @@ module SP_ModPlot
      ! MH data
      !/
      ! variables from the state vector to be written
-     logical:: DoPlot_V(X_:FluxMax_)
+     logical:: DoPlot_V(X_:nVar)
+     ! variables from the flux vector to be written
+     logical, allocatable :: DoPlotFlux_I(:)
      ! total numbers of variables to be written
      integer:: nVarPlot, nFluxPlot
      ! their indices in the state vectors
@@ -194,6 +195,19 @@ contains
     select case(NameCommand)
     case("#SAVEPLOT")
        ! initialize auxilary arrays
+
+       ! GOES by default, #SAVEPLOT must be after #FLUXCHANNEL
+       if (.not. allocated(NameFluxChannel_I)) then
+          if (nFluxChannel == 6) then
+             allocate(NameFluxChannel_I(0:nFluxChannel+1))
+             NameFluxChannel_I = (/'flux_total', 'flux_00005', 'flux_00010', &
+                  'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100', &
+                  'eflux     '/)
+          else
+             call CON_stop(NameSub//' check nFluxChannel ')
+          end if
+       end if
+
        do iNode = 1, nNode
           iNodeIndex_I(iNode) = iNode
        end do
@@ -338,8 +352,15 @@ contains
       integer:: iVar, iVarPlot, iStringPlot
       character(len=10) ::  NameVarLowerCase
       !-----------------------------------------------
+
+      if (allocated(File_I(iFile)%DoPlotFlux_I)) &
+           deallocate(File_I(iFile)%DoPlotFlux_I)
+      allocate(File_I(iFile)%DoPlotFlux_I(0:nFluxChannel+1))
+
       ! reset
-      File_I(iFile) % DoPlot_V = .false.
+      File_I(iFile) % DoPlot_V     = .false.
+      File_I(iFile) % DoPlotFlux_I = .false.
+
       ! for MH1D_ minimal set of variables is printed
       if(File_I(iFile)%iKindData == MH1D_)then
          ! for MH1D_ minimal set of variables is printed
@@ -352,23 +373,32 @@ contains
       ! determine, which variables were requested to be in the output file
       !/
       do iStringPlot = 2, nStringPlot - 1
+         ! if the string is flux, then save ALL the fluxes
+         if (trim(StringPlot_I(iStringPlot)) == 'flux') then
+            File_I(iFile)%DoPlotFlux_I = .true.
+            CYCLE
+         end if
+
          ! check names of individual variables
-         do iVar = 1, FluxMax_
+         do iVar = 1, nVar
             NameVarLowerCase = NameVar_V(iVar)
             call lower_case(NameVarLowerCase)
             if(StringPlot_I(iStringPlot) == NameVarLowerCase)&
                  File_I(iFile)%DoPlot_V(iVar) = .true.
+            CYCLE
          end do
-         ! check common groups of variables
-         select case(StringPlot_I(iStringPlot))
-         case('flux')
-            ! particle and energy fluxes
-            File_I(iFile)%DoPlot_V(Flux0_:FluxMax_) = .true.
-         end select
+
+         do iVar = 0, nFluxChannel+1
+            NameVarLowerCase = NameFluxChannel_I(iVar)
+            call lower_case(NameVarLowerCase)
+            if(StringPlot_I(iStringPlot) == NameVarLowerCase)&
+                 File_I(iFile)%DoPlotFlux_I(iVar) = .true.
+            CYCLE
+         end do
       end do
+
       File_I(iFile)%nVarPlot  = count(File_I(iFile)%DoPlot_V(1:nVar))
-      File_I(iFile)%nFluxPlot = &
-           count(File_I(iFile)%DoPlot_V(Flux0_:FluxMax_))
+      File_I(iFile)%nFluxPlot = count(File_I(iFile)%DoPlotFlux_I)
       ! indices in the state vector
       allocate(File_I(iFile)%iVarPlot_V(File_I(iFile)%nVarPlot))
       ! determine indices and names of variables
@@ -385,14 +415,16 @@ contains
          allocate(File_I(iFile)%iFluxPlot_V(File_I(iFile)%nFluxPlot))
          iVarPlot = 0
          do iVar = Flux0_, FluxMax_
-            if(.not.File_I(iFile)%DoPlot_V(iVar)) CYCLE
+             if(.not.File_I(iFile)%DoPlotFlux_I(iVar)) CYCLE
             File_I(iFile)%NameVarPlot = &
                  trim(File_I(iFile)%NameVarPlot)//' '//&
-                 trim(NameVar_V(iVar))
+                 trim(NameFluxChannel_I(iVar))
             iVarPlot = iVarPlot + 1
             File_I(iFile) % iFluxPlot_V(iVarPlot) = iVar
          end do
       end if
+
+      deallocate(File_I(iFile)%DoPlotFlux_I)
     end subroutine process_mh
     !=============================================================
     subroutine process_distr

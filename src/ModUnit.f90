@@ -6,7 +6,7 @@ module SP_ModUnit
   ! Unit for particle energy,  energy to momentum conversion
   ! for proton, names for all units
   ! Dec.24 2017 Sokolov & Borovikov.
-  use SP_ModGrid, ONLY: nVar, LagrID_, FluxMax_
+  use SP_ModGrid, ONLY: nVar, LagrID_
   use ModConst,   ONLY: energy_in                            , &
        gen_kin_energy_to_momentum=>kinetic_energy_to_momentum, &
        gen_momentum_to_kin_energy=>momentum_to_kinetic_energy, &
@@ -36,7 +36,7 @@ module SP_ModUnit
   ! to be used in these relations.
   character(len=*), parameter :: NameParticle = 'proton'
   !/
-  character(len=6)            :: NameVarUnit_V(LagrID_:FluxMax_) = (/&
+  character(len=6)            :: NameVarUnit_V(LagrID_:nVar) = (/&
        'none  ', &
        'RSun  ', &
        'RSun  ', &
@@ -58,15 +58,8 @@ module SP_ModUnit
        'T     ', &
        'none  ', &
        'amu/m3', &
-       'T     ', &
-       NameFluxUnit, &
-       NameFluxUnit, &
-       NameFluxUnit, &
-       NameFluxUnit, &
-       NameFluxUnit, &
-       NameFluxUnit, &
-       NameFluxUnit, &
-       '??????'  /) ! TBD
+       'T     '/)
+
   logical :: DoInit = .true.
 contains
    subroutine read_param(NameCommand)

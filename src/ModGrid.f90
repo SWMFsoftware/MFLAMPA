@@ -77,47 +77,38 @@ module SP_ModGrid
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
   real, public, allocatable:: State_VIB(:,:,:)
-  real, public, allocatable:: Flux_VIB( :,:,:)
+
   ! Number of variables in the state vector and the identifications
   integer, public, parameter :: nMHData = 13, nVar = 21,          &
        !\
-       LagrID_ = 0, & ! Lagrangian id           ^saved/   ^set to 0
-       X_      = 1, & !                         |read in  |in copy_ 
-       Y_      = 2, & ! Cartesian coordinates   |restart  |old_stat
-       Z_      = 3, & !                         v/        |saved to 
-       Rho_    = 4, & ! Background plasma density         |mhd1
-       T_      = 5, & ! Background temperature            | 
-       Ux_     = 6, & !                                   |may be
-       Uy_     = 7, & ! Background plasma bulk velocity   |read from
-       Uz_     = 8, & !                                   |mhd1
-       Bx_     = 9, & !                                   |or
-       By_     =10, & ! Background magnetic field         |received 
-       Bz_     =11, & !                                   |from
-       Wave1_  =12, & !\                                  |coupler
-       Wave2_  =13, & ! Alfven wave turbulence            v
-       !/
-       !\
-       D_      =14, & ! Distance to the next particle  ^derived from
-       S_      =15, & ! Distance from the foot point   |MHdata in
-       R_      =16, & ! Heliocentric distance          |get_other_
-       U_      =17, & ! Plasma speed                   |state_var
-       B_      =18, & ! Magnitude of magnetic field    v
-       DLogRho_=19, & ! Dln(Rho), i.e. -div(U) * Dt
-       RhoOld_ =20, & ! Background plasma density      !\copy_
-       BOld_   =21, & ! Magnitude of magnetic field    !/old_state
-       Flux0_  =22, & ! Total integral (simulated) particle flux
-       Flux1_  =23, & ! Integral particle flux >  5 MeV (GOES Ch.1)
-       Flux2_  =24, & ! Integral particle flux > 10 MeV (GOES Ch.2)
-       Flux3_  =25, & ! Integral particle flux > 30 MeV (GOES Ch.3)
-       Flux4_  =26, & ! Integral particle flux > 50 MeV (GOES Ch.4)
-       Flux5_  =27, & ! Integral particle flux > 60 MeV (GOES Ch.5)
-       Flux6_  =28, & ! Integral particle flux >100 MeV (GOES Ch.6)
-       EFlux_  =29, & ! Total integral energy flux
-       FluxMax_ = 29
+       LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
+       X_          = 1, & !                         |read in  |in copy_ 
+       Y_          = 2, & ! Cartesian coordinates   |restart  |old_stat
+       Z_          = 3, & !                         v/        |saved to 
+       Rho_        = 4, & ! Background plasma density         |mhd1
+       T_          = 5, & ! Background temperature            | 
+       Ux_         = 6, & !                                   |may be
+       Uy_         = 7, & ! Background plasma bulk velocity   |read from
+       Uz_         = 8, & !                                   |mhd1
+       Bx_         = 9, & !                                   |or
+       By_         =10, & ! Background magnetic field         |received 
+       Bz_         =11, & !                                   |from
+       Wave1_      =12, & !\                                  |coupler
+       Wave2_      =13, & ! Alfven wave turbulence            v
+       !/          
+       !\          
+       D_          =14, & ! Distance to the next particle  ^derived from
+       S_          =15, & ! Distance from the foot point   |MHdata in
+       R_          =16, & ! Heliocentric distance          |get_other_
+       U_          =17, & ! Plasma speed                   |state_var
+       B_          =18, & ! Magnitude of magnetic field    v
+       DLogRho_    =19, & ! Dln(Rho), i.e. -div(U) * Dt
+       RhoOld_     =20, & ! Background plasma density      !\copy_
+       BOld_       =21    ! Magnitude of magnetic field    !/old_state
   !/
   !\
   ! variable names
-  character(len=10), public, parameter:: NameVar_V(LagrID_:EFlux_)&
+  character(len=10), public, parameter:: NameVar_V(LagrID_:nVar)&
         = (/'LagrID    ', &
        'X         ', &
        'Y         ', &
@@ -139,15 +130,7 @@ module SP_ModGrid
        'B         ', &
        'DLogRho   ', &
        'RhoOld    ', &
-       'BOld      ', &
-       'Flux_Total', &
-       'Flux_GOES1', &
-       'Flux_GOES2', &
-       'Flux_GOES3', &
-       'Flux_GOES4', &
-       'Flux_GOES5', &
-       'Flux_GOES6', &
-       'EFlux     '  /)
+       'BOld      ' /)
   !/
   logical:: DoInit = .true.
 
@@ -235,8 +218,7 @@ contains
     allocate(State_VIB(LagrID_:nVar,1:nParticleMax,nBlock), &
          stat=iError)
     call check_allocate(iError, NameSub//'State_VIB')
-    allocate(Flux_VIB(Flux0_:FluxMax_,1:nParticleMax,nBlock), &
-         stat=iError); call check_allocate(iError, 'Flux_VIB')
+
     !\
     ! fill grid containers
     !/
@@ -264,7 +246,7 @@ contains
     ! reset and fill data containers
     !/
     State_VIB = -1; State_VIB(1:nMHData,:,:) = 0.0
-    Flux_VIB = -1; FootPoint_VB = -1
+    FootPoint_VB = -1
     
     !\
     ! reset lagrangian ids
