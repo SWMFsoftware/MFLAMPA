@@ -49,7 +49,6 @@ my $Src = 'src';
 # Grid size variables
 my $NameSizeFile = "$Src/ModSize.f90";
 my $GridSize;
-my ($nLat, $nLon);
 my $nP;
 
 # Read previous grid size
@@ -82,21 +81,13 @@ sub get_settings{
     while(<FILE>){
 	next if /^\s*!/;
 	$nP   =$1 if /\bnParticleMax\s*=[^0-9]*(\d+)/i;
-	$nLat =$1 if /\bnLat\s*=[^0-9]*(\d+)/i;
-	$nLon =$1 if /\bnLon\s*=[^0-9]*(\d+)/i;
     }
     close FILE;
 
     die "$ERROR could not read nParticleMax from $NameSizeFile\n" 
 	unless length($nP);                         
 
-    die "$ERROR could not read nLat from $NameSizeFile\n" 
-	unless length($nLat);                         
-
-    die "$ERROR could not read nLon from $NameSizeFile\n" 
-	unless length($nLon);                         
-
-    $GridSize = "$nP,$nLon,$nLat";
+    $GridSize = "$nP";
 
 }
 
@@ -106,15 +97,13 @@ sub set_grid_size{
 
     $GridSize = $NewGridSize if $NewGridSize;
 
-    if($GridSize =~ /^[1-9]\d*,[1-9]\d*,[1-9]\d*$/){
-	($nP,$nLon,$nLat) = split(',', $GridSize);
+    if($GridSize =~ /^[1-9]\d*$/){
+	$nP = $GridSize;
     }elsif($GridSize){
-	die "$ERROR -g=$GridSize must be 3 integers\n";
+	die "$ERROR -g=$GridSize must be only one integer\n";
     }
     # Check the grid size (to be set)
     die "$ERROR nParticleMax=$nP must be positive\n" if $nP<=0;
-    die "$ERROR nLat=$nLat must be positive\n" if $nLat<=0;
-    die "$ERROR nLon=$nLon must be positive\n" if $nLon<=0;
 
     print "Writing new grid size $GridSize into ".
 	"$NameSizeFile ...\n";
@@ -123,8 +112,6 @@ sub set_grid_size{
     while(<>){
 	if(/^\s*!/){print; next} # Skip commented out lines
 	s/\b(nParticleMax\s*=[^0-9]*)(\d+)/$1$nP/i;
-	s/\b(nLat\s*=[^0-9]*)(\d+)/$1$nLat/i;
-	s/\b(nLon\s*=[^0-9]*)(\d+)/$1$nLon/i;
 	print;
     }
 }
@@ -150,8 +137,5 @@ sub current_settings{
 
     $Settings .= 
 	"Number of particles per line   : nParticleMax=$nP\n";
-    $Settings .=
-	"Size of grid on source surface : nLon=$nLon, nLat=$nLat\n";
-
 }
 
