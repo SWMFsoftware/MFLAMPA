@@ -130,7 +130,7 @@ test_mflampa:
 	${MAKE} test_mflampa_check
 
 test_mflampa_compile:
-	./Config.pl -g=20000,4,4
+	./Config.pl -g=20000
 	${MAKE} 
 
 test_mflampa_rundir: 
