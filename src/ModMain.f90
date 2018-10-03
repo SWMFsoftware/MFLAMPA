@@ -4,14 +4,15 @@
 !==================================================================
 module SP_ModMain
   use SP_ModProc,    ONLY: iProc
-  use SP_ModSize,    ONLY: nDim, nLat, nLon, nNode, nParticleMax
+  use SP_ModSize,    ONLY: nDim, nParticleMax
   use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
   use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
   use SP_ModRestart, ONLY: save_restart, read_restart
   use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
        Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
        Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
-       RhoOld_, iShock_IB, iNode_B, State_VIB, FootPoint_VB
+       RhoOld_, iShock_IB, iNode_B, State_VIB, FootPoint_VB,      &
+       nLat, nLon, nNode
        
   use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
   use SP_ModTime,    ONLY: SPTime, DataInputTime, iIter
@@ -26,6 +27,7 @@ module SP_ModMain
   ! surface R=ROrigin
   real         :: LonMin = 0.0, LonMax = 360.0 
   real         :: LatMin = -70.0, LatMax = 70.0
+
   ! Lower/Upper boundary of the domain in Rs
   real         :: RScMin=-1.0, RIhMax = -1.0
   ! Boundaries of the buffer layer between SC and IH Rs
@@ -130,7 +132,7 @@ contains
           call read_var('RScMax', RScMax)
           call read_var('RIhMax',RIhMax)
        case('#COORDSYSTEM', '#COORDINATESYSTEM',&
-            '#CHECKGRIDSIZE','#DOSMOOTH')
+            '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
           if(i_session_read() /= 1)CYCLE
           call read_param_grid(NameCommand)
        case('#PARTICLEENERGYUNIT')

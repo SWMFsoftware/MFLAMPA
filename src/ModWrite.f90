@@ -6,10 +6,10 @@ module SP_ModPlot
   !\
   ! Methods for saving plots
   !/
-  use SP_ModSize, ONLY: nNode, nParticleMax
+  use SP_ModSize, ONLY: nParticleMax
   use SP_ModGrid, ONLY: get_node_indexes, nVar, nMHData, nBlock,   &
        State_VIB, iShock_IB, iNode_B, nParticle_B, Shock_, X_, Z_, &
-       R_, NameVar_V, TypeCoordSystem, LagrID_
+       R_, NameVar_V, TypeCoordSystem, LagrID_, nNode
   use SP_ModDistribution, ONLY: nP, Energy_I, Momentum_I, Distribution_IIB,  &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
@@ -102,7 +102,7 @@ module SP_ModPlot
   !/
   !\
   ! auxilary array, used to write data on a sphere
-  integer:: iNodeIndex_I(nNode)
+  integer, allocatable:: iNodeIndex_I(:)
   !/
   !\
   ! info for MH1D header and tag list
@@ -207,6 +207,9 @@ contains
              call CON_stop(NameSub//' check nFluxChannel ')
           end if
        end if
+
+       if (.not. allocated(iNodeIndex_I)) &
+            allocate(iNodeIndex_I(nNode))
 
        do iNode = 1, nNode
           iNodeIndex_I(iNode) = iNode
@@ -1050,7 +1053,7 @@ contains
   end subroutine save_plot_all
   !===============================================================
   subroutine finalize
-     use SP_ModSize, ONLY: nLat, nLon
+     use SP_ModGrid, ONLY: nLat, nLon
     ! write the header file that contains necessary information 
     ! for reading input files in a separate run
     character(len=*), parameter:: NameSub='write_mh_1d_header'

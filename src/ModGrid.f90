@@ -7,7 +7,7 @@ module SP_ModGrid
   !Dec.23 2017: exclude fluxes from the state vector.
   !Dec.25 2017: standard init and read_param
   !Dec.25 2017: rename nVarRead=>nMHData, add NoShock_ param.
-  use SP_ModSize, ONLY: nDim, nLon, nLat, nNode, nParticleMax
+  use SP_ModSize, ONLY: nDim, nParticleMax
   use SP_ModProc, ONLY: iProc
   use ModNumConst,ONLY: cTwoPi, cPi
   implicit none
@@ -31,6 +31,12 @@ module SP_ModGrid
   integer, public, allocatable :: nParticle_B(:)
   !/
   !\
+
+  ! angular grid at origin surface
+  integer, public :: nLon  = 4
+  integer, public :: nLat  = 4
+  integer, public :: nNode = 16
+
   ! Node number based on the field line identified by 
   ! 2 angular grid indices, latitude and longitude;
   ! 1st index - longitude index
@@ -173,6 +179,11 @@ contains
           if(nSmooth < 1)&
                call CON_stop(NameSub//': Invalid setting for line smoothing')
        end if
+    case('#GRIDNODE')
+       call read_var('nNode', nNode)
+       call read_var('nLat',  nLat)
+       call read_var('nLon',  nLon)
+       if (nNode /= nLat*nLon) call CON_stop(NameSub//': correct nNode')
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select

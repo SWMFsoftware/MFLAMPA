@@ -4,11 +4,12 @@
 !==================================================================
 module SP_ModRestart
   ! This module contains methods for writing output files
-  use SP_ModSize,   ONLY: nLon, nLat, nParticleMax
+  use SP_ModSize,   ONLY: nParticleMax
   use SP_ModGrid,   ONLY: get_node_indexes, LagrID_, Z_,&
        nBlock, State_VIB, iShock_IB, iNode_B, &
        !RMin, RBufferMin, RBufferMax, RMax, &
-       FootPoint_VB, nParticle_B, nShockParam
+       FootPoint_VB, nParticle_B, nShockParam, &
+       nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
   use SP_ModTime,   ONLY: SPTime, iIter
   use ModPlotFile,  ONLY: save_plot_file, read_plot_file
