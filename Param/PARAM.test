@@ -41,7 +41,7 @@ MH_data_e20120123_040000/MH_data.H
 
 #SAVEPLOT
 1
-mh1d ascii
+mh1d flux ascii
 
 #STOP
 -1			nIterMax
