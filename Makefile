@@ -114,6 +114,7 @@ allclean: install
 #/
 
 TESTDIR = run_test
+MPIRUN  =             # only one processor
 
 test:
 	-@(${MAKE} test_mflampa)
@@ -137,16 +138,14 @@ test_mflampa_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cd ${TESTDIR}; cp -f Param/PARAM.test PARAM.in
-	cp data/input/test_mflampa/MH_data_e20120123_040000.tgz ${TESTDIR}/
-	cd ${TESTDIR}; tar xzvf MH_data_e20120123_040000.tgz
+	cp Param/MH_data_e20120123.zip ${TESTDIR}/
+	cd ${TESTDIR}; tar xvf MH_data_e20120123.zip
 
 test_mflampa_run:
 	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee -a runlog
 
 test_mflampa_check:
-	cat ${TESTDIR}/SP/IO2/MH_data_*_*_e20120123_041000_n000006.out > \
-	    ${TESTDIR}/SP/IO2/MH_data.out
 	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
 		Param/TestOutput/test_mflampa/MH_data.ref \
-	${TESTDIR}/SP/IO2/MH_data.out > test_mflampa.diff
+	${TESTDIR}/SP/IO2/MH_data_*n000006.out > test_mflampa.diff
 
