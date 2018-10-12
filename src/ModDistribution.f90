@@ -50,7 +50,7 @@ module SP_ModDistribution
   integer, public :: FluxLast_ = 6             ! The last channel
   integer, public :: EFlux_    = 7             ! Total integral energy flux
   integer, public :: FluxMax_  = 7
-  real, allocatable :: EChannel_I(:) ! energy limits of the instrument
+  real, allocatable :: EChannelIO_I(:) ! energy limits of the instrument
   real, public, allocatable  :: Flux_VIB( :,:,:)
   character(len=10), public, allocatable  :: NameFluxChannel_I(:)
 
@@ -127,10 +127,10 @@ contains
        end do
     end do
 
-    if (.not. allocated(EChannel_I)) then
+    if (.not. allocated(EChannelIO_I)) then
        if (nFluxChannel == 6) then
-          allocate (EChannel_I(nFluxChannel))
-          EChannel_I = (/5,10,30,50,60,100/)
+          allocate (EChannelIO_I(nFluxChannel))
+          EChannelIO_I = (/5,10,30,50,60,100/)
        else
           call CON_stop(NameSub//' check nFluxChannel ')
        end if
@@ -191,8 +191,8 @@ contains
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
 
-       if (allocated(EChannel_I)) deallocate(EChannel_I)
-       allocate(EChannel_I(nFluxChannel))
+       if (allocated(EChannelIO_I)) deallocate(EChannelIO_I)
+       allocate(EChannelIO_I(nFluxChannel))
        if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
        allocate(NameFluxChannel_I(0:nFluxChannel+1))
 
@@ -200,8 +200,8 @@ contains
        NameFluxChannel_I(nFluxChannel+1) = 'eflux'
 
        do iFluxChannel=1,nFluxChannel
-          call read_var('EChannel_I', EChannel_I(iFluxChannel))
-          write(NameFluxChannel,'(I5.5)') int(EChannel_I(iFluxChannel))
+          call read_var('EChannelIO_I', EChannelIO_I(iFluxChannel))
+          write(NameFluxChannel,'(I5.5)') int(EChannelIO_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
     case default
@@ -283,7 +283,7 @@ contains
     if (.not.allocated(Flux_I)) allocate(Flux_I(nFluxChannel))
     if (.not.allocated(EChannelSI_I)) allocate(EChannelSI_I(nFluxChannel))
 
-    EChannelSI_I = EChannel_I * energy_in('MeV')
+    EChannelSI_I = EChannelIO_I * energy_in('MeV')
 
     do iBlock = 1, nBlock
        do iParticle = 1, nParticle_B( iBlock)
