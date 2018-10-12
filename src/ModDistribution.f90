@@ -8,44 +8,40 @@ module SP_ModDistribution
   use ModNumConst,ONLY: cTiny
   use ModConst,   ONLY: cLightSpeed, energy_in
   use SP_ModSize, ONLY: nParticleMax, nP=>nMomentum
-  use SP_ModUnit, ONLY: UnitEnergy=>UnitParticleEnergy, &
-       UnitFlux=>UnitParticleFlux,&
+  use SP_ModUnit, ONLY: IO2SI_KinEnergy, &
+       UnitFluxSI => UnitParticleFluxSI,&
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid, ONLY: nBlock, nParticle_B
   implicit none
   SAVE
-  PRIVATE ! except
+  PRIVATE
+
   !Public members:
-  public:: init              !Initialize Distribution_IIB
-  public:: read_param        !Read momentum grid parameters  
-  public:: offset            !Sync. index in State_VIB and Dist_IIB 
-  public:: get_integral_flux !Calculate Flux_VIB
-  public:: nP                !Number of points in the momentum grid 
-  public:: MomentumInj       !Mimimum momentum value in SI
-  public:: MomentumMax       !Maximum momentum value in SI
-  public:: EnergyInjIo       !Energy in kev for MomentumInj 
-  public:: EnergyMaxIo       !Energy in keV for MomentumMax
-  public:: DLogP             !Mesh size for log(momentum) grid
-  !\
-!!!!!!!!!!!!!!!Grid along the nomentum axis              !!!!!!
+  public:: init              ! Initialize Distribution_IIB
+  public:: read_param        ! Read momentum grid parameters  
+  public:: offset            ! Sync. index in State_VIB and Dist_IIB 
+  public:: get_integral_flux ! Calculate Flux_VIB
+  public:: nP                ! Number of points in the momentum grid 
+  public:: MomentumInjSI     ! Mimimum momentum value in SI
+  public:: MomentumMaxSI     ! Maximum momentum value in SI
+  public:: EnergyInjIo       ! Energy in kev (IO unit)
+  public:: EnergyMaxIo       ! Energy in keV (IO unit)
+  public:: DLogP             ! Mesh size for log(momentum) grid
+
   ! Injection and maximal energy in the simulation
   ! To be read from the PARAM.in file: KINETIC energies
   real:: EnergyInjIo=10.0, EnergyMaxIo=1.0E+07
+
   ! Injection and max momentum in the simulation
-  real:: MomentumInj, MomentumMax
+  real:: MomentumInjSI, MomentumMaxSI
+
   ! Size of a  log-momentum mesh. For momentum we use both the 
   ! denotaion, P, and a word, momentum - whichever is more covenient
-  real:: DLogP        !log(MomentumMax/MomentumInj)/nP
-  !/
-  !\
-  ! Functions to convert the grid index to momentum and energy
-  !/
-  !\
-  ! Momentum and energy at the grid points
-  real, public:: Momentum_I(0:nP+1)
-  real, public:: Energy_I(0:nP+1)
-  ! Total energy, including the rest mass energy
-  real, public:: TotalEnergy_I(0:nP+1)
+  real:: DLogP        !log(MomentumMaxSI/MomentumInjSI)/nP
+
+  ! Momentum, kinetic energy and total energy (including the rest mass energy) 
+  ! at the momentum grid points
+  real, public, dimension(0:nP+1) :: MomentumSI_I, KinEnergySI_I, EnergySI_I
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_ = 0
@@ -58,26 +54,27 @@ module SP_ModDistribution
   real, public, allocatable  :: Flux_VIB( :,:,:)
   character(len=10), public, allocatable  :: NameFluxChannel_I(:)
 
-  !/
-  !\
-!!!!!!!!!!!!!!Grid in the momentum space                 !!!!!!
-  !iP     0     1                         nP   nP+1
-  !       |     |    ....                 |     | 
-  !P      P_inj P_inj*exp(\Delta(log P))  P_Max P_Max*exp(DLogP)
+
+  !-----------------Grid in the momentum space---------------------------------
+  ! iP     0     1                         nP   nP+1
+  !        |     |    ....                 |     | 
+  ! P      P_inj P_inj*exp(\Delta(log P))  P_Max P_Max*exp(DLogP)
+  !----------------------------------------------------------------------------
+
   ! This is because we put two boundary conditions: the background
   ! value at the right one and the physical condition at the left  
   ! one, for the velocity distribution function
-  !/
-  !\
+
   ! Velosity Distribution Function (VDF) 
   ! Number of points along the momentum axis is set in ModSize
   ! 1st index - log(momentum)
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
-  real, public, allocatable:: Distribution_IIB(:,:,:)
+  real, public, allocatable :: Distribution_IIB(:,:,:)
+
   ! distribution is initialized to have integral flux:
   real:: FluxInitIo = 0.01 ! [PFU]
-  !/
+
   logical :: DoInit = .true.
 contains
   !================================================================
@@ -90,24 +87,29 @@ contains
     !----------------------------------------------------------
     if(.not.DoInit)RETURN
     DoInit = .false.
+
     ! convert energies to momenta
-    MomentumInj  = kinetic_energy_to_momentum(EnergyInjIo*UnitEnergy)
-    MomentumMax  = kinetic_energy_to_momentum(EnergyMaxIo*UnitEnergy)  
-    DLogP = log(MomentumMax/MomentumInj)/nP
+    MomentumInjSI  = kinetic_energy_to_momentum(EnergyInjIo*IO2SI_KinEnergy)
+    MomentumMaxSI  = kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_KinEnergy)  
+
+    ! grid size in the log momentum space
+    DLogP = log(MomentumMaxSI/MomentumInjSI)/nP
+
     !\
     ! Functions to convert the grid index to momentum and energy
     !/
     do iP = 0, nP +1
-       Momentum_I(iP) = MomentumInj*exp(iP*DLogP)
-       Energy_I(iP) = momentum_to_kinetic_energy(Momentum_I(iP))
-       TotalEnergy_I(iP) = momentum_to_energy(Momentum_I(iP))
+       MomentumSI_I(iP)  = MomentumInjSI*exp(iP*DLogP)
+       KinEnergySI_I(iP) = momentum_to_kinetic_energy(MomentumSI_I(iP))
+       EnergySI_I(iP)    = momentum_to_energy(MomentumSI_I(iP))
     end do
+
     !\
     ! Distribution function
     !/    
-    allocate(Distribution_IIB(&
-         0:nP+1,1:nParticleMax,nBlock), stat=iError)
+    allocate(Distribution_IIB(0:nP+1,1:nParticleMax,nBlock), stat=iError)
     call check_allocate(iError, 'Distribution_IIB')
+
     ! initialization depends on momentum, however, this corresponds
     ! to a constant differential flux (intensity), thus ensuring
     ! uniform backgound while visualizing this quantity
@@ -117,9 +119,10 @@ contains
           ! of 10^-6 m^-3. Integral flux is less than 100 per
           ! (m^2 ster s). Differential background flux is constant.
           do iP = 0, nP +1
-             Distribution_IIB(iP,iParticle,iBlock) = &
-                  UnitFlux/UnitEnergy * &
-                  FluxInitIo / (EnergyMaxIo-EnergyInjIo) / Momentum_I(iP)**2
+             Distribution_IIB(iP,iParticle,iBlock) =                         &
+                  FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSI_I(iP)**2   &
+                  *UnitFluxSI/IO2SI_KinEnergy
+
           end do
        end do
     end do
@@ -145,7 +148,10 @@ contains
   !================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
+    use ModUtilities, ONLY: lower_case
     use SP_ModProc,   ONLY: iProc
+    use SP_ModGrid  , ONLY: T_
+    use SP_ModUnit,   ONLY: NameVarUnit_V, NameEnergyUnit
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
     character(len=*), parameter :: NameSub='SP:read_param_dist'
     integer:: nPCheck = nP, iFluxChannel
@@ -154,12 +160,24 @@ contains
     select case(NameCommand)
     case('#MOMENTUMGRID')
        !Read unit to be used for particle energy: eV, keV, GeV
-       call read_var('EnergyMin',EnergyInjIo)
-       call read_var('EnergyMax',EnergyMaxIo)
-       call read_var('nP'       ,nPCheck    )
+       call read_var('EnergyMin',      EnergyInjIo)
+       call read_var('EnergyMax',      EnergyMaxIo)
+       call read_var('nP',             nPCheck    )
+       call read_var('NameEnergyUnit', NameEnergyUnit)
+
+       call lower_case(NameEnergyUnit)
+
+       ! Unfortunately this is needed. The reason is that the code does not
+       ! allow that the unit of the kinetic energy of the plasma temperature 
+       ! to be different from the unit of the kinetic energy of particles.
+       ! The default NameVarUnit_V(T_) ='kev', so if NameEnergyUnit is updated,
+       ! NameVarUnit_V(T_) should also be updated. In stand along mode, the 
+       ! code is happy, but should be tested in the coupling run.
+       NameVarUnit_V(T_) = NameEnergyUnit
+
        if(nP/=nPCheck)then
-          if(iProc==0)write(*,'(a,i6,a,i6)')NameSub//' '//&
-               'Code is configured with nMomentum=',nP,&
+          if(iProc==0)write(*,'(a,i6,a,i6)')NameSub//' '//         &
+               'Code is configured with nMomentum=', nP ,          &
                ' while value read from PARAM.in is nP=',nPCheck 
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
@@ -171,13 +189,14 @@ contains
        call read_var('nFluxChannel', nFluxChannel)
        FluxLast_ = nFluxChannel
        EFlux_    = FluxLast_ + 1
-       FluxMax_    =EFlux_
+       FluxMax_  = EFlux_
+
        if (allocated(EChannel_I)) deallocate(EChannel_I)
        allocate(EChannel_I(nFluxChannel))
        if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
        allocate(NameFluxChannel_I(0:nFluxChannel+1))
 
-       NameFluxChannel_I(0) = 'flux_total'
+       NameFluxChannel_I(0)              = 'flux_total'
        NameFluxChannel_I(nFluxChannel+1) = 'eflux'
 
        do iFluxChannel=1,nFluxChannel
@@ -256,15 +275,16 @@ contains
     real   :: dFlux, dFlux1 ! increments
     real   :: Flux          ! the value of particle flux
     real   :: Norm            ! normalization factor
-    real, allocatable :: Flux_I(:), EChannelIO_I(:)
+    real, allocatable :: Flux_I(:), EChannelSI_I(:)
     !-------------------------------------------------------------------------
     ! energy limits of GOES channels
 
 
     if (.not.allocated(Flux_I)) allocate(Flux_I(nFluxChannel))
-    if (.not.allocated(EChannelIO_I)) allocate(EChannelIO_I(nFluxChannel))
+    if (.not.allocated(EChannelSI_I)) allocate(EChannelSI_I(nFluxChannel))
 
-    EChannelIO_I = EChannel_I * energy_in('MeV')
+    EChannelSI_I = EChannel_I * energy_in('MeV')
+
     do iBlock = 1, nBlock
        do iParticle = 1, nParticle_B( iBlock)
           !\
@@ -278,12 +298,12 @@ contains
           do iP = 1, nP - 1
              ! the flux increment from iP
              dFlux = 0.5 * &
-                  (Energy_I(iP+1) - Energy_I(iP)) * (&
+                  (KinEnergySI_I(iP+1) - KinEnergySI_I(iP)) * (&
                   Distribution_IIB(iP,  iParticle,iBlock)*&
-                  Momentum_I(iP)**2 &
+                  MomentumSI_I(iP)**2 &
                   +&
                   Distribution_IIB(iP+1,iParticle,iBlock)*&
-                  Momentum_I(iP+1)**2)
+                  MomentumSI_I(iP+1)**2)
 
              ! increase the total flux
              Flux = Flux + dFlux
@@ -291,47 +311,47 @@ contains
              ! increase FOES channels' fluxes
              do iFlux = 1, nFluxChannel
                 ! check whether reached the channel's cut-off level
-                if(Energy_I(iP+1) < EChannelIO_I(iFlux))&
+                if(KinEnergySI_I(iP+1) < EChannelSI_I(iFlux))&
                      CYCLE
 
-                if(Energy_I(iP) >= EChannelIO_I(iFlux))then
+                if(KinEnergySI_I(iP) >= EChannelSI_I(iFlux))then
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux
                 else
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
                    dFlux1 =&
-                        ((-0.50*(Energy_I(iP) + EChannelIO_I(iFlux)) + &
-                        Energy_I(iP+1) )*&
+                        ((-0.50*(KinEnergySI_I(iP) + EChannelSI_I(iFlux)) + &
+                        KinEnergySI_I(iP+1) )*&
                         Distribution_IIB(iP,iParticle,iBlock)*&
-                        Momentum_I(iP)**2  &
-                        -0.50*(Energy_I(iP)-EChannelIO_I(iFlux))*&
+                        MomentumSI_I(iP)**2  &
+                        -0.50*(KinEnergySI_I(iP)-EChannelSI_I(iFlux))*&
                         Distribution_IIB(iP+1,iParticle,iBlock)*&
-                        Momentum_I(iP+1)**2)*&
-                        (Energy_I(iP)-EChannelIO_I(iFlux))/&
-                        (Energy_I(iP+1)-Energy_I(iP))
+                        MomentumSI_I(iP+1)**2)*&
+                        (KinEnergySI_I(iP)-EChannelSI_I(iFlux))/&
+                        (KinEnergySI_I(iP+1)-KinEnergySI_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 end if
              end do
 
              ! increase total energy flux
              EFlux = EFlux + 0.5 * &
-                  (Energy_I(iP+1) - Energy_I(iP)) * (&
+                  (KinEnergySI_I(iP+1) - KinEnergySI_I(iP)) * (&
                   Distribution_IIB(iP,  iParticle,iBlock)*&
-                  Energy_I(iP) * &
-                  Momentum_I(iP)**2 &
+                  KinEnergySI_I(iP) * &
+                  MomentumSI_I(iP)**2 &
                   +&
                   Distribution_IIB(iP+1,iParticle,iBlock)*&
-                  Energy_I(iP+1) * &
-                  Momentum_I(iP+1)**2)
+                  KinEnergySI_I(iP+1) * &
+                  MomentumSI_I(iP+1)**2)
 
              ! normalization factor
              Norm = Norm + 0.5 * &
-                  (Momentum_I(iP+1) - Momentum_I(iP)) * (&
+                  (MomentumSI_I(iP+1) - MomentumSI_I(iP)) * (&
                   Distribution_IIB(iP,  iParticle, iBlock) * &
-                  Momentum_I(iP)**2 &
+                  MomentumSI_I(iP)**2 &
                   + &
                   Distribution_IIB(iP+1,iParticle, iBlock) * &
-                  Momentum_I(iP+1)**2)
+                  MomentumSI_I(iP+1)**2)
           end do
 
           ! store the results
@@ -341,7 +361,7 @@ contains
        end do
     end do
 
-    deallocate(Flux_I, EChannelIO_I)
+    deallocate(Flux_I, EChannelSI_I)
 
   end subroutine get_integral_flux
 end module SP_ModDistribution
