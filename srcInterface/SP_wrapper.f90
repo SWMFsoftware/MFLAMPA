@@ -4,7 +4,7 @@
 !==================================================================
 module SP_wrapper
 
-  use SP_ModUnit, ONLY: EnergyUnit=>UnitParticleEnergy
+  use SP_ModUnit, ONLY: SI2IO_KinEnergy
   use SP_ModMain, ONLY: &
        run, save_restart, &
        DoRestart, DoReadMhData, &
@@ -245,7 +245,7 @@ contains
             + Buff_I(iRho)/cProtonMass*Weight
        if(DoCoupleVar_V(Pressure_))&
             State_VIB(T_,i,iBlock) = Aux*State_VIB(T_,i,iBlock) + &
-            Buff_I(iP)/Buff_I(iRho)*cProtonMass/EnergyUnit*Weight
+            Buff_I(iP)/Buff_I(iRho)*cProtonMass*SI2IO_KinEnergy*Weight
        if(DoCoupleVar_V(Momentum_))&
             State_VIB(Ux_:Uz_,i,iBlock) = Aux*State_VIB(Ux_:Uz_,i,iBlock) + &
             Buff_I(iMx:iMz) / Buff_I(iRho) * Weight
