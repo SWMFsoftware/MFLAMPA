@@ -88,23 +88,27 @@ module SP_ModMain
 contains
 
   subroutine read_param
-    use SP_ModGrid    , ONLY: read_param_grid=>read_param
-    use SP_ModUnit    , ONLY: read_param_unit=>read_param
-    use SP_ModTime    , ONLY: read_param_time=>read_param
-    use SP_ModDistribution, ONLY:read_param_dist=>read_param
-    use SP_ModAdvance , ONLY: read_param_adv =>read_param
-    use SP_ModPlot    , ONLY: read_param_plot=>read_param
-    use SP_ModReadMHData, ONLY:read_param_mhdata=>read_param
+    use SP_ModGrid,         ONLY: read_param_grid       =>read_param
+    use SP_ModTime,         ONLY: read_param_time       =>read_param
+    use SP_ModDistribution, ONLY: read_param_dist       =>read_param
+    use SP_ModAdvance,      ONLY: read_param_adv        =>read_param
+    use SP_ModPlot,         ONLY: read_param_plot       =>read_param
+    use SP_ModReadMHData,   ONLY: read_param_mhdata     =>read_param
+    use SP_ModTurbulence,   ONLY: read_param_turbulence =>read_param
+
     ! Read input parameters for SP component
     use ModReadParam, ONLY: &
          read_var, read_line, read_command, i_session_read, read_echo_set
+
     ! aux variables 
     integer:: nParticleCheck, nLonCheck, nLatCheck
     logical:: DoEcho
+
     ! The name of the command
     character (len=100) :: NameCommand
     character (len=*), parameter :: NameSub='SP:read_param'
     !--------------------------------------------------------------------------
+
     ! Read the corresponding section of input file
     do
        if(.not.read_line() ) then
@@ -135,9 +139,6 @@ contains
             '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
           if(i_session_read() /= 1)CYCLE
           call read_param_grid(NameCommand)
-       case('#PARTICLEENERGYUNIT')
-          if(i_session_read() /= 1)CYCLE
-          call read_param_unit(NameCommand)
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
@@ -147,6 +148,8 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
+       case('#INITSPECTRUM', '#TURBULENTSPECTRUM')
+          call read_param_turbulence(NameCommand)
        case('#DORUN')
           call read_var('DoRun',DoRun)
        case('#TIMING')
@@ -213,12 +216,12 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine initialize
-    use SP_ModGrid        , ONLY: init_grid=>init
-    use SP_ModUnit        , ONLY: init_unit=>init 
+    use SP_ModGrid,         ONLY: init_grid=>init
+    use SP_ModUnit,         ONLY: init_unit=>init 
     use SP_ModDistribution, ONLY: init_dist=>init
-    use SP_ModAdvance     , ONLY: init_advance=>init
-    use SP_ModPlot        , ONLY: init_plot=>init
-    use SP_ModReadMhData  , ONLY: init_mhdata=>init
+    use SP_ModAdvance,      ONLY: init_advance=>init
+    use SP_ModPlot,         ONLY: init_plot=>init
+    use SP_ModReadMhData,   ONLY: init_mhdata=>init
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
     !--------------------------------------------------------------------
@@ -244,15 +247,16 @@ contains
       ! convert angels from degrees to radians
       LonMax = LonMax*cDegToRad
       LonMin = LonMin*cDegToRad
+
       ! angular grid's step
       DLon = (LonMax - LonMin)/nLon
-      
+
       ! convert angels from degrees to radians
       LatMax = LatMax*cDegToRad
       LatMin = LatMin*cDegToRad
+
       ! angular grid's step
       DLat = (LatMax - LatMin)/nLat
-      
       
       do iLat = 1, nLat
          do iLon = 1, nLon
