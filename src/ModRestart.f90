@@ -12,6 +12,7 @@ module SP_ModRestart
        nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
   use SP_ModTime,   ONLY: SPTime, iIter
+  use SP_ModUnit,   ONLY: NameEnergyUnit
   use ModPlotFile,  ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file
   use ModIoUnit,    ONLY: UnitTmp_
@@ -145,7 +146,7 @@ contains
     write(UnitTmp_,'(es22.15,a18)')EnergyInjIo,'EnergyMin'
     write(UnitTmp_,'(es22.15,a18)')EnergyMaxIo,'EnergyMax'
     write(UnitTmp_,'(i8,a32)')nP,'nP'
-    write(UnitTmp_,*)
+    write(UnitTmp_,'(a8,a32)')NameEnergyUnit,'NameEnergyUnit'
     write(UnitTMP_,'(a)')'#END'
     write(UnitTmp_,*)
     call close_file

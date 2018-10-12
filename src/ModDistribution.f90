@@ -127,13 +127,17 @@ contains
        end do
     end do
 
-    if (.not. allocated(EChannelIO_I)) then
-       if (nFluxChannel == 6) then
+    ! GOES by default
+    if (.not. allocated(NameFluxChannel_I)) then
+       nFluxChannel = 6
+       allocate(NameFluxChannel_I(0:nFluxChannel+1))
+       NameFluxChannel_I = (/'flux_total', 'flux_00005', 'flux_00010', &
+            'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100', &
+            'eflux     '/)
+       if(allocated(EChannelIO_I))&
+            deallocate(EChannelIO_I)
           allocate (EChannelIO_I(nFluxChannel))
           EChannelIO_I = (/5,10,30,50,60,100/)
-       else
-          call CON_stop(NameSub//' check nFluxChannel ')
-       end if
     end if
 
     if (.not. allocated(Flux_VIB)) then

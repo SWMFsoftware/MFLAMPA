@@ -65,6 +65,8 @@ module SP_ModPlot
      logical:: IsFirstCall
      ! names of variables to be written
      character(len=300):: NameVarPlot
+     ! names of auxilary parameters
+     character(len=300):: NameAuxPlot
      ! output buffer
      real, pointer:: Buffer_II(:,:)
      !\
@@ -72,12 +74,12 @@ module SP_ModPlot
      !/
      ! variables from the state vector to be written
      logical:: DoPlot_V(X_:nVar)
-     ! variables from the flux vector to be written
-     logical, allocatable :: DoPlotFlux_I(:)
+     ! whether fluxes are to be written
+     logical:: DoPlotFlux
      ! total numbers of variables to be written
      integer:: nVarPlot, nFluxPlot
      ! their indices in the state vectors
-     integer, pointer:: iVarPlot_V(:), iFluxPlot_V(:)
+     integer, pointer:: iVarPlot_V(:)
      !\
      ! Distribution
      !/
@@ -138,7 +140,7 @@ contains
     ! full tag file name
     character(len=100)::NameFile
     ! loop variable
-    integer:: iTag
+    integer:: iTag, iFile, iVar
     
     character(len=*),parameter:: NameSub='SP:ModPlot:init'
     !--------------------------------------------------
@@ -149,6 +151,41 @@ contains
     Log10KinEnergySI_I     = log10(KinEnergySI_I)
     DMomentumOverDEnergy_I = EnergySI_I/(MomentumSI_I*cLightSpeed**2)
     
+    !\
+    ! Finalize setting output files:
+    ! number and names of flux channels are known at this point;
+    ! also, allocate buffers for output data
+    !/
+    do iFile = 1, nFileOut
+       File_I(iFile)%nFluxPlot = 0
+       if(File_I(iFile)%DoPlotFlux)then
+          File_I(iFile)%nFluxPlot = FluxMax_ - Flux0_ + 1
+          do iVar = Flux0_, FluxMax_
+             File_I(iFile)%NameVarPlot = &
+                  trim(File_I(iFile)%NameVarPlot)//' '//&
+                  trim(NameFluxChannel_I(iVar))
+          end do
+       end if
+       ! prepare the output dta containers
+       select case(File_I(iFile) % iKindData)
+          case(MH1D_)
+             allocate(File_I(iFile) % Buffer_II(&
+                  File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
+                  1:nParticleMax))
+          case(MH2D_)
+             allocate(File_I(iFile) % Buffer_II(&
+                  File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
+                  nNode))
+          case(MHTime_)
+             ! note extra space reserved for time of the output
+             allocate(File_I(iFile) % Buffer_II(&
+                  1 + File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot, 1))
+          case(Distr1D_)
+             allocate(File_I(iFile) % &
+                  Buffer_II(nP,1:nParticleMax))
+       end select
+    end do
+
     !\
     ! Reset/trim NameTagFile if nTag==0/nTag>0; the latter happens at restart.
     !
@@ -195,19 +232,6 @@ contains
     select case(NameCommand)
     case("#SAVEPLOT")
        ! initialize auxilary arrays
-
-       ! GOES by default, #SAVEPLOT must be after #FLUXCHANNEL
-       if (.not. allocated(NameFluxChannel_I)) then
-          if (nFluxChannel == 6) then
-             allocate(NameFluxChannel_I(0:nFluxChannel+1))
-             NameFluxChannel_I = (/'flux_total', 'flux_00005', 'flux_00010', &
-                  'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100', &
-                  'eflux     '/)
-          else
-             call CON_stop(NameSub//' check nFluxChannel ')
-          end if
-       end if
-
        if (.not. allocated(iNodeIndex_I)) &
             allocate(iNodeIndex_I(nNode))
 
@@ -270,52 +294,45 @@ contains
                   ": output format isn't properly set in PARAM.in")
           end select
           
-          ! reset variables' names
+          ! reset variables' and parameters' names
           File_I(iFile) % NameVarPlot = ''
+          File_I(iFile) % NameAuxPlot = ''
           
           ! based on kind of data process the requested output
           select case(File_I(iFile) % iKindData)
           case(MH1D_)
              call process_mh
-             ! prepare the output data container
-             allocate(File_I(iFile) % Buffer_II(&
-                  File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
-                  1:nParticleMax))
              ! add particle index to variable names
              File_I(iFile) % NameVarPlot = &
                   NameVar_V(LagrID_)//' '//&
                   trim(File_I(iFile) % NameVarPlot)
              do iVar = LagrID_,Z_
-                File_I(iFile)%NameVarPlot = &
-                     trim(File_I(iFile)%NameVarPlot)//&
+                File_I(iFile)%NameAuxPlot = &
+                     trim(File_I(iFile)%NameAuxPlot)//&
                      ' '//NameVar_V(iVar)  
              end do
-             File_I(iFile) % NameVarPlot = &
-                  trim(File_I(iFile) % NameVarPlot)//&
+             File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot)//&
                   ' iShock RShock StartTime StartTimeJulian'
              TypeMHDataFile = File_I(iFile) % TypeFile
              DoWriteHeader = .true.
           case(MH2D_)
              call process_mh
-             ! prepare the output data container
-             allocate(File_I(iFile) % Buffer_II(&
-                  File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
-                  nNode))
              ! add line index to variable names
              File_I(iFile) % NameVarPlot = &
-                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
+                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)
+             File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot) //&
                   ' StartTime StartTimeJulian'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
           case(MHTime_)
              call process_mh
-             ! prepare the output data container;
-             ! note extra space reserved for time of the output
-             allocate(File_I(iFile) % Buffer_II(&
-                  1 + File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot, 1))
              ! add time interval index to variable names
              File_I(iFile) % NameVarPlot = &
-                  'Time '//trim(File_I(iFile) % NameVarPlot)//&
+                  'Time '//trim(File_I(iFile) % NameVarPlot)
+             File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot) //&
                   ' StartTime StartTimeJulian'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
@@ -323,9 +340,6 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
              call process_distr
-             ! prepare the output data container
-             allocate(File_I(iFile) % &
-                  Buffer_II(nP,1:nParticleMax))
           end select
        end do
        !\
@@ -355,14 +369,9 @@ contains
       integer:: iVar, iVarPlot, iStringPlot
       character(len=10) ::  NameVarLowerCase
       !-----------------------------------------------
-
-      if (allocated(File_I(iFile)%DoPlotFlux_I)) &
-           deallocate(File_I(iFile)%DoPlotFlux_I)
-      allocate(File_I(iFile)%DoPlotFlux_I(0:nFluxChannel+1))
-
       ! reset
-      File_I(iFile) % DoPlot_V     = .false.
-      File_I(iFile) % DoPlotFlux_I = .false.
+      File_I(iFile) % DoPlot_V   = .false.
+      File_I(iFile) % DoPlotFlux = .false.
 
       ! for MH1D_ minimal set of variables is printed
       if(File_I(iFile)%iKindData == MH1D_)then
@@ -378,7 +387,7 @@ contains
       do iStringPlot = 2, nStringPlot - 1
          ! if the string is flux, then save ALL the fluxes
          if (trim(StringPlot_I(iStringPlot)) == 'flux') then
-            File_I(iFile)%DoPlotFlux_I = .true.
+            File_I(iFile)%DoPlotFlux = .true.
             CYCLE
          end if
 
@@ -391,17 +400,10 @@ contains
             CYCLE
          end do
 
-         do iVar = 0, nFluxChannel+1
-            NameVarLowerCase = NameFluxChannel_I(iVar)
-            call lower_case(NameVarLowerCase)
-            if(StringPlot_I(iStringPlot) == NameVarLowerCase)&
-                 File_I(iFile)%DoPlotFlux_I(iVar) = .true.
-            CYCLE
-         end do
       end do
 
       File_I(iFile)%nVarPlot  = count(File_I(iFile)%DoPlot_V(1:nVar))
-      File_I(iFile)%nFluxPlot = count(File_I(iFile)%DoPlotFlux_I)
+
       ! indices in the state vector
       allocate(File_I(iFile)%iVarPlot_V(File_I(iFile)%nVarPlot))
       ! determine indices and names of variables
@@ -414,20 +416,6 @@ contains
          iVarPlot = iVarPlot + 1
          File_I(iFile)%iVarPlot_V(iVarPlot) = iVar
       end do
-      if(File_I(iFile)%nFluxPlot > 0)then
-         allocate(File_I(iFile)%iFluxPlot_V(File_I(iFile)%nFluxPlot))
-         iVarPlot = 0
-         do iVar = Flux0_, FluxMax_
-             if(.not.File_I(iFile)%DoPlotFlux_I(iVar)) CYCLE
-            File_I(iFile)%NameVarPlot = &
-                 trim(File_I(iFile)%NameVarPlot)//' '//&
-                 trim(NameFluxChannel_I(iVar))
-            iVarPlot = iVarPlot + 1
-            File_I(iFile) % iFluxPlot_V(iVarPlot) = iVar
-         end do
-      end if
-
-      deallocate(File_I(iFile)%DoPlotFlux_I)
     end subroutine process_mh
     !=============================================================
     subroutine process_distr
@@ -596,10 +584,11 @@ contains
          File_I(iFile) % Buffer_II(1:nVarPlot, 1:iLast) = &
               State_VIB(File_I(iFile) % iVarPlot_V(1:nVarPlot), &
               1:iLast, iBlock)
-         if(nFluxPlot > 0)File_I(iFile)%Buffer_II(&
+         if(File_I(iFile)%DoPlotFlux) then
+            File_I(iFile)%Buffer_II(&
               nVarPlot + 1:nVarPlot + nFluxPlot, 1:iLast) = &
-              Flux_VIB(File_I(iFile)%iFluxPlot_V(1:nFluxPlot), &
-              1:iLast, iBlock)
+              Flux_VIB(Flux0_:FluxMax_, 1:iLast, iBlock)
+         end if
               
          !Parameters
          Param_I(LagrID_:Z_) = FootPoint_VB(LagrID_:Z_,iBlock)
@@ -625,7 +614,9 @@ contains
               nStepIn       = iIter, &
               CoordMinIn_D  = (/State_VIB(LagrID_,1,iBlock)/), &
               CoordMaxIn_D  = (/State_VIB(LagrID_,iLast,iBlock)/), &
-              NameVarIn     = File_I(iFile) % NameVarPlot, &
+              NameVarIn     = &
+              File_I(iFile) % NameVarPlot // ' ' // &
+              File_I(iFile) % NameAuxPlot, &
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nVarPlot + nFluxPlot,1:iLast),&
               ParamIn_I    = Param_I(LagrID_:StartJulian_))
@@ -739,13 +730,10 @@ contains
                  State_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
                  State_VIB(iVarIndex, iAbove,   iBlock) *    Weight
          end do
-         do iVarPlot = 1, nFluxPlot
-            iVarIndex = File_I(iFile)%iFluxPlot_V(iVarPlot)
-            File_I(iFile) % Buffer_II(iVarPlot + nVarPlot, iNode) = &
-                 Flux_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
-                 Flux_VIB(iVarIndex, iAbove,   iBlock) *    Weight
-         end do
-
+         if(File_I(iFile) % DoPlotFlux)&
+              File_I(iFile) % Buffer_II(1+nVarPlot:nFluxPlot+nVarPlot,iNode) =&
+              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
+              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
       end do
 
       ! gather interpolated data on the source processor
@@ -784,7 +772,9 @@ contains
            nStepIn       = iIter, &
            ParamIn_I     = Param_I, &
            Coord1In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)),&
-           NameVarIn     = File_I(iFile) % NameVarPlot, &
+           NameVarIn     = &
+           File_I(iFile) % NameVarPlot // ' ' // &
+           File_I(iFile) % NameAuxPlot, &
            VarIn_VI      = &
            reshape(&
            pack(File_I(iFile) % Buffer_II(1:nVarPlot+nFluxPlot,1:nNode),&
@@ -938,12 +928,10 @@ contains
                  State_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
                  State_VIB(iVarIndex, iAbove,   iBlock) *    Weight
          end do
-         do iVarPlot = 1, nFluxPlot
-            iVarIndex = File_I(iFile)%iFluxPlot_V(iVarPlot)
-            File_I(iFile)%Buffer_II(iVarPlot + nVarPlot, nDataLine) = &
-                 Flux_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
-                 Flux_VIB(iVarIndex, iAbove,   iBlock) *    Weight
-         end do
+         if(File_I(iFile) % DoPlotFlux)&
+              File_I(iFile) % Buffer_II(1+nVarPlot:nFluxPlot+nVarPlot,iNode) =&
+              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
+              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
 
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime
@@ -960,7 +948,9 @@ contains
               ParamIn_I     = Param_I, &
               Coord1In_I    = &
               File_I(iFile) % Buffer_II(1+nVarPlot+nFluxPlot,1:nDataLine), &
-              NameVarIn     = File_I(iFile) % NameVarPlot, &
+              NameVarIn     = &
+              File_I(iFile) % NameVarPlot // ' ' // &
+              File_I(iFile) % NameAuxPlot, &
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nVarPlot+nFluxPlot,1:nDataLine))
       end do
@@ -1046,7 +1036,9 @@ contains
               nStepIn    = iIter, &
               Coord1In_I = Scale_I, &
               Coord2In_I = State_VIB(S_,1:iLast,iBlock), &
-              NameVarIn  = File_I(iFile) % NameVarPlot, &
+              NameVarIn  = &
+              File_I(iFile) % NameVarPlot // ' ' // &
+              File_I(iFile) % NameAuxPlot, &
               VarIn_II   = File_I(iFile) % Buffer_II(:,1:iLast))
       end do
     end subroutine write_distr_1d
