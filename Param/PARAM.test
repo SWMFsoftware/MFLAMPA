@@ -47,6 +47,10 @@ MH_data_e20120123/MH_data.H
 1
 mh1d flux ascii
 
+#DIFFUSION
+T
+0.1
+
 #STOP
 -1			nIterMax
 300			TimeMax
