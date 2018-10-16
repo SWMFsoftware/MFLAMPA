@@ -148,7 +148,7 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
-       case('#INITSPECTRUM', '#TURBULENTSPECTRUM')
+       case('#TURBULENTSPECTRUM', '#INITSPECTRUM', '#ADVECTIONWITHALFVENSPEED')
           call read_param_turbulence(NameCommand)
        case('#DORUN')
           call read_var('DoRun',DoRun)
@@ -216,21 +216,23 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine initialize
-    use SP_ModGrid,         ONLY: init_grid=>init
-    use SP_ModUnit,         ONLY: init_unit=>init 
-    use SP_ModDistribution, ONLY: init_dist=>init
-    use SP_ModAdvance,      ONLY: init_advance=>init
-    use SP_ModPlot,         ONLY: init_plot=>init
-    use SP_ModReadMhData,   ONLY: init_mhdata=>init
+    use SP_ModGrid,         ONLY: init_grid       =>init
+    use SP_ModUnit,         ONLY: init_unit       =>init 
+    use SP_ModDistribution, ONLY: init_dist       =>init
+    ! use SP_ModAdvance,      ONLY: init_advance=>init
+    use SP_ModPlot,         ONLY: init_plot       =>init
+    use SP_ModReadMhData,   ONLY: init_mhdata     =>init
+    use SP_ModTurbulence,   ONLY: init_turbulence => init
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
     !--------------------------------------------------------------------
     call init_grid
     call init_unit
     call init_dist
-    call init_advance
+    ! call init_advance
     call init_plot
     call init_mhdata
+    call init_turbulence
     if(DoRestart) call read_restart
     if((.not.IsStandAlone).and.(.not.DoRestart).and.(.not.DoReadMhData))&
          call get_origin_points
@@ -273,13 +275,15 @@ contains
   end subroutine initialize
   !============================================================================
   subroutine finalize
-    use SP_ModPlot,       ONLY: finalize_plot=>finalize
-    use SP_ModReadMhData, ONLY: finalize_read=>finalize
+    use SP_ModPlot,       ONLY: finalize_plot       =>finalize
+    use SP_ModReadMhData, ONLY: finalize_read       =>finalize
+    use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
     ! finalize the model
     character(LEN=*),parameter:: NameSub='SP:finalize'
     !------------------------------------------------------------------------
     call finalize_plot
     call finalize_read
+    call finalize_turbulence
   end subroutine finalize
   !============================================================================
 
