@@ -11,15 +11,14 @@ module SP_ModAdvance
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP
   use SP_ModGrid, ONLY: State_VIB, iShock_IB,   R_, x_, y_, z_,              &
        Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B 
-  use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, DoInitSpectrum, set_dxx, &
-       set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum, &
+  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx, &
+       set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
 
   implicit none
   SAVE
   PRIVATE ! except
   !Public members:
-  public:: init        !Initialize reused variables 
   public:: read_param  !read injection parameters
   public:: advance     !Advance solution Distribution_IIB
   !\
@@ -43,14 +42,7 @@ module SP_ModAdvance
   !\
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
   !/
-  logical :: DoInit = .true.
 contains
-  subroutine init
-    !----------------------------------------------------------
-    if(.not.DoInit)RETURN
-    DoInit = .false.
-    ! total injection energy (including the rest mass energy)
-  end subroutine init
   !===========================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
@@ -86,7 +78,7 @@ contains
     use SP_ModTime,         ONLY: SPTime
     use SP_ModDiffusion,    ONLY: advance_diffusion
     use SP_ModLogAdvection, ONLY: advance_log_advection
-    use ModConst,           ONLY: cMu, cProtonMass, cGyroradius, RSun
+    use ModConst,           ONLY: cMu, cProtonMass, cGyroradius, Rsun
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_
     use SP_ModUnit,         ONLY: NameParticle, IO2SI_X, SI2IO_x, IO2SI_Rho
     real, intent(in):: TimeLimit
@@ -125,7 +117,7 @@ contains
     ! the diffusion coefficient! Physically, DiffCoeffMin 
     ! should be given by the product of shock wave speed  
     ! and local grid spacing. 
-    real, parameter::  DiffCoeffMinSI =1.0E+04 ! / Rsun
+    real, parameter::  DiffCoeffMinSI =1.0E+04
     ! Full difference between DataInputTime and SPTime
     real      :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
@@ -234,10 +226,9 @@ contains
 
           if(UseTurbulentSpectrum)then
              !Calculate the Alfven speed
-             if (DoInitSpectrum)       &
-                  call init_spectrum(iEnd, nP, XyzSI_DI(x_:z_, 1:iEnd),   &
-                  BSI_I(1:iEnd), MomentumInjSI, DLogP, iShock, CoefInj,   &
-                  MachAlfven)
+             if (DoInitSpectrum) call init_spectrum(iEnd,              &
+                  XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
+                  iShock, CoefInj, MachAlfven)
              call set_wave_advection_rates(iEnd,     &
                   BSI_I(1:iEnd),                     &
                   BOldSI_I(1:iEnd),                  &
@@ -277,36 +268,46 @@ contains
           ! we calculate: "Outer diffusion"=BSI_I and
           ! "Inner diffusion at the injection energy (iP=0)
           call set_coef_diffusion
-          STEP:do iStep = 1, nStep !Currently nStep = 1
 
-             if(UseTurbulentSpectrum)then
-                call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-             end if
+          STEP:do iStep = 1, nStep !Currently nStep = 1
 
              ! update bc for advection
              call set_advection_bc
 
              ! advection in the momentum space
              do iParticle = 2, iEnd
+                if(any(Distribution_IIB(0:nP+1,iParticle,iBlock) <0.0 )) then
+                   write(*,*) NameSub, ': Distribution_IIB < 0'
+                   write(*,*) ' Distribution_IIB ='
+                   write(*,*) Distribution_IIB(0:nP+1,iParticle,iBlock)
+                   call CON_stop(NameSub)
+                end if
+                
                 call advance_log_advection(&
                      FermiFirst_I(iParticle), nP, 1, 1,        &
                      Distribution_IIB(0:nP+1,iParticle,iBlock),&
                      .false.)
              end do
-             if(.not.UseDiffusion) CYCLE STEP 
+             if(.not.UseDiffusion) CYCLE STEP
+
              ! diffusion along the field line
+
+             if(UseTurbulentSpectrum)then
+                call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+             end if
+
              MOMENTUM:do iP = 1, nP
                 ! For each momentum account for dependence
                 ! of the diffusion coefficient on momentum
                 ! D\propto r_L*v\propto Momentum**2/TotalEnergy
                 if(.not. UseTurbulentSpectrum)then
                    vSI = MomentumSI_I(iP)*cLightSpeed**2/EnergySI_I(iP)
-
+                   
                    ! Add v (= p*c^2/E_total in the relativistic case) 
                    ! and (p)^(1/3)
                    DInnerSI_I(1:iEnd) = &
                         CoefDInnerSI_I(1:iEnd)*vSI*(MomentumSI_I(iP))**(1.0/3)
-
+                   
                    ! Add 1/B as the actual diffusion is D/B
                    DInnerSI_I(1:iEnd) = DInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
 
@@ -314,9 +315,10 @@ contains
                         DiffCoeffMinSI/DOuterSI_I(1:iEnd))
                 else
                    do iParticle=1,iEnd
-                      DInnerSI_I(iParticle) = Dxx( &
-                           MomentumInjSI*MomentumSI_I(iP), BSI_I(iParticle), &
-                           iParticle, NameParticle) / BSI_I(iParticle)
+                      DInnerSI_I(iParticle) =                          &
+                           Dxx(iParticle, iP, MomentumSI_I(iP),        &
+                           BSI_I(iParticle), NameParticle)           / &
+                           BSI_I(iParticle)
                    end do
                 end if
 
@@ -325,6 +327,13 @@ contains
                      Distribution_IIB(iP,1:iEnd,iBlock),      &
                      DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
              end do MOMENTUM
+
+             if(UseTurbulentSpectrum)then
+                !call update_spectrum(iEnd,nP,MomentumInjSI,DLogP,XyzSI_DI, &
+                !     Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd),      &
+                !     RhoSI_I(1:iEnd),Dt)
+             end if
+
           end do STEP
        end do PROGRESS
     end do BLOCK
@@ -414,9 +423,10 @@ contains
             ! v (velocity) and (p)^(1/3) are calculated in the momentum do loop
             !/
 
+            ! No idea how the Rsun**2 shows up in SI unit...
             CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
                  (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
-                 *10*(cGyroRadius/BSI_I(1:iEnd))**(1./3)
+                 *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)! /Rsun**2
          else
             ! diffusion is different up- and down-stream
             ! Sokolov et al. 2004, paragraphs before and after eq (4)
@@ -430,13 +440,14 @@ contains
                ! not needed. 
                ! v (velocity) and (p)^(1/3) are calculated in the 
                ! momentum do loop
+
                CoefDInnerSI_I(1:iEnd) =                         &
                     MeanFreePathScaleIO * RadiusSI_I(1:iEnd)    &
-                    *(cLightSpeed/cGEV)**(1.0/3) ! / Rsun
+                    *(cLightSpeed/cGEV)**(1.0/3)
             elsewhere
                CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
                     (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
-                    *10*(cGyroRadius/BSI_I(1:iEnd))**(1./3)
+                    *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)
 
                !\
                ! LEGACY MODEL PREVIOUSLY USED DOWNSTREAM
