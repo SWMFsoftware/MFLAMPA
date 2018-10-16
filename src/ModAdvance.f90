@@ -9,9 +9,9 @@ module SP_ModAdvance
   use SP_ModSize, ONLY: nParticleMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,&
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP
-  use SP_ModGrid, ONLY: State_VIB, iShock_IB,   R_, x_, y_, z_,              &
+  use SP_ModGrid, ONLY: State_VIB, iShock_IB,   R_, x_, y_, z_, iNode_B,      &
        Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B 
-  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx, &
+  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
 
@@ -42,6 +42,10 @@ module SP_ModAdvance
   !\
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
   !/
+
+  logical :: DoTestDiffusion = .false.
+  integer :: iPTest, iParticleTest, iNodeTest
+
 contains
   !===========================================================
   subroutine read_param(NameCommand)
@@ -61,8 +65,13 @@ contains
           ! see Li et al. (2003), doi:10.1029/2002JA009666
           call read_var('MeanFreePathScaleIO [AU]', MeanFreePathScaleIO)
        end if
-    case default
-       call CON_stop(NameSub//' Unknown command '//NameCommand)
+    case('#TESTDIFFUSION')
+       call read_var('DoTestDiffusion', DoTestDiffusion)
+       if (DoTestDiffusion) then
+          call read_var('iPTest',        iPTest)
+          call read_var('iParticleTest', iParticleTest)
+          call read_var('iNodeTest',     iNodeTest)
+       end if
     end select
   end subroutine read_param
   !============================
@@ -150,6 +159,7 @@ contains
     ! the full time interval
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
+
     BLOCK:do iBlock = 1, nBlock
        ! the active particles on the line
        iEnd   = nParticle_B( iBlock)
@@ -320,6 +330,15 @@ contains
                            BSI_I(iParticle), NameParticle)           / &
                            BSI_I(iParticle)
                    end do
+                end if
+
+                if (DoTestDiffusion .and. iNode_B(iBlock) == iNodeTest) then
+                   if (iP == iPTest) then
+                      write(*,*) NameSub, ': DInnerSI at test point/moment', &
+                           ' at iStep =', iStep,                             &
+                           ' iProgress',  iProgress, ' =',                   &
+                           DInnerSI_I(iParticleTest)
+                   end if
                 end if
 
                 call advance_diffusion(Dt, iEnd,              &
