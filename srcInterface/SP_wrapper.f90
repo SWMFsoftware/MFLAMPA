@@ -146,7 +146,8 @@ contains
   end subroutine SP_finalize
   !================================================================
   subroutine SP_set_param(CompInfo,TypeAction)
-    use SP_ModTime,  ONLY: StartTime, SPTime
+    use SP_ModTime,  ONLY: StartTimeJulian, StartTime, SPTime,&
+         time_real_to_julian
     use SP_ModMain,  ONLY: check, read_param
     use SP_ModProc
     use CON_physics, ONLY: get_time
@@ -169,6 +170,7 @@ contains
        if(.not.DoCheck)RETURN
        DoCheck = .false.
        call get_time(tSimulationOut = SPTime, tStartOut = StartTime)
+       call time_real_to_julian(StartTime, StartTimeJulian)
        DataInputTime = SPTime
        call check
     case('READ')

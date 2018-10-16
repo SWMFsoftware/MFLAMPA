@@ -615,8 +615,8 @@ contains
               CoordMinIn_D  = (/State_VIB(LagrID_,1,iBlock)/), &
               CoordMaxIn_D  = (/State_VIB(LagrID_,iLast,iBlock)/), &
               NameVarIn     = &
-              File_I(iFile) % NameVarPlot // ' ' // &
-              File_I(iFile) % NameAuxPlot, &
+              trim(File_I(iFile) % NameVarPlot) // ' ' // &
+              trim(File_I(iFile) % NameAuxPlot), &
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nVarPlot + nFluxPlot,1:iLast),&
               ParamIn_I    = Param_I(LagrID_:StartJulian_))
@@ -773,8 +773,8 @@ contains
            ParamIn_I     = Param_I, &
            Coord1In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)),&
            NameVarIn     = &
-           File_I(iFile) % NameVarPlot // ' ' // &
-           File_I(iFile) % NameAuxPlot, &
+           trim(File_I(iFile) % NameVarPlot) // ' ' // &
+           trim(File_I(iFile) % NameAuxPlot), &
            VarIn_VI      = &
            reshape(&
            pack(File_I(iFile) % Buffer_II(1:nVarPlot+nFluxPlot,1:nNode),&
@@ -949,8 +949,8 @@ contains
               Coord1In_I    = &
               File_I(iFile) % Buffer_II(1+nVarPlot+nFluxPlot,1:nDataLine), &
               NameVarIn     = &
-              File_I(iFile) % NameVarPlot // ' ' // &
-              File_I(iFile) % NameAuxPlot, &
+              trim(File_I(iFile) % NameVarPlot) // ' ' // &
+              trim(File_I(iFile) % NameAuxPlot), &
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nVarPlot+nFluxPlot,1:nDataLine))
       end do
@@ -1037,8 +1037,8 @@ contains
               Coord1In_I = Scale_I, &
               Coord2In_I = State_VIB(S_,1:iLast,iBlock), &
               NameVarIn  = &
-              File_I(iFile) % NameVarPlot // ' ' // &
-              File_I(iFile) % NameAuxPlot, &
+              trim(File_I(iFile) % NameVarPlot) // ' ' // &
+              trim(File_I(iFile) % NameAuxPlot), &
               VarIn_II   = File_I(iFile) % Buffer_II(:,1:iLast))
       end do
     end subroutine write_distr_1d

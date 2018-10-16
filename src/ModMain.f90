@@ -216,12 +216,13 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine initialize
-    use SP_ModGrid,         ONLY: init_grid=>init
-    use SP_ModUnit,         ONLY: init_unit=>init 
-    use SP_ModDistribution, ONLY: init_dist=>init
-    use SP_ModAdvance,      ONLY: init_advance=>init
-    use SP_ModPlot,         ONLY: init_plot=>init
-    use SP_ModReadMhData,   ONLY: init_mhdata=>init
+    use SP_ModGrid,         ONLY: init_grid   => init
+    use SP_ModUnit,         ONLY: init_unit   => init 
+    use SP_ModDistribution, ONLY: init_dist   => init
+    use SP_ModAdvance,      ONLY: init_advance=> init
+    use SP_ModPlot,         ONLY: init_plot   => init
+    use SP_ModReadMhData,   ONLY: init_mhdata => init
+    use SP_ModTime,         ONLY: init_time   => init
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
     !--------------------------------------------------------------------
@@ -234,6 +235,7 @@ contains
     if(DoRestart) call read_restart
     if((.not.IsStandAlone).and.(.not.DoRestart).and.(.not.DoReadMhData))&
          call get_origin_points
+    if(IsStandAlone) call init_time
     DoInit=.false.
   contains
     subroutine get_origin_points

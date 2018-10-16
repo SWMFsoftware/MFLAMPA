@@ -61,13 +61,15 @@ module SP_ModTime
   ! SPTime, we can obtain the date and time, which may be used 
   ! for example, in the file names to label the exact time for
   ! the data sets. 
+
+  ! This is the same default value as in the SWMF
+  integer:: iStartTime_I(7) = (/2000,3,21,10,45,0,0/)  
+
 contains
+
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
-    use ModTimeConvert, ONLY: time_int_to_real
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-    ! This is the same default value as in the SWMF
-    integer      :: iStartTime_I(7) = (/2000,3,21,10,45,0,0/)  
     character(len=*), parameter :: NameSub='SP:read_param_time'
     !---------------
     select case(NameCommand) 
@@ -85,16 +87,42 @@ contains
           call read_var('iMinute',iStartTime_I(5))
           call read_var('iSecond',iStartTime_I(6))
           iStartTime_I(7) = 0
-          call time_int_to_real(iStartTime_I, StartTime)
-          ! also save the start time in Julian days;
-          ! formula is valid for date after March, 1900 to yar 2099
-          StartTimeJulian = 367*iStartTime_I(1) - &
-               floor(7*(iStartTime_I(1)+floor((iStartTime_I(2)+9)/12.))/4.)+&
-               floor(275 * iStartTime_I(2) / 9.) + &
-               iStartTime_I(3) + 1721013.5 +&
-               (iStartTime_I(4)+iStartTime_I(5)/60.+iStartTime_I(6)/3600.)/24.
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
   end subroutine read_param
+  !===========================================================================
+  subroutine init
+    use ModTimeConvert, ONLY: time_int_to_real
+    !------------------------------------------------------
+    call time_int_to_real(iStartTime_I, StartTime)
+    ! also save the start time in Julian days;
+    call time_int_to_julian(iStartTime_I, StartTimeJulian)
+  end subroutine init
+  !===========================================================================
+  subroutine time_real_to_julian(Time, TimeJulian)
+    use ModTimeConvert, ONLY: time_real_to_int
+    ! convert real time info into real julian time
+    real, intent(in)  :: Time
+    real, intent(out) :: TimeJulian
+
+    integer:: iTime_I(7)
+    !------------------------------------------------------------
+    call time_real_to_int(Time, iTime_I)
+    call time_int_to_julian(iTime_I, TimeJulian)
+  end subroutine time_real_to_julian
+  !===========================================================================
+  subroutine time_int_to_julian(iTime_I, TimeJulian)
+    ! convert integer time info into real julian time
+    integer, intent(in)  :: iTime_I(1:7)
+    real,    intent(out) :: TimeJulian
+    !----------------------------------------------------
+    ! formula is valid for date after March, 1900 to yar 2099
+    TimeJulian = 367*iTime_I(1) - &
+               floor(7*(iTime_I(1)+floor((iTime_I(2)+9)/12.))/4.)+&
+               floor(275 * iTime_I(2) / 9.) + &
+               iTime_I(3) + 1721013.5 +&
+               (iTime_I(4)+iTime_I(5)/60.+iTime_I(6)/3600.)/24.
+  end subroutine time_int_to_julian
+    
 end module SP_ModTime
