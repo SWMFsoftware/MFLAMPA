@@ -1,0 +1,2 @@
+$Compiler eq "nagfor"
+	  ${COMPILE.f90} ${Cflag1} ModDistribution.f90
