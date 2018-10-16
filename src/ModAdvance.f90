@@ -154,7 +154,7 @@ contains
 
     real :: vSI
 
-    character(len=*), parameter:: NameSub = 'SP:advance'
+    character(len=*), parameter:: NameSub = 'SP_advance'
     !---------------------------------------------------------------
     ! the full time interval
     DtFull = TimeLimit - SPTime
@@ -334,10 +334,9 @@ contains
 
                 if (DoTestDiffusion .and. iNode_B(iBlock) == iNodeTest) then
                    if (iP == iPTest) then
-                      write(*,*) NameSub, ': DInnerSI at test point/moment', &
-                           ' at iStep =', iStep,                             &
-                           ' iProgress',  iProgress, ' =',                   &
-                           DInnerSI_I(iParticleTest)
+                      write(*,'(a,i3,a,i3,a,es15.7)') NameSub//': iStep =', &
+                           iStep, ' iProgress =',  iProgress,               &
+                           ' DInnerSI =', DInnerSI_I(iParticleTest)
                    end if
                 end if
 
