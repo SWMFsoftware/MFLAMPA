@@ -142,7 +142,7 @@ contains
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL','#DIFFUSION')
+       case('#INJECTION','#CFL','#DIFFUSION', '#TESTDIFFUSION')
           call read_param_adv(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
@@ -219,7 +219,6 @@ contains
     use SP_ModGrid,         ONLY: init_grid       =>init
     use SP_ModUnit,         ONLY: init_unit       =>init 
     use SP_ModDistribution, ONLY: init_dist       =>init
-    ! use SP_ModAdvance,      ONLY: init_advance=>init
     use SP_ModPlot,         ONLY: init_plot       =>init
     use SP_ModReadMhData,   ONLY: init_mhdata     =>init
     use SP_ModTurbulence,   ONLY: init_turbulence => init
@@ -229,13 +228,14 @@ contains
     call init_grid
     call init_unit
     call init_dist
-    ! call init_advance
     call init_plot
     call init_mhdata
     call init_turbulence
     if(DoRestart) call read_restart
     if((.not.IsStandAlone).and.(.not.DoRestart).and.(.not.DoReadMhData))&
          call get_origin_points
+
+    
     DoInit=.false.
   contains
     subroutine get_origin_points
