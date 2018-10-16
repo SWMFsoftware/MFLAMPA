@@ -139,7 +139,7 @@ test_mflampa_rundir:
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cd ${TESTDIR}; cp -f Param/PARAM.test PARAM.in
 	cp Param/MH_data_e20120123.zip ${TESTDIR}/
-	cd ${TESTDIR}; tar xvf MH_data_e20120123.zip
+	cd ${TESTDIR}; unzip MH_data_e20120123.zip
 
 test_mflampa_run:
 	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee -a runlog
