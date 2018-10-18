@@ -114,7 +114,6 @@ allclean: install
 #/
 
 TESTDIR = run_test
-MPIRUN  =             # only one processor
 
 test:
 	-@(${MAKE} test_mflampa)
