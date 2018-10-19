@@ -141,7 +141,7 @@ test_mflampa_rundir:
 	cd ${TESTDIR}; unzip MH_data_e20120123.zip
 
 test_mflampa_run:
-	cd ${TESTDIR}; ${MPIRUN} ${PARALLEL} ${NPFLAG} 1 ./MFLAMPA.exe | tee -a runlog
+	cd ${TESTDIR}; ${PARALLEL} ${NPFLAG} 1 ./MFLAMPA.exe | tee -a runlog
 
 test_mflampa_check:
 	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
