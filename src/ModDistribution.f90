@@ -39,9 +39,10 @@ module SP_ModDistribution
   ! denotaion, P, and a word, momentum - whichever is more covenient
   real:: DLogP        !log(MomentumMaxSI/MomentumInjSI)/nP
 
-  ! Momentum, kinetic energy and total energy (including the rest mass energy) 
-  ! at the momentum grid points
-  real, public, dimension(0:nP+1) :: MomentumSI_I, KinEnergySI_I, EnergySI_I
+  ! speed, momentum, kinetic energy and total energy (including the rest 
+  ! mass energy) at the momentum grid points
+  real, public, dimension(0:nP+1) :: SpeedSI_I, MomentumSI_I, &
+       KinEnergySI_I, EnergySI_I
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_ = 0
@@ -102,6 +103,7 @@ contains
        MomentumSI_I(iP)  = MomentumInjSI*exp(iP*DLogP)
        KinEnergySI_I(iP) = momentum_to_kinetic_energy(MomentumSI_I(iP))
        EnergySI_I(iP)    = momentum_to_energy(MomentumSI_I(iP))
+       SpeedSI_I(iP)     = MomentumSI_I(iP)*cLightSpeed**2/EnergySI_I(iP)
     end do
 
     !\
@@ -155,7 +157,7 @@ contains
     use ModUtilities, ONLY: lower_case
     use SP_ModProc,   ONLY: iProc
     use SP_ModGrid  , ONLY: T_
-    use SP_ModUnit,   ONLY: NameVarUnit_V, NameEnergyUnit
+    use SP_ModUnit,   ONLY: NameVarUnit_V
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
     character(len=*), parameter :: NameSub='SP:read_param_dist'
     integer:: nPCheck = nP, iFluxChannel
@@ -167,17 +169,6 @@ contains
        call read_var('EnergyMin',      EnergyInjIo)
        call read_var('EnergyMax',      EnergyMaxIo)
        call read_var('nP',             nPCheck    )
-       call read_var('NameEnergyUnit', NameEnergyUnit)
-
-       call lower_case(NameEnergyUnit)
-
-       ! Unfortunately this is needed. The reason is that the code does not
-       ! allow that the unit of the kinetic energy of the plasma temperature 
-       ! to be different from the unit of the kinetic energy of particles.
-       ! The default NameVarUnit_V(T_) ='kev', so if NameEnergyUnit is updated,
-       ! NameVarUnit_V(T_) should also be updated. In stand along mode, the 
-       ! code is happy, but should be tested in the coupling run.
-       NameVarUnit_V(T_) = NameEnergyUnit
 
        if(nP/=nPCheck)then
           if(iProc==0)write(*,'(a,i6,a,i6)')NameSub//' '//         &
