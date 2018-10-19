@@ -1,14 +1,14 @@
 !  Copyright (C) 2002 Regents of the University of Michigan, 
 !  portions used with permission 
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!==================================================================
+!==============================================================================
 module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
   use ModNumConst,ONLY: cPi
   use ModConst,   ONLY: cLightSpeed, cGEV
   use SP_ModSize, ONLY: nParticleMax
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,&
-        EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
+        EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, iShock_IB,   R_, x_, y_, z_, iNode_B,      &
        Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B 
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
@@ -36,8 +36,8 @@ module SP_ModAdvance
   !/
   !\
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
-  logical :: UseRealDiffusionUpstream = .false.
-  real    :: MeanFreePathScaleIO = 1.0
+  logical :: UseLiDiffusion = .false.
+  real    :: Lambda0InAu = 1.0
   !/
   !\
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
@@ -47,7 +47,7 @@ module SP_ModAdvance
   integer :: iPTest, iParticleTest, iNodeTest
 
 contains
-  !===========================================================
+  !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
@@ -59,11 +59,11 @@ contains
        call read_var('Efficiency',   CoefInj)
     case('#CFL')
        call read_var('Cfl',CFL)
-    case('#DIFFUSION')
-       call read_var('UseRealDiffusionUpstream',UseRealDiffusionUpstream)
-       if(UseRealDiffusionUpstream)then
+    case('#USELIDIFFUSION')
+       call read_var('UseLiDiffusion',UseLiDiffusion)
+       if(UseLiDiffusion)then
           ! see Li et al. (2003), doi:10.1029/2002JA009666
-          call read_var('MeanFreePathScaleIO [AU]', MeanFreePathScaleIO)
+          call read_var('Lambda0InAu [AU]', Lambda0InAu)
        end if
     case('#TESTDIFFUSION')
        call read_var('DoTestDiffusion', DoTestDiffusion)
@@ -74,7 +74,7 @@ contains
        end if
     end select
   end subroutine read_param
-  !============================
+  !============================================================================
   subroutine advance(TimeLimit)
     ! advance the solution of the diffusive kinetic equation:               
     !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
@@ -152,10 +152,8 @@ contains
          DOuterSI_I, DInnerSI_I, CoefDInnerSI_I
     !/
 
-    real :: vSI
-
     character(len=*), parameter:: NameSub = 'SP_advance'
-    !---------------------------------------------------------------
+    !--------------------------------------------------------------------------
     ! the full time interval
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
@@ -311,12 +309,10 @@ contains
                 ! of the diffusion coefficient on momentum
                 ! D\propto r_L*v\propto Momentum**2/TotalEnergy
                 if(.not. UseTurbulentSpectrum)then
-                   vSI = MomentumSI_I(iP)*cLightSpeed**2/EnergySI_I(iP)
-                   
                    ! Add v (= p*c^2/E_total in the relativistic case) 
                    ! and (p)^(1/3)
-                   DInnerSI_I(1:iEnd) = &
-                        CoefDInnerSI_I(1:iEnd)*vSI*(MomentumSI_I(iP))**(1.0/3)
+                   DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
+                        *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
                    
                    ! Add 1/B as the actual diffusion is D/B
                    DInnerSI_I(1:iEnd) = DInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
@@ -347,9 +343,9 @@ contains
              end do MOMENTUM
 
              if(UseTurbulentSpectrum)then
-                !call update_spectrum(iEnd,nP,MomentumInjSI,DLogP,XyzSI_DI, &
-                !     Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd),      &
-                !     RhoSI_I(1:iEnd),Dt)
+                call update_spectrum(iEnd,nP,MomentumInjSI,DLogP,XyzSI_DI, &
+                     Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd),      &
+                     RhoSI_I(1:iEnd),Dt)
              end if
 
           end do STEP
@@ -361,7 +357,7 @@ contains
       real:: MachAlfven
 
       real:: SpeedAlfvenUpstream, SpeedUpstream
-      !--------------------------------------------
+      !------------------------------------------------------------------------
       ! speed upstream is relative to the shock:
       ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
       SpeedUpstream = RhoSI_I(iShock+1-nWidth)*&
@@ -371,14 +367,14 @@ contains
            sqrt(cMu*RhoSI_I(iShock + nWidth))
       MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
     end function mach_alfven
-    !=======================
+    !==========================================================================
     subroutine steepen_shock
       ! change the density profile near the shock front so it becomes steeper
       ! for the current line
       integer:: iParticle ! loop variable
       real   :: DLogRhoExcessIntegral, DLogRhoExcess
       real, parameter:: DLogRhoBackground = 0.01
-      !---------------------------------------------------------------------
+      !------------------------------------------------------------------------
       ! find the excess of DLogRho within the shock compared to background
       ! averaged over length
       DLogRhoExcessIntegral = 0.0
@@ -422,7 +418,7 @@ contains
       ! different iP
       !/
       if (.not. UseTurbulentSpectrum) then
-         if(.not.UseRealDiffusionUpstream)then
+         if(.not.UseLiDiffusion)then
             !\
             ! Sokolov et al., 2004: eq (4), 
             ! note: Momentum = TotalEnergy * Vel / C**2
@@ -450,17 +446,17 @@ contains
             ! Sokolov et al. 2004, paragraphs before and after eq (4)
             where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
                ! upstream: reset the diffusion coefficient to 
-               ! MeanFreePathScaleIO[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
+               ! Lambda0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
                ! see Li et al. (2003), doi:10.1029/2002JA009666
 
-               ! MeanFreePathScaleIO[AU]*(R/1AU)*(pc/1GeV)^(1/3)
+               ! Lambda0InAu[AU]*(R/1AU)*(pc/1GeV)^(1/3)
                ! In this part, the simulation is done in SI unit, so 1/AU is
                ! not needed. 
                ! v (velocity) and (p)^(1/3) are calculated in the 
                ! momentum do loop
 
-               CoefDInnerSI_I(1:iEnd) =                         &
-                    MeanFreePathScaleIO * RadiusSI_I(1:iEnd)    &
+               CoefDInnerSI_I(1:iEnd) =                    &
+                    Lambda0InAU * RadiusSI_I(1:iEnd)       &
                     *(cLightSpeed/cGEV)**(1.0/3)
             elsewhere
                CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
@@ -492,14 +488,14 @@ contains
            (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
 
     end subroutine set_coef_diffusion
-    !=========================================================================
+    !==========================================================================
     subroutine set_advection_bc
       use SP_ModUnit, ONLY: IO2SI_KinEnergy, kinetic_energy_to_momentum  
       ! set boundary conditions on grid point on the current line
       ! LOCAL VARIABLES:
       integer:: iParticle     ! loop variable
       real   :: MomentumSI    ! Momentum for the thermal energy k_BTi
-      !----------------------------------------
+      !------------------------------------------------------------------------
       do iParticle = 1, iEnd
          ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
          ! f = CoefInj/8/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
@@ -514,5 +510,7 @@ contains
               * (MomentumSI/MomentumInjSI)**SpectralIndex
       end do
     end subroutine set_advection_bc
+    !==========================================================================
   end subroutine advance
+  !============================================================================
 end module SP_ModAdvance
