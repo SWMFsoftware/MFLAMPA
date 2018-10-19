@@ -95,6 +95,7 @@ contains
     use SP_ModPlot,         ONLY: read_param_plot       =>read_param
     use SP_ModReadMHData,   ONLY: read_param_mhdata     =>read_param
     use SP_ModTurbulence,   ONLY: read_param_turbulence =>read_param
+    use SP_ModUnit,         ONLY: read_param_unit       =>read_param
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: &
@@ -142,7 +143,7 @@ contains
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL','#DIFFUSION', '#TESTDIFFUSION')
+       case('#INJECTION','#CFL','#USELIDIFFUSION', '#TESTDIFFUSION')
           call read_param_adv(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
@@ -150,6 +151,8 @@ contains
           call read_param_mhdata(NameCommand)
        case('#TURBULENTSPECTRUM', '#INITSPECTRUM', '#ADVECTIONWITHALFVENSPEED')
           call read_param_turbulence(NameCommand)
+       case('#PARTICLEENERGYUNIT')
+          call read_param_unit(NameCommand)
        case('#DORUN')
           call read_var('DoRun',DoRun)
        case('#TIMING')

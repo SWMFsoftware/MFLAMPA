@@ -21,7 +21,7 @@ module SP_ModUnit
   ! Convert particle momentum to energy or kinetic energy and
   ! kinetic energy to momnetum, for proton
   public :: kinetic_energy_to_momentum, momentum_to_energy, &
-       momentum_to_kinetic_energy
+       momentum_to_kinetic_energy, read_param
 
   ! Only protons are simulated at this moment
   character(len=*), public, parameter :: NameParticle = 'proton'
@@ -68,39 +68,32 @@ module SP_ModUnit
 
   logical :: DoInit = .true.
 contains
+  !============================================================================
+  subroutine read_param(NameCommand)
+    use ModReadParam, ONLY: read_var
+    use ModUtilities, ONLY: lower_case
+    use SP_ModGrid  , ONLY: T_
+    character(len=*), intent(in):: NameCommand ! From PARAM.in  
+    character(len=*), parameter :: NameSub='SP:read_param_unit'
+    !--------------------------------------------------------------------------
+    select case(NameCommand)
+    case('#PARTICLEENERGYUNIT')
+       !Read unit to be used for particle energy: eV, keV, GeV
+       call read_var('ParticleEnergyUnit', NameEnergyUnit)
 
-  !--------------------------------------------------------------------------
-  ! This subroutine is moved to ModDistribution. The reason is if the user 
-  ! changes EnergyInjIo and EnergyMaxIo in #MOMENTUMGRID, it is convenient
-  ! to specify the unit at the same command.
-  !--------------------------------------------------------------------------
+       call lower_case(NameEnergyUnit)
 
-  ! subroutine read_param(NameCommand)
-  !   use ModReadParam, ONLY: read_var
-  !   use ModUtilities, ONLY: lower_case
-  !   use SP_ModGrid  , ONLY: T_
-  !   character(len=*), intent(in):: NameCommand ! From PARAM.in  
-  !   character(len=*), parameter :: NameSub='SP:read_param_unit'
-  !   !----------------------------------------------------------
-  !   select case(NameCommand)
-  !   case('#PARTICLEENERGYUNIT')
-  !      !Read unit to be used for particle energy: eV, keV, GeV
-  !      call read_var('ParticleEnergyUnit',NameEnergyUnit)
-  !      call lower_case(NameEnergyUnit)
-  ! 
-  !      ! Double check this, NameVarUnit_V(T_) shouldn't be fixed
-  !      ! as no unit conversions could not found.
-  !      NameVarUnit_V(T_) = NameEnergyUnit//'   '
-  !   case default
-  !      call CON_stop(NameSub//'Unknown command '//NameCommand)
-  !   end select
-  ! end subroutine read_param
-  !==============
+       NameVarUnit_V(T_) = NameEnergyUnit//'   '
+    case default
+       call CON_stop(NameSub//' Unknown command '//NameCommand)
+    end select
+  end subroutine read_param
+  !============================================================================
   subroutine init
     character(len=*), parameter :: NameSub='SP:init_unit'
-    !------------------
+    !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
-    DoInit = .false.
+
     ! account for units of energy
     IO2SI_KinEnergy = energy_in(NameEnergyUnit)
 
@@ -111,25 +104,26 @@ contains
     SI2IO_rho       = 1/IO2SI_rho
     SI2IO_KinEnergy = 1/IO2SI_KinEnergy
 
+    DoInit = .false.
   end subroutine init
-  !==============
+  !============================================================================
   real function kinetic_energy_to_momentum(Energy)
     real, intent(in) :: Energy
-    !---------------
+    !--------------------------------------------------------------------------
     kinetic_energy_to_momentum = &
          gen_kin_energy_to_momentum(Energy, NameParticle)
   end function kinetic_energy_to_momentum
-  !======================================
+  !============================================================================
   real function momentum_to_energy(Momentum)
     real, intent(in) :: Momentum
-    !---------------
+    !--------------------------------------------------------------------------
     momentum_to_energy = &
          gen_momentum_to_energy(Momentum, NameParticle)
   end function momentum_to_energy
-  !==============================
+  !============================================================================
   real function momentum_to_kinetic_energy(Momentum)
     real, intent(in) :: Momentum
-    !---------------
+    !--------------------------------------------------------------------------
     momentum_to_kinetic_energy = &
          gen_momentum_to_kin_energy(Momentum, NameParticle)
   end function momentum_to_kinetic_energy
