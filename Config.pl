@@ -123,10 +123,9 @@ sub print_help{
     print "
 Additional options for MFLAMPA/Config.pl:
 
--g=nP,nLon,nLat 
+-g=nP
                 Set grid size. 
                 nP is maximum number of particles per field line,
-                nLon, nLat are the grid size at the origin surface.
 \n";
     exit 0;
 }
