@@ -222,9 +222,9 @@ contains
                 KSI = kOverBSI_I(iK)*BSI_I(iParticle)
 
                 IPlusSI_IX( iK,iParticle) = &
-                     (1.0-Alpha)*ICSI_X(iParticle)/KSI
+                     (1.0 - Alpha)*ICSI_X(iParticle)/KSI
                 IMinusSI_IX(iK,iParticle) = &
-                     Alpha/(1.0-Alpha)*IPlusSI_IX(iK,iParticle)
+                     Alpha/(1.0 - Alpha)*IPlusSI_IX(iK,iParticle)
              end do
              CorrectionMode_X(iParticle)=2
           else
