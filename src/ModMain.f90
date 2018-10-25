@@ -13,7 +13,7 @@ module SP_ModMain
        Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
        RhoOld_, iShock_IB, iNode_B, State_VIB, FootPoint_VB,      &
        nLat, nLon, nNode
-       
+  use SP_ModUnit,    ONLY: SI2IO_I, UnitEnergy_
   use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
   use SP_ModTime,    ONLY: SPTime, DataInputTime, iIter
   implicit none
@@ -75,6 +75,10 @@ module SP_ModMain
 
   ! Methods and variables from ModReadMhData
   public:: DoReadMhData
+
+  ! Methods and variables from ModUnit
+  public:: SI2IO_I, UnitEnergy_
+
   !\
   ! Logicals for actions
   !----------------------------------------------------------------------------

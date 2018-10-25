@@ -15,6 +15,7 @@ module SP_ModPlot
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
   use SP_ModProc, ONLY: iProc
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, remove_file
   use ModIoUnit, ONLY: UnitTmp_
@@ -60,6 +61,8 @@ module SP_ModPlot
      ! file name extension
      character(len=4 ):: NameFileExtension  !.out, .tec etc
      character(len=20):: TypeFile           !tec, idl, ascii, real8
+     ! additional info to put into header
+     character(len=300):: StringHeaderAux
      ! whether it is the first call
      ! USED ONLY IN write_mh_time  FOR NOW!!!
      logical:: IsFirstCall
@@ -164,6 +167,16 @@ contains
              File_I(iFile)%NameVarPlot = &
                   trim(File_I(iFile)%NameVarPlot)//' '//&
                   trim(NameFluxChannel_I(iVar))
+             select case(File_I(iFile)%TypeFile)
+             case('tec')
+                File_I(iFile)%NameVarPlot = &
+                     trim(File_I(iFile)%NameVarPlot)//'_['//&
+                     trim(NameFluxUnit_I(iVar))//']'
+             case default
+                File_I(iFile)%StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)//&
+                     ' '//trim(NameFluxUnit_I(iVar))
+             end select
           end do
        end if
        ! prepare the output dta containers
@@ -297,6 +310,13 @@ contains
           ! reset variables' and parameters' names
           File_I(iFile) % NameVarPlot = ''
           File_I(iFile) % NameAuxPlot = ''
+          select case(File_I(iFile)%TypeFile)
+          case('tec')
+             File_I(iFile) % StringHeaderAux = ''
+          case default
+             File_I(iFile) % StringHeaderAux = 'Units:'
+          end select
+
           
           ! based on kind of data process the requested output
           select case(File_I(iFile) % iKindData)
@@ -413,6 +433,16 @@ contains
          File_I(iFile)%NameVarPlot = &
               trim(File_I(iFile)%NameVarPlot)//' '//&
               trim(NameVar_V(iVar))
+         select case(File_I(iFile)%TypeFile)
+         case('tec')
+            File_I(iFile)%NameVarPlot = &
+                 trim(File_I(iFile)%NameVarPlot)//'_['//&
+                 trim(NameVarUnit_V(iVar))//']'
+         case default
+            File_I(iFile)%StringHeaderAux = &
+                 trim(File_I(iFile)%StringHeaderAux)//&
+                 ' '//trim(NameVarUnit_V(iVar))
+         end select
          iVarPlot = iVarPlot + 1
          File_I(iFile)%iVarPlot_V(iVarPlot) = iVar
       end do
@@ -512,7 +542,7 @@ contains
       ! name of the output file
       character(len=100):: NameFile
       ! header for the file
-      character(len=200):: StringHeader
+      character(len=500):: StringHeader
       ! loop variables
       integer:: iBlock, iParticle, iVarPlot
       ! indexes of corresponding node, latitude and longitude
@@ -560,7 +590,8 @@ contains
       nFluxPlot = File_I(iFile)%nFluxPlot
       StringHeader = &
            'MFLAMPA: data along a field line; '//&
-           'Coordindate system: '//trim(TypeCoordSystem)           
+           'Coordindate system: '//trim(TypeCoordSystem)//'; '&
+           //trim(File_I(iFile)%StringHeaderAux)
       do iBlock = 1, nBlock
          iNode = iNode_B(iBlock)
          call get_node_indexes(iNode, iLon, iLat)
@@ -633,7 +664,7 @@ contains
       ! name of the output file
       character(len=100):: NameFile
       ! header of the output file
-      character(len=200):: StringHeader
+      character(len=500):: StringHeader
       ! loop variables
       integer:: iBlock, iParticle, iVarPlot, iVarIndex
       ! indexes of corresponding node, latitude and longitude
@@ -665,7 +696,8 @@ contains
       ! header for the output file
       StringHeader = &
            'MFLAMPA: data on a sphere at fixed heliocentric distance; '//&
-           'Coordindate system: '//trim(TypeCoordSystem)           
+           'Coordindate system: '//trim(TypeCoordSystem)//'; '&
+           //trim(File_I(iFile)%StringHeaderAux)
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0
@@ -817,7 +849,7 @@ contains
       integer, parameter:: StartJulian_= StartTime_ + 1
       real :: Param_I(1:StartJulian_)
       ! header for the file
-      character(len=200):: StringHeader
+      character(len=500):: StringHeader
       character(len=*), parameter:: NameSub='write_mh_time'
       !------------------------------------------------------------------------
       nVarPlot = File_I(iFile)%nVarPlot
@@ -825,7 +857,8 @@ contains
       ! set header
       StringHeader = &
            'MFLAMPA: data on a field line at fixed heliocentric distance; '//&
-           'Coordindate system: '//trim(TypeCoordSystem)           
+           'Coordindate system: '//trim(TypeCoordSystem)//'; '&
+           //trim(File_I(iFile)%StringHeaderAux)
 
       !\
       ! at first call, remove files if they exist to reset time series output

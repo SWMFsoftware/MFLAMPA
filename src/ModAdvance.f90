@@ -14,6 +14,9 @@ module SP_ModAdvance
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
+  use SP_ModUnit, ONLY: UnitX_, UnitRho_, UnitEnergy_,                        &
+       NameParticle, IO2SI_I, kinetic_energy_to_momentum
+
 
   implicit none
   SAVE
@@ -89,7 +92,6 @@ contains
     use SP_ModLogAdvection, ONLY: advance_log_advection
     use ModConst,           ONLY: cMu, cProtonMass, cGyroradius, Rsun
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_
-    use SP_ModUnit,         ONLY: NameParticle, IO2SI_X, SI2IO_x, IO2SI_Rho
     real, intent(in):: TimeLimit
     !\
     ! Loop variables
@@ -168,16 +170,15 @@ contains
        ! amu/m^3, temperature is in the unit of kinetic energy, all others
        ! are in SI units. So to convert the IO units, only need three
        ! conversion factors are needed:
-       ! UnitX_ (IO2SI_X), UnitRho_ (IO2SI_Rho) and 
-       ! UnitTemperature_ (IO2SI_KinEnergy). 
-       XyzSI_DI(x_,1:iEnd) = State_VIB(x_,      1:iEnd,iBlock)*IO2SI_X
-       XyzSI_DI(y_,1:iEnd) = State_VIB(y_,      1:iEnd,iBlock)*IO2SI_X
-       XyzSI_DI(z_,1:iEnd) = State_VIB(z_,      1:iEnd,iBlock)*IO2SI_X
-       DsSI_I(1:iEnd)      = State_VIB(D_,      1:iEnd,iBlock)*IO2SI_X
-       RadiusSI_I( 1:iEnd) = State_VIB(R_,      1:iEnd,iBlock)*IO2SI_X
-       uSI_I(      1:iEnd) = State_VIB(U_,      1:iEnd,iBlock)
-       BOldSI_I(   1:iEnd) = State_VIB(BOld_,   1:iEnd,iBlock)
-       RhoOldSI_I( 1:iEnd) = State_VIB(RhoOld_, 1:iEnd,iBlock)*IO2SI_Rho
+       ! UnitX_, UnitRho_, UnitEnergy_
+       XyzSI_DI(x_,1:iEnd) = State_VIB(x_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       XyzSI_DI(y_,1:iEnd) = State_VIB(y_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       XyzSI_DI(z_,1:iEnd) = State_VIB(z_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iBlock)
+       BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iBlock)
+       RhoOldSI_I( 1:iEnd) = State_VIB(RhoOld_,1:iEnd,iBlock)*IO2SI_I(UnitRho_)
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iBlock)
@@ -208,7 +209,7 @@ contains
                State_VIB(RhoOld_,1:iEnd,iBlock))
 
           nSI_I(1:iEnd)   = n_I(1:iEnd)
-          RhoSI_I(1:iEnd) = n_I(1:iEnd)*IO2SI_Rho
+          RhoSI_I(1:iEnd) = n_I(1:iEnd)*IO2SI_I(UnitRho_)
 
           ! dimensionless
           DLogRho_I(1:iEnd)=log(RhoSI_I(1:iEnd)/RhoOldSI_I(1:iEnd))
@@ -490,7 +491,6 @@ contains
     end subroutine set_coef_diffusion
     !==========================================================================
     subroutine set_advection_bc
-      use SP_ModUnit, ONLY: IO2SI_KinEnergy, kinetic_energy_to_momentum  
       ! set boundary conditions on grid point on the current line
       ! LOCAL VARIABLES:
       integer:: iParticle     ! loop variable
@@ -503,7 +503,7 @@ contains
          ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic 
          ! temperature.
          MomentumSI = kinetic_energy_to_momentum(                  &
-              State_VIB(T_,iParticle,iBlock)*IO2SI_KinEnergy)
+              State_VIB(T_,iParticle,iBlock)*IO2SI_I(UnitEnergy_))
          Distribution_IIB(0,iParticle,iBlock) =                    &
               CoefInj*1.0/(4*(SpectralIndex-3)*cPi)                &
               * nSI_I(iParticle)/MomentumSI**3                     &

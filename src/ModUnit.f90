@@ -31,13 +31,15 @@ module SP_ModUnit
   character(len=3), public :: NameEnergyUnit = 'kev'
 
   ! Integral flux unit is SI
-  character(len=6), parameter :: NameFluxUnit   = 'p.f.u.'
-  real, public,     parameter :: UnitParticleFluxSI = 10000.0
+  character(len=6), public,parameter  :: NameFluxUnit   = 'p.f.u.'
+  real,                    parameter  :: UnitParticleFluxSI = 10000.0
+  character(len=12),public,parameter  :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
+  character(len=12),public,allocatable:: NameFluxUnit_I(:)
 
   ! Unit conversions
-  real, public :: IO2SI_x, IO2SI_rho
-  real, public :: SI2IO_x, SI2IO_rho
-  real, public :: IO2SI_KinEnergy, SI2IO_KinEnergy
+  integer, public, parameter:: &
+       UnitX_ = 1, UnitRho_ = 2, UnitEnergy_ = 3, UnitFlux_ = 4, UnitEFlux_ = 5
+  real, public, dimension(UnitX_:UnitEFlux_) :: IO2SI_I, SI2IO_I
 
   ! Unit for all the state variables: 
   ! Length is in the unit of Rs, Rho is in the unit of amu/m^3, 
@@ -94,15 +96,14 @@ contains
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
 
-    ! account for units of energy
-    IO2SI_KinEnergy = energy_in(NameEnergyUnit)
-
     ! unit conversion
-    IO2SI_x         = Rsun
-    IO2SI_rho       = cProtonMass
-    SI2IO_x         = 1/IO2SI_x
-    SI2IO_rho       = 1/IO2SI_rho
-    SI2IO_KinEnergy = 1/IO2SI_KinEnergy
+    IO2SI_I(UnitX_)      = Rsun
+    IO2SI_I(UnitRho_)    = cProtonMass
+    IO2SI_I(UnitEnergy_) = energy_in(NameEnergyUnit)
+    IO2SI_I(UnitFlux_)   = UnitParticleFluxSI
+    IO2SI_I(UnitEFlux_)  = IO2SI_I(UnitEnergy_) * IO2SI_I(UnitFlux_)
+
+    SI2IO_I = 1.0 / IO2SI_I
 
     DoInit = .false.
   end subroutine init

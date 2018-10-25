@@ -8,8 +8,8 @@ module SP_ModDistribution
   use ModNumConst,ONLY: cTiny
   use ModConst,   ONLY: cLightSpeed, energy_in
   use SP_ModSize, ONLY: nParticleMax, nP=>nMomentum
-  use SP_ModUnit, ONLY: IO2SI_KinEnergy, &
-       UnitFluxSI => UnitParticleFluxSI,&
+  use SP_ModUnit, ONLY: NameFluxUnit, NameEnergyFluxUnit,&
+       IO2SI_I, SI2IO_I, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid, ONLY: nBlock, nParticle_B
   implicit none
@@ -90,8 +90,8 @@ contains
     DoInit = .false.
 
     ! convert energies to momenta
-    MomentumInjSI  = kinetic_energy_to_momentum(EnergyInjIo*IO2SI_KinEnergy)
-    MomentumMaxSI  = kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_KinEnergy)  
+    MomentumInjSI= kinetic_energy_to_momentum(EnergyInjIo*IO2SI_I(UnitEnergy_))
+    MomentumMaxSI= kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_I(UnitEnergy_))  
 
     ! grid size in the log momentum space
     DLogP = log(MomentumMaxSI/MomentumInjSI)/nP
@@ -123,7 +123,7 @@ contains
           do iP = 0, nP +1
              Distribution_IIB(iP,iParticle,iBlock) =                         &
                   FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSI_I(iP)**2   &
-                  *UnitFluxSI/IO2SI_KinEnergy
+                  *IO2SI_I(UnitFlux_)/IO2SI_I(UnitEnergy_)
 
           end do
        end do
@@ -138,8 +138,13 @@ contains
             'eflux     '/)
        if(allocated(EChannelIO_I))&
             deallocate(EChannelIO_I)
-          allocate (EChannelIO_I(nFluxChannel))
-          EChannelIO_I = (/5,10,30,50,60,100/)
+       allocate (EChannelIO_I(nFluxChannel))
+       EChannelIO_I = (/5,10,30,50,60,100/)
+       if(allocated(NameFluxUnit_I))&
+            deallocate(NameFluxUnit_I)
+       allocate(NameFluxUnit_I(0:nFluxChannel+1))
+       NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
+       NameFluxUnit_I(1+nFluxChannel) = NameEnergyFluxUnit
     end if
 
     if (.not. allocated(Flux_VIB)) then
@@ -154,10 +159,7 @@ contains
   !================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
-    use ModUtilities, ONLY: lower_case
     use SP_ModProc,   ONLY: iProc
-    use SP_ModGrid  , ONLY: T_
-    use SP_ModUnit,   ONLY: NameVarUnit_V
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
     character(len=*), parameter :: NameSub='SP:read_param_dist'
     integer:: nPCheck = nP, iFluxChannel
@@ -189,7 +191,9 @@ contains
        if (allocated(EChannelIO_I)) deallocate(EChannelIO_I)
        allocate(EChannelIO_I(nFluxChannel))
        if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(NameFluxChannel_I(0:nFluxChannel+1))
+       allocate(NameFluxChannel_I(0:FluxMax_))
+       if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
+       allocate(NameFluxUnit_I(0:FluxMax_))
 
        NameFluxChannel_I(0)              = 'flux_total'
        NameFluxChannel_I(nFluxChannel+1) = 'eflux'
@@ -199,6 +203,10 @@ contains
           write(NameFluxChannel,'(I5.5)') int(EChannelIO_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
+
+       NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
+       NameFluxUnit_I(EFlux_)         = NameEnergyFluxUnit
+
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -350,9 +358,12 @@ contains
           end do
 
           ! store the results
-          Flux_VIB(Flux0_,       iParticle, iBlock) = Flux
-          Flux_VIB(FluxFirst_:FluxLast_,iParticle, iBlock) = Flux_I
-          Flux_VIB(EFlux_,       iParticle, iBlock) = EFlux
+          Flux_VIB(Flux0_,              iParticle, iBlock) = &
+               Flux   * SI2IO_I(UnitFlux_)
+          Flux_VIB(FluxFirst_:FluxLast_,iParticle, iBlock) = &
+               Flux_I * SI2IO_I(UnitFlux_)
+          Flux_VIB(EFlux_,              iParticle, iBlock) = &
+               EFlux  * SI2IO_I(UnitEFlux_)
        end do
     end do
 

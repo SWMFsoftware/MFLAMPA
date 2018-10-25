@@ -4,7 +4,6 @@
 !==================================================================
 module SP_wrapper
 
-  use SP_ModUnit, ONLY: SI2IO_KinEnergy
   use SP_ModMain, ONLY: &
        run, save_restart, &
        DoRestart, DoReadMhData, &
@@ -15,7 +14,8 @@ module SP_wrapper
        iNode_B, FootPoint_VB, DataInputTime, &
        nParticle_B, Length_,&
        LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_,  Ux_, Uz_, T_, &
-       Wave1_, Wave2_, R_
+       Wave1_, Wave2_, R_, &
+       SI2IO_I, UnitEnergy_
   use CON_comp_info
   use CON_router, ONLY: IndexPtrType, WeightPtrType
   use CON_coupler, ONLY: &
@@ -247,7 +247,7 @@ contains
             + Buff_I(iRho)/cProtonMass*Weight
        if(DoCoupleVar_V(Pressure_))&
             State_VIB(T_,i,iBlock) = Aux*State_VIB(T_,i,iBlock) + &
-            Buff_I(iP)/Buff_I(iRho)*cProtonMass*SI2IO_KinEnergy*Weight
+            Buff_I(iP)/Buff_I(iRho)*cProtonMass*SI2IO_I(UnitEnergy_)*Weight
        if(DoCoupleVar_V(Momentum_))&
             State_VIB(Ux_:Uz_,i,iBlock) = Aux*State_VIB(Ux_:Uz_,i,iBlock) + &
             Buff_I(iMx:iMz) / Buff_I(iRho) * Weight
