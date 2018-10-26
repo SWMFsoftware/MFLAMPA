@@ -57,7 +57,7 @@ mh1d flux ascii
 
 #USELIDIFFUSION
 T
-0.1
+0.3
 
 #STOP
 -1			nIterMax

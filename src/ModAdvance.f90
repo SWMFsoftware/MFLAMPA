@@ -447,17 +447,15 @@ contains
             ! Sokolov et al. 2004, paragraphs before and after eq (4)
             where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
                ! upstream: reset the diffusion coefficient to 
-               ! Lambda0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
+               ! (1/3)*Lambda0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
                ! see Li et al. (2003), doi:10.1029/2002JA009666
 
-               ! Lambda0InAu[AU]*(R/1AU)*(pc/1GeV)^(1/3)
-               ! In this part, the simulation is done in SI unit, so 1/AU is
-               ! not needed. 
+               ! 1/AU cancels with unit of Lambda0,no special attention needed;
                ! v (velocity) and (p)^(1/3) are calculated in the 
                ! momentum do loop
 
                CoefDInnerSI_I(1:iEnd) =                    &
-                    Lambda0InAU * RadiusSI_I(1:iEnd)       &
+                    (1.0/3)*Lambda0InAU * RadiusSI_I(1:iEnd)       &
                     *(cLightSpeed/cGEV)**(1.0/3)
             elsewhere
                CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
