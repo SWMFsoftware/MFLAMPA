@@ -962,9 +962,9 @@ contains
                  State_VIB(iVarIndex, iAbove,   iBlock) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile) % Buffer_II(1+nVarPlot:nFluxPlot+nVarPlot,iNode) =&
-              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
-              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
+             File_I(iFile)%Buffer_II(1+nVarPlot:nFluxPlot+nVarPlot,nDataLine)=&
+             Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
+             Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
 
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime
