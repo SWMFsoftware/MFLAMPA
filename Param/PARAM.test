@@ -33,7 +33,6 @@ T			UseDiffusion
 #GRIDNODE
 1
 1
-1
 
 #READMHDATA
 T
@@ -44,8 +43,12 @@ real8
 MH_data_e20120123/MH_data.H
 
 #SAVEPLOT
-1
+3
 mh1d flux ascii
+mh2d flux ascii
+215.0
+mhtime flux ascii
+215.0
 
 #STOP
 -1			nIterMax

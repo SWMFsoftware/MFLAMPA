@@ -144,7 +144,9 @@ test_mflampa_run:
 	cd ${TESTDIR}; ${PARALLEL} ${NPFLAG} 1 ./MFLAMPA.exe | tee -a runlog
 
 test_mflampa_check:
+	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
+		> ${TESTDIR}/SP/IO2/MH_data.out
 	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
 		Param/TestOutput/test_mflampa/MH_data.ref \
-	${TESTDIR}/SP/IO2/MH_data_*n000006.out > test_mflampa.diff
+	${TESTDIR}/SP/IO2/MH_data.out > test_mflampa.diff
 
