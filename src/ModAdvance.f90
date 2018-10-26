@@ -255,14 +255,14 @@ contains
           end if
 
           !\
-          ! Check if the number of time steps is greater than 1:
+          ! Check if the number of time steps is positive:
           !/
-          if(nStep <= 1) then
+          if(nStep < 1) then
              if(UseTurbulentSpectrum) &
                   write(*,*) ' DtReduction               =', DtReduction
              write(*,*) ' maxval(abs(FermiFirst_I)) =', &
                   maxval(abs(FermiFirst_I(2:iEnd)))
-             call CON_stop(NameSub//': nStep <= 1????')
+             call CON_stop(NameSub//': nStep <= 0????')
           end if
 
           RhoOldSI_I(1:iEnd) = RhoSI_I(1:iEnd)
@@ -278,7 +278,7 @@ contains
           ! "Inner diffusion at the injection energy (iP=0)
           call set_coef_diffusion
 
-          STEP:do iStep = 1, nStep !Currently nStep = 1
+          STEP:do iStep = 1, nStep
 
              ! update bc for advection
              call set_advection_bc
