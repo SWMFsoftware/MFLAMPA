@@ -180,10 +180,9 @@ contains
                call CON_stop(NameSub//': Invalid setting for line smoothing')
        end if
     case('#GRIDNODE')
-       call read_var('nNode', nNode)
        call read_var('nLat',  nLat)
        call read_var('nLon',  nLon)
-       if (nNode /= nLat*nLon) call CON_stop(NameSub//': correct nNode')
+       nNode = nLat * nLon
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
