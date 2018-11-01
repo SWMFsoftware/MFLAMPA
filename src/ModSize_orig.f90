@@ -7,8 +7,7 @@ module SP_ModSize
 
   private ! except
   public:: &
-       nDim, nMomentum, nPitchAngle, IsPitchAngleAveraged, & 
-       nParticleMax
+       nDim, nMomentum, nParticleMax
 
   ! Dimensionality
   integer, parameter:: nDim = 3
