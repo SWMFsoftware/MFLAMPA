@@ -161,13 +161,17 @@ contains
        call read_var('nLon',     nLonCheck)
        call read_var('nLat',     nLatCheck)
        if(iProc==0.and.any(&
-            (/nParticleMax,     nLon,     nLat/) /= &
-            (/nParticleCheck,nLonCheck,nLatCheck/)))then
-          write(*,*)&
-               'Code is compiled with nParticleMax,nLon,nLat=',&
-               (/nParticleMax, nLon, nLat/)
-          call CON_stop(&
-               'Change nParticle,nLon,nLat with Config.pl -g ')
+            (/nLon,     nLat/) /= &
+            (/nLonCheck,nLatCheck/))&
+            )write(*,'(a,2I5)') 'nLon,nLat are reset to ',&
+               nLonCheck, nLatCheck
+       nLon = nLonCheck
+       nLat = nLatCheck
+       nNode = nLon*nLat
+       if(nParticleCheck > nParticleMax)then
+          if(iProc==0)write(*,*)&
+               'nParticleMax is too small, use ./Config.pl -g=',nParticleCheck
+          call CON_stop('Code stopped')
        end if
     case('#COORDSYSTEM','#COORDINATESYSTEM')
        call read_var('TypeCoordSystem', TypeCoordSystem, &
@@ -232,12 +236,12 @@ contains
     !\
     ! fill grid containers
     !/
-    iBlock = 1
+    iBlock = 1; iProcNode = 0
     do iLat = 1, nLat
        do iLon = 1, nLon
           iNode = iLon + nLon * (iLat-1)
           iNode_II(iLon, iLat) = iNode
-          iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
+          !iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
           if(iProcNode==iProc)then
              iNode_B(     iBlock) = iNode
              nParticle_B( iBlock) = 0
@@ -246,7 +250,10 @@ contains
           iGridGlobal_IA(Proc_,   iNode)  = iProcNode
           iGridGlobal_IA(Block_,  iNode)  = iBlock
           if(iNode == ((iProcNode+1)*nNode)/nProc)then
-             iBlock = 1
+             !\
+             ! This was the last node on the iProcNode
+             !/
+             iBlock = 1; iProcNode = iProcNode + 1
           else
              iBlock = iBlock + 1
           end if
