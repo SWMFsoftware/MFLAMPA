@@ -1,6 +1,6 @@
-#  Copyright (C) 2002 Regents of the University of Michigan, 
-#  portions used with permission 
-#  For more information, see http://csem.engin.umich.edu/tools/swmf
+# Copyright (C) 2002 Regents of the University of Michigan, 
+# portions used with permission 
+# For more information, see http://csem.engin.umich.edu/tools/swmf
 
 DEFAULT_TARGET = MFLAMPA
 DEFAULT_EXE    = ${DEFAULT_TARGET}.exe
