@@ -146,6 +146,8 @@ module SP_ModGrid
   ! size of groups used for smoothing
   integer:: nSmooth = -1
 
+  ! Test position and momentum
+  integer, public :: iPTest =1, iParticleTest = 99, iNodeTest =1
 contains  
   !================================================================
   subroutine read_param(NameCommand)
@@ -183,6 +185,10 @@ contains
        call read_var('nLat',  nLat)
        call read_var('nLon',  nLon)
        nNode = nLat * nLon
+    case('#TESTPOS')
+       call read_var('iNodeTest',     iNodeTest)
+       call read_var('iParticleTest', iParticleTest)
+       call read_var('iPTest',        iPTest)
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
