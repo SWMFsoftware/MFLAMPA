@@ -30,17 +30,15 @@ T			UseDiffusion
 21			RBufferMax
 220			RMax
 
-#GRIDNODE
-1
-1
+
+
+#INCLUDE
+MH_data_e20120123/MH_data.H
 
 #READMHDATA
 T
 MH_data_e20120123
 real8
-
-#INCLUDE
-MH_data_e20120123/MH_data.H
 
 #SAVEPLOT
 3

@@ -1,6 +1,6 @@
-#  Copyright (C) 2002 Regents of the University of Michigan, 
-#  portions used with permission 
-#  For more information, see http://csem.engin.umich.edu/tools/swmf
+# Copyright (C) 2002 Regents of the University of Michigan, 
+# portions used with permission 
+# For more information, see http://csem.engin.umich.edu/tools/swmf
 
 DEFAULT_TARGET = MFLAMPA
 DEFAULT_EXE    = ${DEFAULT_TARGET}.exe
@@ -140,8 +140,10 @@ test_mflampa_rundir:
 	cp Param/MH_data_e20120123.zip ${TESTDIR}/
 	cd ${TESTDIR}; unzip MH_data_e20120123.zip
 
+NP = 1
+
 test_mflampa_run:
-	cd ${TESTDIR}; ${PARALLEL} ${NPFLAG} 1 ./MFLAMPA.exe | tee -a runlog
+	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee -a runlog
 
 test_mflampa_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \

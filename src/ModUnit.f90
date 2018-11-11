@@ -32,8 +32,11 @@ module SP_ModUnit
 
   ! Integral flux unit is SI
   character(len=6), public,parameter  :: NameFluxUnit   = 'p.f.u.'
+  !\
+  ! Unit particle flux, 1 particle per cm2 per s per steradian,
+  ! corresponds to 10,000 particles per m2 per s per steradian. 
   real,                    parameter  :: UnitParticleFluxSI = 10000.0
-  character(len=12),public,parameter  :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
+  character(len=12),public            :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
   character(len=12),public,allocatable:: NameFluxUnit_I(:)
 
   ! Unit conversions
@@ -72,7 +75,7 @@ module SP_ModUnit
 contains
   !============================================================================
   subroutine read_param(NameCommand)
-    use ModReadParam, ONLY: read_var
+    use ModReadParam, ONLY: read_var,i_session_read
     use ModUtilities, ONLY: lower_case
     use SP_ModGrid  , ONLY: T_
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
@@ -80,12 +83,13 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#PARTICLEENERGYUNIT')
-       !Read unit to be used for particle energy: eV, keV, GeV
+       if(i_session_read() /= 1)RETURN
+       !Read unit to be used for particle energy: keV, MeV, GeV
        call read_var('ParticleEnergyUnit', NameEnergyUnit)
 
        call lower_case(NameEnergyUnit)
-
-       NameVarUnit_V(T_) = NameEnergyUnit//'   '
+       NameEnergyFluxUnit = NameEnergyUnit//'/cm2*s*sr'
+       NameVarUnit_V(T_)  = NameEnergyUnit//'   '
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
