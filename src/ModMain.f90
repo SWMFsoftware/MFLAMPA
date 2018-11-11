@@ -140,7 +140,7 @@ contains
           call read_var('RIhMin', RIhMin)
           call read_var('RScMax', RScMax)
           call read_var('RIhMax',RIhMax)
-       case('#COORDSYSTEM', '#COORDINATESYSTEM',&
+       case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
             '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
           if(i_session_read() /= 1)CYCLE
           call read_param_grid(NameCommand)
@@ -223,13 +223,15 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine initialize
-    use SP_ModGrid,         ONLY: init_grid       => init
+    use SP_ModGrid,         ONLY: init_grid       => init, iNodeTest, &
+         iParticleTest, iPTest
     use SP_ModUnit,         ONLY: init_unit       => init 
     use SP_ModDistribution, ONLY: init_dist       => init
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
-    use SP_ModTurbulence,   ONLY: init_turbulence => init
+    use SP_ModTurbulence,   ONLY: init_turbulence => init, UseTurbulentSpectrum
+    use SP_ModAdvance,      ONLY: UseLiDiffusion
 
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
@@ -245,6 +247,28 @@ contains
          call get_origin_points
     if(IsStandAlone) call init_time
     DoInit=.false.
+
+    if (iProc == 0) then
+       write(*,'(a)') &
+            '-----------------------------------------------------------------'
+       write(*,*) 'SP:initialize'
+       write(*,*) ' Test position and momentum:'
+       write(*,*) ' iNodeTest     =', iNodeTest
+       write(*,*) ' iParticleTest =', iParticleTest
+       write(*,*) ' iPTest        =', iPTest
+       write(*,*) ' DoTraceShock  =', DoTraceShock
+       write(*,*) ' UseDiffusion  =', UseDiffusion
+       if (UseLiDiffusion .and. UseLiDiffusion) then
+          write(*,*) ' warning: both Li and turbulent spectrum are used.'
+          write(*,*) ' Switch to Li Diffusion'
+          UseTurbulentSpectrum = .false.
+       end if
+       if (UseLiDiffusion) &
+            write(*,*) ' Diffusion coef is from Li 2003.'
+       if (UseTurbulentSpectrum) &
+            write(*,*) ' Diffusion coef is based on turbulent spectrum.'
+    end if
+    !-------------------------------------------------------------------------
   contains
     subroutine get_origin_points
       use ModNumConst,       ONLY: cDegToRad
