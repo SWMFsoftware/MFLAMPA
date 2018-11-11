@@ -17,7 +17,6 @@ module SP_ModAdvance
   use SP_ModUnit, ONLY: UnitX_, UnitRho_, UnitEnergy_,                        &
        NameParticle, IO2SI_I, kinetic_energy_to_momentum
 
-
   implicit none
   SAVE
   PRIVATE ! except
@@ -39,7 +38,7 @@ module SP_ModAdvance
   !/
   !\
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
-  logical :: UseLiDiffusion = .false.
+  logical, public :: UseLiDiffusion = .false.
   real    :: Lambda0InAu = 1.0
   !/
   !\
@@ -47,7 +46,6 @@ module SP_ModAdvance
   !/
 
   logical :: DoTestDiffusion = .false.
-  integer :: iPTest, iParticleTest, iNodeTest
 
 contains
   !============================================================================
@@ -70,11 +68,6 @@ contains
        end if
     case('#TESTDIFFUSION')
        call read_var('DoTestDiffusion', DoTestDiffusion)
-       if (DoTestDiffusion) then
-          call read_var('iPTest',        iPTest)
-          call read_var('iParticleTest', iParticleTest)
-          call read_var('iNodeTest',     iNodeTest)
-       end if
     end select
   end subroutine read_param
   !============================================================================
@@ -90,8 +83,10 @@ contains
     use SP_ModTime,         ONLY: SPTime
     use SP_ModDiffusion,    ONLY: advance_diffusion
     use SP_ModLogAdvection, ONLY: advance_log_advection
-    use ModConst,           ONLY: cMu, cProtonMass, cGyroradius, Rsun
-    use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_
+    use ModConst,           ONLY: cMu, cProtonMass, cGyroradius, Rsun, &
+         cElectronCharge
+    use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
+         iPTest, iParticleTest, iNodeTest
     real, intent(in):: TimeLimit
     !\
     ! Loop variables
@@ -237,16 +232,12 @@ contains
              !Calculate the Alfven speed
              if (DoInitSpectrum) call init_spectrum(iEnd,              &
                   XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
-                  iShock, CoefInj, MachAlfven)
+                  dLogP, iShock, CoefInj, MachAlfven)
              call set_wave_advection_rates(iEnd,     &
-                  BSI_I(1:iEnd),                     &
-                  BOldSI_I(1:iEnd),                  &
-                  RhoSI_I(1:iEnd),                   &
-                  RhoOldSI_I(1:iEnd),                &
-                  XyzSI_DI(x_:z_, 1:iEnd),           &
-                  DLogP,                             &
-                  DtProgress,                        &
-                  DtReduction)
+                  BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
+                  RhoSI_I(1:iEnd),  RhoOldSI_I(1:iEnd),    &
+                  XyzSI_DI(x_:z_, 1:iEnd), DLogP,          &
+                  DtProgress, DtReduction)
 
              nStep = 1+int(max(DtReduction,                &
                   maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
@@ -324,7 +315,7 @@ contains
                    do iParticle=1,iEnd
                       DInnerSI_I(iParticle) =                          &
                            Dxx(iParticle, iP, MomentumSI_I(iP),        &
-                           BSI_I(iParticle), NameParticle)           / &
+                           SpeedSI_I(iP), BSI_I(iParticle))          / &
                            BSI_I(iParticle)
                    end do
                 end if
@@ -343,8 +334,8 @@ contains
                      DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
              end do MOMENTUM
 
-             if(UseTurbulentSpectrum)then
-                call update_spectrum(iEnd,nP,MomentumInjSI,DLogP,XyzSI_DI, &
+             if(UseTurbulentSpectrum .and. .true.)then
+                call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,XyzSI_DI,  &
                      Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd),      &
                      RhoSI_I(1:iEnd),Dt)
              end if
