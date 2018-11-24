@@ -45,7 +45,7 @@ module SP_ModAdvance
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
   !/
 
-  logical :: DoTestDiffusion = .false.
+  logical, public :: DoTestDiffusion = .false.
 
 contains
   !============================================================================

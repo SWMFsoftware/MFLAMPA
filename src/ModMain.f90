@@ -231,7 +231,7 @@ contains
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
     use SP_ModTurbulence,   ONLY: init_turbulence => init, UseTurbulentSpectrum
-    use SP_ModAdvance,      ONLY: UseLiDiffusion
+    use SP_ModAdvance,      ONLY: UseLiDiffusion, DoTestDiffusion
 
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
@@ -248,7 +248,7 @@ contains
     if(IsStandAlone) call init_time
     DoInit=.false.
 
-    if (iProc == 0) then
+    if (DoTestDiffusion .and. iProc == 0) then
        write(*,'(a)') &
             '-----------------------------------------------------------------'
        write(*,*) 'SP:initialize'
@@ -258,13 +258,14 @@ contains
        write(*,*) ' iPTest        =', iPTest
        write(*,*) ' DoTraceShock  =', DoTraceShock
        write(*,*) ' UseDiffusion  =', UseDiffusion
-       if (UseLiDiffusion .and. UseLiDiffusion) then
+       if (UseLiDiffusion .and. UseTurbulentSpectrum) then
           write(*,*) ' warning: both Li and turbulent spectrum are used.'
           write(*,*) ' Switch to Li Diffusion'
           UseTurbulentSpectrum = .false.
        end if
        if (UseLiDiffusion) &
-            write(*,*) ' Diffusion coef is from Li 2003.'
+            write(*,*) ' Diffusion coef is from Li et al. (2003), '//&
+            'doi:10.1029/2002JA009666'
        if (UseTurbulentSpectrum) &
             write(*,*) ' Diffusion coef is based on turbulent spectrum.'
     end if
