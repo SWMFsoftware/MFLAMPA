@@ -76,7 +76,8 @@ foreach my $arg (@ARGV){
     else{
 	$Folder = $arg;
 	die "ERROR: Folder '$Folder' doesn't exist\n" unless (-d -e $Folder);
-	
+	# remove trailing '/'
+	$Folder =~ s/\/*$//;
     }
 }
 
@@ -93,7 +94,7 @@ my %Actions = (
     );
 
 my %Mask = (
-    'combine' => 'MH_data_..._..._(t\d{8}_n\d{6})\.dat',
+    'combine' => 'MH_data_\d{3}_\d{3}_(t\d{8}_n\d{6})\.dat',
     'split'   => 'MH_data_(t\d{8}_n\d{6})\.dat',
     'preplot' => 'MH_data_(t\d{8}_n\d{6})\.dat'
     );
@@ -161,8 +162,8 @@ sub combine{# args: $id
 	print"Thread".sprintf("%3d",$id)." Combining TimeStamp = $TimeStamp\n";
 
 	# find files matching time stamp
-	$FileName = "MH_data_..._..._$TimeStamp.dat";
-	my @Files = process_directory("$Folder/",$FileName); 
+	$FileName = 'MH_data_\d{3}_\d{3}_'."$TimeStamp.dat";
+	my @Files = process_directory("$Folder",$FileName); 
 	@Files = sort @Files;
 	next unless(@Files);
 
@@ -180,7 +181,7 @@ sub combine{# args: $id
 		$PrintHeader='';
 	    }
 	    # determine latitude and longitude indices
-	    $FileName =~ m/_(...)_(...)_/;
+	    $FileName =~ m/^$Folder\/MH_data_(\d{3})_(\d{3})_/;
 	    my $iLon = sprintf("%03d",$1);
 	    my $iLat = sprintf("%03d",$2);
 	    $lines[2] =~ 
@@ -217,7 +218,7 @@ sub split{# args: $id
 	# loop over contents
 	foreach my $LINE (@LINES[2..(@LINES-1)]){
 	    # at the beginning of new zone - > open new file
-	    if($LINE =~m/STRUCTURED GRID LON=(...) LAT=(...)/){
+	    if($LINE =~m/STRUCTURED GRID LON=(\d{3}) LAT=(\d{3})/){
 		# new file's name
 		$FileName = "$Folder/MH_data_$1_$2_$TimeStamp.dat";
 		# close file if its open
@@ -226,7 +227,7 @@ sub split{# args: $id
 		# print header first
 		print $fh @LINES[0..1];
 		# also, shorten the zone name
-		$LINE =~s/STRUCTURED GRID LON=... LAT=.../STRUCTURED GRID/;
+		$LINE =~s/STRUCTURED GRID LON=\d{3} LAT=\d{3}/STRUCTURED GRID/;
 	    }
 	    print $fh $LINE;
 	}
@@ -254,7 +255,7 @@ sub preplot{# args: $id
     print "Thread $id: created dir $dir\n";
 
     # get the list of files to preplot
-    my @Files = process_directory("$Folder/",'MH_data_t\d{8}_n\d{6}\.dat'); 
+    my @Files = process_directory("$Folder",'MH_data_t\d{8}_n\d{6}\.dat'); 
 
     if(@Files){
 	# preplot files
@@ -299,8 +300,12 @@ sub process_directory{
     die("Folder $_[0] doess not exist!")
         unless (-e "$_[0]");
 
+    # copy the directory name without trailing '/'
+    my $DirName = $_[0];
+    $DirName =~ s/\/*$//;
+
     # move to the given directory
-    opendir(my $DIR, "$_[0]") or die $!;
+    opendir(my $DIR, "$DirName") or die $!;
 
     # storage for found files
     my @res = ();
@@ -308,12 +313,12 @@ sub process_directory{
     # collect all files
     while(my $file = readdir($DIR)){
         # skip folders
-        next if(-d "$_[0]/$file");
+        next if(-d "$DirName/$file");
         # ignore temporary files
         next if($file =~ m/^.*~/ || $file =~ m/^#.*#$/);
         # if the file name matches the input mask -> add to the list
         if($file =~ m/$_[1]/){
-            push @res, "$_[0]/$file";
+            push @res, "$DirName/$file";
         }
     }
     # move out of the given directory
