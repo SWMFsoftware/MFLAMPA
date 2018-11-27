@@ -248,7 +248,7 @@ contains
     if(IsStandAlone) call init_time
     DoInit=.false.
 
-    if (DoTestDiffusion .and. iProc == 0) then
+    if (iProc == 0) then
        write(*,'(a)') &
             '-----------------------------------------------------------------'
        write(*,*) 'SP:initialize'
