@@ -48,7 +48,7 @@ Module SP_ModTurbulence
   !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))   !
   !             |    Grid in k-space      |     |                          !
   !K/B         KMax                      KMin                              !
-  !ik    nP+1   nP                        1     0                          !
+  !ik     0     1                         nP   nP+1                         !
   !------------------------------------------------------------------------!
 
   real,allocatable,private:: AK_II(:,:)
@@ -86,6 +86,8 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
+
+    if (UseTurbulentSpectrum) UseAdvectionWithAlfvenSpeed = .true.
   end subroutine read_param
   !============================================================================
   subroutine init
@@ -200,7 +202,7 @@ contains
     !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
     !             |    Grid in k-space      |     |                           !
     !K/B         KMax                      KMin                               !
-    !ik    nP+1   nP                        1     0                           !
+    !ik     0     1                         nP   nP+1                         !
     !-------------------------------------------------------------------------!
 
     ! k = e*B/p => dlog(k) = - dlog(p)
@@ -282,12 +284,13 @@ contains
   end subroutine assign_kolmogorov_spectrum
   !============================================================================
   subroutine set_wave_advection_rates(iEnd, BSI_I, BOldSI_I, RhoSI_I, &
-    RhoOldSI_I, XyzSI_DI, DLogP, Dt, DtReduction)
+    RhoOldSI_I, XyzSI_DI, DsSI_I, DLogP, Dt, DtReduction)
     !=======================Set advection rate in k-space======================
     integer, intent(in) :: iEnd
     real, intent(in)    :: BSI_I(1:iEnd), BOldSI_I(1:iEnd)
     real, intent(in)    :: RhoSI_I(1:iEnd), RhoOldSI_I(1:iEnd)
     real, intent(in)    :: XyzSI_DI(1:3,1:iEnd)
+    real, intent(in)    :: DsSI_I(1:iEnd)
     real, intent(in)    :: DLogP, Dt
     real, intent(out)   :: DtReduction
 
@@ -306,15 +309,16 @@ contains
     DispersionA_I = log(RhoSI_I*BOldSI_I**2/(RhoOldSI_I*BSI_I**2)) 
 
     if(UseAdvectionWithAlfvenSpeed)then
-       DsSI        = sqrt(sum((XyzSI_DI(:,2)-XyzSI_DI(:,1))**2))
-       CFL_I(1)  = Dt*vAlfvenSI_I(1 )/DsSI
-
-       DsSI        = sqrt(sum((XyzSI_DI(:,iEnd)-XyzSI_DI(:,iEnd-1))**2))
-       CFL_I(iEnd) = Dt*vAlfvenSI_I(iEnd)/DsSI
-
-       do iParticle=2,iEnd-1
-          DsSI        = sqrt(sum( &
-               (XyzSI_DI(:,iParticle+1)-XyzSI_DI(:,iParticle-1))**2 )) /2.0
+       do iParticle =1,iEnd
+          ! In this case, only first order accuracy between 2 - iEnd-1
+          ! based on L323 in ModGrid.
+          if (iParticle /= iEnd) then
+             DsSI = DsSI_I(iParticle)
+          else
+             ! Seems DsSI_I(iEnd) is not defined.
+             DsSI = DsSI_I(iEnd-1)
+          end if
+          
           CFL_I(iParticle) = Dt*vAlfvenSI_I(iParticle)/DsSI
        end do
 
@@ -472,12 +476,12 @@ contains
   end subroutine set_dxx
   !===========================================================================
   subroutine update_spectrum(iEnd, nP, MomentumSI_I, DLogP, &
-       XyzSI_DI, F_II, BSI_I, RhoSI_I, SP_Dt)
+       XyzSI_DI, DsSI_I, F_II, BSI_I, RhoSI_I, SP_Dt)
 
-    !This is the subroutine which advances the wave spectrum through
-    !a time step, by solving the equations
-    !dI_+/dt=\gamma_+ I_+
-    !dI_-/dt=\gamma_- I_-
+    ! This is the subroutine which advances the wave spectrum through
+    ! a time step, by solving the equations
+    ! dI_+/dt=\gamma_+ I_+
+    ! dI_-/dt=\gamma_- I_-
 
     use SP_ModLogAdvection, ONLY: advance_log_advection
     use ModLinearAdvection
@@ -488,6 +492,7 @@ contains
     real, intent(in) :: MomentumSI_I(0:nP+1), DLogP, SP_Dt  
     ! Coordinates of the Lagrangian points
     real, intent(in) :: XyzSI_DI(3, 1:iEnd)
+    real, intent(in) :: DsSI_I(1:iEnd)
     ! The distribution function
     real, intent(in) :: F_II(0:nP+1,1:iEnd)
     ! The magnetic field intensity and the particle number density in SI
@@ -548,7 +553,7 @@ contains
        !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P)) !
        !             |    Grid in k-space      |     |                        !
        !K/B         KMax                      KMin                            !
-       !ik    nP+1   nP                        1     0                        !
+       !ik     0     1                         nP   nP+1                      !
        !----------------------------------------------------------------------!
 
        !Calculate the partial sums in the integral for \Gamma
@@ -560,24 +565,21 @@ contains
        ! at the maximal energy
 
        if (iParticle==1) then
-          DsPlusSI = max(cTiny, sqrt( &
-               sum((XyzSI_DI(:,iParticle+1)-XyzSI_DI(:,iParticle))**2)))
+          DsPlusSI = max(cTiny, DsSI_I(1))
 
           !Use the forward spatial derivative
           DfDs0=(F_II(nP,iParticle+1)-F_II(nP,iParticle))/DsPlusSI
 
        else if (iParticle==iEnd) then
-          DsMinusSI = max(cTiny, sqrt( &
-               sum( (XyzSI_DI(:,iParticle)-XyzSI_DI(:,iParticle-1))**2)))
+          ! again, DsSI_I(iEnd) is not defined...
+          DsMinusSI = max(cTiny, DsSI_I(iEnd-1))
 
           !Use the backward spatial derivative
           DfDs0=(F_II(nP,iParticle)-F_II(nP,iParticle-1))/DsMinusSI
 
        else
-          DsPlusSI = max(cTiny, sqrt( &
-               sum((XyzSI_DI(:,iParticle+1)-XyzSI_DI(:,iParticle))**2)))
-          DsMinusSI = max(cTiny, sqrt( &
-               sum( (XyzSI_DI(:,iParticle)-XyzSI_DI(:,iParticle-1))**2)))
+          DsPlusSI  = max(cTiny, DsSI_I(iParticle))
+          DsMinusSI = max(cTiny, DsSI_I(iParticle-1))
 
           !Use the average between the forward and backward spatial derivatives
           DfDs0=cHalf*((F_II(nP,iParticle+1)-F_II(nP,iParticle  ))/DsPlusSI+&
@@ -587,7 +589,7 @@ contains
 
        !The momentum at the maximal energy
 
-       P0=MomentumSI_I(nP+1)
+       P0 = MomentumSI_I(nP+1)
 
        ! We calculate the partial sums for a set of the momentum values.
        ! The integral is taken from pRes up to infinity, so we start from the
@@ -596,8 +598,8 @@ contains
 
        do iP=nP,1,-1
 
-          !Calculate the momentum at the lower energy
-          P1=MomentumSI_I(iP)
+          ! Calculate the momentum at the lower energy
+          P1 = MomentumSI_I(iP)
 
           !Calculate the distribution function gradient at the lower energy
 
@@ -648,14 +650,14 @@ contains
        !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P)) !
        !             |    Grid in k-space      |     |                        !
        !K/B         KMax                      KMin                            !
-       !ik    nP+1   nP                        1     0                        !
+       !ik     0     1                         nP   nP+1                      !
        !----------------------------------------------------------------------!
 
-       do iK=1,nK
-          !The wave number
+       do iK = nK,1,-1
+          ! The wave number
           K=BSI_I(iParticle)*kOverBSI_I(iK)
 
-          !The resonant momentum, for a given K
+          ! The resonant momentum, for a given K
           PRes = cElectronCharge*BSI_I(iParticle)/K
 
           iP = iK
@@ -780,7 +782,7 @@ contains
     !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
     !             |    Grid in k-space      |     |                           !
     !K/B         KMax                      KMin                               !
-    !ik    nP+1   nP                        1     0                           !
+    !ik     0     1                         nP   nP+1                         !
     !-------------------------------------------------------------------------!
 
     ! The coefficient of a spatial diffusion along the magnetic field is
