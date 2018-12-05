@@ -233,14 +233,15 @@ contains
              if (DoInitSpectrum) call init_spectrum(iEnd,              &
                   XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
                   dLogP, iShock, CoefInj, MachAlfven)
-             call set_wave_advection_rates(iEnd,     &
-                  BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
-                  RhoSI_I(1:iEnd),  RhoOldSI_I(1:iEnd),    &
-                  XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
-                  DLogP, DtProgress, DtReduction)
-
-             nStep = 1+int(max(DtReduction,                &
-                  maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
+             ! call set_wave_advection_rates(iEnd,     &
+             !      BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
+             !      RhoSI_I(1:iEnd),  RhoOldSI_I(1:iEnd),    &
+             !      XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
+             !      DLogP, DtProgress, DtReduction)
+               
+             ! nStep = 1+int(max(DtReduction,                &
+             !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
+             nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
           else
              nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
           end if
@@ -262,7 +263,7 @@ contains
           Dt = DtProgress/nStep
 
           FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
-          if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
+          ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
 
           ! compute diffusion along the field line
           ! we calculate: "Outer diffusion"=BSI_I and
@@ -334,14 +335,15 @@ contains
                      DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
              end do MOMENTUM
 
-             if(UseTurbulentSpectrum .and. .true.)then
-                call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
-                     XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
-                     Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd), &
-                     RhoSI_I(1:iEnd),Dt)
-             end if
+             ! if(UseTurbulentSpectrum .and. .true.)then
+             !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
+             !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
+             !         Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd), &
+             !         RhoSI_I(1:iEnd),Dt)
+             ! end if
 
           end do STEP
+          DoInitSpectrum = .true.
        end do PROGRESS
     end do BLOCK
   contains
