@@ -236,8 +236,8 @@ contains
              call set_wave_advection_rates(iEnd,     &
                   BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
                   RhoSI_I(1:iEnd),  RhoOldSI_I(1:iEnd),    &
-                  XyzSI_DI(x_:z_, 1:iEnd), DLogP,          &
-                  DtProgress, DtReduction)
+                  XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
+                  DLogP, DtProgress, DtReduction)
 
              nStep = 1+int(max(DtReduction,                &
                   maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
@@ -335,8 +335,9 @@ contains
              end do MOMENTUM
 
              if(UseTurbulentSpectrum .and. .true.)then
-                call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,XyzSI_DI,  &
-                     Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd),      &
+                call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
+                     XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
+                     Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd), &
                      RhoSI_I(1:iEnd),Dt)
              end if
 
