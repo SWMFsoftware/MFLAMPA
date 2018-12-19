@@ -47,10 +47,17 @@ module SP_ModAdvance
 
   logical, public :: DoTestDiffusion = .false.
 
+  logical, public :: UseBorovikovDiffusion = .false.
+
+  ! Use Sokolov's diffusion coef
+  logical, public :: UseSokolovDiffusion = .false.
+  real :: rL0SI_I(1:nParticleMax) = 0.0, LMaxSI = 0.0
+
 contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
+    use ModConst,     ONLY: cAU
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
     character(len=*), parameter :: NameSub='SP:read_param_adv'
     !---------------------------------------------
@@ -66,6 +73,12 @@ contains
           ! see Li et al. (2003), doi:10.1029/2002JA009666
           call read_var('Lambda0InAu [AU]', Lambda0InAu)
        end if
+    case('#USESOKOLOVDIFFUSION')
+       call read_var('UseSokolovDiffusion',UseSokolovDiffusion)
+       ! LMaxSI is a constant and could be initialized here
+       LMaxSI = 0.03*cAU
+    case('#USEBOROVIKOVDIFFUSION')
+       call read_var('UseBorovikovDiffusion',UseBorovikovDiffusion)
     case('#TESTDIFFUSION')
        call read_var('DoTestDiffusion', DoTestDiffusion)
     end select
@@ -301,7 +314,8 @@ contains
                 ! For each momentum account for dependence
                 ! of the diffusion coefficient on momentum
                 ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-                if(.not. UseTurbulentSpectrum)then
+                if(UseLiDiffusion .or. UseBorovikovDiffusion .or. &
+                     UseBorovikovDiffusion) then
                    ! Add v (= p*c^2/E_total in the relativistic case) 
                    ! and (p)^(1/3)
                    DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
@@ -312,13 +326,15 @@ contains
 
                    DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
                         DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-                else
+                else if (UseTurbulentSpectrum) then
                    do iParticle=1,iEnd
                       DInnerSI_I(iParticle) =                          &
                            Dxx(iParticle, iP, MomentumSI_I(iP),        &
                            SpeedSI_I(iP), BSI_I(iParticle))          / &
                            BSI_I(iParticle)
                    end do
+                else
+                   call CON_stop(NameSub//': unknown diffusion')
                 end if
 
                 if (DoTestDiffusion .and. iNode_B(iBlock) == iNodeTest) then
@@ -407,72 +423,81 @@ contains
       DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
       !DInner = DiffusionCoeff/B_)
 
+      if (UseTurbulentSpectrum) return
+
+      ! reset rL0SI_I
+      rL0SI_I = 0.0
+
       !\
       ! Compute the diffusion coefficient without the contribution of 
       ! v (velocity) and p (momentum), as v and p are different for 
       ! different iP
       !/
-      if (.not. UseTurbulentSpectrum) then
-         if(.not.UseLiDiffusion)then
-            !\
-            ! Sokolov et al., 2004: eq (4), 
-            ! note: Momentum = TotalEnergy * Vel / C**2
-            ! Gyroradius = cGyroRadius * momentum / |B|
-            ! DInner = (B/\delta B)**2*Gyroradius*Vel/|B| 
-            !/
-            !\
-            ! effective level of turbulence is different for different momenta:
-            ! (\delta B)**2 \propto Gyroradius^(1/3)
-            ! we scale it with reference point:  
-            ! mean free path  ~ RSun @ 1AU for 1GeV proton
-            ! (B/\delta B)**2 ~ 1    @ 1AU
-            ! thus (e1,e2 are turbulent energies): 
-            ! DInner=B^2/(2*cMu*(e1+e2))*10*(Gyroradius*RSun**2)**(1/3)*Vel/|B|
-            ! where Gyroradius = cGyroRadius * p / |B|
-            ! v (velocity) and (p)^(1/3) are calculated in the momentum do loop
-            !/
+      if(UseBorovikovDiffusion)then
+         !\
+         ! Sokolov et al., 2004: eq (4), 
+         ! note: Momentum = TotalEnergy * Vel / C**2
+         ! Gyroradius = cGyroRadius * momentum / |B|
+         ! DInner = (B/\delta B)**2*Gyroradius*Vel/|B| 
+         !/
+         !\
+         ! effective level of turbulence is different for different momenta:
+         ! (\delta B)**2 \propto Gyroradius^(1/3)
+         ! we scale it with reference point:  
+         ! mean free path  ~ RSun @ 1AU for 1GeV proton
+         ! (B/\delta B)**2 ~ 1    @ 1AU
+         ! thus (e1,e2 are turbulent energies): 
+         ! DInner=B^2/(2*cMu*(e1+e2))*10*(Gyroradius*RSun**2)**(1/3)*Vel/|B|
+         ! where Gyroradius = cGyroRadius * p / |B|
+         ! v (velocity) and (p)^(1/3) are calculated in the momentum do loop
+         !/
 
-            ! No idea how the Rsun**2 shows up in SI unit...
+         CoefDInnerSI_I(1:iEnd) =  (1.0/3)*BSI_I(1:iEnd)**2 /          &
+              (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
+              *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)
+      else if (UseSokolovDiffusion) then
+         ! cGyroRadius = 1./cElectronCharge
+         rL0SI_I(1:iEnd) = cGEV*cGyroRadius/(cLightSpeed*BSI_I(1:iEnd))
+
+         CoefDInnerSI_I(1:iEnd) =  0.9/3*BSI_I(1:iEnd)**2 /            &
+              (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))      &
+              *(LMaxSI**2*rL0SI_I(1:iEnd))**(1./3)*(cLightSpeed/cGEV)**(1.0/3)
+      else if(UseLiDiffusion) then
+         ! diffusion is different up- and down-stream
+         ! Sokolov et al. 2004, paragraphs before and after eq (4)
+         where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
+            ! upstream: reset the diffusion coefficient to 
+            ! (1/3)*Lambda0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
+            ! see Li et al. (2003), doi:10.1029/2002JA009666
+
+            ! 1/AU cancels with unit of Lambda0,no special attention needed;
+            ! v (velocity) and (p)^(1/3) are calculated in the 
+            ! momentum do loop
+
+            CoefDInnerSI_I(1:iEnd) =                    &
+                 (1.0/3)*Lambda0InAU * RadiusSI_I(1:iEnd)       &
+                 *(cLightSpeed/cGEV)**(1.0/3)
+         elsewhere
             CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
                  (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
-                 *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)! /Rsun**2
-         else
-            ! diffusion is different up- and down-stream
-            ! Sokolov et al. 2004, paragraphs before and after eq (4)
-            where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
-               ! upstream: reset the diffusion coefficient to 
-               ! (1/3)*Lambda0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
-               ! see Li et al. (2003), doi:10.1029/2002JA009666
+                 *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)
 
-               ! 1/AU cancels with unit of Lambda0,no special attention needed;
-               ! v (velocity) and (p)^(1/3) are calculated in the 
-               ! momentum do loop
+            !\
+            ! LEGACY MODEL PREVIOUSLY USED DOWNSTREAM
+            !-------------------------------------------------
+            ! downstream we use the estimate for (\delta B/B) 
+            ! (see detail in Sokolov, 2004):
+            ! (\delta B/B)**2 = (\delta B/B)**2_SW*(R/R_SW)
+            ! where SW means "shock wave". For the SW we use an
+            ! estimate from  from Lee (1983): 
+            ! (\delta B/B)**2_SW = const(=10 below)*CoefInj*MachAlfven
 
-               CoefDInnerSI_I(1:iEnd) =                    &
-                    (1.0/3)*Lambda0InAU * RadiusSI_I(1:iEnd)       &
-                    *(cLightSpeed/cGEV)**(1.0/3)
-            elsewhere
-               CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
-                    (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
-                    *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)
-
-               !\
-               ! LEGACY MODEL PREVIOUSLY USED DOWNSTREAM
-               !-------------------------------------------------
-               ! downstream we use the estimate for (\delta B/B) 
-               ! (see detail in Sokolov, 2004):
-               ! (\delta B/B)**2 = (\delta B/B)**2_SW*(R/R_SW)
-               ! where SW means "shock wave". For the SW we use an
-               ! estimate from  from Lee (1983): 
-               ! (\delta B/B)**2_SW = const(=10 below)*CoefInj*MachAlfven
-
-               !!CoefDInnerSI_I(1:iEnd)=&
-               !!     cGyroRadius*(MomentumInjSI*cLightSpeed)**2/RSun**2/&
-               !!     (BSI_I(1:iEnd)**2*TotalEnergyInjSI)/&
-               !!     (10.0*CoefInj*MachAlfven)/&
-               !!     min(1.0, 1.0/0.9 * RadiusSI_I(1:iEnd)/RadiusSI_I(iShock))
-            end where
-         end if
+            !!CoefDInnerSI_I(1:iEnd)=&
+            !!     cGyroRadius*(MomentumInjSI*cLightSpeed)**2/RSun**2/&
+            !!     (BSI_I(1:iEnd)**2*TotalEnergyInjSI)/&
+            !!     (10.0*CoefInj*MachAlfven)/&
+            !!     min(1.0, 1.0/0.9 * RadiusSI_I(1:iEnd)/RadiusSI_I(iShock))
+         end where
       end if
 
       ! set the left boundary condition for diffusion

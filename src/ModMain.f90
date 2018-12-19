@@ -147,7 +147,8 @@ contains
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL','#USELIDIFFUSION', '#TESTDIFFUSION')
+       case('#INJECTION','#CFL','#USELIDIFFUSION', '#TESTDIFFUSION', &
+            '#USESOKOLOVDIFFUSION', '#USEBOROVIKOVDIFFUSION')
           call read_param_adv(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
