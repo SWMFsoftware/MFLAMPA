@@ -5,16 +5,16 @@ use warnings;
 use Math::Trig;
 
 my $HELP = 
-"The script assists in visualizing M-FLAMPA and relevant BATS-R-US outputs;\n".
-"parameters of visualization are set via input file (default: PLOT.in);\n".
-"Required software: Tecplot\n";
+    "The script assists visualizing M-FLAMPA and relevant BATS-R-US output;\n".
+    "parameters of visualization are set via input file (default: PLOT.in);\n".
+    "Required software: Tecplot\n";
 
 my $USAGE = "Usage:\n". 
-" ./PlotTEC.pl [-help] [-param=PLOT_PARAM_FILE_NAME] [-macro-only]\n".
-"Options:\n".
-" -h -help\t\tdisplay help message\n".
-" -param=FILENAME\tset plot param file to FILENAME (default: PLOT.in)\n".
-" -macro-only\t\tcreate macros without running Tecplot batch mode\n";
+    " ./PlotTEC.pl [-help] [-param=PLOT_PARAM_FILE_NAME] [-macro-only]\n".
+    "Options:\n".
+    " -h -help\t\tdisplay help message\n".
+    " -param=FILENAME\tset plot param file to FILENAME (default: PLOT.in)\n".
+    " -macro-only\t\tcreate macros without running Tecplot batch mode\n";
 
 # name of the input file
 my $INPUT = "PLOT.in";
@@ -97,7 +97,7 @@ my @CustomP = ();
 my @CustomT = ();
 
 #\
-# time singature of files to be plotted
+# time signature of files to be plotted
 #/
 my @Time = ();
 
@@ -159,8 +159,9 @@ die "CME location #CME not found in $INPUT" unless ($LonCME && $LatCME);
 #/
 unless(`which $TecBatch`){
     print 
-"Tecplot executable is not available; re-run script with -macro-only option\n".
-('-'x80)."\n$USAGE";
+	"Tecplot executable is not available; ".
+	"re-run script with -macro-only option\n".
+	('-'x80)."\n$USAGE";
     exit;
 }
 
@@ -175,17 +176,20 @@ for( my $t = 0; $t < @Time; $t++){
     @Files = process_directory("$ScDir",
 			       '3d__.*t'."$Time[$t]".'.*\.plt');
     $ScFile = "$Files[0]";
-
+    
     # get the name of SP files
     @Files = process_directory("$SpDir",
 			       'MH_data_t'."$Time[$t]".'.*\.plt');
     $SpFile = "$Files[0]";
-
+    
     create_macro_cme($Time[$t]);
     
     if($DoRunBatch){
 	system("echo 'Plotting timestamp $Time[$t]'");
 	system("$TecBatch $MacroMain > /dev/null");
+    }
+    else{
+	system("mv $MacroMain SEP.$Time[$t].mcr");
     }
 }
 
@@ -387,12 +391,15 @@ sub read_input{
 
 	# parameters of a custom projection
 	elsif($lines[$i] =~ m/#SAVECUSTOM/i){
-	    push @CustomX, $lines[$i+1];
-	    push @CustomY, $lines[$i+2];
-	    push @CustomZ, $lines[$i+3];
-	    push @CustomP, $lines[$i+4];
-	    push @CustomT, $lines[$i+5];
-	    $i += 5;
+	    my $Lat = $lines[$i+1];
+	    my $Lon = $lines[$i+2];
+	    $i += 2;
+
+	    push @CustomP, $Lat;
+	    push @CustomT, $Lon;
+	    push @CustomX, (-1000*sin($Lat*$rad)*sin($Lon*$rad));
+	    push @CustomY, (-1000*sin($Lat*$rad)*cos($Lon*$rad));
+	    push @CustomZ, ( 1000*cos($Lat*$rad));
 	}
 
 	# custom solar wind speed levels
@@ -422,10 +429,10 @@ sub read_input{
 #------------------------------------------------------------------------
 
 sub create_macro_cme{#args: $Time
-
+    
     # arguments:
     my $TimeIn = $_[0];
-
+    
     # open the filehandler for the main macro
     my $fh;
     open($fh,'>',$MacroMain);
@@ -440,8 +447,7 @@ sub create_macro_cme{#args: $Time
 #/
 $!VarSet |TIMESTAMP| = \'t'.sprintf("%08d",$TimeIn).'\'
 $!VarSet |TIME|= \'T = '.
-	substr($TimeIn,0,4).':'.substr($TimeIn,4,2).':'.
-	substr($TimeIn,6,2).'\'';
+substr($TimeIn,0,4).':'.substr($TimeIn,4,2).':'. substr($TimeIn,6,2).'\'';
     # -----------------------------------------------------------------
     print $fh "
 
@@ -543,7 +549,7 @@ $!VarSet |VIEW3t| = '.(270-$LonCME);
   ASSIGNSTRANDIDS = YES
   VARNAMELIST     = '$BatsrusVar'";
     # -----------------------------------------------------------------    
-print $fh '
+    print $fh '
 
 #\
 # Extract slices
@@ -661,7 +667,7 @@ $!LOOP |NFLUX|
   $!RemoveVar |LEVEL|
 $!ENDLOOP';
     # -----------------------------------------------------------------
-print $fh '
+    print $fh '
 
 #\
 # Legend
@@ -725,7 +731,7 @@ $!ATTACHTEXT
     }
   TEXT = \'|TIME|\'';
     # -----------------------------------------------------------------
-print $fh '
+    print $fh '
 
 #\
 # Insert a circle to cover Sun
@@ -755,11 +761,16 @@ $!AttachGeom
   RawData
 1.000000';
     # -----------------------------------------------------------------
-print $fh '
+    print $fh '
 
 #\
 # Save figures
-#/';
+#/
+
+# Position and size of 3D axes
+\$!THREEDAXIS FRAMEAXIS{XYPOS{X = 82}}
+\$!THREEDAXIS FRAMEAXIS{XYPOS{Y = 10}}
+\$!THREEDAXIS FRAMEAXIS{SIZE = 15}';
     for(my $iView=1; $iView<=3; $iView++){
 	print $fh "
 \$!THREEDVIEW VIEWWIDTH = 35
@@ -769,11 +780,6 @@ print $fh '
 \$!THREEDVIEW PSIANGLE         = |VIEW${iView}p|
 \$!THREEDVIEW THETAANGLE       = |VIEW${iView}t|
 \$!THREEDVIEW ALPHAANGLE       =  0.00
-
-# Position and size of 3D axes
-\$!ThreeDAxis FrameAxis{XYPos{X = 82}}
-\$!ThreeDAxis FrameAxis{XYPos{Y = 10}}
-\$!ThreeDAxis FrameAxis{Size = 15}
 
 \$!IF |SAVE$iView| == 1
   \$!PRINTSETUP PALETTE = COLOR
@@ -786,20 +792,52 @@ print $fh '
 # plot CME only
 \$!ACTIVEFIELDMAPS -= [|SPFIRST|-|SPLAST|]
 \$!THREEDVIEW VIEWWIDTH = 10
-\$!THREEDVIEW VIEWERPOSITION{X = |VIEW${iView}x|}
-\$!THREEDVIEW VIEWERPOSITION{Y = |VIEW${iView}y|}
-\$!THREEDVIEW VIEWERPOSITION{Z = |VIEW${iView}z|}
-\$!THREEDVIEW PSIANGLE         = |VIEW${iView}p|
-\$!THREEDVIEW THETAANGLE       = |VIEW${iView}t|
-\$!THREEDVIEW ALPHAANGLE       =  0.00
 
 \$!IF |SAVE$iView| == 1
   \$!PRINTSETUP PALETTE = COLOR
   \$!EXPORTSETUP IMAGEWIDTH = 1355
-  \$!EXPORTSETUP EXPORTFNAME = \'|OUTDIR|/SC.default.$iView.|TIMESTAMP|.png\'
+  \$!EXPORTSETUP EXPORTFNAME = '|OUTDIR|/SC.default.$iView.|TIMESTAMP|.png'
   \$!EXPORT
     EXPORTREGION = CURRENTFRAME
 \$!ENDIF
+
+\$!ACTIVEFIELDMAPS += [|SPFIRST|-|SPLAST|]
+
+#---------------------------------------------------------------------------
+";
+
+    }
+    # -----------------------------------------------------------------
+    print $fh '
+
+#\
+# Custom viewing positions
+#/';
+    for(my $c=0; $c < @CustomX;$c++){
+	print $fh "
+\$!THREEDVIEW VIEWWIDTH = 30
+\$!THREEDVIEW VIEWERPOSITION{X = $CustomX[$c]}
+\$!THREEDVIEW VIEWERPOSITION{Y = $CustomY[$c]}
+\$!THREEDVIEW VIEWERPOSITION{Z = $CustomZ[$c]}
+\$!THREEDVIEW PSIANGLE         = $CustomP[$c]
+\$!THREEDVIEW THETAANGLE       = $CustomT[$c]
+\$!THREEDVIEW ALPHAANGLE       =  0.00
+
+\$!PRINTSETUP PALETTE = COLOR
+\$!EXPORTSETUP IMAGEWIDTH = 1355
+\$!EXPORTSETUP EXPORTFNAME = '|OUTDIR|/SC.SP.custom.$c.|TIMESTAMP|.png'
+\$!EXPORT
+  EXPORTREGION = CURRENTFRAME
+
+# plot CME only
+\$!ACTIVEFIELDMAPS -= [|SPFIRST|-|SPLAST|]
+\$!THREEDVIEW VIEWWIDTH = 10
+
+\$!PRINTSETUP PALETTE = COLOR
+\$!EXPORTSETUP IMAGEWIDTH = 1355
+\$!EXPORTSETUP EXPORTFNAME = '|OUTDIR|/SC.custom.$c.|TIMESTAMP|.png'
+\$!EXPORT
+  EXPORTREGION = CURRENTFRAME
 
 \$!ACTIVEFIELDMAPS += [|SPFIRST|-|SPLAST|]
 
