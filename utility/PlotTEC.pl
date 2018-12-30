@@ -65,7 +65,9 @@ my $deg= 180/$pi;
 # Tecplot-style lists of variables in BATS-R-US and M-FLAMPA
 #/
 my $BatsrusVar = '"X [R]" "Y [R]" "Z [R]" "`r [g/cm^3]" "U_x [km/s]" "U_y [km/s]" "U_z [km/s]" "B_x [Gauss]" "B_y [Gauss]" "B_z [Gauss]" "ehot [erg/cm^3]" "I01 [erg/cm^3]" "I02 [erg/cm^3]" "pe [dyne/cm^2" "p [dyne/cm^2" "B1_x [Gauss]" "B1_y [Gauss]" "B1_z [Gauss]" "E [erg/cm^3]" "J_x [`mA/m^2]" "J_y [`mA/m^2]" "J_z [`mA/m^2]"';
+my $nBatsrusVar = split(/" "/, $BatsrusVar);
 my $MflampaVar = '"I" "LagrID" "X_[RSun]" "Y_[RSun]" "Z_[RSun]" "Rho_[amu/m3]" "T_[kev]" "Ux_[m/s]" "Uy_[m/s]" "Uz_[m/s]" "Bx_[T]" "By_[T]" "Bz_[T]" "Wave1_[J/m3]" "Wave2_[J/m3]" "flux_total_[p.f.u.]" "flux_00005_[p.f.u.]" "flux_00010_[p.f.u.]" "flux_00030_[p.f.u.]" "flux_00050_[p.f.u.]" "flux_00060_[p.f.u.]" "flux_00100_[p.f.u.]" "eflux_[kev/cm2*s*sr]"';
+my $nMflampaVar = split(/" "/, $MflampaVar);
 
 #\
 # names of SC and SP files
@@ -83,6 +85,13 @@ my $OutDir= '';
 #\
 # Save flags
 #/
+# flag for CME views
+my $SaveCME = 0;
+
+# flag for orbit view
+my $SaveOrbit = 0;
+
+# flags for 3 default CME views
 my $Save1 = 0;
 my $Save2 = 0;
 my $Save3 = 0;
@@ -147,9 +156,16 @@ my @LatStB  =();
 read_input();
 
 #\
+# determine which plots are requested
+#/
+$SaveCME = $Save1 || $Save2 || $Save3 ||
+    @CustomP && @CustomT;
+$SaveOrbit = @LonEarth&&@LatEarth && @LonStA&&@LatStA && @LonStB&&@LatStB;
+
+#\
 # check that all necessary info has been provided
 #/
-die "Directory #SCDIR not found in $INPUT" unless ($ScDir);
+die "Directory #SCDIR not found in $INPUT" unless ($ScDir || not $SaveCME);
 die "Directory #SPDIR not found in $INPUT" unless ($SpDir);
 die "Directory #OUTDIR not found in $INPUT" unless ($OutDir);
 die "CME location #CME not found in $INPUT" unless ($LonCME && $LatCME);
@@ -172,16 +188,18 @@ for( my $t = 0; $t < @Time; $t++){
     
     my @Files = ();
 
-    # get the name of SC file
-    @Files = process_directory("$ScDir",
-			       '3d__.*t'."$Time[$t]".'.*\.plt');
-    $ScFile = "$Files[0]";
+    if($SaveCME){
+	# get the name of SC file
+	@Files = process_directory("$ScDir",
+				   '3d__.*t'."$Time[$t]".'.*\.plt');
+	$ScFile = "$Files[0]";
+    }
     
     # get the name of SP files
     @Files = process_directory("$SpDir",
 			       'MH_data_t'."$Time[$t]".'.*\.plt');
     $SpFile = "$Files[0]";
-    
+
     create_macro_cme($Time[$t]);
     
     if($DoRunBatch){
@@ -454,7 +472,7 @@ substr($TimeIn,0,4).':'.substr($TimeIn,4,2).':'. substr($TimeIn,6,2).'\'';
 #\\
 # Directories
 #/
-\$!VarSet |SCDIR|  = '$ScDir'
+\$!VarSet |SCDIR|  = '".($SaveCME ? $ScDir : "")."'
 \$!VarSet |SPDIR|  = '$SpDir'
 \$!VarSet |OUTDIR| = '$OutDir'";
     # -----------------------------------------------------------------
@@ -509,10 +527,10 @@ $!VarSet |VIEW3t| = '.(270-$LonCME);
     # -----------------------------------------------------------------
     print $fh "
 
-#\\
+#\
 # Name of the datafiles to be read
 #/
-\$!VarSet |SCFILE|   = '$ScFile'
+\$!VarSet |SCFILE|   = '".($SaveCME ? $ScFile : "")."'
 \$!VarSet |SPFILE|   = '$SpFile'";
     # -----------------------------------------------------------------
     print $fh "
@@ -537,7 +555,12 @@ $!VarSet |VIEW3t| = '.(270-$LonCME);
 #/
 \$!VarSet |LINETRIM| = '$LineTrim'";
     # -----------------------------------------------------------------
-    print $fh "
+    if($SaveOrbit){
+	print_orbit_param($fh);
+    }
+    # -----------------------------------------------------------------
+    if($SaveCME){
+	print $fh "
 
 #\\
 # IMPORT DATA FROM BATS-R-US
@@ -575,24 +598,39 @@ $!ALTERDATA
   EQUATION=\'{B [Gauss]}=sqrt({B_x [Gauss]}**2+{B_y [Gauss]}**2+{B_z [Gauss]}**2)\'
 $!ALTERDATA
   EQUATION=\'{U [km/s]} = sqrt({U_x [km/s]}**2+{U_y [km/s]}**2+{U_z [km/s]}**2)\'';
+    }
     # -----------------------------------------------------------------
-    print $fh "
+    print $fh '
 
-#\\
+#\
 # IMPORT DATA FROM M-FLAMPA
 #/
 # first zone containing SP data
-\$!VarSet |SPFIRST| = (|NUMZONES|+1)
+$!VarSet |SPFIRST| = ('.($SaveCME ? '|NUMZONES|+' : '')."1)
 
 \$!READDATASET  '\"|SPDIR|/|SPFILE|\"'
-  READDATAOPTION = APPEND
+  READDATAOPTION = ".($SaveCME ? "APPEND" : "NEW")."
   RESETSTYLE = NO
   VARLOADMODE = BYNAME
   ASSIGNSTRANDIDS = YES
-  VARNAMELIST = '$BatsrusVar \"B [Gauss]\" \"U [km/s]\"$MflampaVar'
+  VARNAMELIST = '".
+  ($SaveCME ? "$BatsrusVar \"B [Gauss]\" \"U [km/s]\"" : "")."$MflampaVar'
 
 # last zone containing SP data
 \$!VarSet |SPLAST| = |NUMZONES|";
+    # -----------------------------------------------------------------
+    print $fh '
+
+#\
+# set coordinate system and assign coordinates and origin
+#/
+$!PlotType = Cartesian3D
+$!ThreeDAxis XDetail{VarNum = '.(1 + ($SaveCME ? 0 : 2)).'}
+$!ThreeDAxis YDetail{VarNum = '.(2 + ($SaveCME ? 0 : 2)).'}
+$!ThreeDAxis ZDetail{VarNum = '.(3 + ($SaveCME ? 0 : 2)).'}
+$!GlobalThreeD RotateOrigin{X = 0}
+$!GlobalThreeD RotateOrigin{Y = 0}
+$!GlobalThreeD RotateOrigin{Z = 0}';
     # -----------------------------------------------------------------
     print $fh '
 
@@ -605,7 +643,8 @@ $!ALTERDATA  [|SPFIRST|-|SPLAST|]
   EQUATION = \'{Z [R]} = {Z_[RSun]}\'
 
 $!FIELDLAYERS SHOWMESH = YES
-$!FIELDMAP [1-4]  MESH{SHOW = NO}';
+$!FIELDMAP [1-4]  MESH{SHOW = NO}
+$!FIELDMAP [|SPFIRST|-|SPLAST|]  MESH{SHOW = YES}';
     # -----------------------------------------------------------------
     print $fh '
 
@@ -620,7 +659,10 @@ $!ALTERDATA
 #\
 # Contour plot settings
 #/
-$!FIELDLAYERS SHOWCONTOUR = YES
+$!FIELDLAYERS SHOWCONTOUR = YES';
+
+    if($SaveCME){
+	print $fh '
 
 # solar wind speed
 $!SETCONTOURVAR
@@ -641,11 +683,13 @@ $!LOOP |NSPEED|
   1
   |LEVEL|
   $!RemoveVar |LEVEL|
-$!ENDLOOP
+$!ENDLOOP';
+    }
+    print $fh '
 
 # SEP flux
 $!SETCONTOURVAR
-  VAR = 48
+  VAR = '.(1 + $nMflampaVar + ($SaveCME ? 2 + $nBatsrusVar : 3)).'
   CONTOURGROUP = 2
   LEVELINITMODE = RESETTONICE
 
@@ -686,9 +730,18 @@ $!GLOBALCONTOUR 1  COLORMAPFILTER{COLORMAPDISTRIBUTION = CONTINUOUS}
 $!GLOBALCONTOUR 1  COLORMAPFILTER{CONTINUOUSCOLOR{CMIN = 0}}
 $!GLOBALCONTOUR 1  COLORMAPFILTER{CONTINUOUSCOLOR{CMAX = |SPEEDMAX|}}
 
+$!GLOBALCONTOUR 2  LEGEND{ISVERTICAL = YES}
+$!GLOBALCONTOUR 2  LEGEND{XYPOS{Y = 95}}
+$!GLOBALCONTOUR 2  LEGEND{XYPOS{X = 100}}
+$!GLOBALCONTOUR 2  LEGEND{HEADERTEXTSHAPE{HEIGHT = 2.5}}
+$!GLOBALCONTOUR 2  LEGEND{NUMBERTEXTSHAPE{HEIGHT = 2.5}}
+$!GLOBALCONTOUR 2  LEGEND{BOX{BOXTYPE = FILLED}}
+$!GLOBALCONTOUR 2  LEGEND{BOX{MARGIN = 5}}
+$!GLOBALCONTOUR 2  LEGEND{ROWSPACING = 1.50000}
+
 $!GLOBALCONTOUR 2  LABELS{NUMFORMAT{FORMATTING = EXPONENTIAL}}
 $!GLOBALCONTOUR 2  LABELS{NUMFORMAT{PRECISION = 1}}
-$!GLOBALCONTOUR 2  LABELS{AUTOLEVELSKIP = 3}
+$!GLOBALCONTOUR 2  LABELS{AUTOLEVELSKIP = 1}
 
 $!GLOBALCONTOUR 2  COLORMAPFILTER{COLORMAPDISTRIBUTION = BANDED}
 $!GLOBALCONTOUR 2  COLORMAPNAME = \'Hot Metal\'';
@@ -771,8 +824,9 @@ $!AttachGeom
 $!THREEDAXIS FRAMEAXIS{XYPOS{X = 82}}
 $!THREEDAXIS FRAMEAXIS{XYPOS{Y = 10}}
 $!THREEDAXIS FRAMEAXIS{SIZE = 15}';
-    for(my $iView=1; $iView<=3; $iView++){
-	print $fh "
+    if($SaveCME){
+	for(my $iView=1; $iView<=3; $iView++){
+	    print $fh "
 \$!IF |SAVE$iView| == 1
 
   \$!THREEDVIEW VIEWWIDTH = 35
@@ -805,16 +859,15 @@ $!THREEDAXIS FRAMEAXIS{SIZE = 15}';
 
 #---------------------------------------------------------------------------
 ";
-
-    }
-    # -----------------------------------------------------------------
-    print $fh '
+	}
+	# -----------------------------------------------------------------
+	print $fh '
 
 #\
 # Custom viewing positions
 #/';
-    for(my $c=0; $c < @CustomX;$c++){
-	print $fh "
+	for(my $c=0; $c < @CustomX;$c++){
+	    print $fh "
 \$!THREEDVIEW VIEWWIDTH = 30
 \$!THREEDVIEW VIEWERPOSITION{X = $CustomX[$c]}
 \$!THREEDVIEW VIEWERPOSITION{Y = $CustomY[$c]}
@@ -843,6 +896,97 @@ $!THREEDAXIS FRAMEAXIS{SIZE = 15}';
 
 #---------------------------------------------------------------------------
 ";
+	}
+    }
+    # -----------------------------------------------------------------
+    if($SaveOrbit){
+	print $fh '
+#\
+# show contour for field lines
+#/
+$!FIELDMAP [1-4]  CONTOUR{SHOW = NO}
+$!FIELDMAP [|SPFIRST|-|SPLAST|]  CONTOUR{SHOW = YES}
+$!FIELDMAP [|SPFIRST|-|SPLAST|]  MESH{COLOR = MULTI2}
+$!FIELDMAP [|SPFIRST|-|SPLAST|]  MESH{LINETHICKNESS = 0.2}
+
+
+#\
+# set viewing position for orbit plot
+#/
+$!THREEDVIEW VIEWWIDTH = 750
+$!THREEDVIEW VIEWERPOSITION{X = |ViewOrbitX|}
+$!THREEDVIEW VIEWERPOSITION{Y = |ViewOrbitY|}
+$!THREEDVIEW VIEWERPOSITION{Z = |ViewOrbitZ|}
+$!THREEDVIEW PSIANGLE         = |PsiOrbit|
+$!THREEDVIEW THETAANGLE       = |ThetaOrbit|
+$!THREEDVIEW ALPHAANGLE       = |AlphaOrbit|
+
+# plot circle for orbit
+$!AttachGeom
+  GeomType = Circle
+  AnchorPos
+    {
+    X = 0.000000
+    Y =-0.000000
+    }
+  LineThickness = 0.2
+  IsFilled = No
+  Color = Black
+  RawData
+215.000000
+
+# plot circle for Earth
+$!AttachGeom
+  GeomType = Circle
+  AnchorPos
+    {
+    X = |XEarth|
+    Y = |YEarth|
+    }
+  LineThickness = 0.2
+  IsFilled = Yes
+  Color = Green
+  FillColor = Green
+  RawData
+5.000000
+
+# plot circle for STEREO A
+$!AttachGeom
+  GeomType = Circle
+  AnchorPos
+    {
+    X = |XStA|
+    Y = |YStA|
+    }
+  LineThickness = 0.2
+  IsFilled = Yes
+  Color = Red
+  FillColor = Red
+  RawData
+5.000000
+
+# plot circle for STEREO B
+$!AttachGeom
+  GeomType = Circle
+  AnchorPos
+    {
+    X = |XStB|
+    Y = |YStB|
+    }
+  LineThickness = 0.2
+  IsFilled = Yes
+  Color = Blue
+  FillColor = Blue
+  RawData
+5.000000
+
+# export plot
+  $!PRINTSETUP PALETTE = COLOR
+  $!EXPORTSETUP IMAGEWIDTH = 1355
+  $!EXPORTSETUP EXPORTFNAME = \'|OUTDIR|/SP.orbit.|TIME|.png\'
+  $!EXPORT 
+    EXPORTREGION = CURRENTFRAME
+';
     }
     # -----------------------------------------------------------------
     print $fh '
@@ -864,4 +1008,105 @@ $!RemoveVar |N3y|
 $!RemoveVar |N3z|';
 
     close($fh);
+}
+
+#------------------------------------------------------------------------
+
+# print orbit parameters to file
+sub print_orbit_param{#args: $fh
+
+    # file handler for macro being created
+    my $fh = $_[0];
+    
+    # compute viewing position for orbit plot
+    
+    # interpolation weight between starting and final positions
+    # NOTE: not precise, but worls well on short time scales
+    my $w = 1;#$t/(@Time-1);
+
+    # longitudes of Earth and STEREOs
+    my $Lon0 = $LonEarth[0]*(1-$w)+$LonEarth[1]*$w;
+    my $LonA = $LonStA[0]  *(1-$w)+$LonStA[1]  *$w;
+    my $LonB = $LonStB[0]  *(1-$w)+$LonStB[1]  *$w;
+
+    # latitudes of Earth and STEREOs
+    my $Lat0 = $LatEarth[0]*(1-$w)+$LatEarth[1]*$w;
+    my $LatA = $LatStA[0]  *(1-$w)+$LatStA[1]  *$w;
+    my $LatB = $LatStB[0]  *(1-$w)+$LatStB[1]  *$w;
+
+    # unit radius vectors in directions of Earth and STEREOs
+    my @REarth = (cos($Lat0*$rad)*cos($Lon0*$rad),
+		  cos($Lat0*$rad)*sin($Lon0*$rad),
+		  sin($Lat0*$rad));
+    my @RStA   = (cos($LatA*$rad)*cos($LonA*$rad),
+		  cos($LatA*$rad)*sin($LonA*$rad),
+		  sin($LatA*$rad));
+    my @RStB   = (cos($LatB*$rad)*cos($LonB*$rad),
+		  cos($LatB*$rad)*sin($LonB*$rad),
+		  sin($LatB*$rad));
+    # normal vector to the plane of Earth and STEREOS (i.e. orbit plane)
+    my @Dir    = ($RStB[1]*$RStA[2]-$RStB[2]*$RStA[1],
+		  $RStB[2]*$RStA[0]-$RStB[0]*$RStA[2],
+		  $RStB[0]*$RStA[1]-$RStB[1]*$RStA[0]);
+    my $Norm = sqrt($Dir[0]*$Dir[0]+$Dir[1]*$Dir[1]+$Dir[2]*$Dir[2]);
+    foreach my $x (@Dir) { $x /= $Norm; }
+
+    # compute viewing position and angles
+    my $PsiOrbit   = 90 - $deg*asin($Dir[2]);
+    my $ThetaOrbit =270 -$deg*asin($Dir[1]/sin($PsiOrbit*$rad));
+    my $AlphaOrbit = $deg*acos(
+	-($REarth[0]*cos($PsiOrbit*$rad)*sin($ThetaOrbit*$rad)+
+	  $REarth[1]*cos($PsiOrbit*$rad)*cos($ThetaOrbit*$rad)+
+	  $REarth[2]*sin($PsiOrbit*$rad)));
+    my $OrbitX = 1000*$Dir[0];
+    my $OrbitY = 1000*$Dir[1];
+    my $OrbitZ = 1000*$Dir[2];
+
+
+    printf $fh "
+
+#\\
+# parameters of orbit plot
+#/
+\$!VarSet |LonEarth|   = $Lon0
+\$!VarSet |LonStA|     = $LonA
+\$!VarSet |LonStB|     = $LonB
+\$!VarSet |LatEarth|   = $Lat0
+\$!VarSet |LatStA|     = $LatA
+\$!VarSet |LatStB|     = $LatB
+\$!VarSet |PsiOrbit|   = $PsiOrbit
+\$!VarSet |ViewOrbitX| = $OrbitX
+\$!VarSet |ViewOrbitY| = $OrbitY
+\$!VarSet |ViewOrbitZ| = $OrbitZ
+\$!VarSet |ThetaOrbit| = $ThetaOrbit
+\$!VarSet |AlphaOrbit| = $AlphaOrbit";
+
+    
+    # 2D coordinates of positions of Earth and STEREOs on the figure;
+    # Earth is fixed at the bottom position
+    my $x; my $y;
+    $y =-215;
+    $x =   0;
+    printf $fh "
+
+# Earth position on the figure
+\$!VarSet |XEarth| = $x
+\$!VarSet |YEarth| = $y";
+
+    $y =-215 * cos($rad*($LonA-$Lon0));
+    $x = 215 * sin($rad*($LonA-$Lon0));
+    printf $fh "
+
+# STEREO A position on the figure
+\$!VarSet |XStA| = $x
+\$!VarSet |YStA| = $y";
+	
+    $y =-215 * cos($rad*($LonB-$Lon0));
+    $x = 215 * sin($rad*($LonB-$Lon0));
+    printf $fh "
+
+# STEREO B position on the figure
+\$!VarSet |XStB| = $x
+\$!VarSet |YStB| = $y";
+
 }
