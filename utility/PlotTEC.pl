@@ -33,7 +33,6 @@ foreach my $arg (@ARGV){
 	exit;
     }
     elsif($arg =~ m/^-param=(.*)$/){
-	die("Plot param file $1 doesn't exist") unless(-e "$1");
 	$INPUT = $1;
     }
     elsif($arg =~ m/^-macro-only$/){
@@ -285,6 +284,9 @@ sub add_time{
 # read plot parameters from $INPUT file
 sub read_input{
     
+    # check that input file exists
+    die("Plot param file $INPUT doesn't exist") unless(-e "$INPUT");
+
     # get input file's content
     my $fh;
     open($fh,'<',$INPUT);
@@ -731,7 +733,7 @@ $!GLOBALCONTOUR 1  COLORMAPFILTER{CONTINUOUSCOLOR{CMIN = 0}}
 $!GLOBALCONTOUR 1  COLORMAPFILTER{CONTINUOUSCOLOR{CMAX = |SPEEDMAX|}}
 
 $!GLOBALCONTOUR 2  LEGEND{ISVERTICAL = YES}
-$!GLOBALCONTOUR 2  LEGEND{XYPOS{Y = 95}}
+$!GLOBALCONTOUR 2  LEGEND{XYPOS{Y = 100}}
 $!GLOBALCONTOUR 2  LEGEND{XYPOS{X = 100}}
 $!GLOBALCONTOUR 2  LEGEND{HEADERTEXTSHAPE{HEIGHT = 2.5}}
 $!GLOBALCONTOUR 2  LEGEND{NUMBERTEXTSHAPE{HEIGHT = 2.5}}
@@ -822,8 +824,8 @@ $!AttachGeom
 
 # Position and size of 3D axes
 $!THREEDAXIS FRAMEAXIS{XYPOS{X = 82}}
-$!THREEDAXIS FRAMEAXIS{XYPOS{Y = 10}}
-$!THREEDAXIS FRAMEAXIS{SIZE = 15}';
+$!THREEDAXIS FRAMEAXIS{XYPOS{Y = 15}}
+$!THREEDAXIS FRAMEAXIS{SIZE = 10}';
     if($SaveCME){
 	for(my $iView=1; $iView<=3; $iView++){
 	    print $fh "
@@ -950,6 +952,23 @@ $!AttachGeom
   RawData
 5.000000
 
+# label Earth
+$!AttachText 
+  PositionCoordSys = Grid
+  AnchorPos
+    {
+    X = |XEarth|
+    Y = (|YEarth| + 15)
+    }
+  TextShape
+    {
+    IsBold = Yes
+    Height = 20
+    }
+
+  Anchor = Center
+  Text = \'Earth\'
+
 # plot circle for STEREO A
 $!AttachGeom
   GeomType = Circle
@@ -965,6 +984,22 @@ $!AttachGeom
   RawData
 5.000000
 
+# label STEREO A
+$!AttachText 
+  PositionCoordSys = Grid
+  AnchorPos
+    {
+    X = |XStA|
+    Y = (|YStA| - 15)
+    }
+  TextShape
+    {
+    IsBold = Yes
+    Height = 20
+    }
+  Anchor = HeadCenter
+  Text = \'STEREO A\'
+
 # plot circle for STEREO B
 $!AttachGeom
   GeomType = Circle
@@ -979,6 +1014,22 @@ $!AttachGeom
   FillColor = Blue
   RawData
 5.000000
+
+# label STEREO B
+$!AttachText 
+  PositionCoordSys = Grid
+  AnchorPos
+    {
+    X = |XStB|
+    Y = (|YStB| - 15)
+    }
+  TextShape
+    {
+    IsBold = Yes
+    Height = 20
+    }
+  Anchor = HeadCenter
+  Text = \'STEREO B\'
 
 # export plot
   $!PRINTSETUP PALETTE = COLOR
