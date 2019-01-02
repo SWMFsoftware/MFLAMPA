@@ -352,27 +352,21 @@ sub read_input{
 	elsif($lines[$i] =~ m/#EARTH/i){
 	    push @LonEarth, $lines[$i+1];
 	    push @LatEarth, $lines[$i+2];
-	    push @LonEarth, $lines[$i+3];
-	    push @LatEarth, $lines[$i+4];
-	    $i += 4;
+	    $i += 2;
 	}
 	
 	# angular location of STEREO A @ start and end
 	elsif($lines[$i] =~ m/#STEREOA/i){
 	    push @LonStA, $lines[$i+1];
 	    push @LatStA, $lines[$i+2];
-	    push @LonStA, $lines[$i+3];
-	    push @LatStA, $lines[$i+4];
-	    $i += 4;
+	    $i += 2;
 	}
 	
 	# angular location of STEREO B @ start and end
 	elsif($lines[$i] =~ m/#STEREOB/i){
 	    push @LonStB, $lines[$i+1];
 	    push @LatStB, $lines[$i+2];
-	    push @LonStB, $lines[$i+3];
-	    push @LatStB, $lines[$i+4];
-	    $i += 4;
+	    $i += 2;
 	}
 	
 	# times of a time series output
@@ -1076,14 +1070,14 @@ sub print_orbit_param{#args: $fh
     my $w = 1;#$t/(@Time-1);
 
     # longitudes of Earth and STEREOs
-    my $Lon0 = $LonEarth[0]*(1-$w)+$LonEarth[1]*$w;
-    my $LonA = $LonStA[0]  *(1-$w)+$LonStA[1]  *$w;
-    my $LonB = $LonStB[0]  *(1-$w)+$LonStB[1]  *$w;
+    my $Lon0 = $LonEarth[0];
+    my $LonA = $LonStA[0]  ;
+    my $LonB = $LonStB[0]  ;
 
     # latitudes of Earth and STEREOs
-    my $Lat0 = $LatEarth[0]*(1-$w)+$LatEarth[1]*$w;
-    my $LatA = $LatStA[0]  *(1-$w)+$LatStA[1]  *$w;
-    my $LatB = $LatStB[0]  *(1-$w)+$LatStB[1]  *$w;
+    my $Lat0 = $LatEarth[0];
+    my $LatA = $LatStA[0]  ;
+    my $LatB = $LatStB[0]  ;
 
     # unit radius vectors in directions of Earth and STEREOs
     my @REarth = (cos($Lat0*$rad)*cos($Lon0*$rad),
