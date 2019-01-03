@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use List::Util "max";
 
 
 my $DESCRIPTION = 
@@ -50,6 +51,18 @@ my $filename = '';
 
 # whether to suppress standard output
 my $IsSilent = '';
+
+# intergral flux cut-off levels in MeV
+my @FluxChannels = (5, 10, 30, 50, 60, 100);
+
+# storage for variables indices corresponding to flux channels
+my %FluxVars;
+@FluxVars{@FluxChannels} = ();
+
+# energy ranges for fluxes
+my %FluxRange;
+@FluxRange{@FluxChannels} = ();
+
 
 # print help if required
 foreach my $Arg (@ARGV){
@@ -215,8 +228,10 @@ foreach my $line (@linesIn){
     }
 
     next unless($FoundData);
-
-    # Process data lines
+    
+    #\
+    # Process data lines --------------------------------------------------
+    #/
     if($fmt eq 'goes') {
 	# process time_tag:
 	# convert dates to Julian dates (in days);
@@ -304,6 +319,61 @@ foreach my $line (@linesIn){
 
 }
 
+#\
+# compute integral fluxes in requested channels
+#/
+foreach my $C (@FluxChannels){
+    # append name to the list of variables
+    if($fmt eq 'goes'){
+	$VarNames .= ',"flux_'.sprintf("%05d",$C).'_[p.f.u.]"';
+    }
+
+    # determine correspondence between channels and variables in data
+    if($fmt eq 'goes') {
+	if($C < 900){
+	    push @{$FluxVars{$C}}, i_var('P7W_UNCOR_FLUX', $VarNames);
+	    push @{$FluxRange{$C}}, 900 - max(0.5*(200+110), $C );
+
+	}
+	if($C < 200){
+	    push @{$FluxVars{$C}}, i_var('P6W_UNCOR_FLUX', $VarNames);
+	    push @{$FluxRange{$C}}, 200 - max(84, $C);
+	}
+	if($C < 82){
+	    push @{$FluxVars{$C}}, i_var('P5W_UNCOR_FLUX', $VarNames);
+	    push @{$FluxRange{$C}}, 82 - max(0.5*(38+40), $C);
+	}
+	if($C < 40){
+	    push @{$FluxVars{$C}}, i_var('P4W_UNCOR_FLUX', $VarNames);
+	    push @{$FluxRange{$C}}, 40 - max(15, $C);
+	}
+	if($C < 14.5){
+	    push @{$FluxVars{$C}}, i_var('P3W_UNCOR_FLUX', $VarNames);
+	    push @{$FluxRange{$C}}, 14.5 - max(8.7, $C);
+	}
+	if($C < 8.7){
+	    push @{$FluxVars{$C}}, i_var('P2W_UNCOR_FLUX', $VarNames);
+	    push @{$FluxRange{$C}}, 8.7 - max(4.2, $C);
+	}
+	
+    }
+}
+
+if($fmt eq 'goes'){
+# using the correspondence determined above, compute fluxes
+    foreach my $line (@linesOut){
+	foreach my $C (@FluxChannels){
+	    my $Flux = 0;
+	    for(my $i=0; $i < @{$FluxVars{$C}}; $i++){
+		$Flux += get_i_var($FluxVars{$C}[$i], $line) * $FluxRange{$C}[$i];
+	    }
+	    # append the result to the end
+	    $line =~ s/(.*)/$1 $Flux/;
+	}
+    }
+}
+
+
 # count and save number of rows
 my $nRow = @linesOut;
 
@@ -345,3 +415,32 @@ sub get_julian_date{
 	int( (275 * $M) / 9 ) + $D + 1721013.5 + 
 	($h + $m/60 + $s/3600)/24;
 }
+
+#---------------------------------------------------------------------
+sub i_var{# args: $Var, $Vars
+    # variables in the list MUST be comma separated
+    # and each may be in double quotes, 
+    # e.g. $Vars = '"Var1" "Var2" "Var3"'
+
+    # result
+    my $res = -1;
+
+    # returns a zero-based index of $Var in the list $Vars
+    my $Var = $_[0];
+    my $Vars= $_[1];
+    if($Vars =~ m/(("[\w ]*"\s*,\s*)*)"$Var"/){
+	# list of variables preceding $Var
+	my $Aux = $1;
+	$res = ~~($Aux =~ s/,/,/g);
+    }
+    return $res;
+}
+
+#---------------------------------------------------------------------
+sub get_i_var{# args: $iVar, $Vars
+    # returns variable with zero-based index in the string $Vars
+    die "Failed to get a variable value from string $_[1]"
+	unless($_[1] =~ m/([0-9.eE+-]+\s+){$_[0]}([0-9.eE+-]+)/);
+    return $2;
+}
+		
