@@ -63,6 +63,12 @@ my %FluxVars;
 my %FluxRange;
 @FluxRange{@FluxChannels} = ();
 
+my %FluxMin;
+@FluxMin{@FluxChannels} = ();
+
+my %FluxMax;
+@FluxMax{@FluxChannels} = ();
+
 
 # print help if required
 foreach my $Arg (@ARGV){
@@ -151,7 +157,7 @@ my %DataMarker = (
 
 # marker of the line that contains (some) header info
 my %HeaderMarker = (
-    'goes'       => 'time_tag',
+    'goes'       => 'time_tag,',
     'soho-ephin' => 'Julian date',
     'stereo-let' => 'Column\s+\d+:',
     'stereo-het' => '[TF]\d'
@@ -172,18 +178,90 @@ foreach my $line (@linesIn){
 	    $VarNames =~ s/,/","/g;
 	    $VarNames =~ s/\R//g;
 	    $VarNames =~ s/time_tag/Julian date/;
+
+	    # determine correspondence between channels and variables in data
+	    foreach my $C (@FluxChannels) {
+		if($C < 8.7){
+		    push @{$FluxVars{$C}}, i_var('P2W_UNCOR_FLUX', $VarNames);
+		    push @{$FluxMin{$C}}, 4.2; 
+		    push @{$FluxMax{$C}}, 8.7;
+		}
+		if($C < 14.5){
+		    push @{$FluxVars{$C}}, i_var('P3W_UNCOR_FLUX', $VarNames);
+		    push @{$FluxMin{$C}}, 8.7; 
+		    push @{$FluxMax{$C}}, 14.5;
+		}
+		if($C < 40){
+		    push @{$FluxVars{$C}}, i_var('P4W_UNCOR_FLUX', $VarNames);
+		    push @{$FluxMin{$C}}, 15; 
+		    push @{$FluxMax{$C}}, 40;
+
+		}
+		if($C < 82){
+		    push @{$FluxVars{$C}}, i_var('P5W_UNCOR_FLUX', $VarNames);
+		    push @{$FluxMin{$C}}, 38; 
+		    push @{$FluxMax{$C}}, 82;
+		}
+		if($C < 200){
+		    push @{$FluxVars{$C}}, i_var('P6W_UNCOR_FLUX', $VarNames);
+		    push @{$FluxMin{$C}}, 84; 
+		    push @{$FluxMax{$C}}, 200;
+		}
+		if($C < 900){
+		    push @{$FluxVars{$C}}, i_var('P7W_UNCOR_FLUX', $VarNames);
+		    push @{$FluxMin{$C}}, 110; 
+		    push @{$FluxMax{$C}}, 900;
+		}
+	    }
 	}
 	elsif($fmt eq 'soho-ephin'){
 	    $VarNames = $line;
 	    $VarNames =~ s/\s{3,}/","/g;
 	    $VarNames =~ s/\R//g;
+
+	    # determine correspondence between channels and variables in data
+	    # description of channel energy levels 
+	    # http://www.ieap.uni-kiel.de/et/ag-heber/costep/ephin_sensor.php
+	    foreach my $C (@FluxChannels) {
+		if($C < 7.8){
+		    push @{$FluxVars{$C}}, i_var('P4', $VarNames);
+		    push @{$FluxMin{$C}}, 4.3; 
+		    push @{$FluxMax{$C}}, 7.8;
+		}
+		if($C < 25.0){
+		    push @{$FluxVars{$C}}, i_var('P8', $VarNames);
+		    push @{$FluxMin{$C}}, 7.8; 
+		    push @{$FluxMax{$C}}, 25.0;
+		}
+		if($C < 40.9){
+		    push @{$FluxVars{$C}}, i_var('P25', $VarNames);
+		    push @{$FluxMin{$C}}, 25.0; 
+		    push @{$FluxMax{$C}}, 40.9;
+		}
+		if($C < 53.0){
+		    push @{$FluxVars{$C}}, i_var('P41', $VarNames);
+		    push @{$FluxMin{$C}}, 40.9; 
+		    push @{$FluxMax{$C}}, 53.0;
+		}
+	    }
 	}
 	elsif($fmt eq 'stereo-let'){
+	    # regex pattern for a decimal number
+	    my $Number = '[0-9]*\.?[0-9]+';
+
 	    $VarNames = '"Julian date"' unless($VarNames);
             # header line format Column N: VarName
-	    if($line =~ m/^$HeaderMarker{$fmt} (.*)$/){
+	    if($line =~ m/^$HeaderMarker{$fmt}\s+(($Number)\s+-\s+($Number).*)$/){
 		$VarNames.=",\"$1\"";
 		$nEntry++;
+
+		foreach my $C (@FluxChannels){
+		    if($C < $3){
+			push @{$FluxVars{$C}}, i_var("$1", $VarNames);
+			push @{$FluxMin{$C}}, $2; 
+			push @{$FluxMax{$C}}, $3;
+		    }
+		}
 	    }
 	}
 	elsif($fmt eq 'stereo-het'){
@@ -215,6 +293,16 @@ foreach my $line (@linesIn){
 		}
 		else {
 		    die "Don't know how to process line:\n\t'$line'\n"
+		}
+		# determine correspondence between channels and variables
+		if($4 eq'H') {
+		    foreach my $C (@FluxChannels){
+			if($C < $3){
+			    push @{$FluxVars{$C}}, i_var("Intensity H $2-$3 MeV", $VarNames);
+			    push @{$FluxMin{$C}}, $2; 
+			    push @{$FluxMax{$C}}, $3;
+			}
+		    }
 		}
 	    }
 	}
@@ -315,61 +403,48 @@ foreach my $line (@linesIn){
     $line = "$line\n";
 
     push @linesOut, $line;
-
-
 }
 
 #\
 # compute integral fluxes in requested channels
 #/
 foreach my $C (@FluxChannels){
+
+    next unless($FluxMax{$C});
+
     # append name to the list of variables
-    if($fmt eq 'goes'){
-	$VarNames .= ',"flux_'.sprintf("%05d",$C).'_[p.f.u.]"';
+    $VarNames .= ',"flux_'.sprintf("%05d",$C).'_[p.f.u.]"';
+    
+    # account for overlapping flux channels in data
+    # NOTE: maxima and minima are assumed to be sorted
+    for (my $i=0; $i < @{$FluxMax{$C}} - 1; $i++){
+	if($FluxMax{$C}[$i] > $FluxMin{$C}[$i+1]){
+	    $FluxMax{$C}[$i]   = 0.5*($FluxMax{$C}[$i]+$FluxMin{$C}[$i+1]);
+	    $FluxMin{$C}[$i+1] = $FluxMax{$C}[$i];
+	}
     }
-
-    # determine correspondence between channels and variables in data
-    if($fmt eq 'goes') {
-	if($C < 900){
-	    push @{$FluxVars{$C}}, i_var('P7W_UNCOR_FLUX', $VarNames);
-	    push @{$FluxRange{$C}}, 900 - max(0.5*(200+110), $C );
-
-	}
-	if($C < 200){
-	    push @{$FluxVars{$C}}, i_var('P6W_UNCOR_FLUX', $VarNames);
-	    push @{$FluxRange{$C}}, 200 - max(84, $C);
-	}
-	if($C < 82){
-	    push @{$FluxVars{$C}}, i_var('P5W_UNCOR_FLUX', $VarNames);
-	    push @{$FluxRange{$C}}, 82 - max(0.5*(38+40), $C);
-	}
-	if($C < 40){
-	    push @{$FluxVars{$C}}, i_var('P4W_UNCOR_FLUX', $VarNames);
-	    push @{$FluxRange{$C}}, 40 - max(15, $C);
-	}
-	if($C < 14.5){
-	    push @{$FluxVars{$C}}, i_var('P3W_UNCOR_FLUX', $VarNames);
-	    push @{$FluxRange{$C}}, 14.5 - max(8.7, $C);
-	}
-	if($C < 8.7){
-	    push @{$FluxVars{$C}}, i_var('P2W_UNCOR_FLUX', $VarNames);
-	    push @{$FluxRange{$C}}, 8.7 - max(4.2, $C);
-	}
-	
+    
+    # compute the energy ranges corresponding to flux variables
+    for (my $i=0; $i < @{$FluxMax{$C}}; $i++){
+	# current channel serves as the lower intergration limit
+	$FluxMin{$C}[$i] = max($FluxMin{$C}[$i], $C);
+	# compute the final range
+	push @{$FluxRange{$C}}, ($FluxMax{$C}[$i] - $FluxMin{$C}[$i]);
     }
 }
 
-if($fmt eq 'goes'){
 # using the correspondence determined above, compute fluxes
-    foreach my $line (@linesOut){
-	foreach my $C (@FluxChannels){
-	    my $Flux = 0;
-	    for(my $i=0; $i < @{$FluxVars{$C}}; $i++){
-		$Flux += get_i_var($FluxVars{$C}[$i], $line) * $FluxRange{$C}[$i];
-	    }
-	    # append the result to the end
-	    $line =~ s/(.*)/$1 $Flux/;
+foreach my $line (@linesOut){
+    foreach my $C (@FluxChannels){
+	
+	next unless($FluxRange{$C});
+	
+	my $Flux = 0;
+	for(my $i=0; $i < @{$FluxVars{$C}}; $i++){
+	    $Flux += get_i_var($FluxVars{$C}[$i], $line) * $FluxRange{$C}[$i];
 	}
+	# append the result to the end
+	$line =~ s/(.*)/$1 $Flux/;
     }
 }
 
@@ -428,7 +503,7 @@ sub i_var{# args: $Var, $Vars
     # returns a zero-based index of $Var in the list $Vars
     my $Var = $_[0];
     my $Vars= $_[1];
-    if($Vars =~ m/(("[\w ]*"\s*,\s*)*)"$Var"/){
+    if($Vars =~ m/(([^,]*\s*,\s*)*)"?\Q$Var\E"?\s*(,|$)/){
 	# list of variables preceding $Var
 	my $Aux = $1;
 	$res = ~~($Aux =~ s/,/,/g);
