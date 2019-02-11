@@ -147,8 +147,8 @@ contains
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL','#USELIDIFFUSION', '#TESTDIFFUSION', &
-            '#USESOKOLOVDIFFUSION', '#USEBOROVIKOVDIFFUSION')
+       case('#INJECTION','#CFL','#USEFIXEDMFPUPSTREAM', '#TESTDIFFUSION', &
+            '#SCALETURBULENCE')
           call read_param_adv(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
@@ -231,8 +231,7 @@ contains
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
-    use SP_ModTurbulence,   ONLY: init_turbulence => init, UseTurbulentSpectrum
-    use SP_ModAdvance,      ONLY: UseLiDiffusion, DoTestDiffusion
+    use SP_ModTurbulence,   ONLY: init_turbulence => init
 
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
@@ -248,28 +247,6 @@ contains
          call get_origin_points
     if(IsStandAlone) call init_time
     DoInit=.false.
-
-    if (iProc == 0) then
-       write(*,'(a)') &
-            '-----------------------------------------------------------------'
-       write(*,*) 'SP:initialize'
-       write(*,*) ' Test position and momentum:'
-       write(*,*) ' iNodeTest     =', iNodeTest
-       write(*,*) ' iParticleTest =', iParticleTest
-       write(*,*) ' iPTest        =', iPTest
-       write(*,*) ' DoTraceShock  =', DoTraceShock
-       write(*,*) ' UseDiffusion  =', UseDiffusion
-       if (UseLiDiffusion .and. UseTurbulentSpectrum) then
-          write(*,*) ' warning: both Li and turbulent spectrum are used.'
-          write(*,*) ' Switch to Li Diffusion'
-          UseTurbulentSpectrum = .false.
-       end if
-       if (UseLiDiffusion) &
-            write(*,*) ' Diffusion coef is from Li et al. (2003), '//&
-            'doi:10.1029/2002JA009666'
-       if (UseTurbulentSpectrum) &
-            write(*,*) ' Diffusion coef is based on turbulent spectrum.'
-    end if
     !-------------------------------------------------------------------------
   contains
     subroutine get_origin_points

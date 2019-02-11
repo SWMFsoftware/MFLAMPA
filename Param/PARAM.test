@@ -48,6 +48,9 @@ mh2d flux ascii
 mhtime flux ascii
 215.0
 
+#SCALETURBULENCE
+0.2402397832		ScaleTurbulence [AU]
+
 #STOP
 -1			nIterMax
 300			TimeMax
@@ -56,9 +59,9 @@ mhtime flux ascii
 
 ==============================================================================
 
-#USELIDIFFUSION
-T
-0.3
+#USEFIXEDMFPUPSTREAM
+T			UseFixedMFPUpstream
+0.3			MeanFreePath0 [AU]
 
 #STOP
 -1			nIterMax

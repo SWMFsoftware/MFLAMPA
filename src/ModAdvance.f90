@@ -5,7 +5,7 @@
 module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
   use ModNumConst,ONLY: cPi
-  use ModConst,   ONLY: cLightSpeed, cGEV
+  use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
   use SP_ModSize, ONLY: nParticleMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
@@ -38,8 +38,8 @@ module SP_ModAdvance
   !/
   !\
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
-  logical, public :: UseLiDiffusion = .false.
-  real    :: Lambda0InAu = 1.0
+  logical, public :: UseFixedMFPUpstream = .false.
+  real    :: MeanFreePath0InAu = 1.0
   !/
   !\
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
@@ -47,17 +47,15 @@ module SP_ModAdvance
 
   logical, public :: DoTestDiffusion = .false.
 
-  logical, public :: UseBorovikovDiffusion = .false.
-
-  ! Use Sokolov's diffusion coef
-  logical, public :: UseSokolovDiffusion = .false.
-  real :: rL0SI_I(1:nParticleMax) = 0.0, LMaxSI = 0.0
+  !\
+  ! Parameter characterizing cut-off wavenumber of turbulent spectrum
+  real:: ScaleTurbulenceSI = 0.03 * cAu
+  !/
 
 contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
-    use ModConst,     ONLY: cAU
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
     character(len=*), parameter :: NameSub='SP:read_param_adv'
     !---------------------------------------------
@@ -67,18 +65,16 @@ contains
        call read_var('Efficiency',   CoefInj)
     case('#CFL')
        call read_var('Cfl',CFL)
-    case('#USELIDIFFUSION')
-       call read_var('UseLiDiffusion',UseLiDiffusion)
-       if(UseLiDiffusion)then
+    case('#USEFIXEDMFPUPSTREAM')
+       call read_var('UseFixedMFPUpstream',UseFixedMFPUpstream)
+       if(UseFixedMFPUpstream)then
           ! see Li et al. (2003), doi:10.1029/2002JA009666
-          call read_var('Lambda0InAu [AU]', Lambda0InAu)
+          call read_var('MeanFreePath0 [AU]', MeanFreePath0InAu)
        end if
-    case('#USESOKOLOVDIFFUSION')
-       call read_var('UseSokolovDiffusion',UseSokolovDiffusion)
-       ! LMaxSI is a constant and could be initialized here
-       LMaxSI = 0.03*cAU
-    case('#USEBOROVIKOVDIFFUSION')
-       call read_var('UseBorovikovDiffusion',UseBorovikovDiffusion)
+    case('#SCALETURBULENCE')
+       ! cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
+       call read_var('ScaleTurbulence [AU]', ScaleTurbulenceSI)
+       ScaleTurbulenceSI = ScaleTurbulenceSI * cAu
     case('#TESTDIFFUSION')
        call read_var('DoTestDiffusion', DoTestDiffusion)
     end select
@@ -96,7 +92,7 @@ contains
     use SP_ModTime,         ONLY: SPTime
     use SP_ModDiffusion,    ONLY: advance_diffusion
     use SP_ModLogAdvection, ONLY: advance_log_advection
-    use ModConst,           ONLY: cMu, cProtonMass, cGyroradius, Rsun, &
+    use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
          cElectronCharge
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
          iPTest, iParticleTest, iNodeTest
@@ -124,7 +120,7 @@ contains
     real     :: Alpha
     !/
     !\
-    ! Lower imit to floor the spatial diffusion coefficient For a
+    ! Lower limit to floor the spatial diffusion coefficient For a
     ! given spatial and temporal resolution, the value of the  
     ! diffusion coefficient should be artificially increased to get       
     ! the diffusion length to be larger than the shock front width, 
@@ -314,19 +310,7 @@ contains
                 ! For each momentum account for dependence
                 ! of the diffusion coefficient on momentum
                 ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-                if(UseLiDiffusion .or. UseBorovikovDiffusion .or. &
-                     UseBorovikovDiffusion) then
-                   ! Add v (= p*c^2/E_total in the relativistic case) 
-                   ! and (p)^(1/3)
-                   DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
-                        *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
-                   
-                   ! Add 1/B as the actual diffusion is D/B
-                   DInnerSI_I(1:iEnd) = DInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
-
-                   DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
-                        DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-                else if (UseTurbulentSpectrum) then
+                if (UseTurbulentSpectrum) then
                    do iParticle=1,iEnd
                       DInnerSI_I(iParticle) =                          &
                            Dxx(iParticle, iP, MomentumSI_I(iP),        &
@@ -334,8 +318,15 @@ contains
                            BSI_I(iParticle)
                    end do
                 else
-                   call CON_stop(NameSub//': unknown diffusion')
+                   ! Add v (= p*c^2/E_total in the relativistic case) 
+                   ! and (p)^(1/3)
+                   DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
+                        *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+                   
+                   DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
+                        DiffCoeffMinSI/DOuterSI_I(1:iEnd))
                 end if
+
 
                 if (DoTestDiffusion .and. iNode_B(iBlock) == iNodeTest) then
                    if (iP == iPTest) then
@@ -417,70 +408,48 @@ contains
     end subroutine steepen_shock
     !==========================================================================
     subroutine set_coef_diffusion
-      use ModConst,   ONLY: cMu, cAu
       ! set diffusion coefficient for the current line
+      real, parameter:: cCoef = 81./7/cPi/(2*cPi)**(2./3)
       !------------------------------------------------------------------------
       DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
-      !DInner = DiffusionCoeff/B_)
 
-      if (UseTurbulentSpectrum) return
-
-      ! reset rL0SI_I
-      rL0SI_I = 0.0
+      if(UseTurbulentSpectrum) return
 
       !\
       ! Compute the diffusion coefficient without the contribution of 
       ! v (velocity) and p (momentum), as v and p are different for 
       ! different iP
       !/
-      if(UseBorovikovDiffusion)then
+      if(.not.UseFixedMFPUpstream)then
          !\
          ! Sokolov et al., 2004: eq (4), 
          ! note: Momentum = TotalEnergy * Vel / C**2
          ! Gyroradius = cGyroRadius * momentum / |B|
-         ! DInner = (B/\delta B)**2*Gyroradius*Vel/|B| 
-         !/
-         !\
+         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B| 
+         ! ------------------------------------------------------
          ! effective level of turbulence is different for different momenta:
          ! (\delta B)**2 \propto Gyroradius^(1/3)
-         ! we scale it with reference point:  
-         ! mean free path  ~ RSun @ 1AU for 1GeV proton
-         ! (B/\delta B)**2 ~ 1    @ 1AU
-         ! thus (e1,e2 are turbulent energies): 
-         ! DInner=B^2/(2*cMu*(e1+e2))*10*(Gyroradius*RSun**2)**(1/3)*Vel/|B|
-         ! where Gyroradius = cGyroRadius * p / |B|
-         ! v (velocity) and (p)^(1/3) are calculated in the momentum do loop
          !/
-
-         CoefDInnerSI_I(1:iEnd) =  (1.0/3)*BSI_I(1:iEnd)**2 /          &
-              (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
-              *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)
-      else if (UseSokolovDiffusion) then
-         ! cGyroRadius = 1./cElectronCharge
-         rL0SI_I(1:iEnd) = cGEV*cGyroRadius/(cLightSpeed*BSI_I(1:iEnd))
-
-         CoefDInnerSI_I(1:iEnd) =  0.9/3*BSI_I(1:iEnd)**2 /            &
-              (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))      &
-              *(LMaxSI**2*rL0SI_I(1:iEnd))**(1./3)*(cLightSpeed/cGEV)**(1.0/3)
-      else if(UseLiDiffusion) then
+         CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
+              (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+              (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
+      else if(UseFixedMFPUpstream) then
          ! diffusion is different up- and down-stream
          ! Sokolov et al. 2004, paragraphs before and after eq (4)
          where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
             ! upstream: reset the diffusion coefficient to 
-            ! (1/3)*Lambda0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
+            ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
             ! see Li et al. (2003), doi:10.1029/2002JA009666
-
+            ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
             ! 1/AU cancels with unit of Lambda0,no special attention needed;
-            ! v (velocity) and (p)^(1/3) are calculated in the 
-            ! momentum do loop
-
-            CoefDInnerSI_I(1:iEnd) =                    &
-                 (1.0/3)*Lambda0InAU * RadiusSI_I(1:iEnd)       &
+            ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
+            CoefDInnerSI_I(1:iEnd) =                     &
+                 (1.0/3)*MeanFreePath0InAU * RadiusSI_I(1:iEnd)&
                  *(cLightSpeed/cGEV)**(1.0/3)
          elsewhere
-            CoefDInnerSI_I(1:iEnd) =  BSI_I(1:iEnd)**2 /                  &
-                 (2*cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))    &
-                 *10*(cGyroRadius/BSI_I(1:iEnd)*Rsun**2)**(1./3)
+            CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
+                 (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+                 (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
 
             !\
             ! LEGACY MODEL PREVIOUSLY USED DOWNSTREAM
@@ -499,6 +468,9 @@ contains
             !!     min(1.0, 1.0/0.9 * RadiusSI_I(1:iEnd)/RadiusSI_I(iShock))
          end where
       end if
+
+      ! Add 1/B as the actual diffusion is D/B
+      CoefDInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
 
       ! set the left boundary condition for diffusion
       Distribution_IIB(1:nP+1, 1, iBlock) = &
