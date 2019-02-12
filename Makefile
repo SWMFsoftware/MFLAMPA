@@ -140,8 +140,6 @@ test_mflampa_rundir:
 	cp Param/MH_data_e20120123.zip ${TESTDIR}/
 	cd ${TESTDIR}; unzip MH_data_e20120123.zip
 
-NP = 1
-
 test_mflampa_run:
 	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee -a runlog
 
