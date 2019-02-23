@@ -154,6 +154,8 @@ contains
     !\
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
+    ! DOuter =BSI in the cell center
+    ! DInner = DiffusionCoefficient/BSI at the face
     real, dimension(1:nParticleMax):: &
          DOuterSI_I, DInnerSI_I, CoefDInnerSI_I
     !/
@@ -449,23 +451,7 @@ contains
          elsewhere
             CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
                  (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
-                 (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
-
-            !\
-            ! LEGACY MODEL PREVIOUSLY USED DOWNSTREAM
-            !-------------------------------------------------
-            ! downstream we use the estimate for (\delta B/B) 
-            ! (see detail in Sokolov, 2004):
-            ! (\delta B/B)**2 = (\delta B/B)**2_SW*(R/R_SW)
-            ! where SW means "shock wave". For the SW we use an
-            ! estimate from  from Lee (1983): 
-            ! (\delta B/B)**2_SW = const(=10 below)*CoefInj*MachAlfven
-
-            !!CoefDInnerSI_I(1:iEnd)=&
-            !!     cGyroRadius*(MomentumInjSI*cLightSpeed)**2/RSun**2/&
-            !!     (BSI_I(1:iEnd)**2*TotalEnergyInjSI)/&
-            !!     (10.0*CoefInj*MachAlfven)/&
-            !!     min(1.0, 1.0/0.9 * RadiusSI_I(1:iEnd)/RadiusSI_I(iShock))
+                 (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3))
          end where
       end if
 
