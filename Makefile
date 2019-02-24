@@ -149,4 +149,5 @@ test_mflampa_check:
 	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
 		Param/TestOutput/test_mflampa/MH_data.ref \
 	${TESTDIR}/SP/IO2/MH_data.out > test_mflampa.diff
+	ls -ltr test_mflampa.diff
 
