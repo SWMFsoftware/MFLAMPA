@@ -34,15 +34,36 @@ contains
     integer:: i
     real:: Aux1,Aux2
     !-----------------------------------------------------------------
-    !D_I(i)      is the distance between meshes i   and i+1
-    !DsMesh_I(i) is the distance between meshes i-1 and i 
+    !\
+    !In M-FLAMPA D_I(i) is the distance between meshes i   and i+1
+    !while DsMesh_I(i) is the distance between centers of meshes  
+    !i-1 and i. Therefore,
     do i=2,n
        DsMesh_I(i) = max(Dist_I(i-1),cTiny)
     end do
-    !Distance between the faces is enumerated with the cell index
+    !/
+    !\
+    ! Within the framework of finite volume method, the cell 
+    ! volume is used, which is proportional to  the distance between 
+    ! the faces bounding the volume with an index, i, which is half of
+    ! sum of distance between meshes i-1 and i (i.e. D_I(i-1) and that 
+    ! between meshes i and i+1 (which is D_I(i)):  
     do i=2,n-1
        DsFace_I(i) = max(0.5*(Dist_I(i) + Dist_I(i-1)),cTiny)
     end do
+    !/
+    ! In flux coordinates, the control volume associated with the 
+    ! given cell has a cross-section equal to (Magnetic Flux)/B, 
+    ! where the flux is a constant along the magnetic field line, 
+    ! set to one hereafter. Therefore, the diffusion equation has 
+    ! a following form:
+    ! (DsFace_i/B_i)(f^(n+1) - f^n) = Flux_(i-1/2) - Flux_(i+1/2),
+    ! where the particle density flux should be multiplied by the
+    ! cross-section area too (magnetic flux factor is one!):  
+    !  Flux_(i-1/2) = (diffusion coefficient)_(i-1/2)/B_(i-1/2)*&
+    !                 (f^(n+1)_(i-1) - f^(n+1)_i),
+    !  The multiplier, DsFace_i/B_i, is denoted as DsFace_i/DOuter_i
+    !  The face-centered combination, 
     !\
     ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
     !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
