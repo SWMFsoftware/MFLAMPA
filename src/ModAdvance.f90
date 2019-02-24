@@ -451,7 +451,7 @@ contains
          elsewhere
             CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
                  (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
-                 (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3))
+                 (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
          end where
       end if
 
