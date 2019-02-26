@@ -18,6 +18,8 @@ module SP_ModPlot
   use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, remove_file
+  use ModNumConst, ONLY: cPi, cTwoPi, cDegToRad
+  use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   implicit none
   SAVE
@@ -41,8 +43,10 @@ module SP_ModPlot
        MH2D_      = 1, & ! at given radius as Lon-Lat plot
        MHTime_    = 2, & ! at given radius as time series for lines 
        ! Distribution
-       Distr1D_   = 3    ! along each line
-  ! Momentum or energy axis to use for 2D plots 
+       Distr1D_   = 3, & ! along each line
+       ! Flux
+       Flux2D_    = 4    ! at a given radius on rectangular Lon-Lat grid
+  ! Momentum or energy axis to use for Distribution plots 
   integer, parameter:: & 
        Momentum_= 1,   &
        Energy_  = 2
@@ -86,15 +90,26 @@ module SP_ModPlot
      !\
      ! Distribution
      !/
-     ! Momentum or energy axis to use for 2D plots 
+     ! Momentum or energy axis to use for distribution plots 
      integer:: iScale      ! =Momentum_ or Energy_
      ! type out output (CDF or differential energy flow)
-     integer:: iTypeDistr  ! =CDF_ or EDF_
+     integer:: iTypeDistr  ! =CDF_ or DEF_
      !\
      ! Data on the sphere
      !/
      ! radius of the sphere the data to be written at
      real:: Radius
+     !\
+     ! Flux through sphere
+     !/
+     ! size of angular output grid
+     integer:: nLonOut, nLatOut
+     ! cell centers of angular output grid
+     real, pointer :: Lon_I(:), Lat_I(:)
+     ! characteristic angular spread
+     real :: AngleSpread
+     ! spread of flux of an idividual line over grid
+     real, pointer :: Spread_II(:,:)
   end type TypePlotFile
   !/
   !\
@@ -114,19 +129,20 @@ module SP_ModPlot
   ! info for MH1D header and tag list
   logical:: DoWriteHeader = .false.
   character(len=*), parameter, public :: NameMHData = "MH_data"
+  character(len=*), parameter, public :: NameFluxData = "Flux"
   ! name of the header file
   character(len=*), parameter :: NameHeaderFile = NameMHData//'.H'
   ! name of the tag list file
   character(len=*), parameter :: NameTagFile  = NameMHData//'.lst'
   ! number of different output file tags
-  integer,  public            :: nTag = 0 
+  integer,  public :: nTag = 0 
   !/
   !\ 
-  character(len=20)           :: TypeMHDataFile 
+  character(len=20) :: TypeMHDataFile 
   !/
   !\
-  !Fromat for saving time tag. If .true. the time tag format is
-  !YYYYMMDDHHMMSS 
+  ! Format for saving time tag. If .true. the time tag format is
+  ! YYYYMMDDHHMMSS 
   logical, public:: UseDateTime = .false.
   !/
   !\
@@ -179,7 +195,7 @@ contains
              end select
           end do
        end if
-       ! prepare the output dta containers
+       ! prepare the output data containers
        select case(File_I(iFile) % iKindData)
           case(MH1D_)
              allocate(File_I(iFile) % Buffer_II(&
@@ -196,6 +212,11 @@ contains
           case(Distr1D_)
              allocate(File_I(iFile) % &
                   Buffer_II(nP,1:nParticleMax))
+          case(Flux2D_)
+             ! extra space is reserved for sum of spreads
+             allocate(File_I(iFile) % Buffer_II(&
+                  (1+File_I(iFile)%nFluxPlot)*File_I(iFile)%nLonOut,&
+                  File_I(iFile) % nLatOut))
        end select
     end do
 
@@ -269,7 +290,7 @@ contains
           ! make comparison case insensitive: convert strings to lower case
           call lower_case(StringPlot)
           
-          ! put individual variables' and format names in separate array entries
+          !put individual variables' and format names in separate array entries
           call split_string(StringPlot, StringPlot_I, nStringPlot)
           
           ! data kind is the first entry
@@ -284,6 +305,8 @@ contains
              File_I(iFile) % iKindData = MHTime_
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
+          case('flux2d')
+             File_I(iFile) % iKindData = Flux2D_
           case default
              call CON_stop(NameSub//&
                   ": kind of data isn't properly set in PARAM.in")
@@ -360,6 +383,33 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
              call process_distr
+          case(Flux2D_)
+             ! mark flux to be written
+             File_I(iFile) % DoPlotFlux = .true.
+             ! add longitude and latitude with units to variable names
+             select case(File_I(iFile) % TypeFile)
+             case('tec')
+                File_I(iFile) % NameVarPlot = &
+                     'Longitude_[deg] Latitude_[deg]'
+             case default
+                File_I(iFile) % NameVarPlot = &
+                     'Longitude Latitude '
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)//' deg deg'
+             end select
+             File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot) //&
+                  ' StartTime StartTimeJulian'
+             ! get radius
+             call read_var('Radius [Rs]', File_I(iFile) % Radius)
+             ! get angular spread and convert to radian
+             call read_var('AngleSpread [deg]', File_I(iFile) % AngleSpread)
+             File_I(iFile) % AngleSpread = &
+                  File_I(iFile) % AngleSpread *cDegToRad
+             ! get angular grid sizes
+             call read_var('nLon', File_I(iFile) % nLonOut)
+             call read_var('nLat', File_I(iFile) % nLatOut)
+             call prepare_flux
           end select
        end do
        !\
@@ -484,6 +534,27 @@ contains
       File_I(iFile) % NameVarPlot = &
            trim(NameScale)//' Distance '//trim(NameVar)
     end subroutine process_distr
+    !=============================================================
+    subroutine prepare_flux
+      integer:: iLonOut, iLatOut
+      real:: DLon, DLat
+      real, parameter:: LatMin = -cPi / 3.0
+      !-----------------------------------------------------------
+      ! allocate storages for angular grid coords and spread
+      allocate(File_I(iFile) % &
+           Spread_II(File_I(iFile) % nLonOut, File_I(iFile) % nLatOut))
+      allocate(File_I(iFile) % Lon_I(File_I(iFile) % nLonOut))
+      allocate(File_I(iFile) % Lat_I(File_I(iFile) % nLatOut))
+      ! fill grid coords
+      DLon = cTwoPi / File_I(iFile) % nLonOut
+      DLat = cTwoPi / File_I(iFile) % nLatOut / 3.0
+      do iLonOut = 1, File_I(iFile) % nLonOut
+         File_I(iFile) % Lon_I(iLonOut) = (iLonOut-0.5) * DLon
+      end do
+      do iLatOut = 1, File_I(iFile) % nLatOut
+         File_I(iFile) % Lat_I(iLatOut) = LatMin + (iLatOut-0.5) * DLat
+      end do
+    end subroutine prepare_flux
   end subroutine read_param
   !===============================================================
   subroutine save_plot_all(IsInitialOutputIn)
@@ -527,6 +598,8 @@ contains
           call write_mh_time
        case(Distr1D_)
           call write_distr_1d
+       case(Flux2D_)
+          call write_flux_2d
        end select
     end do
   contains
@@ -544,16 +617,13 @@ contains
       ! header for the file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iBlock, iParticle, iVarPlot
-      ! indexes of corresponding node, latitude and longitude
-      integer:: iNode, iLat, iLon
+      integer:: iBlock, iVarPlot
       ! index of last particle on the field line
       integer:: iLast
       ! for better readability
       integer:: nVarPlot, nFluxPlot
       ! shock location
       integer:: iShock
-      real   :: RShock
       integer, parameter:: RShock_     = Z_ + 2
       integer, parameter:: StartTime_  = RShock_ + 1
       integer, parameter:: StartJulian_= StartTime_ + 1
@@ -563,7 +633,7 @@ contains
       character(len=*), parameter:: NameSub='write_mh_1d'
       !------------------------------------------------------------------------
       !\
-      !  Update number of time tags and write to tag list file
+      !  Update number of time tags and write to tag l ist file
       !/
       if(iProc==0)then
          ! increase the file counter
@@ -593,22 +663,13 @@ contains
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
       do iBlock = 1, nBlock
-         iNode = iNode_B(iBlock)
-         call get_node_indexes(iNode, iLon, iLat)
-         ! set the file name
-         if(UseDateTime)then
-            call get_date_time_string(SPTime, StringTime)
-            write(NameFile,'(a,i3.3,a,i3.3,a,i6.6,a)') &
-                 trim(NamePlotDir)//NameMHData//'_',iLon,'_',iLat,&
-                 '_e'//StringTime//'_n',iIter,&
-                 File_I(iFile)%NameFileExtension
-         else
-            call get_time_string(SPTime, StringTime(1:8))
-            write(NameFile,'(a,i3.3,a,i3.3,a,i6.6,a)') &
-                 trim(NamePlotDir)//NameMHData//'_',iLon,'_',iLat,&
-                 '_t'//StringTime(1:8)//'_n',iIter,&
-                 File_I(iFile)%NameFileExtension
-         end if
+         call make_file_name(&
+              StringBase    = NameMHData,                     &
+              iNode         = iNode_B(iBlock),                &
+              iIter         = iIter,                          &
+              NameExtension = File_I(iFile)%NameFileExtension,&
+              NameOut       = NameFile)
+
          ! get min and max particle indexes on this field line
          iLast  = nParticle_B(   iBlock)
          ! fill the output buffer
@@ -668,7 +729,7 @@ contains
       ! loop variables
       integer:: iBlock, iParticle, iVarPlot, iVarIndex
       ! indexes of corresponding node, latitude and longitude
-      integer:: iNode, iLat, iLon
+      integer:: iNode
       ! index of first/last particle on the field line
       integer:: iLast
       ! index of particle just above the radius
@@ -687,8 +748,6 @@ contains
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
       real :: Param_I(1:StartJulian_)
-      ! timetag
-      character(len=15):: StringTime
       character(len=*), parameter:: NameSub='write_mh_2d'
       !-----------------------------------------------------------
       nVarPlot = File_I(iFile)%nVarPlot
@@ -698,6 +757,14 @@ contains
            'MFLAMPA: data on a sphere at fixed heliocentric distance; '//&
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
+
+      ! set the file name
+      call make_file_name(&
+           StringBase    = NameMHData,                     &
+           Radius        = File_I(iFile) % Radius,         &
+           iIter         = iIter,                          &
+           NameExtension = File_I(iFile)%NameFileExtension,&
+           NameOut       = NameFile)
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0
@@ -710,26 +777,6 @@ contains
       do iBlock = 1, nBlock
          iNode = iNode_B(iBlock)
 
-         ! set the file name
-         if(UseDateTime)then
-            call get_date_time_string(SPTime, StringTime)
-            write(NameFile,'(a,i4.4,f0.2,a,i6.6,a)')  &
-                 trim(NamePlotDir)//NameMHData//'_R=',     &
-                 int(File_I(iFile)%Radius),           &
-                 File_I(iFile)%Radius - &
-                 int(File_I(iFile)%Radius),           &
-                 '_e'//StringTime//'_n', iIter, &
-                 File_I(iFile) % NameFileExtension
-         else
-            call get_time_string(SPTime, StringTime(1:8))
-            write(NameFile,'(a,i4.4,f0.2,a,i6.6,a)')  &
-                 trim(NamePlotDir)//NameMHData//'_R=',     &
-                 int(File_I(iFile) % Radius),         &
-                 File_I(iFile) % Radius -             &
-                 int(File_I(iFile)%Radius),           &
-                 '_t'//StringTime(1:8)//'_n',         &
-                 iIter, File_I(iFile)%NameFileExtension
-         end if
          ! get max particle indexes on this field line
          iLast  = nParticle_B(iBlock)
 
@@ -824,8 +871,6 @@ contains
       character(len=100):: NameFile
       ! loop variables
       integer:: iBlock, iParticle, iVarPlot, iVarIndex
-      ! indexes of corresponding node, latitude and longitude
-      integer:: iNode, iLat, iLon
       ! index of first/last particle on the field line
       integer:: iLast
       ! index of particle just above the radius
@@ -864,18 +909,18 @@ contains
       ! at first call, remove files if they exist to reset time series output
       !/
       if(File_I(iFile) % IsFirstCall)then
-         ! mark that the 1st call has alredy happened
+         ! mark that the 1st call has already happened
          File_I(iFile) % IsFirstCall = .false.
          ! go over list of lines and remove file for each one
          do iBlock = 1, nBlock
-            iNode = iNode_B(iBlock)
-            call get_node_indexes(iNode, iLon, iLat)
             ! set the file name
-            write(NameFile,'(a,i4.4,f0.2,a,i3.3,a,i3.3,a)') &
-                 trim(NamePlotDir)//NameMHData//'_R=', &
-                 int(File_I(iFile)%Radius),&
-                 File_I(iFile) % Radius - int(File_I(iFile) % Radius), &
-                 '_', iLon, '_', iLat, File_I(iFile) % NameFileExtension
+            call make_file_name(&
+                 StringBase    = NameMHData,                     &
+                 Radius        = File_I(iFile) % Radius,         &
+                 iNode         = iNode_B(iBlock),                &
+                 NameExtension = File_I(iFile)%NameFileExtension,&
+                 NameOut       = NameFile)
+
             call remove_file(NameFile)
          end do
       end if
@@ -889,9 +934,6 @@ contains
 
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
-
-         iNode = iNode_B(iBlock)
-         call get_node_indexes(iNode, iLon, iLat)
 
          ! get max particle indexes on this field line
          iLast  = nParticle_B(   iBlock)
@@ -913,11 +955,13 @@ contains
          if(.not.DoPrint) CYCLE
 
          ! set the file name
-         write(NameFile,'(a,i4.4,f0.2,a,i3.3,a,i3.3,a)') &
-              trim(NamePlotDir)//NameMHData//'_R=', &
-              int(File_I(iFile)%Radius),&
-              File_I(iFile) % Radius - int(File_I(iFile) % Radius), &
-              '_', iLon, '_', iLat, File_I(iFile) % NameFileExtension
+         call make_file_name(&
+              StringBase    = NameMHData,                     &
+              Radius        = File_I(iFile) % Radius,         &
+              iNode         = iNode_B(iBlock),                &
+              NameExtension = File_I(iFile)%NameFileExtension,&
+              NameOut       = NameFile)
+         
          !\
          ! if file already exists -> read its content
          nDataLine = 0
@@ -1024,20 +1068,14 @@ contains
          iNode = iNode_B(iBlock)
          call get_node_indexes(iNode, iLon, iLat)
 
-         ! set the file name
-         if(UseDateTime)then
-            call get_date_time_string(SPTime, StringTime)
-            write(NameFile,'(a,i3.3,a,i3.3,a,i6.6,a)') &
-                 trim(NamePlotDir)//'Distribution_',iLon,'_',iLat,&
-                 '_e'//StringTime//'_n',iIter,&
-                 File_I(iFile) % NameFileExtension
-         else
-            call get_time_string(SPTime, StringTime(1:8))
-            write(NameFile,'(a,i3.3,a,i3.3,a,i6.6,a)') &
-                 trim(NamePlotDir)//'Distribution_',iLon,'_',iLat,&
-                 '_t'//StringTime(1:8)//'_n',iIter,&
-                 File_I(iFile) % NameFileExtension
-         end if
+            ! set the file name
+            call make_file_name(&
+                 StringBase    = 'Distribution_',                &
+                 iNode         = iNode_B(iBlock),                &
+                 iIter         = iIter,                          &
+                 NameExtension = File_I(iFile)%NameFileExtension,&
+                 NameOut       = NameFile)
+
          ! get max particle indexes on this field line
          iLast  = nParticle_B(   iBlock)
 
@@ -1075,6 +1113,191 @@ contains
               VarIn_II   = File_I(iFile) % Buffer_II(:,1:iLast))
       end do
     end subroutine write_distr_1d
+    !=============================================================
+    subroutine write_flux_2d
+      use SP_ModProc, ONLY: iComm, nProc
+      use ModMpi
+      !\
+      ! write file with fluxes in the format to be read by IDL/TECPLOT;
+      ! single file is created for akk field line, name format is
+      ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
+      !/
+      ! name of the output file
+      character(len=100):: NameFile
+      ! header of the output file
+      character(len=500):: StringHeader
+      ! loop variables
+      integer:: iBlock, iParticle, iFlux
+      ! indexes of corresponding node, latitude and longitude
+      integer:: iNode, iLatOut, iLonOut
+      ! index of first/last particle on the field line
+      integer:: iLast
+      ! index of particle just above the radius
+      integer:: iAbove
+      ! radii of particles, added for readability
+      real:: Radius0, Radius1
+      ! interpolation weight
+      real:: Weight
+      ! xyz coords of intersection point on the sphere
+      real:: XyzPoint_D(3)
+      ! longitude and latitude of intersection point on the sphere
+      real:: LonPoint, LatPoint
+      ! angle between intersection point and grid point
+      real:: CosAngle, Angle
+      ! for better readability
+      integer:: nFlux, nLonOut, nLatOut
+      ! MPI error
+      integer:: iError
+      ! skip a field line not reaching radius of output sphere
+      logical:: DoPrint
+      ! additional parameters
+      integer, parameter:: StartTime_  = 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      real :: Param_I(1:StartJulian_)
+      ! timetag
+      character(len=15):: StringTime
+      character(len=*), parameter:: NameSub='write_flux_2d'
+      !-----------------------------------------------------------
+      nFlux   = File_I(iFile) % nFluxPlot
+      nLonOut = File_I(iFile) % nLonOut
+      nLatOut = File_I(iFile) % nLatOut
+
+      ! header for the output file
+      StringHeader = &
+           'MFLAMPA: flux data on a sphere at fixed heliocentric distance; '//&
+           'Coordindate system: '//trim(TypeCoordSystem)//'; '&
+           //trim(File_I(iFile)%StringHeaderAux)
+
+      ! set the file name
+      call make_file_name(&
+           StringBase    = NameFluxData,                   &
+           Radius        = File_I(iFile)%Radius,           &
+           iIter         = iIter,                          &
+           NameExtension = File_I(iFile)%NameFileExtension,&
+           NameOut       = NameFile)
+      
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0
+
+      ! go over all lines on the processor and find the point of 
+      ! intersection with output sphere if present
+      do iBlock = 1, nBlock
+         iNode = iNode_B(iBlock)
+
+         ! reset, all field lines are printed reaching output sphere
+         DoPrint = .true.
+
+         ! get max particle indexes on this field line
+         iLast  = nParticle_B(iBlock)
+
+         ! find the particle just above the given radius
+         do iParticle = 1 , iLast
+            Radius0 = State_VIB(R_, iParticle, iBlock)
+            if( Radius0 > File_I(iFile)%Radius) then
+               iAbove = iParticle
+               !check if line started above output sphere, i.e. no intersection
+               DoPrint = iAbove /= 1
+               EXIT
+            end if
+            ! check if reached the end, i.e. there is no intersection
+            if(iParticle == iLast) &
+                 DoPrint = .false.
+         end do
+
+         ! if no intersection found -> proceed to the next line
+         if(.not.DoPrint) CYCLE
+
+         ! intersection is found -> get data at that location;
+         ! interpolate data and fill buffer
+         Radius0 = sum(State_VIB(X_:Z_, iAbove-1, iBlock)**2)**0.5
+         Radius1 = sum(State_VIB(X_:Z_, iAbove,   iBlock)**2)**0.5
+         Weight  = (File_I(iFile)%Radius - Radius0) / (Radius1 - Radius0)
+
+         ! find coordinates of intersection
+         XyzPoint_D =  &
+              State_VIB(X_:Z_, iAbove-1, iBlock) * (1-Weight) + &
+              State_VIB(X_:Z_, iAbove,   iBlock) *    Weight
+         call xyz_to_rlonlat(XyzPoint_D, Radius0, LonPoint, LatPoint)
+
+         ! compute spread over grid for current line
+         do iLonOut = 1, nLonOut
+            do iLatOut = 1, nLatOut
+               CosAngle = min(1.0, max(-1.0, &
+                    cos(File_I(iFile)%Lat_I(iLatOut) - LatPoint) + &
+                    cos(File_I(iFile)%Lat_I(iLatOut)) * cos(LatPoint) * &
+                    (cos(File_I(iFile)%Lon_I(iLonOut) - LonPoint) - 1.0)))
+               Angle = acos(CosAngle)
+               File_I(iFile) % Spread_II(iLonOut, iLatOut) = &
+                    exp( - 0.5 * (Angle/File_I(iFile)%AngleSpread)**2)
+            end do
+         end do
+
+         ! normalize spread
+         File_I(iFile) % Spread_II = &
+              File_I(iFile) % Spread_II / sum(File_I(iFile) % Spread_II)
+         
+         ! apply spread to fluxes
+         do iFlux = 1, nFlux
+            File_I(iFile) % Buffer_II(iFlux:nFlux*nLonOut:nFlux,:) =    &
+                 File_I(iFile) % Buffer_II(iFlux:nFlux*nLonOut:nFlux,:)+&
+                 File_I(iFile)%Spread_II(:,:)**2 * (                          &
+                 Flux_VIB(Flux0_+iFlux-1, iAbove-1, iBlock) * (1-Weight) +    &
+                 Flux_VIB(Flux0_+iFlux-1, iAbove,   iBlock) *    Weight )
+         end do
+         File_I(iFile)%Buffer_II(1+nFlux*nLonOut:(1+nFlux)*nLonOut,:)=&
+              File_I(iFile)%Buffer_II(1+nFlux*nLonOut:(1+nFlux)*nLonOut,:) + &
+              File_I(iFile)%Spread_II(:,:)
+      end do
+
+      ! gather interpolated data on the source processor
+      if(nProc > 1)then
+         if(iProc==0)then
+            call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
+                 (1+nFlux) * nLonOut * nLatOut, & 
+                 MPI_REAL, MPI_Sum, 0, iComm, iError)
+         else
+            call MPI_Reduce(File_I(iFile)%Buffer_II, &
+                 File_I(iFile)%Buffer_II,&
+                 (1+nFlux) * nLonOut * nLatOut, & 
+                 MPI_REAL, MPI_Sum, 0, iComm, iError)
+         end if
+      end if
+
+      ! divide by sum of spreads
+      if(iProc==0)then
+      do iFlux = 1, nFlux
+         where(File_I(iFile) % Buffer_II(1+nFlux*nLonOut:(1+nFlux)*nLonOut,:) > 0.0)
+            File_I(iFile) % Buffer_II(iFlux:nFlux*nLonOut:nFlux,:) = &
+                 File_I(iFile) % Buffer_II(iFlux:nFlux*nLonOut:nFlux,:) / &
+                 File_I(iFile) % Buffer_II(1+nFlux*nLonOut:(1+nFlux)*nLonOut,:)
+         end where
+      end do
+   end if
+
+      ! start time in seconds from base year
+      Param_I(StartTime_)  = StartTime
+      ! start time in Julian date
+      Param_I(StartJulian_)= StartTimeJulian
+
+      if(iProc==0)&
+           ! print data to file
+           call save_plot_file(&
+           NameFile      = NameFile, &
+           StringHeaderIn= StringHeader, &
+           TypeFileIn    = File_I(iFile) % TypeFile, &
+           nDimIn        = 2, &
+           TimeIn        = SPTime, &
+           nStepIn       = iIter, &
+           ParamIn_I     = Param_I, &
+           Coord1In_I    = File_I(iFile)%Lon_I,&
+           Coord2In_I    = File_I(iFile)%Lat_I,&
+           NameVarIn     = &
+           trim(File_I(iFile) % NameVarPlot) // ' ' // &
+           trim(File_I(iFile) % NameAuxPlot), &
+           VarIn_VII      =  reshape(&
+           File_I(iFile) % Buffer_II(1:nFlux*nLonOut,:),&
+           (/nFlux, nLonOut, nLatOut/)))
+    end subroutine write_flux_2d
   end subroutine save_plot_all
   !===============================================================
   subroutine finalize
@@ -1138,4 +1361,51 @@ contains
     write(StringTime,'(i4.4,i2.2,i2.2,a,i2.2,i2.2,i2.2)')&
          iTime_I(1:3),'_',iTime_I(4:6)
   end subroutine get_date_time_string
+  !===============================================================
+  subroutine make_file_name(StringBase, Radius, iNode, iIter, NameExtension,&
+       NameOut)
+    ! creates a string with file name and stores in NameOut;
+    ! result is as follows:
+    !   StringBase[_R=??.??][_???_???][_t????????_n??????].NameExtension
+    ! parts in [] are written if present: Radius, iNode, iIter
+    character(len=*),          intent(in) :: StringBase
+    real,            optional, intent(in) :: Radius
+    integer,         optional, intent(in) :: iNode
+    integer,         optional, intent(in) :: iIter
+    character(len=*),          intent(in) :: NameExtension
+    character(len=100),        intent(out):: NameOut
+    
+    ! timetag
+    character(len=15):: StringTime
+    ! lon, lat indexes corresponding to iNode
+    integer:: iLon, iLat
+    !------------------------------------------------------------
+    write(NameOut,'(a)')trim(NamePlotDir)//trim(StringBase)
+
+    if(present(Radius))then
+       write(NameOut,'(a,i4.4,f0.2)')   &
+            trim(NameOut)//'_R=',     &
+            int(Radius), Radius - int(Radius)
+    end if
+
+    if(present(iNode))then
+       call get_node_indexes(iNode, iLon, iLat)
+       write(NameOut,'(a,i3.3,a,i3.3)') &
+            trim(NameOut)//'_',iLon,'_',iLat
+    end if
+
+    if(present(iIter))then
+      if(UseDateTime)then
+         call get_date_time_string(SPTime, StringTime)
+         write(NameOut,'(a,i6.6)')  &
+              trim(NameOut)//'_e'//StringTime//'_n', iIter
+      else
+         call get_time_string(SPTime, StringTime(1:8))
+         write(NameOut,'(a,i6.6,a)')  &
+              trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
+      end if
+    end if
+
+    write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)
+  end subroutine make_file_name
 end module SP_ModPlot
