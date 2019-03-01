@@ -18,7 +18,7 @@ module SP_ModPlot
   use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, remove_file
-  use ModNumConst, ONLY: cPi, cTwoPi, cDegToRad
+  use ModNumConst, ONLY: cPi, cTwoPi, cDegToRad, cRadToDeg
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   implicit none
@@ -99,6 +99,8 @@ module SP_ModPlot
      !/
      ! radius of the sphere the data to be written at
      real:: Radius
+     ! whether to compute and ouput average position and angular spread
+     logical:: DoPlotSpread
      !\
      ! Flux through sphere
      !/
@@ -202,8 +204,9 @@ contains
                   File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
                   1:nParticleMax))
           case(MH2D_)
+             ! extra space is reserved for longitude and latitude
              allocate(File_I(iFile) % Buffer_II(&
-                  File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
+                  2 + File_I(iFile)%nVarPlot + File_I(iFile)%nFluxPlot,&
                   nNode))
           case(MHTime_)
              ! note extra space reserved for time of the output
@@ -361,12 +364,26 @@ contains
              DoWriteHeader = .true.
           case(MH2D_)
              call process_mh
-             ! add line index to variable names
+             ! add line index, lon and lat to variable names
+             select case(File_I(iFile) % TypeFile)
+             case('tec')
              File_I(iFile) % NameVarPlot = &
-                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)
+                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
+                  ' Longitude_[deg] Latitude_[deg]'
+             case default
+                File_I(iFile) % NameVarPlot = &
+                     'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
+                     ' Longitude Latitude'
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)//' deg deg'
+             end select
              File_I(iFile) % NameAuxPlot = &
                   trim(File_I(iFile) % NameAuxPlot) //&
                   ' StartTime StartTimeJulian'
+             if(File_I(iFile) % DoPlotSpread)&
+                  File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot) //&
+                  ' LonAverage LatAverage AngleSpread'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
           case(MHTime_)
@@ -442,6 +459,7 @@ contains
       ! reset
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
+      File_I(iFile)%DoPlotSpread = .false.
 
       ! for MH1D_ minimal set of variables is printed
       if(File_I(iFile)%iKindData == MH1D_)then
@@ -469,6 +487,14 @@ contains
                  File_I(iFile)%DoPlot_V(iVar) = .true.
             CYCLE
          end do
+
+         ! for data on a sphere compute and output average position and spread
+         if(trim(StringPlot_I(iStringPlot)) == 'spread' .and.&
+              File_I(iFile)%iKindData == MH2D_ .and. nNode > 1)then
+            File_I(iFile)%DoPlotSpread = .true.
+            CYCLE
+         end if
+            
 
       end do
 
@@ -736,10 +762,14 @@ contains
       integer:: iAbove
       ! radii of particles, added for readability
       real:: Radius0, Radius1
+      ! coordinate of intersection point
+      real:: XyzPoint_D(3)
+      ! longitude and latitude intersection point
+      real:: LonPoint, LatPoint
       ! interpolation weight
       real:: Weight
       ! for better readability
-      integer:: nVarPlot, nFluxPlot
+      integer:: nVarPlot, nFluxPlot, iVarLon, iVarLat
       ! MPI error
       integer:: iError
       ! skip a field line not reaching radius of output sphere
@@ -747,11 +777,23 @@ contains
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
-      real :: Param_I(1:StartJulian_)
+      integer, parameter:: LonAv_ = StartTime_ + 2
+      integer, parameter:: LatAv_ = StartTime_ + 3
+      integer, parameter:: AngleSpread_= StartTime_ + 4
+      integer:: nParam
+      real :: Param_I(1:AngleSpread_)
       character(len=*), parameter:: NameSub='write_mh_2d'
       !-----------------------------------------------------------
       nVarPlot = File_I(iFile)%nVarPlot
       nFluxPlot= File_I(iFile)%nFluxPlot
+      iVarLon = nVarPlot + 1
+      iVarLat = nVarPlot + 2
+      if(File_I(iFile) % DoPlotSpread)then
+         nParam = AngleSpread_
+      else
+         nParam = StartJulian_
+      end if
+
       ! header for the output file
       StringHeader = &
            'MFLAMPA: data on a sphere at fixed heliocentric distance; '//&
@@ -802,6 +844,14 @@ contains
          Radius0 = sum(State_VIB(X_:Z_, iAbove-1, iBlock)**2)**0.5
          Radius1 = sum(State_VIB(X_:Z_, iAbove,   iBlock)**2)**0.5
          Weight  = (File_I(iFile)%Radius - Radius0) / (Radius1 - Radius0)
+         ! find coordinates of intersection
+         XyzPoint_D =  &
+              State_VIB(X_:Z_, iAbove-1, iBlock) * (1-Weight) + &
+              State_VIB(X_:Z_, iAbove,   iBlock) *    Weight
+         call xyz_to_rlonlat(XyzPoint_D, Radius0, LonPoint, LatPoint)
+         ! put longitude and latitude to output
+         File_I(iFile) % Buffer_II(iVarLon, iNode) = LonPoint
+         File_I(iFile) % Buffer_II(iVarLat, iNode) = LatPoint
          ! interpolate each requested variable
          do iVarPlot = 1, nVarPlot
             iVarIndex = File_I(iFile) % iVarPlot_V(iVarPlot)
@@ -810,7 +860,7 @@ contains
                  State_VIB(iVarIndex, iAbove,   iBlock) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile) % Buffer_II(1+nVarPlot:nFluxPlot+nVarPlot,iNode) =&
+              File_I(iFile)%Buffer_II(3+nVarPlot:2+nFluxPlot+nVarPlot,iNode)=&
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
               Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
       end do
@@ -819,7 +869,7 @@ contains
       if(nProc > 1)then
          if(iProc==0)then
             call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 nNode * (nVarPlot + nFluxPlot), MPI_REAL, MPI_Sum, &
+                 nNode * (2 + nVarPlot + nFluxPlot), MPI_REAL, MPI_Sum, &
                  0, iComm, iError)
             call MPI_Reduce(MPI_IN_PLACE, DoPrint_I, &
                  nNode, MPI_Logical, MPI_Land, &
@@ -827,7 +877,7 @@ contains
          else
             call MPI_Reduce(File_I(iFile)%Buffer_II, &
                  File_I(iFile)%Buffer_II,&
-                 nNode * (nVarPlot + nFluxPlot), MPI_REAL, MPI_Sum,&
+                 nNode * (2 + nVarPlot + nFluxPlot), MPI_REAL, MPI_Sum,&
                  0, iComm, iError)
             call MPI_Reduce(DoPrint_I, DoPrint_I, &
                  nNode, MPI_Logical, MPI_Land, &
@@ -840,6 +890,23 @@ contains
       ! start time in Julian date
       Param_I(StartJulian_)= StartTimeJulian
 
+      ! spread data: average lon and lat, angle spread
+      if(File_I(iFile) % DoPlotSpread)then
+         Param_I(LonAv_) = sum(File_I(iFile)%Buffer_II(iVarLon,:)) / nNode
+         Param_I(LatAv_) = sum(File_I(iFile)%Buffer_II(iVarLat,:)) / nNode
+         Param_I(AngleSpread_) = sqrt(sum(acos(min(1.0, max(-1.0, &
+              cos(Param_I(LatAv_)-File_I(iFile)%Buffer_II(iVarLat,:))+&
+              cos(Param_I(LatAv_)) * cos(File_I(iFile)%Buffer_II(iVarLat,:)) *&
+              (cos(Param_I(LonAv_)-File_I(iFile)%Buffer_II(iVarLon,:))-1.0)))&
+              )**2) / (nNode - 1))
+         Param_I((/LonAv_, LatAv_, AngleSpread_/)) = &
+              Param_I((/LonAv_, LatAv_, AngleSpread_/)) * cRadToDeg
+      end if
+      
+      ! convert angles
+      File_I(iFile) % Buffer_II((/iVarLon,iVarLat/), :) = &
+           File_I(iFile) % Buffer_II((/iVarLon,iVarLat/), :) * cRadToDeg
+
       if(iProc==0)&
            ! print data to file
            call save_plot_file(&
@@ -849,16 +916,16 @@ contains
            nDimIn        = 1, &
            TimeIn        = SPTime, &
            nStepIn       = iIter, &
-           ParamIn_I     = Param_I, &
+           ParamIn_I     = Param_I(1:nParam), &
            Coord1In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)),&
            NameVarIn     = &
            trim(File_I(iFile) % NameVarPlot) // ' ' // &
            trim(File_I(iFile) % NameAuxPlot), &
            VarIn_VI      = &
            reshape(&
-           pack(File_I(iFile) % Buffer_II(1:nVarPlot+nFluxPlot,1:nNode),&
-           MASK = spread(DoPrint_I, 1, nVarPlot+nFluxPlot)), &
-           (/nVarPlot+nFluxPlot, count(DoPrint_I)/)))
+           pack(File_I(iFile) % Buffer_II(1:nVarPlot+nFluxPlot+2,1:nNode),&
+           MASK = spread(DoPrint_I, 1, nVarPlot+nFluxPlot+2)), &
+           (/nVarPlot+nFluxPlot+2, count(DoPrint_I)/)))
     end subroutine write_mh_2d
     !=============================================================
     subroutine write_mh_time
