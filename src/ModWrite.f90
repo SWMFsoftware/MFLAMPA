@@ -762,8 +762,8 @@ contains
       integer:: iAbove
       ! radii of particles, added for readability
       real:: Radius0, Radius1
-      ! coordinate of intersection point
-      real:: XyzPoint_D(3)
+      ! xyz coordinate of intersection point or average direction
+      real:: Xyz_D(3)
       ! longitude and latitude intersection point
       real:: LonPoint, LatPoint
       ! interpolation weight
@@ -845,10 +845,10 @@ contains
          Radius1 = sum(State_VIB(X_:Z_, iAbove,   iBlock)**2)**0.5
          Weight  = (File_I(iFile)%Radius - Radius0) / (Radius1 - Radius0)
          ! find coordinates of intersection
-         XyzPoint_D =  &
+         Xyz_D =  &
               State_VIB(X_:Z_, iAbove-1, iBlock) * (1-Weight) + &
               State_VIB(X_:Z_, iAbove,   iBlock) *    Weight
-         call xyz_to_rlonlat(XyzPoint_D, Radius0, LonPoint, LatPoint)
+         call xyz_to_rlonlat(Xyz_D, Radius0, LonPoint, LatPoint)
          ! put longitude and latitude to output
          File_I(iFile) % Buffer_II(iVarLon, iNode) = LonPoint
          File_I(iFile) % Buffer_II(iVarLat, iNode) = LatPoint
@@ -892,13 +892,19 @@ contains
 
       ! spread data: average lon and lat, angle spread
       if(File_I(iFile) % DoPlotSpread)then
-         Param_I(LonAv_) = sum(File_I(iFile)%Buffer_II(iVarLon,:)) / nNode
-         Param_I(LatAv_) = sum(File_I(iFile)%Buffer_II(iVarLat,:)) / nNode
+         ! average direction (not normalized)
+         Xyz_D = sum(File_I(iFile) % Buffer_II(X_:Z_,:), DIM=2, &
+              MASK=spread(DoPrint_I, 1, 3))
+         call xyz_to_rlonlat(Xyz_D, Radius0, Param_I(LonAv_), Param_I(LatAv_))
+         ! angular spread/variance
          Param_I(AngleSpread_) = sqrt(sum(acos(min(1.0, max(-1.0, &
-              cos(Param_I(LatAv_)-File_I(iFile)%Buffer_II(iVarLat,:))+&
-              cos(Param_I(LatAv_)) * cos(File_I(iFile)%Buffer_II(iVarLat,:)) *&
-              (cos(Param_I(LonAv_)-File_I(iFile)%Buffer_II(iVarLon,:))-1.0)))&
-              )**2) / (nNode - 1))
+              cos(Param_I(LatAv_)-&
+              pack(File_I(iFile)%Buffer_II(iVarLat,:),MASK=DoPrint_I))+&
+              cos(Param_I(LatAv_)) *  &
+              cos(pack(File_I(iFile)%Buffer_II(iVarLat,:),MASK=DoPrint_I)) *&
+              (cos(Param_I(LonAv_)-&
+              pack(File_I(iFile)%Buffer_II(iVarLon,:),MASK=DoPrint_I))-1.0)))&
+              )**2) / (count(DoPrint_I) - 1))
          Param_I((/LonAv_, LatAv_, AngleSpread_/)) = &
               Param_I((/LonAv_, LatAv_, AngleSpread_/)) * cRadToDeg
       end if
