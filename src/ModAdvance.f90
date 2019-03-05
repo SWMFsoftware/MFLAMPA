@@ -48,8 +48,11 @@ module SP_ModAdvance
   logical, public :: DoTestDiffusion = .false.
 
   !\
-  ! Parameter characterizing cut-off wavenumber of turbulent spectrum
+  ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
+  ! value of scale turbulence at 1 AU for any type (const or linear)
   real:: ScaleTurbulenceSI = 0.03 * cAu
+  integer:: iScaleTurbulenceType
+  integer, parameter:: Const_ = 0, Linear_ = 1
   !/
 
 contains
@@ -57,6 +60,7 @@ contains
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand ! From PARAM.in  
+    character(len=8) :: StringScaleTurbulenceType
     character(len=*), parameter :: NameSub='SP:read_param_adv'
     !---------------------------------------------
     select case(NameCommand)
@@ -73,7 +77,16 @@ contains
        end if
     case('#SCALETURBULENCE')
        ! cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
-       call read_var('ScaleTurbulence [AU]', ScaleTurbulenceSI)
+       call read_var('ScaleTurbulenceType', StringScaleTurbulenceType)
+       select case(StringScaleTurbulenceType)
+       case('const', 'constant')
+          iScaleTurbulenceType = Const_
+       case('linear')
+          iScaleTurbulenceType = Linear_
+       case default
+          call CON_stop(NameSub//": unknown scale turbulence type")
+       end select
+       call read_var('ScaleTurbulence [AU] at 1 AU', ScaleTurbulenceSI)
        ScaleTurbulenceSI = ScaleTurbulenceSI * cAu
     case('#TESTDIFFUSION')
        call read_var('DoTestDiffusion', DoTestDiffusion)
@@ -411,6 +424,7 @@ contains
     !==========================================================================
     subroutine set_coef_diffusion
       ! set diffusion coefficient for the current line
+      real, dimension(1:nParticleMax):: ScaleSI_I
       real, parameter:: cCoef = 81./7/cPi/(2*cPi)**(2./3)
       !------------------------------------------------------------------------
       DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
@@ -418,24 +432,20 @@ contains
       if(UseTurbulentSpectrum) return
 
       !\
+      ! precompute scale of turbulence along the line
+      !/
+      select case(iScaleTurbulenceType)
+      case(Const_)
+         ScaleSI_I(1:iEnd) = ScaleTurbulenceSI
+      case(Linear_)
+         ScaleSI_I(1:iEnd) = ScaleTurbulenceSI*RadiusSI_I(1:iEnd)/cAU
+      end select
+      !\
       ! Compute the diffusion coefficient without the contribution of 
       ! v (velocity) and p (momentum), as v and p are different for 
       ! different iP
       !/
-      if(.not.UseFixedMFPUpstream)then
-         !\
-         ! Sokolov et al., 2004: eq (4), 
-         ! note: Momentum = TotalEnergy * Vel / C**2
-         ! Gyroradius = cGyroRadius * momentum / |B|
-         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B| 
-         ! ------------------------------------------------------
-         ! effective level of turbulence is different for different momenta:
-         ! (\delta B)**2 \propto Gyroradius^(1/3)
-         !/
-         CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-              (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
-              (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
-      else if(UseFixedMFPUpstream) then
+      if(UseFixedMFPUpstream) then
          ! diffusion is different up- and down-stream
          ! Sokolov et al. 2004, paragraphs before and after eq (4)
          where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
@@ -451,10 +461,23 @@ contains
          elsewhere
             CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
                  (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
-                 (ScaleTurbulenceSI**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
+                 (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
          end where
+      else    ! .not.UseFixedMFPUpstream
+         !\
+         ! Sokolov et al., 2004: eq (4), 
+         ! note: Momentum = TotalEnergy * Vel / C**2
+         ! Gyroradius = cGyroRadius * momentum / |B|
+         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B| 
+         ! ------------------------------------------------------
+         ! effective level of turbulence is different for different momenta:
+         ! (\delta B)**2 \propto Gyroradius^(1/3)
+         !/
+         CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
+              (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+              (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
       end if
-
+      
       ! Add 1/B as the actual diffusion is D/B
       CoefDInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
 

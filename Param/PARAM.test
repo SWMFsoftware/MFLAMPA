@@ -49,7 +49,8 @@ mhtime flux ascii
 215.0
 
 #SCALETURBULENCE
-0.2402397832		ScaleTurbulence [AU]
+constant		ScaleTurbulenceType
+0.2402397832		ScaleTurbulence [AU] at 1AU
 
 #STOP
 -1			nIterMax
