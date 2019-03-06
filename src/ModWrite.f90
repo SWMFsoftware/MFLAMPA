@@ -1697,6 +1697,8 @@ contains
     
     ! timetag
     character(len=15):: StringTime
+    ! write format
+    character(len=100)::StringFmt
     ! lon, lat indexes corresponding to iNode
     integer:: iLon, iLat
     !------------------------------------------------------------
@@ -1718,12 +1720,22 @@ contains
                trim(NameOut)//'_Lon=', int(Longitude*cRadToDeg),&
                Longitude*cRadToDeg - int(Longitude*cRadToDeg)
        end if
-
+       
        if(abs(nint(Latitude*cRadToDeg)-Latitude*cRadToDeg) < cTolerance)then
-          write(NameOut,'(a,i2.2,a)') & 
+          if(Latitude < 0.0)then
+             write(StringFmt,'(a)') '(a,i3.2,a)'
+          else
+             write(StringFmt,'(a)') '(a,i2.2,a)'
+          end if
+          write(NameOut,StringFmt) & 
                trim(NameOut)//'_Lat=', nint(Latitude*cRadToDeg), '.00'
        else
-          write(NameOut,'(a,i2.2,f0.2)') & 
+          if(Latitude < 0.0)then
+             write(StringFmt,'(a)') '(a,i3.2,f0.2)'
+          else
+             write(StringFmt,'(a)') '(a,i2.2,f0.2)'
+          end if
+          write(NameOut,StringFmt) & 
                trim(NameOut)//'_Lat=', int(Latitude*cRadToDeg),&
                Latitude*cRadToDeg - int(Latitude*cRadToDeg)
        end if
