@@ -7,7 +7,7 @@ module SP_ModPlot
   ! Methods for saving plots
   !/
   use SP_ModSize, ONLY: nParticleMax
-  use SP_ModGrid, ONLY: get_node_indexes, nVar, nMHData, nBlock,   &
+  use SP_ModGrid, ONLY: search_line, get_node_indexes, nVar, nMHData, nBlock, &
        State_VIB, iShock_IB, iNode_B, nParticle_B, Shock_, X_, Z_, &
        R_, NameVar_V, TypeCoordSystem, LagrID_, nNode
   use SP_ModDistribution, ONLY: nP, KinEnergySI_I, MomentumSI_I,      &
@@ -788,8 +788,6 @@ contains
       integer:: iBlock, iParticle, iVarPlot, iVarIndex
       ! indexes of corresponding node, latitude and longitude
       integer:: iNode
-      ! index of first/last particle on the field line
-      integer:: iLast
       ! index of particle just above the radius
       integer:: iAbove
       ! radii of particles, added for readability
@@ -851,22 +849,9 @@ contains
       do iBlock = 1, nBlock
          iNode = iNode_B(iBlock)
 
-         ! get max particle indexes on this field line
-         iLast  = nParticle_B(iBlock)
-
          ! find the particle just above the given radius
-         do iParticle = 1 , iLast
-            Radius0 = State_VIB(R_, iParticle, iBlock)
-            if( Radius0 > File_I(iFile)%Radius) then
-               iAbove = iParticle
-               !check if line started above output sphere, i.e. no intersection
-               DoPrint_I(iNode) = iAbove /= 1
-               EXIT
-            end if
-            ! check if reached the end, i.e. there is no intersection
-            if(iParticle == iLast) &
-                 DoPrint_I(iNode) = .false.
-         end do
+         call search_line(iBlock,File_I(iFile)%Radius,iAbove,DoPrint_I(iNode))
+         DoPrint_I(iNode) = DoPrint_I(iNode) .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
          if(.not.DoPrint_I(iNode)) CYCLE
@@ -976,8 +961,6 @@ contains
       character(len=100):: NameFile
       ! loop variables
       integer:: iBlock, iParticle, iVarPlot, iVarIndex
-      ! index of first/last particle on the field line
-      integer:: iLast
       ! index of particle just above the radius
       integer:: iAbove
       ! radii of particles, added for readability
@@ -1040,22 +1023,10 @@ contains
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
 
-         ! get max particle indexes on this field line
-         iLast  = nParticle_B(   iBlock)
-
          ! find the particle just above the given radius
-         do iParticle = 1 , iLast
-            Radius0 = sum(State_VIB(X_:Z_, iParticle, iBlock)**2)**0.5
-            if( Radius0 > File_I(iFile) % Radius)then
-               iAbove = iParticle
-               !check if line started above output sphere, i.e. no intersection
-               DoPrint = iAbove /= 1
-               EXIT
-            end if
-            ! check if reached the end, i.e. there is no intersection
-            if(iParticle == iLast) &
-                 DoPrint = .false.
-         end do
+         call search_line(iBlock, File_I(iFile)%Radius, iAbove, DoPrint)
+         DoPrint = DoPrint .and. iAbove /= 1
+
          ! if no intersection found -> proceed to the next line
          if(.not.DoPrint) CYCLE
 
@@ -1235,8 +1206,6 @@ contains
       integer:: iBlock, iParticle, iFlux
       ! indexes of corresponding node, latitude and longitude
       integer:: iNode, iLatOut, iLonOut
-      ! index of first/last particle on the field line
-      integer:: iLast
       ! index of particle just above the radius
       integer:: iAbove
       ! radii of particles, added for readability
@@ -1292,22 +1261,9 @@ contains
          ! reset, all field lines are printed reaching output sphere
          DoPrint = .true.
 
-         ! get max particle indexes on this field line
-         iLast  = nParticle_B(iBlock)
-
          ! find the particle just above the given radius
-         do iParticle = 1 , iLast
-            Radius0 = State_VIB(R_, iParticle, iBlock)
-            if( Radius0 > File_I(iFile)%Radius) then
-               iAbove = iParticle
-               !check if line started above output sphere, i.e. no intersection
-               DoPrint = iAbove /= 1
-               EXIT
-            end if
-            ! check if reached the end, i.e. there is no intersection
-            if(iParticle == iLast) &
-                 DoPrint = .false.
-         end do
+         call search_line(iBlock, File_I(iFile)%Radius, iAbove, DoPrint)
+         DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
          if(.not.DoPrint) CYCLE
@@ -1418,8 +1374,6 @@ contains
       character(len=500):: StringHeader
       ! loop variables
       integer:: iBlock, iParticle
-      ! index of first/last particle on the field line
-      integer:: iLast
       ! index of particle just above the radius
       integer:: iAbove
       ! radii of particles, added for readability
@@ -1524,22 +1478,10 @@ contains
          ! reset, the field line contrubtes unless fail to reach output sphere
          DoPrint = .true.
          
-         ! get max particle indexes on this field line
-         iLast  = nParticle_B(iBlock)
-         
          ! find the particle just above the given radius
-         do iParticle = 1 , iLast
-            Radius0 = sum(State_VIB(X_:Z_, iParticle, iBlock)**2)**0.5
-            if( Radius0 > File_I(iFile) % Radius)then
-               iAbove = iParticle
-               !check if line started above output sphere, i.e. no intersection
-               DoPrint = iAbove /= 1
-               EXIT
-            end if
-            ! check if reached the end, i.e. there is no intersection
-            if(iParticle == iLast) &
-                 DoPrint = .false.
-         end do
+         call search_line(iBlock, File_I(iFile)%Radius, iAbove, DoPrint)
+         DoPrint = DoPrint .and. iAbove /= 1
+
          ! if no intersection found -> proceed to the next line
          if(.not.DoPrint) CYCLE
          

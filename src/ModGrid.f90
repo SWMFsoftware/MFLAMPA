@@ -15,10 +15,11 @@ module SP_ModGrid
 
   private ! except
   !Public members:
-  public:: read_param      !read parameters related to grid 
-  public:: init            !Initialize arrays on the grid
-  public:: copy_old_state  !save old arrays before getting new ones  
+  public:: read_param          !read parameters related to grid 
+  public:: init                !Initialize arrays on the grid
+  public:: copy_old_state      !save old arrays before getting new ones  
   public:: get_other_state_var !Auxiliary components of state vector 
+  public:: search_line         !find particle index corresponding to radius
  
   ! Coordinate system and geometry
   character(len=3), public :: TypeCoordSystem = 'HGR'
@@ -352,4 +353,30 @@ contains
        end do
     end do
   end subroutine get_other_state_var
+  !================================================================
+  subroutine search_line(iBlock, Radius, iParticleAbove, IsFound)
+    ! performs search along given line
+    ! for FIRST location ABOVE given heliocentric radius;
+    ! if found, IsFound is set to .true. (.false. otherwise)
+    ! and iParticleAbove is set to index of particle just above Radius
+    integer, intent(in) :: iBlock ! block/line index
+    real,    intent(in) :: Radius ! heliocentric distance to find
+    integer, intent(out):: iParticleAbove ! result: index
+    logical, intent(out):: IsFound ! result: whether search was successful
+    !-------------------------------------------------------------
+    ! check whether line reaches given radial distance
+    if(State_VIB(R_, nParticle_B(iBlock), iBlock) < Radius)then
+       ! mark failure to find location
+       IsFound = .false.
+       iParticleAbove = -1
+       RETURN
+    end if
+
+    ! line reaches given radial distance
+    IsFound = .true.
+    ! find index of first particle above Radius
+    do iParticleAbove = 1, nParticle_B(iBlock)
+       if(State_VIB(R_, iParticleAbove, iBlock) > Radius) EXIT
+    end do
+  end subroutine search_line
 end module SP_ModGrid
