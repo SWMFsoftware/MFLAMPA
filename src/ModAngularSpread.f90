@@ -1,0 +1,309 @@
+!  Copyright (C) 2002 Regents of the University of Michigan, 
+!  portions used with permission 
+!  For more information, see http://csem.engin.umich.edu/tools/swmf
+!==================================================================
+module SP_ModAngularSpread
+
+  use ModNumConst, ONLY: cPi, cTwoPi, cTolerance, cSqrtTwo
+  use ModCoordTransform, ONLY: xyz_to_rlonlat
+  use SP_ModGrid, ONLY: search_line, &
+       nBlock, State_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
+  use SP_ModSize, ONLY: nDim
+  use SP_ModTIme, ONLY: iIter
+
+  implicit none
+  SAVE
+
+  !\
+  !Public members
+  public:: init
+  public:: read_param
+  public:: get_magnetic_flux
+  public:: get_normalized_spread
+  !/
+
+  interface get_normalized_spread
+     module procedure get_normalized_spread_grid
+     module procedure get_normalized_spread_point
+  end interface
+
+  !\
+  ! Module contains data and methods used primarily to create flux output 
+  ! on a sphere (see SP_ModWrite);
+  ! ---------------------------------------------------------------------
+  ! flux associated with each line is spread over a sphere as follows:
+  !  Probability of particle to deviate into a solid angle \Omega is
+  !  A * \int\limits_\Omega spread_shape(\Omega^\prime) d\Omega^\prime,
+  !  where A is normalization constant;
+  ! ---------------------------------------------------------------------
+  ! original implementation has 
+  !  spread_shape = \exp(-0.5 * (\psi/\sigma)^2),
+  ! where \sigma is a free parameter, 
+  !       \psi is angle of arc corresponding to deviation into d\Omega^\prime
+  ! ---------------------------------------------------------------------
+  ! flux spread to some location (lon,lat)is proportional to total of particles
+  ! traveling along the line:
+  !  flux(lon,lat)*d\Omega = flux_{line}*\omega_{line}*A*spread_shape*d\Omega
+  !/
+
+  !\
+  ! whether ready to use get_normalized_spread
+  logical, public:: IsReadySpreadPoint= .false.
+  logical, public:: IsReadySpreadGrid = .false.
+  !/
+
+  !\
+  ! angular grid for flux spread on a sphere
+  integer, public:: nSpreadLon
+  integer, public:: nSpreadLat
+  real, allocatable, public:: SpreadLon_I(:)
+  real, allocatable, public:: SpreadLat_I(:)
+  real, parameter:: LatMin = -cPi / 3.0
+  !/
+
+  !\
+  ! Reference radius and value of solid angle associated with lines
+  real:: RadiusRef = -1.0
+  real:: SolidAngleRef = -1.0
+  !/
+
+contains
+
+  subroutine read_param(NameCommand)
+    use ModReadParam, ONLY: read_var
+    character(len=*), intent(in):: NameCommand ! From PARAM.in
+    character(len=*), parameter :: NameSub='SP:read_param_angular_spread'
+    !--------------------------------------------------------------------
+    select case(NameCommand) 
+    case('#SPREADGRID')
+       call read_var('nSpreadLon', nSpreadLon)
+       call read_var('nSpreadLat', nSpreadLat)
+       if(nSpreadLon < 1 .or. nSpreadLat < 1)&
+            call CON_stop(NameSub//' spread grid is invalid')
+       IsReadySpreadGrid = .true.
+    case('#SPREADSOLIDANGLE')
+       call read_var('RadiusRef [Rs]', RadiusRef)
+       if(RadiusRef < 1.0)&
+            call CON_stop(NameSub//' Invalid reference radius')
+       call read_var('SolidAngleRef', SolidAngleRef)
+       if(SolidAngleRef < 0.0 .or. SolidAngleRef > 4*cPi)&
+            call CON_stop(NameSub//' Invalid reference solid angle')
+       IsReadySpreadPoint = .true.
+    case default
+       call CON_stop(NameSub//' Unknown command '//NameCommand)
+    end select
+  end subroutine read_param
+  !===========================================================================
+  subroutine init
+    integer:: i
+    real:: DLon, DLat
+    !------------------------------------------------------
+    if(.not.IsReadySpreadGrid)&
+         RETURN
+
+    allocate(SpreadLon_I(nSpreadLon))
+    allocate(SpreadLat_I(nSpreadLat))
+    
+    ! fill grid coords
+    DLon = cTwoPi / nSpreadLon
+    DLat = cTwoPi / nSpreadLat / 3.0
+    do i = 1, nSpreadLon
+       SpreadLon_I(i) = (i - 0.5) * DLon
+    end do
+    do i = 1, nSpreadLat
+       SpreadLat_I(i) = LatMin + (i - 0.5) * DLat
+    end do
+  end subroutine init
+  !===========================================================================
+  subroutine get_magnetic_flux
+    ! fill MagneticFluxAbs_B with reference value and radius from PARAM.in
+    integer:: iBlock
+    integer:: iRef
+    logical:: IsFoundRef
+    real:: Weight
+    real:: Xyz_D(nDim)
+    !------------------------------------------------------------------------
+    do iBlock = 1, nBlock
+       call search_line(iBlock, RadiusRef, iRef, IsFoundRef, Weight)
+       if(IsFoundRef .and. iRef > 1)then
+          Xyz_D = &
+               State_VIB(X_:Z_,iRef-1,iBlock) * (1-Weight) + &
+               State_VIB(X_:Z_,iRef,  iBlock) *    Weight
+          MagneticFluxAbs_B(iBlock) = SolidAngleRef * RadiusRef * abs(&
+               sum(Xyz_D*(&
+               State_VIB(Bx_:Bz_,iRef-1,iBlock) * (1-Weight) + &
+               State_VIB(Bx_:Bz_,iRef,  iBlock) *    Weight )))
+       else
+          ! mark that failed to find magnetic flux with given refernce radius
+          MagneticFluxAbs_B(iBlock) = -1.0
+       end if
+    end do
+  end subroutine get_magnetic_flux
+  !===========================================================================
+  subroutine get_angular_spread_normalization(Sigma, Norm)
+    ! get value of integral:
+    !   2\pi\int\limits_0^\pi \sin(t) \exp(-0.5*(t/Sigma)^2) dt
+    real, intent(in) :: Sigma ! characteristic scale of spread
+    real, intent(out):: Norm  ! result
+    
+    ! temporary values used to compute Norm
+    real:: DNorm, Aux1, Aux2
+    integer:: iTerm
+    !------------------------------------------------------
+    ! compute normalization factor for angular distribution
+    ! using one of two approximations based on value of AngularSpread
+    if(Sigma < cPi)then
+       ! for smaller values use approximate formula for complex erf
+       ! from Abramowitz and Stegun, 1972
+       Aux1 = (cPi / Sigma)**2
+       Aux2 = sqrt(cTwoPi) * Sigma * exp(-0.5 * Sigma**2)
+       Norm = Aux2 * Sigma / cSqrtTwo
+       DNorm = Norm
+       iTerm = 0
+       do while(DNorm/Norm > cTolerance)
+          iTerm = iTerm + 1
+          DNorm = 2.0 / iTerm * Aux2 * exp(-0.25*iTerm**2)  * &
+               (1 + exp(-0.5*Aux1) / (1+2.0*Aux1/iTerm**2)) * &
+               sinh(iTerm * Sigma / cSqrtTwo)
+          Norm = Norm + DNorm
+       end do
+    else
+       ! for larger values use Taylor expansion with respect to (1/Sigma)
+       Aux1 = cTwoPi
+       Aux2 = 4.0 * cPi
+       Norm = Aux2
+       DNorm = Norm
+       iTerm = 0
+       do while(abs(DNorm/Norm) > cTolerance)
+          iTerm = iTerm + 1
+          Aux1 =-Aux1 * 0.5*cPi*cPi / iTerm
+          Aux2 = Aux2 * (2*iTerm-1) + Aux1
+          DNorm = Aux2 / Sigma**(2*iTerm)
+          Norm = Norm + DNorm
+       end do
+    end if
+  end subroutine get_angular_spread_normalization
+  !===========================================================================
+  function angle(Lon1, Lat1, Lon2, Lat2) result(AngleOut)
+    ! angle of arc between 2 points given by their lon and lat
+    real, intent(in):: Lon1, Lat1
+    real, intent(in):: Lon2, Lat2
+    real            :: AngleOut
+    !--------------------------------------------------
+    AngleOut = acos(min(1.0, max(-1.0, &
+         cos(Lat1-Lat2) + cos(Lat1) * cos(Lat2) * (cos(Lon1-Lon2)-1.0) )))
+  end function angle
+  !===========================================================================
+  function spread_shape(Angle, Sigma) result(SpreadShape)
+    ! value of non-normalized angular spread function;
+    ! as in probability of deviation angle < T 
+    !   Prob = const \int\limits_0^T spread_shape(t,\sigma) \sin(t) dt
+    real, intent(in):: Angle
+    real, intent(in):: Sigma
+    real            :: SpreadShape
+    !--------------------------------------------------
+    SpreadShape = exp(- 0.5 * (Angle/Sigma)**2 )
+  end function spread_shape
+  !===========================================================================
+  subroutine get_normalized_spread_point(&
+       iBlock, Radius, Sigma, LonPoint, LatPoint, Spread)
+    ! value of normalized angular spread function:
+    ! equal to probability of particle deviation to be within some solid angle
+    ! centered around LonPoint, LatPoint
+    integer,         intent(in) :: iBlock  ! line index on processor
+    real,            intent(in) :: Radius  ! heliocentric radius
+    real,            intent(in) :: Sigma   ! charachteristic scale
+    real,            intent(in) :: LonPoint! longitude of location
+    real,            intent(in) :: LatPoint! latitude of location
+    real,            intent(out):: Spread  ! result
+
+    ! whether to perfrom full computation or reuse result of previous call
+    logical:: DoReset
+    ! parameters of previous call
+    integer, save::  iIterPrevCall = -1
+    integer, save:: iBlockPrevCall = -1
+    real,    save:: RadiusPrevCall = -1.0
+    real,    save:: SScalePrevCall = -1.0
+    ! result of previous call
+    logical, save:: IsFound
+    integer, save:: iParticle
+    real,    save:: Norm
+    real,    save:: SolidAngle
+    real,    save:: LonLine, LatLine
+    ! miscallaneous values
+    real:: Aux
+    ! interpolation weight between particles on line
+    real:: Weight
+    ! interpolated coords
+    real:: Xyz_D(nDim)
+    !---------------------------------------------------------------
+    ! check whether value of magnetic flux has been found for this line
+    if(MagneticFluxAbs_B(iBlock) < 0)then
+       Spread = 0
+       RETURN
+    end if
+    !---------------------------------------------------------------
+    ! to optimize function, sequential and similar calls reuse
+    ! results of previous calls,
+    ! e.g. multiple calls for same line at the same timestep
+    !---------------------------------------------------------------
+    ! determine whether to perform full computation
+    DoReset = iBlock/=iBlockPrevCall .or. Radius/=RadiusPrevCall .or.&
+         Sigma/=SScalePrevCall .or.  iIter/= iIterPrevCall
+
+    if(DoReset)then
+       ! update parameters that determine similarity of consequitive calls
+       iIterPrevCall  = iIter
+       iBlockPrevCall = iBlock
+       RadiusPrevCall = Radius
+       SScalePrevCall = Sigma
+       call search_line(iBlock, Radius, iParticle, IsFound, Weight)
+    end if
+
+    if(.not.IsFound.and.iParticle > 1)then
+       ! if location not found, do not apply spread
+       Spread = 0
+       RETURN
+    end if
+
+    if(DoReset)then
+       ! normalizaiton factor corresponding to charactersitic spread Sigma
+       call get_angular_spread_normalization(Sigma, Norm)
+       ! spread is computed based on interpolated coordinates and field
+       Xyz_D = &
+            State_VIB(X_:Z_,iParticle-1,iBlock) * (1-Weight) + &
+            State_VIB(X_:Z_,iParticle,  iBlock) *    Weight
+       call xyz_to_rlonlat(Xyz_D, Aux, LonLine, LatLine)
+       ! Aux = B \cdot Xyz
+       Aux = abs(sum(Xyz_D * (&
+            State_VIB(Bx_:Bz_,iParticle-1,iBlock) * (1-Weight) + &
+            State_VIB(Bx_:Bz_,iParticle,  iBlock) *    Weight)))
+       ! solid angle of line's flux tube section on sphere
+       SolidAngle = MagneticFluxAbs_B(iBlock) / Aux / Radius
+    end if
+    ! Aux = angle of arc between line and locaiton of interest
+    Aux = angle(LonLine, LatLine, LonPoint, LatPoint)
+
+    Spread = spread_shape(Aux, Sigma)  * SolidAngle / Norm
+  end subroutine get_normalized_spread_point
+  !===========================================================================
+  subroutine get_normalized_spread_grid(&
+       iBlock, Radius, Sigma, Spread_II)
+    ! value of normalized angular spread on rectangular angular grid
+    ! defined by SpreadLon_I and SpreadLat_I;
+    integer, intent(in) :: iBlock
+    real,    intent(in) :: Radius
+    real,    intent(in) :: Sigma
+    real,    intent(out):: Spread_II(nSpreadLon,nSpreadLat)
+
+    integer:: iLon, iLat
+    !---------------------------------------------------------------
+    ! compute spread over grid for current line
+    do iLon = 1, nSpreadLon
+       do iLat = 1, nSpreadLat
+          call get_normalized_spread_point(iBlock, Radius, Sigma,    &
+               SpreadLon_I(iLon), SpreadLat_I(iLat), Spread_II(iLon, iLat))
+       end do
+    end do
+  end subroutine get_normalized_spread_grid
+end module SP_ModAngularSpread

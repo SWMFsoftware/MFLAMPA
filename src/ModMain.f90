@@ -3,19 +3,19 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 !==================================================================
 module SP_ModMain
-  use SP_ModProc,    ONLY: iProc
-  use SP_ModSize,    ONLY: nDim, nParticleMax
-  use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
-  use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
-  use SP_ModRestart, ONLY: save_restart, read_restart
+  use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
   use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
        Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
        Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
        RhoOld_, iShock_IB, iNode_B, State_VIB, FootPoint_VB,      &
        nLat, nLon, nNode
-  use SP_ModUnit,    ONLY: SI2IO_I, UnitEnergy_
-  use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
+  use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
+  use SP_ModProc,    ONLY: iProc
+  use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
+  use SP_ModRestart, ONLY: save_restart, read_restart
+  use SP_ModSize,    ONLY: nDim, nParticleMax
   use SP_ModTime,    ONLY: SPTime, DataInputTime, iIter
+  use SP_ModUnit,    ONLY: SI2IO_I, UnitEnergy_
   implicit none
   SAVE
   private ! except
@@ -92,12 +92,13 @@ module SP_ModMain
 contains
 
   subroutine read_param
-    use SP_ModGrid,         ONLY: read_param_grid       =>read_param
-    use SP_ModTime,         ONLY: read_param_time       =>read_param
-    use SP_ModDistribution, ONLY: read_param_dist       =>read_param
     use SP_ModAdvance,      ONLY: read_param_adv        =>read_param
+    use SP_ModAngularSpread,ONLY: read_param_spread     =>read_param
+    use SP_ModDistribution, ONLY: read_param_dist       =>read_param
+    use SP_ModGrid,         ONLY: read_param_grid       =>read_param
     use SP_ModPlot,         ONLY: read_param_plot       =>read_param
     use SP_ModReadMHData,   ONLY: read_param_mhdata     =>read_param
+    use SP_ModTime,         ONLY: read_param_time       =>read_param
     use SP_ModTurbulence,   ONLY: read_param_turbulence =>read_param
     use SP_ModUnit,         ONLY: read_param_unit       =>read_param
 
@@ -158,6 +159,8 @@ contains
           call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')
           call read_param_unit(NameCommand)
+       case('#SPREADGRID', '#SPREADSOLIDANGLE')
+          call read_param_spread(NameCommand)
        case('#DORUN')
           call read_var('DoRun',DoRun)
        case('#TIMING')
@@ -224,14 +227,15 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine initialize
+    use SP_ModAngularSpread,ONLY: init_spread     => init
+    use SP_ModDistribution, ONLY: init_dist       => init
     use SP_ModGrid,         ONLY: init_grid       => init, iNodeTest, &
          iParticleTest, iPTest
-    use SP_ModUnit,         ONLY: init_unit       => init 
-    use SP_ModDistribution, ONLY: init_dist       => init
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
     use SP_ModTurbulence,   ONLY: init_turbulence => init
+    use SP_ModUnit,         ONLY: init_unit       => init 
 
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
@@ -242,6 +246,7 @@ contains
     call init_plot
     call init_mhdata
     call init_turbulence
+    call init_spread
     if(DoRestart) call read_restart
     if((.not.IsStandAlone).and.(.not.DoRestart).and.(.not.DoReadMhData))&
          call get_origin_points
@@ -299,6 +304,7 @@ contains
   !============================================================================
 
   subroutine run(TimeLimit)
+    use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid, ONLY: get_other_state_var
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
@@ -311,6 +317,9 @@ contains
     if(IsFirstCall)then
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
+       ! compute magnetic fluxes associated with lines if needed
+       if(IsReadySpreadPoint) call get_magnetic_flux
+
        IsFirstCall = .false.
     end if
     !\

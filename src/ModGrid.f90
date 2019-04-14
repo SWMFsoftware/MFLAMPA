@@ -32,7 +32,6 @@ module SP_ModGrid
   integer, public, allocatable :: nParticle_B(:)
   !/
   !\
-
   ! angular grid at origin surface
   integer, public :: nLon  = 4
   integer, public :: nLat  = 4
@@ -77,6 +76,10 @@ module SP_ModGrid
   integer, public, parameter :: &! init length of segment 1-2: 
        Length_ = 4               ! control appending  new particles 
   real, public, allocatable:: FootPoint_VB(:,:)
+  !/
+  !\
+  ! Magnetic flux (absolute value) associated with lines
+  real, public, allocatable:: MagneticFluxAbs_B(:)
   !/
   !\
   ! State vector;
@@ -173,7 +176,7 @@ contains
        nNode = nLon*nLat
        if(nParticleCheck > nParticleMax)then
           if(iProc==0)write(*,*)&
-               'nParticleMax is too small, use ./Config.pl -g=',nParticleCheck
+              'nParticleMax is too small, use ./Config.pl -g=',nParticleCheck
           call CON_stop('Code stopped')
        end if
     case('#COORDSYSTEM','#COORDINATESYSTEM')
@@ -236,6 +239,8 @@ contains
     call check_allocate(iError, NameSub//'iShock_IB')
     allocate(FootPoint_VB(LagrID_:Length_, nBlock), stat=iError)
     call check_allocate(iError, NameSub//'FootPoint_VB')
+    allocate(MagneticFluxAbs_B(nBlock), stat=iError)
+    call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
     allocate(State_VIB(LagrID_:nVar,1:nParticleMax,nBlock), &
          stat=iError)
     call check_allocate(iError, NameSub//'State_VIB')
@@ -270,7 +275,7 @@ contains
     ! reset and fill data containers
     !/
     State_VIB = -1; State_VIB(1:nMHData,:,:) = 0.0
-    FootPoint_VB = -1
+    FootPoint_VB = -1; MagneticFluxAbs_B = -1
     
     !\
     ! reset lagrangian ids
@@ -354,29 +359,46 @@ contains
     end do
   end subroutine get_other_state_var
   !================================================================
-  subroutine search_line(iBlock, Radius, iParticleAbove, IsFound)
+  subroutine search_line(iBlock, Radius, iParticleOut, IsFound, Weight)
     ! performs search along given line
     ! for FIRST location ABOVE given heliocentric radius;
     ! if found, IsFound is set to .true. (.false. otherwise)
-    ! and iParticleAbove is set to index of particle just above Radius
-    integer, intent(in) :: iBlock ! block/line index
-    real,    intent(in) :: Radius ! heliocentric distance to find
-    integer, intent(out):: iParticleAbove ! result: index
-    logical, intent(out):: IsFound ! result: whether search was successful
+    ! and iParticleOut is set to index of particle just above Radius
+    integer,      intent(in) :: iBlock ! block/line index
+    real,         intent(in) :: Radius ! heliocentric distance to find
+    integer,      intent(out):: iParticleOut ! result: index
+    logical,      intent(out):: IsFound! result: whether search was successful
+    real,optional,intent(out):: Weight ! interpolation weight for output index 
+
+    integer:: iParticle !loop variable
     !-------------------------------------------------------------
     ! check whether line reaches given radial distance
     if(State_VIB(R_, nParticle_B(iBlock), iBlock) < Radius)then
        ! mark failure to find location
        IsFound = .false.
-       iParticleAbove = -1
+       iParticleOut = -1
        RETURN
     end if
 
     ! line reaches given radial distance
     IsFound = .true.
     ! find index of first particle above Radius
-    do iParticleAbove = 1, nParticle_B(iBlock)
-       if(State_VIB(R_, iParticleAbove, iBlock) > Radius) EXIT
+    do iParticle = 1, nParticle_B(iBlock)
+       if(State_VIB(R_, iParticle, iBlock) > Radius)then
+          iParticleOut = iParticle
+          EXIT
+       end if
     end do
+    
+    ! get interpolation weight is necessary
+    if(present(Weight))then
+       if(iParticleOut > 1)then
+          Weight = (Radius - State_VIB(R_,iParticleOut-1, iBlock)) / (&
+               State_VIB(R_,iParticleOut,  iBlock) - &
+               State_VIB(R_,iParticleOut-1,iBlock))
+       else
+          Weight = 1.0
+       end if
+    end if
   end subroutine search_line
 end module SP_ModGrid

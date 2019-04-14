@@ -10,6 +10,7 @@ include Makefile.RULES
 # Object files included into the library
 OBJECTS = \
 	ModAdvance.o \
+	ModAngularSpread.o \
 	ModDistribution.o \
 	ModDiffusion.o \
 	ModGrid.o \
