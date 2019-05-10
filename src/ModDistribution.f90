@@ -75,6 +75,9 @@ module SP_ModDistribution
 
   ! distribution is initialized to have integral flux:
   real:: FluxInitIo = 0.01 ! [PFU]
+  ! initial values of fluxes in energy channels
+  real,public,allocatable:: FluxChannelInit_V(:)
+
 
   logical :: DoInit = .true.
 contains
@@ -91,7 +94,7 @@ contains
 
     ! convert energies to momenta
     MomentumInjSI= kinetic_energy_to_momentum(EnergyInjIo*IO2SI_I(UnitEnergy_))
-    MomentumMaxSI= kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_I(UnitEnergy_))  
+    MomentumMaxSI= kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_I(UnitEnergy_))
 
     ! grid size in the log momentum space
     DLogP = log(MomentumMaxSI/MomentumInjSI)/nP
@@ -154,7 +157,15 @@ contains
     else
        call CON_stop(NameSub//' Flux_VIB already allocated')
     end if
-
+    
+    ! fill initial values of flux in energy channels
+    allocate(FluxChannelInit_V(0:nFluxChannel+1))
+    ! for the assumed initial distribution (~1/p^2)
+    FluxChannelInit_V(0:nFluxChannel) = FluxInitIo * &
+         (EnergyMaxIo-EChannelIO_I(0:nFluxChannel)) / (EnergyMaxIo-EnergyInjIo)
+    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2SI_I(UnitFlux_) * &
+         0.5 * (EnergyMaxIo + EnergyInjIo) * IO2SI_I(UnitEnergy_) * &
+         SI2IO_I(UnitEFlux_)
   end subroutine init
   !================================================================
   subroutine read_param(NameCommand)
@@ -277,7 +288,6 @@ contains
     real   :: EFlux ! the value of energy flux
     real   :: dFlux, dFlux1 ! increments
     real   :: Flux          ! the value of particle flux
-    real   :: Norm            ! normalization factor
     real, allocatable :: Flux_I(:), EChannelSI_I(:)
     !-------------------------------------------------------------------------
     ! energy limits of GOES channels
@@ -296,7 +306,6 @@ contains
           ! reset values
           EFlux = 0.0
           Flux_I= 0.0
-          Norm  = 0.0
           Flux  = 0.0
           do iP = 1, nP - 1
              ! the flux increment from iP
@@ -311,7 +320,7 @@ contains
              ! increase the total flux
              Flux = Flux + dFlux
 
-             ! increase FOES channels' fluxes
+             ! increase GOES channels' fluxes
              do iFlux = 1, nFluxChannel
                 ! check whether reached the channel's cut-off level
                 if(KinEnergySI_I(iP+1) < EChannelSI_I(iFlux))&
@@ -345,15 +354,6 @@ contains
                   +&
                   Distribution_IIB(iP+1,iParticle,iBlock)*&
                   KinEnergySI_I(iP+1) * &
-                  MomentumSI_I(iP+1)**2)
-
-             ! normalization factor
-             Norm = Norm + 0.5 * &
-                  (MomentumSI_I(iP+1) - MomentumSI_I(iP)) * (&
-                  Distribution_IIB(iP,  iParticle, iBlock) * &
-                  MomentumSI_I(iP)**2 &
-                  + &
-                  Distribution_IIB(iP+1,iParticle, iBlock) * &
                   MomentumSI_I(iP+1)**2)
           end do
 

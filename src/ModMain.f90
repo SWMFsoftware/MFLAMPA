@@ -159,7 +159,7 @@ contains
           call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')
           call read_param_unit(NameCommand)
-       case('#SPREADGRID', '#SPREADSOLIDANGLE')
+       case('#SPREADGRID', '#SPREADSOLIDANGLE', '#SPREADSIGMA')
           call read_param_spread(NameCommand)
        case('#DORUN')
           call read_var('DoRun',DoRun)

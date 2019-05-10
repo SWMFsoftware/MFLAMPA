@@ -10,7 +10,7 @@ module SP_ModPlot
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModDistribution, ONLY: nP, KinEnergySI_I, MomentumSI_I, &
-       Distribution_IIB,                                         &
+       Distribution_IIB, FluxChannelInit_V,                      &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, get_node_indexes, nVar, nMHData, nBlock, &
        State_VIB, iShock_IB, iNode_B, nParticle_B, Shock_, X_, Z_, &
@@ -108,8 +108,6 @@ module SP_ModPlot
      !\
      ! Flux through sphere
      !/
-     ! characteristic angular spread
-     real :: AngleSpread
      ! angular coords of point where output is requested
      real :: Lon, Lat
      ! spread of flux of an individual line over grid
@@ -434,11 +432,6 @@ contains
                   ' StartTime StartTimeJulian'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
-             ! get angular spread and convert to radian
-             call read_var('AngleSpread [deg]', File_I(iFile) % AngleSpread)
-             File_I(iFile) % AngleSpread = &
-                  File_I(iFile) % AngleSpread * cDegToRad
-!             allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
           case(FluxTime_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -448,9 +441,6 @@ contains
                   ' StartTime StartTimeJulian Longitude Latitude'
              ! get radius
              call read_var('Radius [Rs]', File_I(iFile) % Radius)
-             call read_var('AngleSpread [deg]', File_I(iFile) % AngleSpread)
-             File_I(iFile) % AngleSpread = &
-                  File_I(iFile) % AngleSpread * cDegToRad
              ! get longitude and latitude of location being tracked
              call read_var('Longitude [deg]', File_I(iFile) % Lon)
              File_I(iFile) % Lon = File_I(iFile) % Lon * cDegToRad
@@ -1229,16 +1219,16 @@ contains
          ! intersection is found -> get data at that location;
          ! compute spread over grid for current line
          call get_normalized_spread(iBlock, File_I(iFile) % Radius, &
-              File_I(iFile) % AngleSpread,&
               File_I(iFile) % Spread_II)
 
-         ! apply spread to fluxes
+         ! apply spread to excess fluxes above background/initial flux
          do iFlux = 1, nFlux
             File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:) =    &
                  File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:)+&
                  File_I(iFile)%Spread_II(:,:) * (                            &
                  Flux_VIB(Flux0_+iFlux-1, iAbove-1, iBlock) * (1-Weight) +   &
-                 Flux_VIB(Flux0_+iFlux-1, iAbove,   iBlock) *    Weight  )
+                 Flux_VIB(Flux0_+iFlux-1, iAbove,   iBlock) *    Weight  -   &
+                 FluxChannelInit_V(Flux0_+iFlux-1))
          end do
       end do
 
@@ -1255,6 +1245,13 @@ contains
                  MPI_REAL, MPI_Sum, 0, iComm, iError)
          end if
       end if
+
+      ! add background/initial flux back
+      do iFlux = 1, nFlux
+         File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:) =    &
+              File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:)+&
+              FluxChannelInit_V(Flux0_+iFlux-1)
+      end do
 
       ! start time in seconds from base year
       Param_I(StartTime_)  = StartTime
@@ -1402,15 +1399,15 @@ contains
          
          ! interpolate data and fill buffer
          call get_normalized_spread(&
-              iBlock, File_I(iFile)%Radius, File_I(iFile)%AngleSpread, &
+              iBlock, File_I(iFile)%Radius, &
               File_I(iFile)%Lon, File_I(iFile)%Lat, Spread)
 
-         ! interpolate fluxes and apply spread weight
+         ! apply spread to excess fluxes above background/initial flux
          File_I(iFile)%Buffer_II(1:nFluxPlot,nDataLine) = &
-              File_I(iFile)%Buffer_II(1:nFluxPlot,nDataLine) + (&
+              File_I(iFile)%Buffer_II(1:nFluxPlot,nDataLine) + Spread * (&
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
-              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight  )*&
-              Spread
+              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight  - &
+              FluxChannelInit_V(Flux0_:FluxMax_))
       end do
       
       ! gather interpolated data on the source processor
@@ -1426,6 +1423,12 @@ contains
       end if
       
       if(iProc==0)then
+         
+         ! add background/initial flux back
+         File_I(iFile)%Buffer_II(1:nFluxPlot,nDataLine) = &
+              File_I(iFile)%Buffer_II(1:nFluxPlot,nDataLine) + &
+              FluxChannelInit_V(Flux0_:FluxMax_)
+
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime
          ! start time in Julian date
@@ -1573,7 +1576,7 @@ contains
           end if
           write(NameOut,StringFmt) & 
                trim(NameOut)//'_Lat=', int(Latitude*cRadToDeg),&
-               Latitude*cRadToDeg - int(Latitude*cRadToDeg)
+               abs(Latitude*cRadToDeg - int(Latitude*cRadToDeg))
        end if
 
     end if
