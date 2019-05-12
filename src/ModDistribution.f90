@@ -161,8 +161,9 @@ contains
     ! fill initial values of flux in energy channels
     allocate(FluxChannelInit_V(0:nFluxChannel+1))
     ! for the assumed initial distribution (~1/p^2)
-    FluxChannelInit_V(0:nFluxChannel) = FluxInitIo * &
-         (EnergyMaxIo-EChannelIO_I(0:nFluxChannel)) / (EnergyMaxIo-EnergyInjIo)
+    FluxChannelInit_V(0) = FluxInitIo
+    FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
+         (EnergyMaxIo-EChannelIO_I(:)) / (EnergyMaxIo-EnergyInjIo)
     FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2SI_I(UnitFlux_) * &
          0.5 * (EnergyMaxIo + EnergyInjIo) * IO2SI_I(UnitEnergy_) * &
          SI2IO_I(UnitEFlux_)
