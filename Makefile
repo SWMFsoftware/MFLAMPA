@@ -59,14 +59,9 @@ NOMPI:
 	cd util/NOMPI/src; make LIB
 
 # The MACHINE variable holds the machine name for which scripts should
-# be copied to the run directory when it is created.  This is used mostly
-# when several different machines have the same operating system,
-# but they require different batch queue scripts.
-# If MACHINE is empty or not defined, all scripts for the current OS will
-# be copied.
-#
-# The default is the short name of the current machine
-MACHINE = `hostname | sed -e 's/\..*//;s/[0-9]*$$//'`
+# be copied to the run directory when it is created.
+
+MACHINE = `hostname | perl -pe 's/^login\d*\.//; s/\..*//; s/\d+$$//'`
 COMPONENT = SP
 
 rundir:
