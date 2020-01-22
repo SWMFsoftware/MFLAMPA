@@ -10,13 +10,7 @@ default : ${DEFAULT_TARGET}
 include Makefile.def
 include Makefile.conf
 
-
-INSTALLFILES =	src/Makefile.DEPEND srcInterface/Makefile.DEPEND
-
-
-#\
 # Menu of make options
-#/
 help:
 	@echo ' '
 	@echo '  You can "make" the following:'
@@ -40,7 +34,6 @@ help:
 #------------------------------------------------------------------------
 
 install: src/ModSize.f90
-	touch ${INSTALLFILES}
 
 src/ModSize.f90: src/ModSize_orig.f90
 	cp -f src/ModSize_orig.f90 src/ModSize.f90
