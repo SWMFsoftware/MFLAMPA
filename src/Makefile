@@ -4,8 +4,8 @@
 SHELL =/bin/sh
 include ../Makefile.def
 include ../Makefile.conf
-include Makefile.DEPEND
-include Makefile.RULES
+-include Makefile.DEPEND
+-include Makefile.RULES
 
 # Object files included into the library
 OBJECTS = \
