@@ -19,7 +19,7 @@ our @Arguments= @ARGV;
 
 my $config     = "share/Scripts/Config.pl";
 # get util and share
-my $GITCLONE = "git clone"; my $GITDIR = "herot:/GIT/FRAMEWORK/";
+my $GITCLONE = "git clone"; my $GITDIR = "git\@gitlab.umich.edu:swmf_software/";
 
 if (-f $config or -f "../../$config"){
 }else{
