@@ -30,8 +30,6 @@ T			UseDiffusion
 21			RBufferMax
 220			RMax
 
-
-
 #INCLUDE
 MH_data_e20120123/MH_data.H
 
