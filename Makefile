@@ -70,11 +70,6 @@ rundir:
 		ln -s ${COMPONENT}/* .; \
 	fi);
 
-
-#\
-# Cleaning
-#/
-
 clean:  install
 	@(if [ -r "Makefile.conf" ]; then \
 		cd src; make clean; \
@@ -93,9 +88,7 @@ allclean: install
 	fi)
 	rm -f Makefile.def *~
 
-#\
 # Testing
-#/
 
 TESTDIR = run_test
 
