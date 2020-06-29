@@ -31,7 +31,7 @@ help:
 	@echo ' '
 	@echo '    clean         (remove temp files like: *~ *.o *.kmo *.mod *.T *.lst core)'
 	@echo '    distclean     (equivalent to ./Config.pl -uninstall)'
-#------------------------------------------------------------------------
+
 
 install: src/ModSize.f90
 
@@ -92,9 +92,7 @@ allclean: install
 
 TESTDIR = run_test
 
-test:
-	-@(${MAKE} test_mflampa)
-	ls -lt test*.diff
+test: test_mflampa
 
 test_mflampa:
 	@echo "test_mflampa_compile..." > test_mflampa.diff
@@ -113,18 +111,17 @@ test_mflampa_compile:
 test_mflampa_rundir: 
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cd ${TESTDIR}; cp -f Param/PARAM.test PARAM.in
-	cp data/input/test_mflampa/MH_data_e20120123_040000.tgz ${TESTDIR}/
-	cd ${TESTDIR}; tar xzvf MH_data_e20120123_040000.tgz; mv MH_data_e20120123_040000 MH_data_e20120123
+	cd ${TESTDIR}; cp -f Param/PARAM.in.test PARAM.in
+	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
 test_mflampa_run:
-	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee -a runlog
+	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
 
 test_mflampa_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
-		> ${TESTDIR}/SP/IO2/MH_data.out
+		> ${TESTDIR}/SP/IO2/MH_data.outs
 	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/MH_data.outs \
 		Param/TestOutput/test_mflampa/MH_data.ref \
-	${TESTDIR}/SP/IO2/MH_data.out > test_mflampa.diff
-	ls -ltr test_mflampa.diff
-
+		> test_mflampa.diff
+	ls -l test_mflampa.diff
