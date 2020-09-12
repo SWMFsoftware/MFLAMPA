@@ -289,14 +289,39 @@ previous run.
  
 </command>
 
-<command name="MHDATA" alias="READMHDATA" if="$_IsFirstSession">
-	<parameter name="DoReadMhData" type="logical" default="F" />
-
-#DOMHDATA
-T	DoReadMhData
+<command name="READMHDATA" if="$_IsFirstSession">
+  <parameter name="DoReadMhData" type="logical" default="F" />
+  <parameter name="NameInputDir" type="string"/>
 
 
-The default values are shown.
+#READMHDATA
+T              DoReadMhData
+MH_data        NameInputDir
+
+Sets the name of input directory with MHD data
+
+</command>
+
+<command name="MHDATA" if="$_IsFirstSession">
+  <parameter name="TypeFile" type="string" input="select"/>
+		<option name="idl" default="T"/>
+		<option name="ascii"/>
+		<option name="tec"/>
+		<option name="real4"/>
+		<option name="real8"/>
+  <parameter name="nFileRead" type="integer" default="0"/>
+  <parameter name="NameTagFile" type="string" default=""/>
+
+#MHDATA
+idl            TypeFile
+120            nFileRead
+MH_data.lst    NameTagFile
+
+Sets type, number and names of the MHD input files. While running MFLAMPA
+in cinjunction with the MHD code, these parameters are usually saved into
+the header file, which is then included into the MFLAMPA parameter file
+
+
 </command>
 
 
