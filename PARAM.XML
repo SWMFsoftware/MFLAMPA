@@ -7,7 +7,7 @@
 
 List of commands used in the PARAM.in file for MFLAMPA configured as the SP 
 component of the SWMF.
-<command name="COMPDOMAINS">
+<command name="COMPDOMAINS" alias="GRID">
 	<parameter name="RMin" type="real" min="-1" default="-1" />
 	<parameter name="RBufferMin"  type="real" min="-1" default="-1" />
 	<parameter name="RBufferMax"  type="real" min="-1" default="-1" />
@@ -201,10 +201,11 @@ assumed in the input files
 </command>
 
 <command name="COORDSYSTEM" alias="COORDINATESYSTEM" if="$_IsFirstSession">
-	<parameter name="TypeCoordSystem" type="string" input="select"/>
+	<parameter name="TypeCoordSystem" type="string" input="select">
 		<option name="HGR" default="T"/>
 		<option name="HGI"/>
 		<option name="HGC"/>
+	</parameter>
 
 Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 
@@ -248,6 +249,7 @@ T	DoRestart
 
 The default values are shown.
 </command>
+
 <command name="DORUN">
 	<parameter name="DoRun" type="logical" default="F" />
 
@@ -257,6 +259,19 @@ T	DoRun
 
 The default values are shown.
 </command>
+
+<command name="TEST">
+  <parameter name="DoTraceShock" type="logical" default="T" />
+  <parameter name="UseDiffusion" type="logical" default="T" />
+
+#TEST
+T           DoTraceShock
+T           UseDiffusion
+
+
+Used for testing, to disable diffusion or tracing the shock.
+</command>
+
 
 </commandgroup>
 
@@ -303,14 +318,15 @@ Sets the name of input directory with MHD data
 </command>
 
 <command name="MHDATA" if="$_IsFirstSession">
-  <parameter name="TypeFile" type="string" input="select"/>
-		<option name="idl" default="T"/>
-		<option name="ascii"/>
-		<option name="tec"/>
-		<option name="real4"/>
-		<option name="real8"/>
-  <parameter name="nFileRead" type="integer" default="0"/>
-  <parameter name="NameTagFile" type="string" default=""/>
+        <parameter name="TypeFile" type="string" input="select">
+                 <option name="idl" default="T" />
+		 <option name="ascii" />
+		 <option name="tec" />
+		 <option name="real4" />
+		 <option name="real8" />
+	</parameter>
+	<parameter name="nFileRead" type="integer" default="0"/>
+	<parameter name="NameTagFile" type="string" default=""/>
 
 #MHDATA
 idl            TypeFile
@@ -324,6 +340,21 @@ the header file, which is then included into the MFLAMPA parameter file
 
 </command>
 
+<command name="SAVEPLOT">
+  <parameter name="nFilOut" type="integer" default="0"/>
+  <parameter name="StringPlot" type="string"/>
+  
+#SAVEPLOT
+3
+mh1d flux ascii
+mh2d flux spread ascii
+215.0
+mhtime flux ascii
+215.0
+
+Sets the number and type of the plotfiles to save. For several types of plot
+the radius of heliocentric spherical surface on which to plot may be also set.
+</command>
 
 </commandgroup>
 
