@@ -25,7 +25,7 @@ data with SP.
 
 <command name="ORIGIN">
 	<parameter name="ROrigin" type="real" min="1" default="2.5"/>
-	<parameter name="LonMin"  type="real" min="0" max="359" default="0"/>
+	<parameter name="LonMin"  type="real" min="-359" max="359" default="0"/>
 	<parameter name="LatMin"  type="real" min="-90" max="89" default="-70"/>
 	<parameter name="LonMax"  type="real" min="1" max="360" default="360"/>
 	<parameter name="LatMax"  type="real" min="-89" max="90" default="70"/>
@@ -71,6 +71,38 @@ The #STARTTIME command sets the date and time in Greenwich Mean Time
 (GMT) or Universal Time (UT) when the simulation starts.
 
 There is no default value.
+</command>
+
+<command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
+	<parameter name="tSimulation" type="real" min="0" default="0.0" />
+
+#TIMESIMULATION
+1 			SPTime [sec]
+
+The SPTime variable contains the simulation time in seconds
+relative to the initial time set by the #STARTTIME command.
+The #TIMESIMULATION command and SPTime are saved into the restart
+header file, so the simulation can be continued from the same time. 
+This value can be overwritten by a subsequent #TIMESIMULATION command 
+if necessary.
+
+In SWMF the MFLAMPA time is checked against the global SWMF simulation time.
+
+The default value is SPTime=0.
+</command>
+
+<command name="NSTEP" if="$_IsFirstSession" multiple="T">
+	<parameter name="nStep" type="integer" min="0" default="0" />
+
+#NSTEP
+100			nStep
+
+Set nStep for the component. Typically used in the restart.H header file.
+Generally it is not inserted in a PARAM.in file by the user, except
+when the number of steps are reset for extremely long runs, such as
+the operational run at NOAA SWPC, to avoid integer overflow.
+
+The default is nStep=0 as the starting time step with no restart.
 </command>
 
 <command name="BEGIN_COMP" multiple="T" if="$_IsStandAlone">
