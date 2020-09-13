@@ -12,15 +12,15 @@ component of the SWMF.
 	<parameter name="RBufferMin"  type="real" min="-1" default="-1" />
 	<parameter name="RBufferMax"  type="real" min="-1" default="-1" />
 	<parameter name="RMax"  type="real" min="-1" default="-1" />
-Sets the ranges of heliocentric distances for domains in SC and IH exchanging
-data with SP.
-
 #COMPDOMAINS
 1.15            RScMin [Rs]
 19.0            RIhMin [Rs]
 21.0            RScMax [Rs]
 220.0           RIhMax [Rs]
 
+
+Sets the ranges of heliocentric distances for domains in SC and IH exchanging
+data with SP.
 </command>
 
 <command name="ORIGIN">
@@ -30,11 +30,6 @@ data with SP.
 	<parameter name="LonMax"  type="real" min="1" max="360" default="360"/>
 	<parameter name="LatMax"  type="real" min="-89" max="90" default="70"/>
 
-Origin points on the surface R=ROrigin in the intervals of longitude,
-(LonMin,LonMax) and latitude, (LatMin,LatMax). Originating from these
-points are the magnetic field lines traced down from ROrigin to RScMin
-and up from ROrigin to RIhMax. 
- 
 #ORIGIN
 2.5            ROrigin [Rs]
 0.0             LonMin [deg]
@@ -42,6 +37,11 @@ and up from ROrigin to RIhMax.
 360.0           LonMax [deg]
 70.0            LatMax [deg]
 
+Origin points on the surface R=ROrigin in the intervals of longitude,
+(LonMin,LonMax) and latitude, (LatMin,LatMax). Originating from these
+points are the magnetic field lines traced down from ROrigin to RScMin
+and up from ROrigin to RIhMax. 
+ 
 </command>
 <commandgroup name="STAND ALONE MODE">
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -191,13 +191,14 @@ Parameters of the Lagrangian grid used in MFLAMPA
 	<parameter name="nParticleMax" type="integer" default="2000" />
 	<parameter name="nLon"  type="integer" default="20" />
 	<parameter name="nLat"  type="integer" default="20" />
-Check if the configured parameters of the Lagrangian grid match those
-assumed in the input files
 
 #CHECKGRIDSIZE
  1000     nParticleMax
     4     nLon
     4     nLat
+
+Check if the configured parameters of the Lagrangian grid match those
+assumed in the input files
 </command>
 
 <command name="COORDSYSTEM" alias="COORDINATESYSTEM" if="$_IsFirstSession">
@@ -207,10 +208,10 @@ assumed in the input files
 		<option name="HGC"/>
 	</parameter>
 
-Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
-
 #COORDSYSTEM
 HGI       TypeCoordSystem
+
+Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 
 </command>
 </commandgroup>
@@ -225,6 +226,8 @@ HGI       TypeCoordSystem
 5.0     SpectralIndex
 1.0     Efficency
 
+Please send an email to Igor Sokolov for more information.
+
 </command>
 
 <command name="CFL">
@@ -232,6 +235,8 @@ HGI       TypeCoordSystem
 
 #CFL
 1.0     Cfl
+
+Please send an email to Igor Sokolov for more information.
 
 </command>
 	
@@ -246,8 +251,9 @@ HGI       TypeCoordSystem
 #RESTART
 T	DoRestart
 
+Please send an email to Igor Sokolov for more information.
 
-The default values are shown.
+The default values are shown. ??? Sure ???
 </command>
 
 <command name="DORUN">
@@ -256,6 +262,7 @@ The default values are shown.
 #DORUN
 T	DoRun
 
+Please send an email to Igor Sokolov for more information.
 
 The default values are shown.
 </command>
@@ -268,10 +275,8 @@ The default values are shown.
 T           DoTraceShock
 T           UseDiffusion
 
-
 Used for testing, to disable diffusion or tracing the shock.
 </command>
-
 
 </commandgroup>
 
@@ -308,12 +313,11 @@ previous run.
   <parameter name="DoReadMhData" type="logical" default="F" />
   <parameter name="NameInputDir" type="string"/>
 
-
 #READMHDATA
 T              DoReadMhData
 MH_data        NameInputDir
 
-Sets the name of input directory with MHD data
+Sets the name of input directory with MHD data.
 
 </command>
 
@@ -337,23 +341,24 @@ Sets type, number and names of the MHD input files. While running MFLAMPA
 in cinjunction with the MHD code, these parameters are usually saved into
 the header file, which is then included into the MFLAMPA parameter file
 
-
 </command>
 
 <command name="SAVEPLOT">
-  <parameter name="nFilOut" type="integer" default="0"/>
+  <parameter name="nFileOut" type="integer" default="0"/>
   <parameter name="StringPlot" type="string"/>
   
 #SAVEPLOT
-3
-mh1d flux ascii
-mh2d flux spread ascii
-215.0
-mhtime flux ascii
-215.0
+3                             nFileOut
+mh1d flux ascii               StringPlot
+mh2d flux spread ascii        StringPlot
+215.0                         Undocumented parameter
+mhtime flux ascii             StringPlot
+215.0                         Undocumented parameter
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
+
+Please send an email to Igor Sokolov for more information on this command.
 </command>
 
 </commandgroup>
