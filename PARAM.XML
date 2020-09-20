@@ -246,6 +246,18 @@ HGI       TypeCoordSystem
 Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 
 </command>
+<command name="MOMENTUMGRID" if="$_IsFirstSession">
+  <parameter name ="EnergyMin" type="real" />
+  <parameter name ="EnergyMax" type="real" />
+  <parameter name ="nP" type="integer" />
+
+#MOMENTUMGRID
+1.0                   EnergyMin
+1000.0                EnergyMax
+100                   nP
+       
+Read energy range and a number of energy bins
+</command>
 </commandgroup>
 
 <commandgroup name="ADVANCE">
@@ -374,7 +386,15 @@ in cinjunction with the MHD code, these parameters are usually saved into
 the header file, which is then included into the MFLAMPA parameter file
 
 </command>
+<command name="NTAG">
+  <parameter name="nTag" type="integer" default="0" />
 
+#NTAG
+120            nTag  
+
+The number of different time-line tags of the MH_data files.
+
+</command>
 <command name="SAVEPLOT">
   <parameter name="nFileOut" type="integer" default="0"/>
   <parameter name="StringPlot" type="string"/>
