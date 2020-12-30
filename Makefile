@@ -79,14 +79,10 @@ clean:  install
 distclean: 
 	./Config.pl -uninstall
 
-allclean: install
-	@(if [ -r "Makefile.conf" ]; then \
-		cd src; $(MAKE) distclean; \
-		cd ../srcInterface; $(MAKE) distclean; \
-		cd ../Doc/Tex; $(MAKE) cleanpdf; \
-		rm -f ../../Makefile.conf; \
-	fi)
-	rm -f Makefile.def *~
+allclean:
+	cd src; $(MAKE) distclean
+	cd srcInterface; $(MAKE) distclean
+	cd Doc/Tex; $(MAKE) cleanpdf
 
 # Testing
 
