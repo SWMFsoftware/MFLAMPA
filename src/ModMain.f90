@@ -68,9 +68,9 @@ module SP_ModMain
 
   ! Methods and variables from ModGrid
   public:: &
-       LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_, Ux_, Uz_, T_, R_, &
+       LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_, Ux_, Uz_, T_, R_,   &
        Wave1_, Wave2_, Length_, nBlock, nParticle_B, Shock_,   &
-       ShockOld_, RScMin, RIhMin, RScMax, RIhMax,          &
+       ShockOld_, RScMin, RIhMin, RScMax, RIhMax,              &
        iShock_IB, iNode_B, State_VIB, FootPoint_VB
 
   ! Methods and variables from ModReadMhData
@@ -229,8 +229,7 @@ contains
   subroutine initialize
     use SP_ModAngularSpread,ONLY: init_spread     => init
     use SP_ModDistribution, ONLY: init_dist       => init
-    use SP_ModGrid,         ONLY: init_grid       => init, iNodeTest, &
-         iParticleTest, iPTest
+    use SP_ModGrid,         ONLY: iNodeTest, iParticleTest, iPTest
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
@@ -240,7 +239,6 @@ contains
     ! initialize the model
     character(LEN=*),parameter:: NameSub='SP:initialize'
     !--------------------------------------------------------------------
-    call init_grid
     call init_unit
     call init_dist
     call init_plot

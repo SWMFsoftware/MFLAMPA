@@ -8,13 +8,14 @@ program MFLAMPA
   use ModUtilities, ONLY: remove_file, touch_file
   use SP_ModMain, ONLY: &
        nTiming, IsLastRead, IsStandAlone, &
-       iIter, SPTime, TimeMax, nIterMax, &
-       SP_read_param => read_param, &
-       SP_check      => check, &
-       SP_initialize => initialize, &
+       iIter, SPTime, TimeMax, nIterMax,  &
+       SP_read_param => read_param,       &
+       SP_check      => check,            &
+       SP_initialize => initialize,       &
        SP_run        => run, &
        SP_finalize   => finalize
-
+  use SP_ModGrid, ONLY: &
+       init_stand_alone, init_grid=>init
   use ModReadParam, ONLY: read_file, read_init
   use ModMpi
   
@@ -73,6 +74,8 @@ program MFLAMPA
         call timing_start('setup')
      end if
      if(IsFirstSession)then
+        call init_grid
+        call init_stand_alone
         call SP_initialize
      end if
      if(IsFirstSession)then

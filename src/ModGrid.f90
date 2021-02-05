@@ -17,21 +17,22 @@ module SP_ModGrid
   !Public members:
   public:: read_param          !read parameters related to grid 
   public:: init                !Initialize arrays on the grid
+  public:: init_stand_alone    !Initialize arrays on the grid
   public:: copy_old_state      !save old arrays before getting new ones  
   public:: get_other_state_var !Auxiliary components of state vector 
   public:: search_line         !find particle index corresponding to radius
  
   ! Coordinate system and geometry
   character(len=3), public :: TypeCoordSystem = 'HGR'
-  !\
+  !
   ! Grid info
-  !/
+  !
   ! Number of blocks on this processor
   integer, public              :: nBlock
   ! Number of particles per block (line):
   integer, public, allocatable :: nParticle_B(:)
-  !/
-  !\
+  !
+  !
   ! angular grid at origin surface
   integer, public :: nLon  = 4
   integer, public :: nLat  = 4
@@ -44,53 +45,59 @@ module SP_ModGrid
   integer, public, allocatable:: iNode_II(:,:)
   !inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
   public :: get_node_indexes
-  !/
-  !\
+  !
+  !
   ! Node number based on the local block number
   ! 1st index - block number
   integer, public, allocatable:: iNode_B(:)
-  !/
-  !\
+  !
+  !
   ! Various house-keeping information about the node/line;
   ! 1st index - identification of info field
   ! 2nd index - node number / block number
-  !/
-  !\
+  !
+  !
   !Proc_ and Block_ number, for a given node:
   integer, public, parameter:: &
        Proc_  = 1, & ! Processor that has this line/node
        Block_ = 2    ! Block that has this line/node
     integer, public, allocatable:: iGridGlobal_IA(:,:)
-  !/
-  !\
+  !
+  !
   ! Array for current and present location of shock wave
   integer, public, parameter:: nShockParam = 2,  &
        Shock_   = 1, & ! Current location of a shock wave
        ShockOld_= 2    ! Old location of a shock wave
   integer, public, allocatable:: iShock_IB(:,:)
   integer, public, parameter:: NoShock_ = 1
-  !/ 
-  !\
+  ! 
+  !
   ! Information about the magnetic field line foot point:
   ! the Lagrangian (0) and Cartesian (1:3) coordinates, and
   integer, public, parameter :: &! init length of segment 1-2: 
        Length_ = 4               ! control appending  new particles 
   real, public, allocatable:: FootPoint_VB(:,:)
-  !/
-  !\
+  !
+  !
   ! Magnetic flux (absolute value) associated with lines
   real, public, allocatable:: MagneticFluxAbs_B(:)
-  !/
-  !\
+  !
+  !
   ! State vector;
   ! 1st index - identification of variable
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
-  real, public, allocatable:: State_VIB(:,:,:)
-
+  !
+  real, public, pointer:: State_VIB(:,:,:)
+  !
+  !State vector is a pointer, which is joined to a target array
+  !For stand alone version the target array is allocated here
+  !
+  real, allocatable, target:: StandAloneState_VIB(:,:,:)
+  
   ! Number of variables in the state vector and the identifications
   integer, public, parameter :: nMHData = 13, nVar = 21,          &
-       !\
+       !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
        X_          = 1, & !                         |read in  |in copy_ 
        Y_          = 2, & ! Cartesian coordinates   |restart  |old_stat
@@ -104,9 +111,9 @@ module SP_ModGrid
        By_         =10, & ! Background magnetic field         |received 
        Bz_         =11, & !                                   |from
        Wave1_      =12, & !\                                  |coupler
-       Wave2_      =13, & ! Alfven wave turbulence            v
-       !/          
-       !\          
+       Wave2_      =13, & !-Alfven wave turbulence            v
+       !          
+       !          
        D_          =14, & ! Distance to the next particle  ^derived from
        S_          =15, & ! Distance from the foot point   |MHdata in
        R_          =16, & ! Heliocentric distance          |get_other_
@@ -115,8 +122,8 @@ module SP_ModGrid
        DLogRho_    =19, & ! Dln(Rho), i.e. -div(U) * Dt
        RhoOld_     =20, & ! Background plasma density      !\copy_
        BOld_       =21    ! Magnitude of magnetic field    !/old_state
-  !/
-  !\
+  !
+  !
   ! variable names
   character(len=10), public, parameter:: NameVar_V(LagrID_:nVar)&
         = (/'LagrID    ', &
@@ -141,7 +148,7 @@ module SP_ModGrid
        'DLogRho   ', &
        'RhoOld    ', &
        'BOld      ' /)
-  !/
+  !
   logical:: DoInit = .true.
 
   ! whether to use smoothing of length along lines,
@@ -213,20 +220,20 @@ contains
     !-------------------------------------------------------------
     if(.not.DoInit)RETURN
     DoInit = .false.
-    !\
+    !
     ! distribute nodes between processors
-    !/
+    !
     if(nNode < nProc)call CON_stop(NameSub//&
          ': There are more processors than field lines')
     nBlock = ((iProc+1)*nNode) / nProc - (iProc*nNode) / nProc
-    !\
+    !
     ! check consistency
-    !/
+    !
     if(nLat <= 0 .or. nLon <= 0)&
          call CON_stop(NameSub//': Origin surface grid is invalid')
-    !\
+    !
     ! allocate data and grid containers
-    !/
+    !
     allocate(iNode_II(nLon, nLat), stat=iError)
     call check_allocate(iError, NameSub//'iNode_II')
     allocate(iNode_B(nBlock), stat=iError)
@@ -241,13 +248,9 @@ contains
     call check_allocate(iError, NameSub//'FootPoint_VB')
     allocate(MagneticFluxAbs_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
-    allocate(State_VIB(LagrID_:nVar,1:nParticleMax,nBlock), &
-         stat=iError)
-    call check_allocate(iError, NameSub//'State_VIB')
-
-    !\
+    !
     ! fill grid containers
-    !/
+    !
     iBlock = 1; iProcNode = 0
     do iLat = 1, nLat
        do iLon = 1, nLon
@@ -262,43 +265,57 @@ contains
           iGridGlobal_IA(Proc_,   iNode)  = iProcNode
           iGridGlobal_IA(Block_,  iNode)  = iBlock
           if(iNode == ((iProcNode+1)*nNode)/nProc)then
-             !\
+             !
              ! This was the last node on the iProcNode
-             !/
+             !
              iBlock = 1; iProcNode = iProcNode + 1
           else
              iBlock = iBlock + 1
           end if
        end do
     end do
-    !\
+    !
     ! reset and fill data containers
-    !/
-    State_VIB = -1; State_VIB(1:nMHData,:,:) = 0.0
+    !
     FootPoint_VB = -1; MagneticFluxAbs_B = -1
-    
-    !\
+  end subroutine init
+  !================================================================
+  subroutine init_stand_alone
+    ! allocate the grid used in this model
+    use ModUtilities,      ONLY: check_allocate
+    integer :: iParticle, iError
+    character(LEN=*),parameter:: NameSub='SP:init_stand_alone'
+    !--------------------------------------------------------------
+    ! Allocate if stand alone and associate here the State pointer
+    allocate(StandAloneState_VIB( &
+         LagrID_:nVar,1:nParticleMax,nBlock), &
+         stat=iError)
+    call check_allocate(iError, NameSub//'StandAloneState_VIB')
+    State_VIB=>StandAloneState_VIB
+    !
+    State_VIB = -1; State_VIB(1:nMHData,:,:) = 0.0
+    !
     ! reset lagrangian ids
-    !/
+    !
     do iParticle = 1, nParticleMax
        State_VIB(LagrID_, iParticle, 1:nBlock) = real(iParticle)
     end do
-  end subroutine init
+  end subroutine init_stand_alone
   !================================================================
   subroutine get_node_indexes(iNodeIn, iLonOut, iLatOut)
     ! return angular grid's indexes corresponding to this node
     integer, intent(in) :: iNodeIn
     integer, intent(out):: iLonOut
     integer, intent(out):: iLatOut
-    !---------------------------------------------------------
+    !--------------------------------------------------------------
     iLatOut = 1 + (iNodeIn-1) / nLon
     iLonOut = iNodeIn - nLon * (iLatOut-1)
   end subroutine get_node_indexes
-  !===================
+  !================================================================
   subroutine copy_old_state
     ! copy current state to old state for all field lines
     integer:: iEnd, iBlock
-    !----------------------------------------------------------
+    !--------------------------------------------------------------
     do iBlock = 1, nBlock
        iEnd   = nParticle_B(  iBlock)
        iShock_IB(ShockOld_,iBlock) = iShock_IB(Shock_, iBlock)
@@ -334,13 +351,13 @@ contains
              ! nSmooth particles are aggeregated into single effective one, 
              ! find length increment between effective particles are used
              ! to find length increment between regular particles
-             iAux1 = nSmooth * max(1, &
-                  min(iParticle/nSmooth,nParticle_B(iBlock)/nSmooth-1))
+             iAux1 = nSmooth * max(1, min(&
+                  iParticle/nSmooth,nParticle_B(iBlock)/nSmooth-1))
              iAux2 = iAux1 + nSmooth
-             XyzAux1_D = &
-                  sum(State_VIB(X_:Z_,iAux1-nSmooth+1:iAux1,iBlock),DIM=2)/nSmooth
-             XyzAux2_D = &
-                  sum(State_VIB(X_:Z_,iAux2-nSmooth+1:iAux2,iBlock),DIM=2)/nSmooth
+             XyzAux1_D = sum(State_VIB(&
+                  X_:Z_,iAux1-nSmooth+1:iAux1,iBlock),DIM=2)/nSmooth
+             XyzAux2_D = sum(State_VIB(&
+                  X_:Z_,iAux2-nSmooth+1:iAux2,iBlock),DIM=2)/nSmooth
              State_VIB(D_, iParticle, iBlock) = &
                   sqrt(sum((XyzAux2_D-XyzAux1_D)**2)) / nSmooth
           end if

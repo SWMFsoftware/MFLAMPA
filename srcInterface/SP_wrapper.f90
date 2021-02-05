@@ -124,6 +124,8 @@ contains
   !========================================================================
   subroutine SP_init_session(iSession,TimeSimulation)
     use SP_ModMain, ONLY: initialize
+    use SP_ModGrid, ONLY: init_grid=>init
+    use CON_mflampa,ONLY: set_state_pointer
     integer,  intent(in) :: iSession         ! session number (starting from 1)
     real,     intent(in) :: TimeSimulation   ! seconds from start time
 
@@ -132,6 +134,9 @@ contains
     if(IsInitialized)&
          RETURN
     IsInitialized = .true.
+    call init_grid
+    nullify(State_VIB)
+    call set_state_pointer(State_VIB, nBlock, nParticleMax)
     call initialize
     allocate(iOffset_B(nBlock)); iOffset_B = 0
   end subroutine SP_init_session
