@@ -1,16 +1,16 @@
-!  Copyright (C) 2002 Regents of the University of Michigan, 
-!  portions used with permission 
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!==============================================================================
 module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
-  use ModNumConst,ONLY: cPi
+  use ModNumConst, ONLY: cPi
   use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
   use SP_ModSize, ONLY: nParticleMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
-  use SP_ModGrid, ONLY: State_VIB, iShock_IB,   R_, x_, y_, z_, iNode_B,      &
-       Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B 
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
+       iNode_B,      &
+       Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
@@ -20,49 +20,38 @@ module SP_ModAdvance
   implicit none
   SAVE
   PRIVATE ! except
-  !Public members:
-  public:: read_param  !read injection parameters
-  public:: advance     !Advance solution Distribution_IIB
-  !\
+  ! Public members:
+  public:: read_param  ! read injection parameters
+  public:: advance     ! Advance solution Distribution_IIB
   !||||||||||||||Boundary condition at the injection energy!!!!!!
   ! Injection efficiency and assumed spectral index with the energy
-  ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in 
+  ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real:: CoefInj = 1.0, SpectralIndex = 5.0
 
-  !/
-  !\
-  !!!!!!!!!!!!!!!!!!!!!!!!!Local parameters!!!!!!!!!!!!!!!
-  real:: CFL=0.9        !Controls the maximum allowed time step
-  !\
+  !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
+  real:: CFL=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
-  !/
-  !\
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMFPUpstream = .false.
   real    :: MeanFreePath0InAu = 1.0
-  !/
-  !\
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
-  !/
 
   logical, public :: DoTestDiffusion = .false.
 
-  !\
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
   real:: ScaleTurbulenceSI = 0.03 * cAu
   integer:: iScaleTurbulenceType
   integer, parameter:: Const_ = 0, Linear_ = 1
-  !/
 
 contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
-    character(len=*), intent(in):: NameCommand ! From PARAM.in  
+    character(len=*), intent(in):: NameCommand ! From PARAM.in
     character(len=8) :: StringScaleTurbulenceType
-    character(len=*), parameter :: NameSub='SP:read_param_adv'
-    !---------------------------------------------
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#INJECTION')
        call read_var('SpectralIndex',SpectralIndex)
@@ -94,9 +83,9 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine advance(TimeLimit)
-    ! advance the solution of the diffusive kinetic equation:               
+    ! advance the solution of the diffusive kinetic equation:
     !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
-    ! with accounting for diffusion and Fermi acceleration 
+    ! with accounting for diffusion and Fermi acceleration
     ! from SPTime to TimeLimit
     ! Prototype: FLAMPA/src/SP_main, case("RUN"), Roussev&Sokolov2008
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
@@ -110,46 +99,37 @@ contains
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
          iPTest, iParticleTest, iNodeTest
     real, intent(in):: TimeLimit
-    !\
     ! Loop variables
     integer  :: iP, iParticle, iBlock
-    !/
-    !\
-    !For a given block: nParticle_B, iShock_IB:
+    ! For a given block: nParticle_B, iShock_IB:
     integer  :: iEnd, iShock, iShockOld
-    !/
-    !\
     ! Upper limit and variable for the Loop which makes
     ! a time step so short that the shock wave passes
     ! a single grid interval per a progress step:
     integer  :: iProgress, nProgress
-    ! Upper limit and variable for the loop which makes a 
-    ! time step so short that the CFL for the (explicit) 
-    ! advection is less that CFL declared abobe. 
+    ! Upper limit and variable for the loop which makes a
+    ! time step so short that the CFL for the (explicit)
+    ! advection is less that CFL declared abobe.
     integer  :: iStep, nStep
-    !/
-    !\
     ! coefficient to interpolate  "old" and "new"
     real     :: Alpha
-    !/
-    !\
     ! Lower limit to floor the spatial diffusion coefficient For a
-    ! given spatial and temporal resolution, the value of the  
-    ! diffusion coefficient should be artificially increased to get       
-    ! the diffusion length to be larger than the shock front width, 
+    ! given spatial and temporal resolution, the value of the
+    ! diffusion coefficient should be artificially increased to get
+    ! the diffusion length to be larger than the shock front width,
     ! which even for the steepened shock is as wide as a mesh size
-    ! of the Largangian grid, State_VIB(D_,:,:)*RSun. In this way, 
-    ! the Lagrangian grid resolution is sufficient to resolve a 
-    ! precursor in the upstream distribution of 
-    ! DiffCoeffMin=0 (default value), we do NOT enhance   
-    ! the diffusion coefficient! Physically, DiffCoeffMin 
-    ! should be given by the product of shock wave speed  
-    ! and local grid spacing. 
+    ! of the Largangian grid, State_VIB(D_,:,:)*RSun. In this way,
+    ! the Lagrangian grid resolution is sufficient to resolve a
+    ! precursor in the upstream distribution of
+    ! DiffCoeffMin=0 (default value), we do NOT enhance
+    ! the diffusion coefficient! Physically, DiffCoeffMin
+    ! should be given by the product of shock wave speed
+    ! and local grid spacing.
     real, parameter::  DiffCoeffMinSI =1.0E+04
     ! Full difference between DataInputTime and SPTime
     real      :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
-    real      :: DtProgress 
+    real      :: DtProgress
     ! Time step in the STEP Loop, DtProgress/nStep
     real      :: Dt
     real      :: MachAlfven
@@ -161,19 +141,17 @@ contains
          RhoSI_I, RhoOldSI_I, nSI_I, uSI_I, BSI_I, BOldSI_I, &
          n_I ! n_I is in the IO unit
 
-    ! Lagrangian derivatives 
+    ! Lagrangian derivatives
     real, dimension(1:nParticleMax):: DLogRho_I, FermiFirst_I
 
-    !\
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter =BSI in the cell center
     ! DInner = DiffusionCoefficient/BSI at the face
     real, dimension(1:nParticleMax):: &
          DOuterSI_I, DInnerSI_I, CoefDInnerSI_I
-    !/
 
-    character(len=*), parameter:: NameSub = 'SP_advance'
+    character(len=*), parameter:: NameSub = 'advance'
     !--------------------------------------------------------------------------
     ! the full time interval
     DtFull = TimeLimit - SPTime
@@ -184,15 +162,15 @@ contains
        iEnd   = nParticle_B( iBlock)
 
        ! Various data along the line in SI units.
-       ! The IO units of the state vectors could be seen in ModUnit, the 
+       ! The IO units of the state vectors could be seen in ModUnit, the
        ! summary is: Length is in the unit of Rs, Rho is in the unit of
        ! amu/m^3, temperature is in the unit of kinetic energy, all others
        ! are in SI units. So to convert the IO units, only need three
        ! conversion factors are needed:
        ! UnitX_, UnitRho_, UnitEnergy_
-       XyzSI_DI(x_,1:iEnd) = State_VIB(x_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
-       XyzSI_DI(y_,1:iEnd) = State_VIB(y_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
-       XyzSI_DI(z_,1:iEnd) = State_VIB(z_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       XyzSI_DI(x_,1:iEnd) = MhData_VIB(x_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       XyzSI_DI(y_,1:iEnd) = MhData_VIB(y_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       XyzSI_DI(z_,1:iEnd) = MhData_VIB(z_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
        DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
        RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
        uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iBlock)
@@ -220,11 +198,11 @@ contains
           Alpha = real(iProgress) / real(nProgress)
 
           ! Recall that State_VIB(Rho_/RhoOld_) is in the unit of amu/m^3.
-          ! And we only consider protons, so in principle, 
+          ! And we only consider protons, so in principle,
           ! State_VIB(Rho_/RhoOld_) gives number density in the SI unit.
           ! nSI is needed to set up the distribution at the injection.
           n_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iBlock) +Alpha *&
-               (State_VIB(Rho_,  1:iEnd,iBlock) - &
+               (MhData_VIB(Rho_,  1:iEnd,iBlock) - &
                State_VIB(RhoOld_,1:iEnd,iBlock))
 
           nSI_I(1:iEnd)   = n_I(1:iEnd)
@@ -247,13 +225,13 @@ contains
              MachAlfven = 1.0
           end if
 
-          ! 1st order Fermi acceleration is responsible for advection 
+          ! 1st order Fermi acceleration is responsible for advection
           ! in momentum space
           ! first order Fermi acceleration for the current line, dimensionless
           FermiFirst_I(1:iEnd) = DLogRho_I(1:iEnd) / (3*DLogP)
 
           if(UseTurbulentSpectrum)then
-             !Calculate the Alfven speed
+             ! Calculate the Alfven speed
              if (DoInitSpectrum) call init_spectrum(iEnd,              &
                   XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
                   dLogP, iShock, CoefInj, MachAlfven)
@@ -262,7 +240,7 @@ contains
              !      RhoSI_I(1:iEnd),  RhoOldSI_I(1:iEnd),    &
              !      XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
              !      DLogP, DtProgress, DtReduction)
-               
+
              ! nStep = 1+int(max(DtReduction,                &
              !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
              nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
@@ -270,9 +248,7 @@ contains
              nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
           end if
 
-          !\
           ! Check if the number of time steps is positive:
-          !/
           if(nStep < 1) then
              if(UseTurbulentSpectrum) &
                   write(*,*) ' DtReduction               =', DtReduction
@@ -307,7 +283,7 @@ contains
                    write(*,*) Distribution_IIB(0:nP+1,iParticle,iBlock)
                    call CON_stop(NameSub)
                 end if
-                
+
                 call advance_log_advection(&
                      FermiFirst_I(iParticle), nP, 1, 1,        &
                      Distribution_IIB(0:nP+1,iParticle,iBlock),&
@@ -333,15 +309,14 @@ contains
                            BSI_I(iParticle)
                    end do
                 else
-                   ! Add v (= p*c^2/E_total in the relativistic case) 
+                   ! Add v (= p*c^2/E_total in the relativistic case)
                    ! and (p)^(1/3)
                    DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
                         *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
-                   
+
                    DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
                         DiffCoeffMinSI/DOuterSI_I(1:iEnd))
                 end if
-
 
                 if (DoTestDiffusion .and. iNode_B(iBlock) == iNodeTest) then
                    if (iP == iPTest) then
@@ -369,14 +344,16 @@ contains
        end do PROGRESS
     end do BLOCK
   contains
+    !==========================================================================
     function mach_alfven() result(MachAlfven)
       ! alfvenic mach number for the current line
       real:: MachAlfven
 
       real:: SpeedAlfvenUpstream, SpeedUpstream
-      !------------------------------------------------------------------------
+
       ! speed upstream is relative to the shock:
       ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
+      !------------------------------------------------------------------------
       SpeedUpstream = RhoSI_I(iShock+1-nWidth)*&
            (uSI_I(  iShock + 1 - nWidth) - uSI_I(  iShock + nWidth))/    &
            (RhoSI_I(iShock + 1 - nWidth) - RhoSI_I(iShock + nWidth))
@@ -397,9 +374,9 @@ contains
       DLogRhoExcessIntegral = 0.0
       do iParticle = iShock - nWidth, iShock + nWidth - 1
          DLogRhoExcess = 0.5*(DLogRho_I(iParticle) + DLogRho_I(iParticle+1)) &
-              - DLogRhoBackground !D log(rho)/Dt*\Delta t = -\div U*\Delta t
+              - DLogRhoBackground ! D log(rho)/Dt*\Delta t = -\div U*\Delta t
          if(DLogRhoExcess>0) then
-            !This is a jump in velocity accross the shock wave * \Delta t
+            ! This is a jump in velocity accross the shock wave * \Delta t
             DLogRhoExcessIntegral = DLogRhoExcessIntegral + &
                  DLogRhoExcess*DsSI_I(iParticle)
          end if
@@ -407,12 +384,12 @@ contains
 
       ! check for zero excess
       if(DLogRhoExcessIntegral == 0.0)RETURN
-      ! nullify excess  within the smoothed shock 
+      ! nullify excess  within the smoothed shock
       DLogRho_I(iShock-nWidth:iShock+nWidth) = min(&
            DLogRhoBackground, &
            DLogRho_I(iShock-nWidth:iShock+nWidth))
       ! ...and concetrate it at the shock front, applying the whole jump
-      ! in the velocity at a single grid point 
+      ! in the velocity at a single grid point
       DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral/&
            DsSI_I(iParticle)
       ! also, sharpen the magnetic field magnitude
@@ -426,31 +403,28 @@ contains
       ! set diffusion coefficient for the current line
       real, dimension(1:nParticleMax):: ScaleSI_I
       real, parameter:: cCoef = 81./7/cPi/(2*cPi)**(2./3)
+
       !------------------------------------------------------------------------
       DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
 
-      if(UseTurbulentSpectrum) return
+      if(UseTurbulentSpectrum) RETURN
 
-      !\
       ! precompute scale of turbulence along the line
-      !/
       select case(iScaleTurbulenceType)
       case(Const_)
          ScaleSI_I(1:iEnd) = ScaleTurbulenceSI
       case(Linear_)
          ScaleSI_I(1:iEnd) = ScaleTurbulenceSI*RadiusSI_I(1:iEnd)/cAU
       end select
-      !\
-      ! Compute the diffusion coefficient without the contribution of 
-      ! v (velocity) and p (momentum), as v and p are different for 
+      ! Compute the diffusion coefficient without the contribution of
+      ! v (velocity) and p (momentum), as v and p are different for
       ! different iP
-      !/
       if(UseFixedMFPUpstream) then
          ! diffusion is different up- and down-stream
          ! Sokolov et al. 2004, paragraphs before and after eq (4)
          where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
-            ! upstream: reset the diffusion coefficient to 
-            ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3) 
+            ! upstream: reset the diffusion coefficient to
+            ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3)
             ! see Li et al. (2003), doi:10.1029/2002JA009666
             ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
             ! 1/AU cancels with unit of Lambda0,no special attention needed;
@@ -460,24 +434,22 @@ contains
                  *(cLightSpeed/cGEV)**(1.0/3)
          elsewhere
             CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-                 (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+                 (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
                  (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
          end where
       else    ! .not.UseFixedMFPUpstream
-         !\
-         ! Sokolov et al., 2004: eq (4), 
+         ! Sokolov et al., 2004: eq (4),
          ! note: Momentum = TotalEnergy * Vel / C**2
          ! Gyroradius = cGyroRadius * momentum / |B|
-         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B| 
+         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B|
          ! ------------------------------------------------------
          ! effective level of turbulence is different for different momenta:
          ! (\delta B)**2 \propto Gyroradius^(1/3)
-         !/
          CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-              (cMu*sum(State_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+              (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
               (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
       end if
-      
+
       ! Add 1/B as the actual diffusion is D/B
       CoefDInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
 
@@ -493,15 +465,16 @@ contains
       ! LOCAL VARIABLES:
       integer:: iParticle     ! loop variable
       real   :: MomentumSI    ! Momentum for the thermal energy k_BTi
+
       !------------------------------------------------------------------------
       do iParticle = 1, iEnd
          ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
          ! f = CoefInj/8/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
          !   = CoefInj/8/pi * N / p^3 * (p/p_inj)^5
-         ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic 
+         ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic
          ! temperature.
          MomentumSI = kinetic_energy_to_momentum(                  &
-              State_VIB(T_,iParticle,iBlock)*IO2SI_I(UnitEnergy_))
+              MHData_VIB(T_,iParticle,iBlock)*IO2SI_I(UnitEnergy_))
          Distribution_IIB(0,iParticle,iBlock) =                    &
               CoefInj*1.0/(4*(SpectralIndex-3)*cPi)                &
               * nSI_I(iParticle)/MomentumSI**3                     &
@@ -512,3 +485,4 @@ contains
   end subroutine advance
   !============================================================================
 end module SP_ModAdvance
+!==============================================================================

@@ -1,27 +1,26 @@
-!  Copyright (C) 2002 Regents of the University of Michigan, 
-!  portions used with permission 
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!==================================================================
 module SP_ModGrid
-  !Multi-line grid, D.Borovikov & I.Sokolov, Dec,17, 2017.
-  !Dec.23 2017: exclude fluxes from the state vector.
-  !Dec.25 2017: standard init and read_param
-  !Dec.25 2017: rename nVarRead=>nMHData, add NoShock_ param.
+  ! Multi-line grid, D.Borovikov & I.Sokolov, Dec,17, 2017.
+  ! Dec.23 2017: exclude fluxes from the state vector.
+  ! Dec.25 2017: standard init and read_param
+  ! Dec.25 2017: rename nVarRead=>nMHData, add NoShock_ param.
   use SP_ModSize, ONLY: nDim, nParticleMax
   use SP_ModProc, ONLY: iProc
-  use ModNumConst,ONLY: cTwoPi, cPi
+  use ModNumConst, ONLY: cTwoPi, cPi
   implicit none
   SAVE
 
   private ! except
-  !Public members:
-  public:: read_param          !read parameters related to grid 
-  public:: init                !Initialize arrays on the grid
-  public:: init_stand_alone    !Initialize arrays on the grid
-  public:: copy_old_state      !save old arrays before getting new ones  
-  public:: get_other_state_var !Auxiliary components of state vector 
-  public:: search_line         !find particle index corresponding to radius
- 
+  ! Public members:
+  public:: read_param          ! read parameters related to grid
+  public:: init                ! Initialize arrays on the grid
+  public:: init_stand_alone    ! Initialize arrays on the grid
+  public:: copy_old_state      ! save old arrays before getting new ones
+  public:: get_other_state_var ! Auxiliary components of state vector
+  public:: search_line         ! find particle index corresponding to radius
+
   ! Coordinate system and geometry
   character(len=3), public :: TypeCoordSystem = 'HGR'
   !
@@ -38,12 +37,12 @@ module SP_ModGrid
   integer, public :: nLat  = 4
   integer, public :: nNode = 16
 
-  ! Node number based on the field line identified by 
+  ! Node number based on the field line identified by
   ! 2 angular grid indices, latitude and longitude;
   ! 1st index - longitude index
   ! 2nd index - latitude index
   integer, public, allocatable:: iNode_II(:,:)
-  !inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
+  ! inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
   public :: get_node_indexes
   !
   !
@@ -57,7 +56,7 @@ module SP_ModGrid
   ! 2nd index - node number / block number
   !
   !
-  !Proc_ and Block_ number, for a given node:
+  ! Proc_ and Block_ number, for a given node:
   integer, public, parameter:: &
        Proc_  = 1, & ! Processor that has this line/node
        Block_ = 2    ! Block that has this line/node
@@ -70,12 +69,12 @@ module SP_ModGrid
        ShockOld_= 2    ! Old location of a shock wave
   integer, public, allocatable:: iShock_IB(:,:)
   integer, public, parameter:: NoShock_ = 1
-  ! 
+  !
   !
   ! Information about the magnetic field line foot point:
   ! the Lagrangian (0) and Cartesian (1:3) coordinates, and
-  integer, public, parameter :: &! init length of segment 1-2: 
-       Length_ = 4               ! control appending  new particles 
+  integer, public, parameter :: &! init length of segment 1-2:
+       Length_ = 4               ! control appending  new particles
   real, public, allocatable:: FootPoint_VB(:,:)
   !
   !
@@ -83,37 +82,45 @@ module SP_ModGrid
   real, public, allocatable:: MagneticFluxAbs_B(:)
   !
   !
-  ! State vector;
-  ! 1st index - identification of variable
+  ! MHD state vector;
+  ! 1st index - identification of variable (LagrID_:Wave2_)
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
   !
-  real, public, pointer:: State_VIB(:,:,:)
+  real, public, pointer     :: MHData_VIB(:,:,:)
+
+  ! Aux state vector;
+  ! 1st index - identification of variable (LagrID_:Wave2_)
+  ! 2nd index - particle index along the field line
+  ! 3rd index - local block number
   !
-  !State vector is a pointer, which is joined to a target array
-  !For stand alone version the target array is allocated here
+
+  real, public, allocatable :: State_VIB(:,:,:)
   !
-  real, allocatable, target:: StandAloneState_VIB(:,:,:)
-  
+  ! State vector is a pointer, which is joined to a target array
+  ! For stand alone version the target array is allocated here
+  !
+  real, allocatable, target:: Target_VIB(:,:,:)
+
   ! Number of variables in the state vector and the identifications
   integer, public, parameter :: nMHData = 13, nVar = 21,          &
        !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
-       X_          = 1, & !                         |read in  |in copy_ 
+       X_          = 1, & !                         |read in  |in copy_
        Y_          = 2, & ! Cartesian coordinates   |restart  |old_stat
-       Z_          = 3, & !                         v/        |saved to 
+       Z_          = 3, & !                         v/        |saved to
        Rho_        = 4, & ! Background plasma density         |mhd1
-       T_          = 5, & ! Background temperature            | 
+       T_          = 5, & ! Background temperature            |
        Ux_         = 6, & !                                   |may be
        Uy_         = 7, & ! Background plasma bulk velocity   |read from
        Uz_         = 8, & !                                   |mhd1
        Bx_         = 9, & !                                   |or
-       By_         =10, & ! Background magnetic field         |received 
+       By_         =10, & ! Background magnetic field         |received
        Bz_         =11, & !                                   |from
        Wave1_      =12, & !\                                  |coupler
        Wave2_      =13, & !-Alfven wave turbulence            v
-       !          
-       !          
+       !
+       !
        D_          =14, & ! Distance to the next particle  ^derived from
        S_          =15, & ! Distance from the foot point   |MHdata in
        R_          =16, & ! Heliocentric distance          |get_other_
@@ -126,7 +133,7 @@ module SP_ModGrid
   !
   ! variable names
   character(len=10), public, parameter:: NameVar_V(LagrID_:nVar)&
-        = (/'LagrID    ', &
+        = ['LagrID    ', &
        'X         ', &
        'Y         ', &
        'Z         ', &
@@ -147,7 +154,7 @@ module SP_ModGrid
        'B         ', &
        'DLogRho   ', &
        'RhoOld    ', &
-       'BOld      ' /)
+       'BOld      ' ]
   !
   logical:: DoInit = .true.
 
@@ -159,23 +166,23 @@ module SP_ModGrid
 
   ! Test position and momentum
   integer, public :: iPTest =1, iParticleTest = 99, iNodeTest =1
-contains  
-  !================================================================
+contains
+  !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
-    character(len=*), intent(in):: NameCommand ! From PARAM.in  
-    !Misc
+    character(len=*), intent(in):: NameCommand ! From PARAM.in
+    ! Misc
     integer :: nParticleCheck, nLonCheck, nLatCheck
-    character(len=*), parameter :: NameSub = 'SP:set_grid_param'
-    !--------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#CHECKGRIDSIZE')
        call read_var('nParticleMax',nParticleCheck)
        call read_var('nLon',     nLonCheck)
        call read_var('nLat',     nLatCheck)
        if(iProc==0.and.any(&
-            (/nLon,     nLat/) /= &
-            (/nLonCheck,nLatCheck/))&
+            [nLon,     nLat] /= &
+            [nLonCheck,nLatCheck])&
             )write(*,'(a,2I5)') 'nLon,nLat are reset to ',&
                nLonCheck, nLatCheck
        nLon = nLonCheck
@@ -208,7 +215,7 @@ contains
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
   end subroutine read_param
-  !===============================================================
+  !============================================================================
   subroutine init
     ! allocate the grid used in this model
     use ModUtilities,      ONLY: check_allocate
@@ -216,8 +223,9 @@ contains
 
     integer:: iError
     integer:: iLat, iLon, iNode, iBlock, iProcNode, iParticle
-    character(LEN=*),parameter:: NameSub='SP:init_grid'
-    !-------------------------------------------------------------
+
+    character(len=*), parameter:: NameSub = 'init'
+    !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
     DoInit = .false.
     !
@@ -248,6 +256,12 @@ contains
     call check_allocate(iError, NameSub//'FootPoint_VB')
     allocate(MagneticFluxAbs_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
+    ! Allocate auxiliary State vector
+    allocate(State_VIB( &
+         nMHData+1:nVar, 1:nParticleMax, nBlock), &
+         stat=iError)
+    call check_allocate(iError, NameSub//'State_VIB')
+    State_VIB = -1
     !
     ! fill grid containers
     !
@@ -256,7 +270,7 @@ contains
        do iLon = 1, nLon
           iNode = iLon + nLon * (iLat-1)
           iNode_II(iLon, iLat) = iNode
-          !iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
+          ! iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
           if(iProcNode==iProc)then
              iNode_B(     iBlock) = iNode
              nParticle_B( iBlock) = 0
@@ -279,84 +293,86 @@ contains
     !
     FootPoint_VB = -1; MagneticFluxAbs_B = -1
   end subroutine init
-  !================================================================
+  !============================================================================
   subroutine init_stand_alone
     ! allocate the grid used in this model
     use ModUtilities,      ONLY: check_allocate
     integer :: iParticle, iError
-    character(LEN=*),parameter:: NameSub='SP:init_stand_alone'
-    !--------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'init_stand_alone'
+    !--------------------------------------------------------------------------
     ! Allocate if stand alone and associate here the State pointer
-    allocate(StandAloneState_VIB( &
-         LagrID_:nVar,1:nParticleMax,nBlock), &
+    allocate(Target_VIB( &
+         LagrID_:nMHData, 1:nParticleMax, nBlock), &
          stat=iError)
-    call check_allocate(iError, NameSub//'StandAloneState_VIB')
-    State_VIB=>StandAloneState_VIB
+    call check_allocate(iError, NameSub//'Target_VIB')
+    MHData_VIB=>Target_VIB
     !
-    State_VIB = -1; State_VIB(1:nMHData,:,:) = 0.0
+    MHData_VIB(1:nMHData,:,:) = 0.0
     !
     ! reset lagrangian ids
     !
     do iParticle = 1, nParticleMax
-       State_VIB(LagrID_, iParticle, 1:nBlock) = real(iParticle)
+       MHData_VIB(LagrID_, iParticle, 1:nBlock) = real(iParticle)
     end do
   end subroutine init_stand_alone
-  !================================================================
+  !============================================================================
   subroutine get_node_indexes(iNodeIn, iLonOut, iLatOut)
     ! return angular grid's indexes corresponding to this node
     integer, intent(in) :: iNodeIn
     integer, intent(out):: iLonOut
     integer, intent(out):: iLatOut
-    !--------------------------------------------------------------
+    !--------------------------------------------------------------------------
     iLatOut = 1 + (iNodeIn-1) / nLon
     iLonOut = iNodeIn - nLon * (iLatOut-1)
   end subroutine get_node_indexes
-  !================================================================
+  !============================================================================
   subroutine copy_old_state
     ! copy current state to old state for all field lines
     integer:: iEnd, iBlock
-    !--------------------------------------------------------------
+    !--------------------------------------------------------------------------
     do iBlock = 1, nBlock
        iEnd   = nParticle_B(  iBlock)
        iShock_IB(ShockOld_,iBlock) = iShock_IB(Shock_, iBlock)
-       State_VIB((/RhoOld_,BOld_/), 1:iEnd, iBlock) = &
-            State_VIB((/Rho_,B_/),  1:iEnd, iBlock)
-       !reset variables read from file or received via coupler
-       State_VIB(1:nMHData,1:iEnd, iBlock) = 0.0
+       State_VIB(RhoOld_, 1:iEnd, iBlock) = &
+            MHData_VIB(Rho_,  1:iEnd, iBlock)
+       State_VIB(BOld_, 1:iEnd, iBlock) = &
+            State_VIB(B_,  1:iEnd, iBlock)
+       ! reset variables read from file or received via coupler
+       MHData_VIB(1:nMHData, 1:iEnd, iBlock) = 0.0
     end do
   end subroutine copy_old_state
-  !================================================================
+  !============================================================================
   subroutine get_other_state_var
     integer:: iBlock, iParticle, iEnd
     integer:: iAux1, iAux2
     real   :: XyzAux1_D(1:nDim), XyzAux2_D(1:nDim)
-    !---------------------------------------------------------
+    !--------------------------------------------------------------------------
     do iBlock = 1, nBlock
        iEnd   = nParticle_B(  iBlock)
        do iParticle = 1, iEnd
           ! plasma speed
           State_VIB(U_,iParticle, iBlock) = &
-               sqrt(sum(State_VIB(Ux_:Uz_,iParticle,iBlock)**2))
+               sqrt(sum(MHData_VIB(Ux_:Uz_,iParticle,iBlock)**2))
           ! magnetic field
           State_VIB(B_,iParticle, iBlock) = &
-               sqrt(sum(State_VIB(Bx_:Bz_,iParticle,iBlock)**2))
+               sqrt(sum(MHData_VIB(Bx_:Bz_,iParticle,iBlock)**2))
           ! distances between particles
           if(.not.DoSmooth)then
              if(iParticle /=nParticle_B(iBlock))&
                   State_VIB(D_, iParticle, iBlock) = sqrt(sum((&
-                  State_VIB(X_:Z_, iParticle    , iBlock) - &
-                  State_VIB(X_:Z_, iParticle + 1, iBlock))**2))
+                  MHData_VIB(X_:Z_, iParticle    , iBlock) - &
+                  MHData_VIB(X_:Z_, iParticle + 1, iBlock))**2))
           else
-             ! smoothing is done by groups: 
-             ! nSmooth particles are aggeregated into single effective one, 
+             ! smoothing is done by groups:
+             ! nSmooth particles are aggeregated into single effective one,
              ! find length increment between effective particles are used
              ! to find length increment between regular particles
              iAux1 = nSmooth * max(1, min(&
                   iParticle/nSmooth,nParticle_B(iBlock)/nSmooth-1))
              iAux2 = iAux1 + nSmooth
-             XyzAux1_D = sum(State_VIB(&
+             XyzAux1_D = sum(MHData_VIB(&
                   X_:Z_,iAux1-nSmooth+1:iAux1,iBlock),DIM=2)/nSmooth
-             XyzAux2_D = sum(State_VIB(&
+             XyzAux2_D = sum(MHData_VIB(&
                   X_:Z_,iAux2-nSmooth+1:iAux2,iBlock),DIM=2)/nSmooth
              State_VIB(D_, iParticle, iBlock) = &
                   sqrt(sum((XyzAux2_D-XyzAux1_D)**2)) / nSmooth
@@ -369,13 +385,13 @@ contains
                   State_VIB(S_, iParticle-1, iBlock) + &
                   State_VIB(D_, iParticle-1, iBlock)
           end if
-          !Heliocentric Distance
+          ! Heliocentric Distance
           State_VIB(R_, iParticle, iBlock) = &
-               sqrt(sum(State_VIB(X_:Z_, iParticle, iBlock)**2, 1))
+               sqrt(sum(MHData_VIB(X_:Z_, iParticle, iBlock)**2, 1))
        end do
     end do
   end subroutine get_other_state_var
-  !================================================================
+  !============================================================================
   subroutine search_line(iBlock, Radius, iParticleOut, IsFound, Weight)
     ! performs search along given line
     ! for FIRST location ABOVE given heliocentric radius;
@@ -385,10 +401,10 @@ contains
     real,         intent(in) :: Radius ! heliocentric distance to find
     integer,      intent(out):: iParticleOut ! result: index
     logical,      intent(out):: IsFound! result: whether search was successful
-    real,optional,intent(out):: Weight ! interpolation weight for output index 
+    real,optional,intent(out):: Weight ! interpolation weight for output index
 
-    integer:: iParticle !loop variable
-    !-------------------------------------------------------------
+    integer:: iParticle ! loop variable
+    !--------------------------------------------------------------------------
     ! check whether line reaches given radial distance
     if(State_VIB(R_, nParticle_B(iBlock), iBlock) < Radius)then
        ! mark failure to find location
@@ -406,7 +422,7 @@ contains
           EXIT
        end if
     end do
-    
+
     ! get interpolation weight is necessary
     if(present(Weight))then
        if(iParticleOut > 1)then
@@ -418,4 +434,6 @@ contains
        end if
     end if
   end subroutine search_line
+  !============================================================================
 end module SP_ModGrid
+!==============================================================================

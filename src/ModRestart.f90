@@ -1,13 +1,12 @@
-!  Copyright (C) 2002 Regents of the University of Michigan, 
-!  portions used with permission 
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!==================================================================
 module SP_ModRestart
   ! This module contains methods for writing output files
   use SP_ModSize,   ONLY: nParticleMax
   use SP_ModGrid,   ONLY: get_node_indexes, LagrID_, Z_,&
-       nBlock, State_VIB, iShock_IB, iNode_B, &
-       !RMin, RBufferMin, RBufferMax, RMax, &
+       nBlock, MhData_VIB, iShock_IB, iNode_B, &
+       ! RMin, RBufferMin, RBufferMax, RMax, &
        FootPoint_VB, nParticle_B, nShockParam, &
        nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
@@ -19,7 +18,7 @@ module SP_ModRestart
   implicit none
   SAVE
   private ! except
-  !Public members
+  ! Public members
   public:: save_restart, read_restart
   public:: NameRestartInDir, NameRestartOutDir
 
@@ -30,23 +29,22 @@ module SP_ModRestart
   ! name of the header file
   character (len=100) :: NameHeaderFile   ="restart.H"
   !----------------------------------------------------------------
-  !/
 contains
-  !================================================================
+  !============================================================================
   subroutine save_restart
     use ModIoUnit,     ONLY: UnitTmp_
     use ModUtilities,  ONLY: open_file, close_file
     ! write the restart data
- 
+
     ! name of the output file
     character(len=100):: NameFile
     ! loop variable
     integer:: iBlock
     ! indexes of corresponding node, latitude and longitude
     integer:: iNode, iLat, iLon
-    character(len=*), parameter:: NameSub = 'SP:save_restart'
-    !--------------------------------------------------------------
- 
+    character(len=*), parameter:: NameSub = 'save_restart'
+    !--------------------------------------------------------------------------
+
     call write_restart_header
 
     do iBlock = 1, nBlock
@@ -63,12 +61,12 @@ contains
             real(iShock_IB(:, iBlock))
        write(UnitTmp_)&
             FootPoint_VB(:, iBlock),&
-            State_VIB(LagrID_:Z_,1:nParticle_B(iBlock), iBlock),&
+            MhData_VIB(LagrID_:Z_,1:nParticle_B(iBlock), iBlock),&
             Distribution_IIB(:,1:nParticle_B(iBlock), iBlock)
        call close_file
     end do
   end subroutine save_restart
-  !================================================================
+  !============================================================================
   subroutine read_restart
     ! read the restart data
 
@@ -78,11 +76,11 @@ contains
     integer:: iBlock
     ! indexes of corresponding node, latitude and longitude
     integer:: iNode, iLat, iLon
-    real   :: Aux, Aux_I(nShockParam) !For reading integers
+    real   :: Aux, Aux_I(nShockParam) ! For reading integers
     integer:: iError
-    character(len=*), parameter:: NameSub = 'SP:read_restart'
-    !--------------------------------------------------------------
-   
+    character(len=*), parameter:: NameSub = 'read_restart'
+    !--------------------------------------------------------------------------
+
     do iBlock = 1, nBlock
        iNode = iNode_B(iBlock)
        call get_node_indexes(iNode, iLon, iLat)
@@ -105,12 +103,12 @@ contains
        iShock_IB(:, iBlock) = nint(Aux_I)
        read(UnitTmp_, iostat = iError) &
             FootPoint_VB(:, iBlock),&
-            State_VIB(LagrID_:Z_,1:nParticle_B(iBlock), iBlock),&
+            MhData_VIB(LagrID_:Z_,1:nParticle_B(iBlock), iBlock),&
             Distribution_IIB(:,1:nParticle_B(iBlock), iBlock)
        call close_file
     end do
   end subroutine read_restart
-  !================================================================
+  !============================================================================
   subroutine write_restart_header
     use SP_ModPlot, ONLY: nTag
     use SP_ModProc, ONLY: iProc
@@ -118,8 +116,8 @@ contains
     ! full name of the header file
     character(len=100):: NameFile
 
-    character(len=*), parameter:: NameSub='write_restart_header'
-    !--------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'write_restart_header'
+    !--------------------------------------------------------------------------
     if (iProc/=0) RETURN
     NameFile = trim(NameRestartOutDir)//trim(NameHeaderFile)
 
@@ -151,4 +149,6 @@ contains
     write(UnitTmp_,*)
     call close_file
   end subroutine write_restart_header
+  !============================================================================
 end module SP_ModRestart
+!==============================================================================

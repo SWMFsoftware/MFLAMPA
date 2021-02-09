@@ -1,14 +1,13 @@
 !  Copyright (C) 2002 Regents of the University of Michigan
-! portions used with permission 
+! portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!==================================================================
 module SP_ModMain
   use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
   use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
        Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
        Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
-       RhoOld_, iShock_IB, iNode_B, State_VIB, FootPoint_VB,      &
-       nLat, nLon, nNode
+       RhoOld_, iShock_IB, iNode_B, State_VIB, MHData_VIB,        &
+       FootPoint_VB, nLat, nLon, nNode
   use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
   use SP_ModProc,    ONLY: iProc
   use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
@@ -19,20 +18,18 @@ module SP_ModMain
   implicit none
   SAVE
   private ! except
-  !\
   ! Grid size, boundaries, coordinates
   ! Starting position of field lines in Rs
   real         :: ROrigin = 2.5
-  ! Size of angular grid, latitude and longitude, at origin 
+  ! Size of angular grid, latitude and longitude, at origin
   ! surface R=ROrigin
-  real         :: LonMin = 0.0, LonMax = 360.0 
+  real         :: LonMin = 0.0, LonMax = 360.0
   real         :: LatMin = -70.0, LatMax = 70.0
 
   ! Lower/Upper boundary of the domain in Rs
   real         :: RScMin=-1.0, RIhMax = -1.0
   ! Boundaries of the buffer layer between SC and IH Rs
   real         :: RIhMin=-1.0, RScMax=-1.0
-  !\
   ! Stopping conditions. These variables are only used in stand alone mode.
   real   :: TimeMax  = -1.0, CpuTimeMax = -1.0
   integer:: nIterMax = -1
@@ -44,20 +41,17 @@ module SP_ModMain
   logical:: DoSaveRestart=.false.
   integer:: DnSaveRestart=-1,  nIterSinceRestart = 0
   real   :: DtSaveRestart=-1.0, TimeSinceRestart = 0.0
-  !/
 
-  !\
-  !Timing variables
+  ! Timing variables
   logical:: UseTiming = .true.
   integer:: nTiming = -2
   integer:: nTimingDepth = -1
   character(len=10):: TimingStyle = 'cumm'
-  !/
 
-  ! Methods and variables from this module 
+  ! Methods and variables from this module
   public:: &
        read_param, initialize, finalize, run, check, save_restart, &
-       SPTime, iIter, DataInputTime, DoRestart,     & 
+       SPTime, iIter, DataInputTime, DoRestart,     &
        UseTiming, nTiming, nTimingDepth, TimingStyle,         &
        IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax,&
        IsStandAlone, copy_old_state
@@ -71,7 +65,7 @@ module SP_ModMain
        LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_, Ux_, Uz_, T_, R_,   &
        Wave1_, Wave2_, Length_, nBlock, nParticle_B, Shock_,   &
        ShockOld_, RScMin, RIhMin, RScMax, RIhMax,              &
-       iShock_IB, iNode_B, State_VIB, FootPoint_VB
+       iShock_IB, iNode_B, MHData_VIB, FootPoint_VB
 
   ! Methods and variables from ModReadMhData
   public:: DoReadMhData
@@ -79,21 +73,20 @@ module SP_ModMain
   ! Methods and variables from ModUnit
   public:: SI2IO_I, UnitEnergy_
 
-  !\
   ! Logicals for actions
   !----------------------------------------------------------------------------
   ! run the component
   logical:: DoRun = .true.
-  ! restart the run 
+  ! restart the run
   logical:: DoRestart = .false.
   ! perform initialization
   logical:: DoInit = .true.
-  !/
 contains
+  !============================================================================
 
   subroutine read_param
     use SP_ModAdvance,      ONLY: read_param_adv        =>read_param
-    use SP_ModAngularSpread,ONLY: read_param_spread     =>read_param
+    use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
     use SP_ModDistribution, ONLY: read_param_dist       =>read_param
     use SP_ModGrid,         ONLY: read_param_grid       =>read_param
     use SP_ModPlot,         ONLY: read_param_plot       =>read_param
@@ -106,13 +99,13 @@ contains
     use ModReadParam, ONLY: &
          read_var, read_line, read_command, i_session_read, read_echo_set
 
-    ! aux variables 
+    ! aux variables
     integer:: nParticleCheck, nLonCheck, nLatCheck
     logical:: DoEcho
 
     ! The name of the command
     character (len=100) :: NameCommand
-    character (len=*), parameter :: NameSub='SP:read_param'
+    character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
 
     ! Read the corresponding section of input file
@@ -125,9 +118,7 @@ contains
        select case(NameCommand)
        case('#RESTART')
           call read_var('DoRestart',DoRestart)
-          !\
           ! read parameters for each module
-          !/
        case('#ORIGIN')
           if(IsStandAlone)CYCLE
           call read_var('ROrigin', ROrigin)
@@ -215,6 +206,7 @@ contains
        end select
     end do
   contains
+    !==========================================================================
     subroutine check_stand_alone
       ! certain options are only available for stand alone mode;
       ! check whether the mode is used and stop the code if it's no the case
@@ -223,22 +215,23 @@ contains
       call CON_stop(NameSub//': command '//trim(NameCommand)//&
            ' is only allowed in stand alone mode, correct PARAM.in')
     end subroutine check_stand_alone
+    !==========================================================================
 
   end subroutine read_param
   !============================================================================
   subroutine initialize
-    use SP_ModAngularSpread,ONLY: init_spread     => init
+    use SP_ModAngularSpread, ONLY: init_spread     => init
     use SP_ModDistribution, ONLY: init_dist       => init
     use SP_ModGrid,         ONLY: iNodeTest, iParticleTest, iPTest
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
     use SP_ModTurbulence,   ONLY: init_turbulence => init
-    use SP_ModUnit,         ONLY: init_unit       => init 
+    use SP_ModUnit,         ONLY: init_unit       => init
 
     ! initialize the model
-    character(LEN=*),parameter:: NameSub='SP:initialize'
-    !--------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'initialize'
+    !--------------------------------------------------------------------------
     call init_unit
     call init_dist
     call init_plot
@@ -252,15 +245,17 @@ contains
     DoInit=.false.
     !-------------------------------------------------------------------------
   contains
+    !==========================================================================
     subroutine get_origin_points
       use ModNumConst,       ONLY: cDegToRad
       use ModCoordTransform, ONLY: rlonlat_to_xyz
-      use SP_ModGrid,        ONLY: Block_, Proc_, iGridGlobal_IA, iNode_II 
-      integer:: iLat, iLon, iNode, iBlock      
-      !Sell size on the origin surface, per line
+      use SP_ModGrid,        ONLY: Block_, Proc_, iGridGlobal_IA, iNode_II
+      integer:: iLat, iLon, iNode, iBlock
+      ! Sell size on the origin surface, per line
       real         ::  DLon, DLat
-      !--------------------------
+
       ! convert angels from degrees to radians
+      !------------------------------------------------------------------------
       LonMax = LonMax*cDegToRad
       LonMin = LonMin*cDegToRad
 
@@ -273,19 +268,20 @@ contains
 
       ! angular grid's step
       DLat = (LatMax - LatMin)/nLat
-      
+
       do iLat = 1, nLat
          do iLon = 1, nLon
             iNode = iNode_II(iLon, iLat)
             iBlock = iGridGlobal_IA(Block_, iNode)
             if(iProc == iGridGlobal_IA(Proc_, iNode))then
                nParticle_B(iBlock) = 1
-               call rlonlat_to_xyz((/ROrigin, LonMin + (iLon - 0.5)*DLon, &
-                    LatMin + (iLat - 0.5)*DLat/), State_VIB(X_:Z_,1,iBlock))
+               call rlonlat_to_xyz([ROrigin, LonMin + (iLon - 0.5)*DLon, &
+                    LatMin + (iLat - 0.5)*DLat], MHData_VIB(X_:Z_,1,iBlock))
             end if
          end do
       end do
     end subroutine get_origin_points
+    !==========================================================================
   end subroutine initialize
   !============================================================================
   subroutine finalize
@@ -293,8 +289,8 @@ contains
     use SP_ModReadMhData, ONLY: finalize_read       =>finalize
     use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
     ! finalize the model
-    character(LEN=*),parameter:: NameSub='SP:finalize'
-    !------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'finalize'
+    !--------------------------------------------------------------------------
     call finalize_plot
     call finalize_read
     call finalize_turbulence
@@ -308,10 +304,9 @@ contains
     real, intent(in)   :: TimeLimit
     logical, save:: IsFirstCall = .true.
     real:: Dt ! time increment in the current call
-    !------------------------------
-    !\
+
     ! write the initial background state to the output file
-    !/
+    !--------------------------------------------------------------------------
     if(IsFirstCall)then
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
@@ -320,35 +315,23 @@ contains
 
        IsFirstCall = .false.
     end if
-    !\
     ! May need to read background data from files
-    !/
     if(DoReadMhData)then
-       !\
        ! copy some variables from the previous time step
-       !/
        call copy_old_state
-       !\
        ! Read the background data from file
-       !/
        call read_mh_data()
-       !Read from file: State_VIB(0:nMHData,::) for the time moment
-       !DataInputTime
+       ! Read from file: MHData_VIB(0:nMHData,::) for the time moment
+       ! DataInputTime
     end if
-    !\
-    ! recompute the derived components of state vector, e.g. 
+    ! recompute the derived components of state vector, e.g.
     ! magnitude of magnetic field and velocity etc.
-    !/
     call get_other_state_var
-    !\
     ! if no new background data loaded, don't advance in time
-    !/
     if(DataInputTime <= SPTime) RETURN
 
     call lagr_time_derivative
-    !\
     ! run the model
-    !/
     if(DoRun) call advance(min(DataInputTime,TimeLimit))
 
     ! update time & iteration counters
@@ -356,11 +339,11 @@ contains
     Dt = min(DataInputTime,TimeLimit) - SPTime
     SPTime = SPTime + Dt
     call save_plot_all
-    
+
     ! save restart in the stand alone mod
     if(IsStandAlone .and. DoSaveRestart)then
        nIterSinceRestart = nIterSinceRestart + 1
-       TimeSinceRestart  = TimeSinceRestart  + Dt 
+       TimeSinceRestart  = TimeSinceRestart  + Dt
        if(  DtSaveRestart > 0..and.  TimeSinceRestart >= DtSaveRestart .or. &
             DnSaveRestart > 0 .and. nIterSinceRestart == DnSaveRestart)then
           call save_restart
@@ -373,31 +356,29 @@ contains
        end if
     end if
   contains
-    !=====================================================================
+    !==========================================================================
     subroutine lagr_time_derivative
       integer:: iBlock, iParticle
-      !----------------------------------------------------------------------
+      !------------------------------------------------------------------------
       do iBlock = 1, nBlock
-         do iParticle = 1, nParticle_B(  iBlock)            
+         do iParticle = 1, nParticle_B(  iBlock)
             ! divergence of plasma velocity
             State_VIB(DLogRho_,iParticle,iBlock) = log(&
-                 State_VIB(Rho_,iParticle,iBlock)/&
+                 MHData_VIB(Rho_,iParticle,iBlock)/&
                  State_VIB(RhoOld_,iParticle,iBlock))
          end do
          ! location of shock
          call get_shock_location(iBlock)
       end do
     end subroutine lagr_time_derivative
+    !==========================================================================
   end subroutine run
-  !=================
+  !============================================================================
   subroutine get_shock_location(iBlock)
     use SP_ModAdvance, ONLY: nWidth
     use SP_ModGrid,    ONLY: R_, NoShock_
     integer, intent(in) :: iBlock
-    !\
     ! find location of a shock wave on a given line (block)
-    !/
-    !\
     ! Do not search too close to the Sun
     integer         :: iShockMin
     real, parameter :: RShockMin = 1.20  !*RSun
@@ -407,7 +388,8 @@ contains
     integer:: iShockMax
     ! Misc
     integer:: iShockCandidate
-    !---------------------------------------------------------------------
+
+    !--------------------------------------------------------------------------
     if(.not.DoTraceShock)then
        iShock_IB(Shock_, iBlock) = NoShock_
        RETURN
@@ -424,17 +406,18 @@ contains
     if(iShockCandidate >= iShockMin)&
          iShock_IB(Shock_, iBlock) = iShockCandidate
   end subroutine get_shock_location
-  !=======================================================================
+  !============================================================================
   subroutine check
     use ModUtilities, ONLY: make_dir
-    character(LEN=*),parameter:: NameSub='SP:check'
-    !---------------------------------------------------------------------
+
+    character(len=*), parameter:: NameSub = 'check'
+    !--------------------------------------------------------------------------
     if(.not.IsStandAlone)then
        ! check if the domains for SC and IH are correctly set
        if(RScMin < 0.0.or. RIhMin < 0.0 .or.RScMax < 0.0 .or.RIhMax < 0.0)&
             call CON_stop(NameSub//&
             ': RScMin, RScMax, RIhMin, RIhMax must be set to positive values')
-       if(any((/RIhMax, RScMax/) < RIhMin) .or. RIhMax < RScMax)&
+       if(any([RIhMax, RScMax] < RIhMin) .or. RIhMax < RScMax)&
             call CON_stop(NameSub//&
            ': inconsistent values of RIhMin, RScMax, RIhMax')
        if(.not.(DoRestart.or.DoReadMhData))then
@@ -443,16 +426,14 @@ contains
                call CON_stop(NameSub//': Origin surface grid is inconsistent')
           if(ROrigin <= RScMin)call CON_stop(NameSub//&
                ': ROrigin, if set, must be greater than RScMin')
-          if(any((/RIhMin, RScMax, RIhMax/) < ROrigin))&
+          if(any([RIhMin, RScMax, RIhMax] < ROrigin))&
                call CON_stop(NameSub//&
                ': inconsistent values of ROrigin, RIhMin, RScMax, RIhMax')
        end if
     end if
     ! Make output directory
     if(iProc==0) call make_dir(NamePlotDir)
-    !\
     ! Initialize timing
-    !/
     if(iProc==0)then
        call timing_active(UseTiming)
        call timing_step(0)
@@ -460,4 +441,6 @@ contains
        call timing_report_style(TimingStyle)
     end if
   end subroutine check
+  !============================================================================
 end module SP_ModMain
+!==============================================================================

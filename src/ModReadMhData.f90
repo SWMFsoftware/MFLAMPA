@@ -1,13 +1,12 @@
-!  Copyright (C) 2002 Regents of the University of Michigan, 
-!  portions used with permission 
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!==================================================================
 module SP_ModReadMhData
   ! This module contains methods for reading input MH data
   use SP_ModSize,    ONLY: nDim, nParticleMax
   use SP_ModGrid,    ONLY: get_node_indexes, get_other_state_var,&
        nMHData,  nBlock, Z_,&
-       iNode_B, FootPoint_VB, nParticle_B, State_VIB,  LagrID_
+       iNode_B, FootPoint_VB, nParticle_B, MHData_VIB,  LagrID_
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
   use ModPlotFile,   ONLY: read_plot_file
@@ -16,16 +15,13 @@ module SP_ModReadMhData
   implicit none
   SAVE
   private ! except
-  !\
-  !Public members
+  ! Public members
   public:: init         ! Initialize module variables
   public:: read_param   ! Read module variables
   public:: read_mh_data ! Read MH_data from files
   public:: finalize     ! Finalize module variables DoReadMhData
-  ! If the folliwing logical is true, read MH_data from files 
+  ! If the folliwing logical is true, read MH_data from files
   logical, public :: DoReadMhData = .false.
-  !/
-  !\
   ! the input directory
   character(len=100)         :: NameInputDir=""
   ! the name with list of file tags
@@ -38,13 +34,13 @@ module SP_ModReadMhData
   integer:: iIOTag
 
 contains
-  !================================================================
+  !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     ! set parameters of input files with background data
     integer :: nFileRead
-    character (len=*), intent(in):: NameCommand ! From PARAM.in  
-    character(len=*), parameter :: NameSub='SP:set_read_mh_data_param'
+    character (len=*), intent(in):: NameCommand ! From PARAM.in
+    character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#READMHDATA')
@@ -80,10 +76,10 @@ contains
   subroutine init
     use SP_ModPLot, ONLY: nTag
     ! initialize by setting the time and interation index of input files
-    character (len=*), parameter :: NameSub='SP:init_read_mh_data'
     integer:: iTag
     character(len=50):: StringAux
-    !-------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'init'
+    !--------------------------------------------------------------------------
     if(.not.DoReadMhData) RETURN
     ! open the file with the list of tags
     iIOTag = io_unit_new()
@@ -103,18 +99,16 @@ contains
   !============================================================================
   subroutine finalize
     ! close currentl opend files
+    !--------------------------------------------------------------------------
     if(DoReadMhData) call close_file(iUnitIn=iIOTag)
   end subroutine finalize
   !============================================================================
   subroutine read_mh_data(DoOffsetIn)
     use SP_ModPlot,    ONLY: NameMHData
     logical, optional, intent(in ):: DoOffsetIn
-    !\
     ! read 1D MH data, which are produced by write_mh_1d n ModWrite
-    ! separate file is read for each field line, name format is 
+    ! separate file is read for each field line, name format is
     ! (usually)MH_data_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
-    !/
-    !\
     ! name of the input file
     character(len=100):: NameFile
     ! loop variables
@@ -129,37 +123,34 @@ contains
     ! auxilary parameter index
     integer, parameter:: RShock_ = Z_ + 2
     integer, parameter:: StartTime_  = RShock_ + 1
-    integer, parameter:: StartJulian_= StartTime_ + 1 
+    integer, parameter:: StartJulian_= StartTime_ + 1
     ! additional parameters of lines
     real:: Param_I(LagrID_:StartJulian_)
     ! data input time before reading new data file
     real:: DataInputTimeOld
     ! timetag
     character(len=50):: StringTag
-    character(len=*), parameter:: NameSub = "SP:read_mh_data"
-    !------------------------------------------------------------------------
+
     ! check whether need to apply offset, default is .true.
+    character(len=*), parameter:: NameSub = 'read_mh_data'
+    !--------------------------------------------------------------------------
     if(present(DoOffsetIn))then
        DoOffset = DoOffsetIn
     else
        DoOffset = .true.
     end if
-    !\
     ! get the tag for files
     read(iIOTag,'(a)') StringTag
-    !/
     ! save the current data input time
     DataInputTimeOld = DataInputTime
     ! read the data
     BLOCK:do iBlock = 1, nBlock
        iNode = iNode_B(iBlock)
        call get_node_indexes(iNode, iLon, iLat)
-       !\ 
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameInputDir)//NameMHData//'_',iLon,&
             '_',iLat, '_'//trim(StringTag)//NameFileExtension
-       !/
        ! read the header first
        call read_plot_file(NameFile          ,&
             TypeFileIn = TypeMhDataFile      ,&
@@ -175,26 +166,25 @@ contains
                   'with tag '//trim(StringTag)//&
                   '; the tag may be repeated in '//trim(NameTagFile))
           end if
-          ! amount of the offset is determined from difference 
-          ! in LagrID_ 
+          ! amount of the offset is determined from difference
+          ! in LagrID_
           iOffset = FootPoint_VB(LagrID_,iBlock) - Param_I(LagrID_)
        else
           iOffset = 0
        end if
-       !Parameters
+       ! Parameters
        FootPoint_VB(LagrID_:Z_,iBlock) = Param_I(LagrID_:Z_)
-       !\
        ! read MH data
-       call read_plot_file(NameFile          ,&
-            TypeFileIn = TypeMhDataFile      ,&
-            Coord1Out_I= State_VIB(LagrID_   ,&
-            1:nParticle_B(iBlock),iBlock)    ,&
-            VarOut_VI  = State_VIB(1:nMHData ,&
-            1:nParticle_B(iBlock),iBlock)) 
-       !\
+       call read_plot_file(NameFile           ,&
+            TypeFileIn = TypeMhDataFile       ,&
+            Coord1Out_I= MHData_VIB(LagrID_   ,&
+            1:nParticle_B(iBlock),iBlock)     ,&
+            VarOut_VI  = MHData_VIB(1:nMHData ,&
+            1:nParticle_B(iBlock),iBlock))
        ! apply offset
-       !/
        call offset(iBlock, iOffset)
     end do BLOCK
   end subroutine read_mh_data
+  !============================================================================
 end module SP_ModReadMhData
+!==============================================================================
