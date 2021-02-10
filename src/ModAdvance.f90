@@ -353,6 +353,9 @@ contains
 
       ! speed upstream is relative to the shock:
       ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
+      !=> V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
+      !=> V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
+      !Hence, below there should be norm2(\vect{U}_d - \vect{U}_u) 
       !------------------------------------------------------------------------
       SpeedUpstream = RhoSI_I(iShock+1-nWidth)*&
            (uSI_I(  iShock + 1 - nWidth) - uSI_I(  iShock + nWidth))/    &
