@@ -96,11 +96,6 @@ module SP_ModGrid
   !
 
   real, public, allocatable :: State_VIB(:,:,:)
-  !
-  ! State vector is a pointer, which is joined to a target array
-  ! For stand alone version the target array is allocated here
-  !
-  real, allocatable, target:: Target_VIB(:,:,:)
 
   ! Number of variables in the state vector and the identifications
   integer, public, parameter :: nMHData = 13, nVar = 21,          &
@@ -300,12 +295,8 @@ contains
     integer :: iParticle, iError
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
-    ! Allocate if stand alone and associate here the State pointer
-    allocate(Target_VIB( &
-         LagrID_:nMHData, 1:nParticleMax, nBlock), &
-         stat=iError)
-    call check_allocate(iError, NameSub//'Target_VIB')
-    MHData_VIB=>Target_VIB
+    ! Allocate here if stand alone 
+    allocate(MHData_VIB(LagrID_:nMHData, 1:nParticleMax, nBlock))
     !
     MHData_VIB(1:nMHData,:,:) = 0.0
     !
