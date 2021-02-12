@@ -255,6 +255,7 @@ contains
       real         ::  DLon, DLat
 
       ! convert angels from degrees to radians
+
       !------------------------------------------------------------------------
       LonMax = LonMax*cDegToRad
       LonMin = LonMin*cDegToRad
@@ -306,6 +307,7 @@ contains
     real:: Dt ! time increment in the current call
 
     ! write the initial background state to the output file
+
     !--------------------------------------------------------------------------
     if(IsFirstCall)then
        ! print the initial state
@@ -443,4 +445,3 @@ contains
   end subroutine check
   !============================================================================
 end module SP_ModMain
-!==============================================================================
