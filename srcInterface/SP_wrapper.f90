@@ -26,7 +26,8 @@ module SP_wrapper
   use ModConst, ONLY: rSun, cProtonMass
   use ModMpi
   use CON_world,  ONLY: is_proc0, is_proc, n_proc
-  use CON_mflampa, ONLY: iOffset_B
+  use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
+       rInterfaceMin, rInterfaceMax
   implicit none
   save
   private ! except
@@ -37,7 +38,6 @@ module SP_wrapper
   public:: SP_finalize
 
   ! coupling with MHD components
-  public:: SP_put_from_mh
   public:: SP_interface_point_coords
   public:: SP_put_line
   public:: SP_adjust_lines
@@ -53,9 +53,9 @@ module SP_wrapper
   integer, parameter:: Lower_=0, Upper_=1
   ! coupling parameters:
   ! domain boundaries
-  real :: rInterfaceMin, rInterfaceMax
+  !real :: rInterfaceMin, rInterfaceMax
   ! buffer boundaries located near lower (Lo) or upper (Up) boudanry of domain
-  real :: rBufferLo, rBufferUp
+  !real :: rBufferLo, rBufferUp
   logical :: DoCheck = .true.
 contains
   !============================================================================
@@ -122,6 +122,8 @@ contains
     use SP_ModMain, ONLY: initialize
     use SP_ModGrid, ONLY: init_grid=>init
     use CON_mflampa, ONLY: set_state_pointer
+    use SP_ModUnit, ONLY:  NameEnergyUnit
+    use ModConst,   ONLY: energy_in
     integer,  intent(in) :: iSession         ! session number (starting from 1)
     real,     intent(in) :: TimeSimulation   ! seconds from start time
 
@@ -133,7 +135,7 @@ contains
     call init_grid
     nullify(MHData_VIB); nullify(nParticle_B)
     call set_state_pointer(MHData_VIB, nParticle_B, &
-         nBlock, nParticleMax, SI2IO_I(UnitEnergy_))
+         nBlock, nParticleMax, 1/energy_in(NameEnergyUnit))
     call initialize
   end subroutine SP_init_session
   !============================================================================
@@ -193,75 +195,6 @@ contains
     call save_restart
   end subroutine SP_save_restart
   !============================================================================
-
-  subroutine SP_put_from_mh(nPartial,iPutStart,Put,W,DoAdd,Buff_I,nVar)
-    integer,intent(in)::nPartial,iPutStart,nVar
-    type(IndexPtrType),intent(in)::Put
-    type(WeightPtrType),intent(in)::W
-    logical,intent(in)::DoAdd
-    real,dimension(nVar),intent(in)::Buff_I
-    integer:: iRho, iP, iMx, iMz, iBx, iBz, iWave1, iWave2
-    integer:: i, iBlock
-    integer:: iPartial
-    real:: Weight
-    real:: R, Aux
-
-    character(len=100):: StringError
-    character(len=*), parameter:: NameSub = 'SP_put_from_mh'
-    !--------------------------------------------------------------------------
-    ! check consistency of DoCoupleVar_V
-    if(.not. DoCoupleVar_V(Density_) .and. &
-         (DoCoupleVar_V(Pressure_) .or. DoCoupleVar_V(Momentum_)))&
-         call CON_Stop(NameSub//': pressure or momentum is coupled,'&
-         //' but density is not')
-    ! indices of variables in the buffer
-    iRho  = iVar_V(RhoCouple_)
-    iP    = iVar_V(PCouple_)
-    iMx   = iVar_V(RhoUxCouple_)
-    iMz   = iVar_V(RhoUzCouple_)
-    iBx   = iVar_V(BxCouple_)
-    iBz   = iVar_V(BzCouple_)
-    iWave1= iVar_V(WaveFirstCouple_)
-    iWave2= iVar_V(WaveLastCouple_)
-    Aux = 0
-    if(DoAdd)Aux = 1.0
-    do iPartial = 0, nPartial-1
-       ! cell and block indices
-       i      = Put%iCB_II(1, iPutStart + iPartial)
-       iBlock = Put%iCB_II(4, iPutStart + iPartial)
-       ! interpolation weight
-       Weight = W%Weight_I(   iPutStart + iPartial)
-       if(is_in_buffer_xyz(Lower_,MHData_VIB(X_:Z_,i,iBlock)))then
-          R = sqrt(sum(MHData_VIB(X_:Z_,i,iBlock)**2))
-          Aux = 1.0
-          Weight = Weight * (0.50 + 0.50*tanh(2*(2*R - &
-               RBufferLo - RInterfaceMin)/(RBufferLo - RInterfaceMin)))
-       end if
-       if(is_in_buffer_xyz(Upper_,MHData_VIB(X_:Z_,i,iBlock)))then
-          R = sqrt(sum(MHData_VIB(X_:Z_,i,iBlock)**2))
-          Weight = Weight * (0.50 - 0.50*tanh(2*(2*R - &
-               RInterfaceMax - RBufferUp)/(RInterfaceMax - RBufferUp)))
-       end if
-       ! put the data
-       if(DoCoupleVar_V(Density_))&
-            MHData_VIB(Rho_,i,iBlock) = Aux*MHData_VIB(Rho_,i,iBlock) &
-            + Buff_I(iRho)/cProtonMass*Weight
-       if(DoCoupleVar_V(Pressure_))&
-            MHData_VIB(T_,i,iBlock) = Aux*MHData_VIB(T_,i,iBlock) + &
-            Buff_I(iP)/Buff_I(iRho)*cProtonMass*SI2IO_I(UnitEnergy_)*Weight
-       if(DoCoupleVar_V(Momentum_))&
-            MHData_VIB(Ux_:Uz_,i,iBlock) = Aux*MHData_VIB(Ux_:Uz_,i,iBlock) + &
-            Buff_I(iMx:iMz) / Buff_I(iRho) * Weight
-       if(DoCoupleVar_V(BField_))&
-            MHData_VIB(Bx_:Bz_,i,iBlock) = Aux*MHData_VIB(Bx_:Bz_,i,iBlock) + &
-            Buff_I(iBx:iBz) * Weight
-       if(DoCoupleVar_V(Wave_))&
-            MHData_VIB(Wave1_:Wave2_,i,iBlock) = &
-            Aux*MHData_VIB(Wave1_:Wave2_,i,iBlock) + &
-            Buff_I(iWave1:iWave2)*Weight
-    end do
-  end subroutine SP_put_from_mh
-  !============================================================================
   subroutine SP_set_grid
     use SP_ModGrid, ONLY: iGridGlobal_IA, Block_, Proc_, &
           TypeCoordSystem
@@ -298,24 +231,14 @@ contains
   subroutine SP_put_coupling_param(iModelIn, rMinIn, rMaxIn, TimeIn,&
        rBufferLoIn, rBufferUpIn)
     use SP_ModMain, ONLY: copy_old_state
+    use CON_mflampa, ONLY: get_bounds
     integer,        intent(in) :: iModelIn
     real,           intent(in) :: rMinIn, rMaxIn
     real,           intent(in) :: TimeIn
     real, optional, intent(in) :: rBufferLoIn, rBufferUpIn
     !--------------------------------------------------------------------------
-    ! set domain boundaries
-    rInterfaceMin = rMinIn; rInterfaceMax = rMaxIn
-    ! set buffer boundaries
-    if(present(rBufferLoIn))then
-       rBufferLo = rBufferLoIn
-    else
-       rBufferLo = rMinIn
-    end if
-    if(present(rBufferUpIn))then
-       rBufferUp = rBufferUpIn
-    else
-       rBufferUp = rMaxIn
-    end if
+    call get_bounds(iModelIn, rMinIn, rMaxIn, &
+       rBufferLoIn, rBufferUpIn)
     Model_ = iModelIn
     if(DataInputTime >= TimeIn)RETURN
     ! New coupling time, get it and save old state
@@ -667,15 +590,5 @@ contains
         call CON_stop("ERROR: incorrect call of SP_wrapper:is_in_buffer")
     end select
   end function is_in_buffer_r
-  !============================================================================
-  function is_in_buffer_xyz(iBuffer, Xyz_D) Result(IsInBuffer)
-    integer,intent(in):: iBuffer
-    real,   intent(in) :: Xyz_D(nDim)
-    logical:: IsInBuffer
-    real:: R
-    !--------------------------------------------------------------------------
-    R = sqrt(sum(Xyz_D**2))
-    IsInBuffer = is_in_buffer_r(iBuffer, R)
-  end function is_in_buffer_xyz
   !============================================================================
 end module SP_wrapper
