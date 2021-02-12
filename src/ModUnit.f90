@@ -1,7 +1,6 @@
-!  Copyright (C) 2002 Regents of the University of Michigan, 
-!  portions used with permission 
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-!=============================================================!
 module SP_ModUnit
   ! Unit for particle energy,  energy to momentum conversion
   ! for proton, names for all units
@@ -13,7 +12,7 @@ module SP_ModUnit
        gen_momentum_to_energy    =>momentum_to_energy
   implicit none
   SAVE
-  private !Except
+  private ! Except
 
   ! Public routines
   public :: init
@@ -26,15 +25,14 @@ module SP_ModUnit
   ! Only protons are simulated at this moment
   character(len=*), public, parameter :: NameParticle = 'proton'
 
-  !\
   ! unit of SEP energy, also applicable for ion kinetic temperature
   character(len=3), public :: NameEnergyUnit = 'kev'
 
   ! Integral flux unit is SI
   character(len=6), public,parameter  :: NameFluxUnit   = 'p.f.u.'
-  !\
+
   ! Unit particle flux, 1 particle per cm2 per s per steradian,
-  ! corresponds to 10,000 particles per m2 per s per steradian. 
+  ! corresponds to 10,000 particles per m2 per s per steradian.
   real,                    parameter  :: UnitParticleFluxSI = 10000.0
   character(len=12),public            :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
   character(len=12),public,allocatable:: NameFluxUnit_I(:)
@@ -44,10 +42,10 @@ module SP_ModUnit
        UnitX_ = 1, UnitRho_ = 2, UnitEnergy_ = 3, UnitFlux_ = 4, UnitEFlux_ = 5
   real, public, dimension(UnitX_:UnitEFlux_) :: IO2SI_I, SI2IO_I
 
-  ! Unit for all the state variables: 
-  ! Length is in the unit of Rs, Rho is in the unit of amu/m^3, 
+  ! Unit for all the state variables:
+  ! Length is in the unit of Rs, Rho is in the unit of amu/m^3,
   ! temperature is in the unit of kinetic energy, all others are in SI units.
-  character(len=6), public :: NameVarUnit_V(LagrID_:nVar) = (/&
+  character(len=6), public :: NameVarUnit_V(LagrID_:nVar) = [&
        'none  ', &
        'RSun  ', &
        'RSun  ', &
@@ -69,7 +67,7 @@ module SP_ModUnit
        'T     ', &
        'none  ', &
        'amu/m3', &
-       'T     '/)
+       'T     ']
 
   logical :: DoInit = .true.
 contains
@@ -77,14 +75,15 @@ contains
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var,i_session_read
     use ModUtilities, ONLY: lower_case
-    use SP_ModGrid  , ONLY: T_
-    character(len=*), intent(in):: NameCommand ! From PARAM.in  
-    character(len=*), parameter :: NameSub='SP:read_param_unit'
+    use SP_ModGrid, ONLY: T_
+    character(len=*), intent(in):: NameCommand ! From PARAM.in
+
+    character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#PARTICLEENERGYUNIT')
        if(i_session_read() /= 1)RETURN
-       !Read unit to be used for particle energy: keV, MeV, GeV
+       ! Read unit to be used for particle energy: keV, MeV, GeV
        call read_var('ParticleEnergyUnit', NameEnergyUnit)
 
        call lower_case(NameEnergyUnit)
@@ -96,7 +95,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine init
-    character(len=*), parameter :: NameSub='SP:init_unit'
+    character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
 
@@ -132,4 +131,5 @@ contains
     momentum_to_kinetic_energy = &
          gen_momentum_to_kin_energy(Momentum, NameParticle)
   end function momentum_to_kinetic_energy
+  !============================================================================
 end module SP_ModUnit
