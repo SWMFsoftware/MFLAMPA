@@ -1,7 +1,8 @@
-!  Copyright (C) 2002 Regents of the University of Michigan, portions used 
-!  with permission 
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used
+!  with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-Module SP_ModTurbulence
+module SP_ModTurbulence
   use ModConst
   use SP_ModDistribution, ONLY: nP
   use SP_ModGrid,         ONLY: iPTest, iParticleTest
@@ -14,9 +15,7 @@ Module SP_ModTurbulence
        read_param, set_wave_advection_rates, reduce_advection_rates, dxx,  &
        init_spectrum, update_spectrum
 
-  !\
   ! Logicals, all .false. by default
-  !/
   logical:: DoInitSpectrum              = .false.
   logical:: UseTurbulentSpectrum        = .false.
   logical:: UseAdvectionWithAlfvenSpeed = .false.
@@ -30,25 +29,25 @@ Module SP_ModTurbulence
   real, allocatable :: kOverBSI_I(:)
   real, allocatable :: kSI_I(:)
 
-  ! Rate of advection in k space, neglecting 
+  ! Rate of advection in k space, neglecting
   ! a spacial advection with the Alfven speed
   real, allocatable:: DispersionA_I(:)
 
-  !Rate of advection in k space, for I_+/I_- wave 
+  ! Rate of advection in k space, for I_+/I_- wave
   real, allocatable:: DispersionPlus_I(:)
   real, allocatable:: DispersionMinus_I(:)
 
-  ! This is the ratio of densities powered 3/2 
+  ! This is the ratio of densities powered 3/2
   real, allocatable:: RhoCompression_I(:)
 
   !------------------------------------------------------------------------!
   !          Grid in the momentum space                                    !
-  !iP     0     1                         nP   nP+1                        !
+  ! iP     0     1                         nP   nP+1                        !
   !       |     |    ....                 |     |                          !
-  !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))   !
+  ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))   !
   !             |    Grid in k-space      |     |                          !
-  !K/B         KMax                      KMin                              !
-  !ik     0     1                         nP   nP+1                         !
+  ! K/B         KMax                      KMin                              !
+  ! ik     0     1                         nP   nP+1                         !
   !------------------------------------------------------------------------!
 
   real,allocatable,private:: AK_II(:,:)
@@ -58,7 +57,7 @@ Module SP_ModTurbulence
 
   integer,allocatable::      CorrectionMode_X(:)
 
-  !the intensity of the back travelling wave in the initial condition
+  ! the intensity of the back travelling wave in the initial condition
   real :: Alpha       = 1.0/10
   real :: Lambda0InAu = 4.0/10.0  ![AU]
 contains
@@ -67,8 +66,8 @@ contains
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand
 
-    character(len=*), parameter :: NameSub = 'SP:read_param_Turbulence'
-    !-------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
 
     select case(NameCommand)
     case('#INITSPECTRUM')
@@ -94,8 +93,8 @@ contains
     ! Init all the allocatable vars
     use SP_ModSize, ONLY: nParticleMax
     use SP_ModProc, ONLY: iProc
-    character(len=*), parameter :: NameSub = 'SP_init_turbulent'
-    !-------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'init'
+    !--------------------------------------------------------------------------
 
     allocate(IPlusSI_IX(0:nP+1,1:nParticleMax), &
          IMinusSI_IX(0:nP+1,1:nParticleMax))
@@ -116,7 +115,7 @@ contains
     allocate(AK_II(nP,nParticleMax),BK_II(nP,nParticleMax))
 
     if (UseTurbulentSpectrum .and. .not. DoInitSpectrum) then
-       DoInitSpectrum = .true. 
+       DoInitSpectrum = .true.
        if (iProc == 0) then
           write(*,*) NameSub, ': UseTurbulentSpectrum: '
           write(*,*) NameSub, ': DoInitSpectrum is switched to T'
@@ -125,9 +124,9 @@ contains
   end subroutine init
   !============================================================================
   subroutine finalize
-    character(len=*), parameter :: NameSub = 'SP_init_turbulent'
 
-    !-------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'finalize'
+    !--------------------------------------------------------------------------
     deallocate(IPlusSI_IX,IMinusSI_IX)
     deallocate(kOverBSI_I, kSI_I)
     deallocate(ICSI_X,CorrectionMode_X)
@@ -150,8 +149,8 @@ contains
   subroutine init_spectrum(iEnd, XyzSI_DI, BSI_I, MomentumSI_I, dLogP, iShock,&
        CoefInj, AlfvenMach)
     !==============Initial spectrum of turbulence=============================!
-    ! We recover the initial spectrum of turbulence from the spatial 
-    ! distribution of the diffusion coefficient and its dependence on the 
+    ! We recover the initial spectrum of turbulence from the spatial
+    ! distribution of the diffusion coefficient and its dependence on the
     ! particle energy.
 
     ! the number of active particles on the line
@@ -169,7 +168,7 @@ contains
     ! delta log p in SI unit
     real,intent(in)     :: dLogP
 
-    ! coef of injection 
+    ! coef of injection
     real,intent(in)     :: CoefInj
 
     ! Alfven March number
@@ -182,7 +181,7 @@ contains
     real    :: ICOldSI, kSI
     real    :: rSI , rShockSI
 
-    !-------------------------------------------------------------------------!
+    !--------------------------------------------------------------------------
 
     IPlusSI_IX  = 0.0; IMinusSI_IX   = 0.0
     vAlfvenSI_I = 0.0; DispersionA_I = 0.0
@@ -197,12 +196,12 @@ contains
 
     !-------------------------------------------------------------------------!
     !          Grid in the momentum space                                     !
-    !iP     0     1                         nP   nP+1                         !
+    ! iP     0     1                         nP   nP+1                         !
     !       |     |    ....                 |     |                           !
-    !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
+    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
     !             |    Grid in k-space      |     |                           !
-    !K/B         KMax                      KMin                               !
-    !ik     0     1                         nP   nP+1                         !
+    ! K/B         KMax                      KMin                               !
+    ! ik     0     1                         nP   nP+1                         !
     !-------------------------------------------------------------------------!
 
     ! k = e*B/p => dlog(k) = - dlog(p)
@@ -216,7 +215,6 @@ contains
          XyzSI_DI(:, 1:iEnd), BSI_I(1:iEnd))
 
     CorrectionMode_X=1.0
-
 
     do iParticle=1,iEnd
        rSI   = sqrt(sum(XyzSI_DI(:,iParticle)**2))
@@ -239,7 +237,7 @@ contains
 
              CorrectionMode_X(iParticle)=2
           else
-             ! Do not change if the newly calculated value is less than the 
+             ! Do not change if the newly calculated value is less than the
              ! old one
              ICSI_X(iParticle) = ICOldSI
           end if
@@ -259,7 +257,7 @@ contains
 
     integer :: iParticle
     real    :: kSI_I(iKFirst:iKLast), kr0SI, rSI
-    !------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     do iParticle=iParticleFirst,iParticleLast
        ! kr0 = c*e*B/(1 GeV) in SI unit.
        kr0SI = cElectronCharge*BSI_I(iParticle)*cLightSpeed/cGeV
@@ -274,7 +272,7 @@ contains
 
        ! I_{+} + I_{-} = IC/k^(5/3)
        ! I_{+}(k)=(1-\Alpha)*IC/K^{5/3} and I_{-}=\Alpha*I_{+}/(1-\Alpha),
-       ! where IC=54*B^2/(7*pi*mu0*Lambda_0*kr0^{1/3}*(r/1 [AU])) and 
+       ! where IC=54*B^2/(7*pi*mu0*Lambda_0*kr0^{1/3}*(r/1 [AU])) and
        ! \Lambda_0=0.4 [AU], and kr0 = c*e*B/(1 GeV), all in SI unit
        IPlusSI_IX(iKFirst:iKLast,iParticle)  =  &
             (1.0-Alpha)*ICSI_X(iParticle)/kSI_I**(5.0/3)
@@ -296,7 +294,7 @@ contains
 
     ! local vars
     integer :: iParticle, DsSI, DLogRho, DLogB
-    !-------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
 
     ! Calculate alfven speed in SI unit
     vAlfvenSI_I = BSI_I/sqrt(cMu*RhoSI_I)
@@ -306,7 +304,7 @@ contains
     ! Contribution to the advection in k_space from the Lagrangian derivatives:
     ! Dispersion = Dt * [ (D ln {\rho})/(Dt) - 2 (D ln { B })/(D t) ] + ...
 
-    DispersionA_I = log(RhoSI_I*BOldSI_I**2/(RhoOldSI_I*BSI_I**2)) 
+    DispersionA_I = log(RhoSI_I*BOldSI_I**2/(RhoOldSI_I*BSI_I**2))
 
     if(UseAdvectionWithAlfvenSpeed)then
        do iParticle =1,iEnd
@@ -318,13 +316,13 @@ contains
              ! Seems DsSI_I(iEnd) is not defined.
              DsSI = DsSI_I(iEnd-1)
           end if
-          
+
           CFL_I(iParticle) = Dt*vAlfvenSI_I(iParticle)/DsSI
        end do
 
-       !Now add the contribution from the spacial derivative:
-       ! ... + Dt * [ \partial ((1/2) ln {rho})/(\partial s)-2\partial( ln{B})/(\partial s) ]  
-       !for the "plus" wave 
+       ! Now add the contribution from the spacial derivative:
+       ! ... + Dt * [ \partial ((1/2) ln {rho})/(\partial s)-2\partial( ln{B})/(\partial s) ]
+       ! for the "plus" wave
 
        DLogRho = log(RhoSI_I(2)/ RhoSI_I(1))
        DLogB   = log(BSI_I(2)  / BSI_I(1))
@@ -344,9 +342,9 @@ contains
                + CFL_I(iParticle)*(0.5*DLogRho-2.0*DLogB)
        end do
 
-       !Now add the contribution from the spacial derivative:
-       ! ... - Dt * [ \partial ((1/2) ln {rho})/(\partial s)-2\partial( ln{B})/(\partial s) ]  
-       !for the "minus" wave 
+       ! Now add the contribution from the spacial derivative:
+       ! ... - Dt * [ \partial ((1/2) ln {rho})/(\partial s)-2\partial( ln{B})/(\partial s) ]
+       ! for the "minus" wave
 
        DispersionMinus_I(1:iEnd) = 2.0*DispersionA_I(1:iEnd) &
             - DispersionPlus_I(1:iEnd)
@@ -365,7 +363,7 @@ contains
   !============================================================================
   subroutine reduce_advection_rates(nStep)
     integer, intent(in) :: nStep
-    !-------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     if(UseAdvectionWithAlfvenSpeed) then
        DispersionPlus_I  = DispersionPlus_I  /real(nStep)
        DispersionMinus_I = DispersionMinus_I /real(nStep)
@@ -388,25 +386,21 @@ contains
 
     logical :: DoTestMe = .false.
 
-    !-------------------------------------------------------------------------
-
     ! The coefficient of a spatial diffusion along the magnetic field is
     ! given by a formula in the SI unit:
     ! D_{xx}=v*B^2/(cPi*cMu)*(AK_I(k_{res})-k_{res}^2*BK_I(k_{res})),
 
     ! where AK_I=\int_{k_{res}}^\infty{d(\log k)/(k^2*(I_{+}(k) + I_{-}(k) )) }
     ! and   BK_I=\int_{k_{res}}^\infty{d(\log k)/(k^4*(I_{+}(k) + I_{-}(k) )) }
-    !--------------------------------------------------------------------
 
-    !-------------------------------------------------------------------------!
     !          Grid in the momentum space                                     !
-    !iP     0     1                         nP   nP+1                         !
+    ! iP     0     1                         nP   nP+1                         !
     !       |     |    ....                 |     |                           !
-    !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
+    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
     !             |    Grid in k-space      |     |                           !
-    !K/B         kMax(k0)                  kMin                               !
-    !ik     0     1                         nP   nP+1                         !
-    !-------------------------------------------------------------------------!
+    ! K/B         kMax(k0)                  kMin                               !
+    ! ik     0     1                         nP   nP+1                         !
+    !--------------------------------------------------------------------------
 
     do iParticle=1,iEnd
        select case(CorrectionMode_X(iParticle))
@@ -420,11 +414,11 @@ contains
 
        ! Initially from kMax
        k0SI = kSI_I(1)
-       
+
        ! The sum of I_{plus}+I_{minus} at P_max
        ISumSI = IPlusSI_IX(1,iParticle)+IMinusSI_IX(1,iParticle)
 
-       !The integrand for AK_I, BK_I
+       ! The integrand for AK_I, BK_I
        F01 = 1.0/(k0SI**2)/ISumSI
        F02 = 1.0/(k0SI**4)/ISumSI
 
@@ -449,8 +443,8 @@ contains
 
        do iK=2,nP
           ! We calculate the partial sums for a set of the wave number values.
-          ! The integral is taken from KRes up to infinity, so we start from 
-          ! the maximal wave number and add the contributions from each of 
+          ! The integral is taken from KRes up to infinity, so we start from
+          ! the maximal wave number and add the contributions from each of
           ! the wave number intervals.
 
           ! The current value of the wave number
@@ -468,13 +462,13 @@ contains
           AK_II(iK,iParticle)=AK_II(iK-1,iParticle)+0.5*(F01+F11)*dLogK
           BK_II(iK,iParticle)=BK_II(iK-1,iParticle)+0.5*(F02+F12)*dLogK
 
-          ! current values saved as the initial values for the next step in 
+          ! current values saved as the initial values for the next step in
           ! the loop
           k0SI = k1SI; F01=F11; F02=F12
        end do
     end do
   end subroutine set_dxx
-  !===========================================================================
+  !============================================================================
   subroutine update_spectrum(iEnd, nP, MomentumSI_I, DLogP, &
        XyzSI_DI, DsSI_I, F_II, BSI_I, RhoSI_I, SP_Dt)
 
@@ -485,11 +479,11 @@ contains
 
     use SP_ModLogAdvection, ONLY: advance_log_advection
     use ModLinearAdvection
-    !-----------------------------------------------------------------
-    !The number of points and the number of the energy intervals
+
+    ! The number of points and the number of the energy intervals
     integer,intent(in)::iEnd,nP
 
-    real, intent(in) :: MomentumSI_I(0:nP+1), DLogP, SP_Dt  
+    real, intent(in) :: MomentumSI_I(0:nP+1), DLogP, SP_Dt
     ! Coordinates of the Lagrangian points
     real, intent(in) :: XyzSI_DI(3, 1:iEnd)
     real, intent(in) :: DsSI_I(1:iEnd)
@@ -500,36 +494,37 @@ contains
 
     integer :: iParticle,iK,iP
 
-    !Resonant value of the particle momentum, for a given K
+    ! Resonant value of the particle momentum, for a given K
     real:: PRes
 
-    ! The increment for the I_+ wave, multiplied by (I_+  +  I_-). Below 
-    ! the dynamical equations for I_+ and I_- are reformulated in terms of 
-    ! \gamma and integrated exactly assuming the constant value of \gamma 
-    ! (NOT the increment) through the time step 
+    ! The increment for the I_+ wave, multiplied by (I_+  +  I_-). Below
+    ! the dynamical equations for I_+ and I_- are reformulated in terms of
+    ! \gamma and integrated exactly assuming the constant value of \gamma
+    ! (NOT the increment) through the time step
     real:: Gamma
 
-    !Wave number
+    ! Wave number
     real:: K
 
-    !Forward and backward values for Ds 
+    ! Forward and backward values for Ds
     real:: DsPlusSI,DsMinusSI
 
-    !Spatial derivatives of the distribution function at given values 
+    ! Spatial derivatives of the distribution function at given values
     ! of the momentum
     real:: DfDs0,P0,DfDs1,P1
 
-    !Partial sums in the integral for Gamma
+    ! Partial sums in the integral for Gamma
     real:: A_I(nP+1),B_I(nP+1)
 
-    !Variables used in the spectral model for turbulence
+    ! Variables used in the spectral model for turbulence
     real:: ExpRhoCompression
 
-    !Miscellaneous 
+    ! Miscellaneous
     real:: C1,C2,C3
 
+    !--------------------------------------------------------------------------
     do iParticle=1,iEnd
-       !Advection in k space:
+       ! Advection in k space:
        if(UseAdvectionWithAlfvenSpeed)then
           call advance_log_advection(DispersionPlus_I(iParticle),  nP, 1, 1, &
                IPlusSI_IX( :,iParticle),IsConservative=.true., &
@@ -548,52 +543,52 @@ contains
 
        !----------------------------------------------------------------------!
        !          Grid in the momentum space                                  !
-       !iP     0     1                         nP   nP+1                      !
+       ! iP     0     1                         nP   nP+1                      !
        !       |     |    ....                 |     |                        !
-       !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P)) !
+       ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P)) !
        !             |    Grid in k-space      |     |                        !
-       !K/B         KMax                      KMin                            !
-       !ik     0     1                         nP   nP+1                      !
+       ! K/B         KMax                      KMin                            !
+       ! ik     0     1                         nP   nP+1                      !
        !----------------------------------------------------------------------!
 
-       !Calculate the partial sums in the integral for \Gamma
-       !Nullify the sums
+       ! Calculate the partial sums in the integral for \Gamma
+       ! Nullify the sums
 
        A_I(nP+1)=0.0; B_I(nP+1)=0.0
 
-       ! Calculate the spatial derivatives of the distribution function 
+       ! Calculate the spatial derivatives of the distribution function
        ! at the maximal energy
 
        if (iParticle==1) then
           DsPlusSI = max(cTiny, DsSI_I(1))
 
-          !Use the forward spatial derivative
+          ! Use the forward spatial derivative
           DfDs0=(F_II(nP,iParticle+1)-F_II(nP,iParticle))/DsPlusSI
 
        else if (iParticle==iEnd) then
           ! again, DsSI_I(iEnd) is not defined...
           DsMinusSI = max(cTiny, DsSI_I(iEnd-1))
 
-          !Use the backward spatial derivative
+          ! Use the backward spatial derivative
           DfDs0=(F_II(nP,iParticle)-F_II(nP,iParticle-1))/DsMinusSI
 
        else
           DsPlusSI  = max(cTiny, DsSI_I(iParticle))
           DsMinusSI = max(cTiny, DsSI_I(iParticle-1))
 
-          !Use the average between the forward and backward spatial derivatives
-          DfDs0=cHalf*((F_II(nP,iParticle+1)-F_II(nP,iParticle  ))/DsPlusSI+&
+          ! Use the average between the forward and backward spatial derivatives
+          DfDs0=0.5*((F_II(nP,iParticle+1)-F_II(nP,iParticle  ))/DsPlusSI+&
                (F_II(nP,iParticle  )-F_II(nP,iParticle-1))/DsMinusSI)
 
        end if
 
-       !The momentum at the maximal energy
+       ! The momentum at the maximal energy
 
        P0 = MomentumSI_I(nP+1)
 
        ! We calculate the partial sums for a set of the momentum values.
        ! The integral is taken from pRes up to infinity, so we start from the
-       ! maximal energy and add the contributions from each of the energy 
+       ! maximal energy and add the contributions from each of the energy
        ! intervals.
 
        do iP=nP,1,-1
@@ -601,56 +596,56 @@ contains
           ! Calculate the momentum at the lower energy
           P1 = MomentumSI_I(iP)
 
-          !Calculate the distribution function gradient at the lower energy
+          ! Calculate the distribution function gradient at the lower energy
 
           if (iParticle == 1) then
              DfDs1 = (F_II(iP,iParticle+1)-F_II(iP,iParticle  ))/DsPlusSI
           else if (iParticle == iEnd) then
              DfDs1 = (F_II(iP,iParticle  )-F_II(iP,iParticle-1))/DsMinusSI
           else
-             DfDs1 = cHalf* &
+             DfDs1 = 0.5* &
                   ( (F_II(iP,iParticle+1)-F_II(iP,iParticle  ))/DsPlusSI  +&
                   (  F_II(iP,iParticle  )-F_II(iP,iParticle-1))/DsMinusSI )
           end if
 
-          ! here are the parts for \gamma being integrated 
+          ! here are the parts for \gamma being integrated
           ! For I_+ the increment equals \frac{\gamma}{(I_{+}+I_{-})}
-          ! where \gamma =-4.0*(cPi**2)*Va/k *Integral/cProtonMass 
+          ! where \gamma =-4.0*(cPi**2)*Va/k *Integral/cProtonMass
           ! Integral=\int_{p_{res}(k)}^{\infty}{\frac{dp}{p}*p^4
           ! (p_{res}(k)-\frac{p_{res}^3}{p^2})\frac{\partial{f}}{\partial{s}}
           !
           ! A=p_{res}^{k}=\int{d(ln{p})*(p^{4}*{\frac{\partial{f}}{\partial{s}}}}
           ! B=p_{res}^{3}\int{d(ln{p})*p^2*{\frac{\partial{f}}{\partial{s}}
 
-          A_I(iP)=A_I(iP+1)+cHalf*(DfDs0*(P0**4)+DfDs1*(P1**4))*DLogP
-          B_I(iP)=B_I(iP+1)+cHalf*(DfDs0*(P0**2)+DfDs1*(P1**2))*DLogP
+          A_I(iP)=A_I(iP+1)+0.5*(DfDs0*(P0**4)+DfDs1*(P1**4))*DLogP
+          B_I(iP)=B_I(iP+1)+0.5*(DfDs0*(P0**2)+DfDs1*(P1**2))*DLogP
 
-          ! Save the values for the lower energy to re-use them as the values 
-          ! for the higher energy end of the next interval (in CYCLING the 
+          ! Save the values for the lower energy to re-use them as the values
+          ! for the higher energy end of the next interval (in CYCLING the
           ! momentummo DECREASES)
 
           P0=P1; DfDs0=DfDs1
        end do
 
-       !Calculate the wave increment and update the wave spectra
+       ! Calculate the wave increment and update the wave spectra
        ExpRhoCompression=exp(RhoCompression_I(iParticle))
 
        call assign_kolmogorov_spectrum( &
             iParticle, iParticle, 0, 0, XyzSI_DI(:,iParticle:iParticle),&
             BSI_I(iParticle:iParticle))
-       !IPlusSI_IX(    0,iParticle) = 
+       ! IPlusSI_IX(    0,iParticle) =
        !       IPlusSI_IX(  0,iParticle)*ExpRhoCompression
-       !IMinusSI_IX(   0,iParticle) = 
+       ! IMinusSI_IX(   0,iParticle) =
        !       IMinusSI_IX( 0,iParticle)*ExpRhoCompression
 
        !----------------------------------------------------------------------!
        !          Grid in the momentum space                                  !
-       !iP     0     1                         nP   nP+1                      !
+       ! iP     0     1                         nP   nP+1                      !
        !       |     |    ....                 |     |                        !
-       !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P)) !
+       ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P)) !
        !             |    Grid in k-space      |     |                        !
-       !K/B         KMax                      KMin                            !
-       !ik     0     1                         nP   nP+1                      !
+       ! K/B         KMax                      KMin                            !
+       ! ik     0     1                         nP   nP+1                      !
        !----------------------------------------------------------------------!
 
        do iK = nK,1,-1
@@ -676,13 +671,13 @@ contains
           ! DI_-/Dt =(3/2)* (D ln rho/Dt)) *I_-  -  \gamma/(I_+ + I_-) * I_-
           ! see Eq.(\ref{eq:Lagrangian})
           !
-          ! Make a substitution 
+          ! Make a substitution
           ! I_+ = I_+(new) * rho^{3/2},    I_- = I_-(new) * rho^{3/2}
           !
-          ! The modified equations do not involve the density derivative on 
-          ! the right hand side and are given below. The solution will be 
-          ! expressed in terms of I_+ * I_- and I_+  - I_-, in which we 
-          ! multiply the "old" values of intinsity by the compression ratio 
+          ! The modified equations do not involve the density derivative on
+          ! the right hand side and are given below. The solution will be
+          ! expressed in terms of I_+ * I_- and I_+  - I_-, in which we
+          ! multiply the "old" values of intinsity by the compression ratio
           ! to account for the contribution from the density derivative.
 
           ! Compression  factor comes twice
@@ -700,26 +695,26 @@ contains
 
           C3=gamma*SP_Dt+C2
 
-          ! Having in mind the conservation of the c1= I_-*I_+ product, 
+          ! Having in mind the conservation of the c1= I_-*I_+ product,
           ! solve the quadratic equation for I_+ :   I_+^2-c3*I_+ - c1=0.
           ! To avoid the loss in accuracy, occuring at C3>>C1, calculate that
-          ! root of the quadratic equation which may be obataibed as a total 
+          ! root of the quadratic equation which may be obataibed as a total
           ! of two POSITIVE numbers
 
           if(C3>0)then
 
-             IPlusSI_IX(iK,iParticle)=(C3+sqrt(C3**2+4.0*C1))/2.0 
+             IPlusSI_IX(iK,iParticle)=(C3+sqrt(C3**2+4.0*C1))/2.0
 
-             ! Now we take again into account the conservation of the 
+             ! Now we take again into account the conservation of the
              ! product I_+*I_-
              ! which is the consequence of the relationship \gamma_-=-\gamma_+
 
              IMinusSI_IX(iK,iParticle)=C1/IPlusSI_IX(iK,iParticle)
           else
 
-             IMinusSI_IX(iK,iParticle)=(-C3+sqrt(C3**2+4.0*C1))/2.0 
+             IMinusSI_IX(iK,iParticle)=(-C3+sqrt(C3**2+4.0*C1))/2.0
 
-             ! Now we take again into account the conservation of the product 
+             ! Now we take again into account the conservation of the product
              ! I_+*I_-
              ! which is the consequence of the relationship \gamma_-=-\gamma_+
 
@@ -738,10 +733,10 @@ contains
              stop
           end if
 
-       end do    !cycling iK
+       end do    ! cycling iK
        IPlusSI_IX( nP+1,iParticle) = IPlusSI_IX( nP,iParticle)
        IMinusSI_IX(nP+1,iParticle) = IMinusSI_IX(nP,iParticle)
-    end do       !cycling iParticle
+    end do       ! cycling iParticle
 
     if(UseAdvectionWithAlfvenSpeed)then
        do iK=0,nP+1
@@ -773,17 +768,14 @@ contains
 
     logical :: DoTestMe =.false.
 
-    !-------------------------------------------------------------------------
-
-    !-------------------------------------------------------------------------!
     !          Grid in the momentum space                                     !
-    !iP     0     1                         nP   nP+1                         !
+    ! iP     0     1                         nP   nP+1                         !
     !       |     |    ....                 |     |                           !
-    !P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
+    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
     !             |    Grid in k-space      |     |                           !
-    !K/B         KMax                      KMin                               !
-    !ik     0     1                         nP   nP+1                         !
-    !-------------------------------------------------------------------------!
+    ! K/B         KMax                      KMin                               !
+    ! ik     0     1                         nP   nP+1                         !
+    !--------------------------------------------------------------------------
 
     ! The coefficient of a spatial diffusion along the magnetic field is
     ! given by a formula in the SI unit:
@@ -808,4 +800,4 @@ contains
 
   end function Dxx
   !============================================================================
-end Module SP_ModTurbulence
+end module SP_ModTurbulence
