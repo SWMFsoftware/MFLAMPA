@@ -6,8 +6,11 @@ module SP_ModGrid
   ! Dec.23 2017: exclude fluxes from the state vector.
   ! Dec.25 2017: standard init and read_param
   ! Dec.25 2017: rename nVarRead=>nMHData, add NoShock_ param.
-  use SP_ModSize, ONLY: nDim, nParticleMax
-  use SP_ModProc, ONLY: iProc
+#ifdef OPENACC
+  use ModUtilities, ONLY: norm2
+#endif
+  use SP_ModSize,  ONLY: nParticleMax
+  use SP_ModProc,  ONLY: iProc
   use ModNumConst, ONLY: cTwoPi, cPi
   implicit none
   SAVE
@@ -29,7 +32,7 @@ module SP_ModGrid
   ! Number of blocks on this processor
   integer, public              :: nBlock
   ! Number of particles per block (line):
-  integer, public, allocatable :: nParticle_B(:)
+  integer, public,     pointer :: nParticle_B(:)
   !
   !
   ! angular grid at origin surface
@@ -42,34 +45,38 @@ module SP_ModGrid
   ! 1st index - longitude index
   ! 2nd index - latitude index
   integer, public, allocatable:: iNode_II(:,:)
-  ! inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
-  public :: get_node_indexes
   !
+  ! inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
+  !
+  public :: get_node_indexes
   !
   ! Node number based on the local block number
   ! 1st index - block number
-  integer, public, allocatable:: iNode_B(:)
   !
+  integer, public, allocatable:: iNode_B(:)
   !
   ! Various house-keeping information about the node/line;
   ! 1st index - identification of info field
   ! 2nd index - node number / block number
   !
-  !
   ! Proc_ and Block_ number, for a given node:
+  !
   integer, public, parameter:: &
        Proc_  = 1, & ! Processor that has this line/node
        Block_ = 2    ! Block that has this line/node
-    integer, public, allocatable:: iGridGlobal_IA(:,:)
   !
+  ! They is the first index values for
+  ! the following array
+  !
+  integer, public, allocatable:: iGridGlobal_IA(:,:)
   !
   ! Array for current and present location of shock wave
+  !
   integer, public, parameter:: nShockParam = 2,  &
        Shock_   = 1, & ! Current location of a shock wave
        ShockOld_= 2    ! Old location of a shock wave
   integer, public, allocatable:: iShock_IB(:,:)
   integer, public, parameter:: NoShock_ = 1
-  !
   !
   ! Information about the magnetic field line foot point:
   ! the Lagrangian (0) and Cartesian (1:3) coordinates, and
@@ -77,10 +84,9 @@ module SP_ModGrid
        Length_ = 4               ! control appending  new particles
   real, public, allocatable:: FootPoint_VB(:,:)
   !
-  !
   ! Magnetic flux (absolute value) associated with lines
-  real, public, allocatable:: MagneticFluxAbs_B(:)
   !
+  real, public, allocatable:: MagneticFluxAbs_B(:)
   !
   ! MHD state vector;
   ! 1st index - identification of variable (LagrID_:Wave2_)
@@ -88,16 +94,16 @@ module SP_ModGrid
   ! 3rd index - local block number
   !
   real, public, pointer     :: MHData_VIB(:,:,:)
-
+  !
   ! Aux state vector;
-  ! 1st index - identification of variable (LagrID_:Wave2_)
+  ! 1st index - identification of variable (D_:BOld_)
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
   !
-
   real, public, allocatable :: State_VIB(:,:,:)
-
+  !
   ! Number of variables in the state vector and the identifications
+  !
   integer, public, parameter :: nMHData = 13, nVar = 21,          &
        !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
@@ -112,18 +118,17 @@ module SP_ModGrid
        Bx_         = 9, & !                                   |or
        By_         =10, & ! Background magnetic field         |received
        Bz_         =11, & !                                   |from
-       Wave1_      =12, & !\                                  |coupler
+       Wave1_      =12, & !                                   |coupler
        Wave2_      =13, & !-Alfven wave turbulence            v
-       !
-       !
+       !-
        D_          =14, & ! Distance to the next particle  ^derived from
        S_          =15, & ! Distance from the foot point   |MHdata in
        R_          =16, & ! Heliocentric distance          |get_other_
        U_          =17, & ! Plasma speed                   |state_var
        B_          =18, & ! Magnitude of magnetic field    v
        DLogRho_    =19, & ! Dln(Rho), i.e. -div(U) * Dt
-       RhoOld_     =20, & ! Background plasma density      !\copy_
-       BOld_       =21    ! Magnitude of magnetic field    !/old_state
+       RhoOld_     =20, & ! Background plasma density      ! copy_
+       BOld_       =21    ! Magnitude of magnetic field    ! old_state
   !
   !
   ! variable names
@@ -243,8 +248,6 @@ contains
     call check_allocate(iError, NameSub//'iNode_B')
     allocate(iGridGlobal_IA(Proc_:Block_, nNode), stat=iError)
     call check_allocate(iError, NameSub//'iGridGlobal_IA')
-    allocate(nParticle_B(nBlock), stat=iError)
-    call check_allocate(iError, NameSub//'nParticle_B')
     allocate(iShock_IB(nShockParam, nBlock), stat=iError)
     call check_allocate(iError, NameSub//'iShock_IB')
     allocate(FootPoint_VB(LagrID_:Length_, nBlock), stat=iError)
@@ -265,10 +268,11 @@ contains
        do iLon = 1, nLon
           iNode = iLon + nLon * (iLat-1)
           iNode_II(iLon, iLat) = iNode
+          !
           ! iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
+          !
           if(iProcNode==iProc)then
              iNode_B(     iBlock) = iNode
-             nParticle_B( iBlock) = 0
              iShock_IB(:, iBlock) = NoShock_
           end if
           iGridGlobal_IA(Proc_,   iNode)  = iProcNode
@@ -295,7 +299,7 @@ contains
     integer :: iParticle, iError
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
-    ! Allocate here if stand alone 
+    ! Allocate here if stand alone
     allocate(MHData_VIB(LagrID_:nMHData, 1:nParticleMax, nBlock))
     !
     MHData_VIB(1:nMHData,:,:) = 0.0
@@ -305,6 +309,8 @@ contains
     do iParticle = 1, nParticleMax
        MHData_VIB(LagrID_, iParticle, 1:nBlock) = real(iParticle)
     end do
+    allocate(nParticle_B(nBlock))
+    nParticle_B = 0
   end subroutine init_stand_alone
   !============================================================================
   subroutine get_node_indexes(iNodeIn, iLonOut, iLatOut)
@@ -336,23 +342,23 @@ contains
   subroutine get_other_state_var
     integer:: iBlock, iParticle, iEnd
     integer:: iAux1, iAux2
-    real   :: XyzAux1_D(1:nDim), XyzAux2_D(1:nDim)
+    real   :: XyzAux1_D(x_:z_), XyzAux2_D(x_:z_)
     !--------------------------------------------------------------------------
     do iBlock = 1, nBlock
        iEnd   = nParticle_B(  iBlock)
        do iParticle = 1, iEnd
           ! plasma speed
           State_VIB(U_,iParticle, iBlock) = &
-               sqrt(sum(MHData_VIB(Ux_:Uz_,iParticle,iBlock)**2))
+               norm2(MHData_VIB(Ux_:Uz_,iParticle,iBlock))
           ! magnetic field
           State_VIB(B_,iParticle, iBlock) = &
-               sqrt(sum(MHData_VIB(Bx_:Bz_,iParticle,iBlock)**2))
+               norm2(MHData_VIB(Bx_:Bz_,iParticle,iBlock))
           ! distances between particles
           if(.not.DoSmooth)then
              if(iParticle /=nParticle_B(iBlock))&
-                  State_VIB(D_, iParticle, iBlock) = sqrt(sum((&
+                  State_VIB(D_, iParticle, iBlock) = norm2(&
                   MHData_VIB(X_:Z_, iParticle    , iBlock) - &
-                  MHData_VIB(X_:Z_, iParticle + 1, iBlock))**2))
+                  MHData_VIB(X_:Z_, iParticle + 1, iBlock))
           else
              ! smoothing is done by groups:
              ! nSmooth particles are aggeregated into single effective one,
@@ -366,7 +372,7 @@ contains
              XyzAux2_D = sum(MHData_VIB(&
                   X_:Z_,iAux2-nSmooth+1:iAux2,iBlock),DIM=2)/nSmooth
              State_VIB(D_, iParticle, iBlock) = &
-                  sqrt(sum((XyzAux2_D-XyzAux1_D)**2)) / nSmooth
+                  sqrt(sum((XyzAux2_D - XyzAux1_D)**2)) / nSmooth
           end if
           ! distance from the beginning of the line
           if(iParticle == 1)then
@@ -427,4 +433,3 @@ contains
   end subroutine search_line
   !============================================================================
 end module SP_ModGrid
-!==============================================================================
