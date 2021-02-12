@@ -201,7 +201,7 @@ contains
     logical,intent(in)::DoAdd
     real,dimension(nVar),intent(in)::Buff_I
     integer:: iRho, iP, iMx, iMz, iBx, iBz, iWave1, iWave2
-    integer:: i, j, k, iBlock
+    integer:: i, iBlock
     integer:: iPartial
     real:: Weight
     real:: R, Aux
@@ -228,8 +228,6 @@ contains
     do iPartial = 0, nPartial-1
        ! cell and block indices
        i      = Put%iCB_II(1, iPutStart + iPartial)
-       j      = Put%iCB_II(2, iPutStart + iPartial)
-       k      = Put%iCB_II(3, iPutStart + iPartial)
        iBlock = Put%iCB_II(4, iPutStart + iPartial)
        ! interpolation weight
        Weight = W%Weight_I(   iPutStart + iPartial)
@@ -380,7 +378,7 @@ contains
     nParticle_B(iBlock) = MAX(nParticle_B(iBlock), iParticle)
   end subroutine SP_put_line
   !============================================================================
-  ! Called from coupler after the updated grid point location are
+  ! Called from coupler after the updated grid point lo<cation are
   ! received from the other component (SC, IH). Determines whether some
   ! grid points should be added/deleted
   subroutine SP_adjust_lines(DoInit)
