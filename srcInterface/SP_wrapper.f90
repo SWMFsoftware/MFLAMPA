@@ -25,7 +25,8 @@ module SP_wrapper
        Wave_, WaveFirstCouple_, WaveLastCouple_
   use ModConst, ONLY: rSun, cProtonMass
   use ModMpi
-  use CON_world, ONLY: is_proc0, is_proc, n_proc
+  use CON_world,  ONLY: is_proc0, is_proc, n_proc
+  use CON_mflampa, ONLY: iOffset_B
   implicit none
   save
   private ! except
@@ -55,7 +56,6 @@ module SP_wrapper
   real :: rInterfaceMin, rInterfaceMax
   ! buffer boundaries located near lower (Lo) or upper (Up) boudanry of domain
   real :: rBufferLo, rBufferUp
-  integer, allocatable :: iOffset_B(:)
   logical :: DoCheck = .true.
 contains
   !============================================================================
@@ -131,10 +131,10 @@ contains
          RETURN
     IsInitialized = .true.
     call init_grid
-    nullify(MHData_VIB)
-    call set_state_pointer(MHData_VIB, nBlock, nParticleMax)
+    nullify(MHData_VIB); nullify(nParticle_B)
+    call set_state_pointer(MHData_VIB, nParticle_B, &
+         nBlock, nParticleMax, SI2IO_I(UnitEnergy_))
     call initialize
-    allocate(iOffset_B(nBlock)); iOffset_B = 0
   end subroutine SP_init_session
   !============================================================================
   subroutine SP_finalize(TimeSimulation)
@@ -142,6 +142,7 @@ contains
     real,intent(in)::TimeSimulation
 
     ! if data are read from files, no special finalization is needed
+
     !--------------------------------------------------------------------------
     if(.not.DoReadMhData)call run(TimeSimulation)
     call finalize
@@ -680,4 +681,3 @@ contains
   end function is_in_buffer_xyz
   !============================================================================
 end module SP_wrapper
-!==============================================================================
