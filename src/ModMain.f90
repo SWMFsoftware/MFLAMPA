@@ -327,7 +327,7 @@ contains
        ! DataInputTime
     end if
     ! recompute the derived components of state vector, e.g.
-    ! magnitude of magnetic field and velocity etc.
+    ! magnitude of magnetic field and velocity etc. Smooth if needed.
     call get_other_state_var
     ! if no new background data loaded, don't advance in time
     if(DataInputTime <= SPTime) RETURN

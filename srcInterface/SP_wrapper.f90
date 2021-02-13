@@ -38,11 +38,8 @@ module SP_wrapper
   public:: SP_finalize
 
   ! coupling with MHD components
-  public:: SP_interface_point_coords
-  public:: SP_put_line
   public:: SP_adjust_lines
   public:: SP_get_bounds_comp
-  public:: SP_n_particle
   public:: SP_check_ready_for_mh
   public:: SP_put_coupling_param
   ! variables requested via coupling: coordinates,
@@ -99,12 +96,6 @@ contains
   end subroutine SP_get_bounds_comp
   !============================================================================
   ! Above routines may be called from superstructure only.
-  integer function SP_n_particle(iBlockLocal)
-    integer, intent(in) :: iBlockLocal
-    !--------------------------------------------------------------------------
-    SP_n_particle = nParticle_B(  iBlockLocal)
-  end function SP_n_particle
-  !============================================================================
   subroutine SP_run(TimeSimulation,TimeSimulationLimit)
     real,intent(inout)::TimeSimulation
     real,intent(in)::TimeSimulationLimit
@@ -135,7 +126,9 @@ contains
     call init_grid
     nullify(MHData_VIB); nullify(nParticle_B)
     call set_state_pointer(MHData_VIB, nParticle_B, &
-         nBlock, nParticleMax, 1/energy_in(NameEnergyUnit))
+         nBlock, nParticleMax,                      &
+         rMin, rMax,                                &
+         1/energy_in(NameEnergyUnit))
     call initialize
   end subroutine SP_init_session
   !============================================================================
@@ -208,6 +201,7 @@ contains
          CompID_ = SP_,&
          nDim    = nDim)
     ! Construct decomposition
+
     if(is_proc0(SP_))&
          call get_root_decomposition(&
          GridID_       = SP_,&
@@ -249,57 +243,6 @@ contains
        call CON_stop("Time in IHSP coupling differs from that in SCSP")
     end if
   end subroutine SP_put_coupling_param
-  !============================================================================
-  subroutine SP_interface_point_coords(nDim, Xyz_D, &
-       nIndex, iIndex_I, IsInterfacePoint)
-    ! interface points (request), which needed to be communicated
-    ! to other components to perform field line extraction and
-    ! perform further coupling with SP:
-    ! the framework tries to determine Xyz_D of such points,
-    ! SP changes them to the correct values
-    integer,intent(in)   :: nDim
-    real,   intent(inout):: Xyz_D(nDim)
-    integer,intent(in)   :: nIndex
-    integer,intent(inout):: iIndex_I(nIndex)
-    logical,intent(out)  :: IsInterfacePoint
-    integer:: iParticle, iBlock
-    real:: R2
-    character(len=*), parameter:: NameSub = 'SP_interface_point_coords'
-    !--------------------------------------------------------------------------
-    iParticle = iIndex_I(1); iBlock    = iIndex_I(4)
-    ! Check whether the particle is within interface bounds
-    R2 = sum(MHData_VIB(X_:Z_,iParticle,iBlock)**2)
-    IsInterfacePoint = &
-         R2 >= rInterfaceMin**2 .and. R2 < rInterfaceMax**2
-    ! Fix coordinates to be used in mapping
-    if(IsInterfacePoint)&
-         Xyz_D = MHData_VIB(X_:Z_, iParticle, iBlock)
-  end subroutine SP_interface_point_coords
-  !============================================================================
-  subroutine SP_put_line(nPartial, iPutStart, Put,&
-       Weight, DoAdd, Coord_D, nVar)
-    integer, intent(in) :: nPartial, iPutStart, nVar
-    type(IndexPtrType), intent(in) :: Put
-    type(WeightPtrType),intent(in) :: Weight
-    logical,            intent(in) :: DoAdd
-    real,               intent(in) :: Coord_D(nVar) ! nVar=nDim
-
-    ! indices of the particle
-    integer:: iBlock, iParticle
-    ! Misc
-    real :: R2
-    character(len=*), parameter:: NameSub = 'SP_put_line'
-    !--------------------------------------------------------------------------
-    R2 = sum(Coord_D(1:nDim)**2)
-    ! Sort out particles out of the SP domain
-    if(R2<RMin**2.or.R2>=RMax**2)RETURN
-    ! store passed particles
-    iBlock    = Put%iCB_II(4,iPutStart)
-    iParticle = Put%iCB_II(1,iPutStart) + iOffset_B(iBlock)
-    ! put coordinates
-    MHData_VIB(X_:Z_,iParticle, iBlock) = Coord_D(1:nDim)
-    nParticle_B(iBlock) = MAX(nParticle_B(iBlock), iParticle)
-  end subroutine SP_put_line
   !============================================================================
   ! Called from coupler after the updated grid point lo<cation are
   ! received from the other component (SC, IH). Determines whether some
