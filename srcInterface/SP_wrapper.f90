@@ -6,15 +6,12 @@ module SP_wrapper
   use SP_ModMain, ONLY: &
        run, save_restart, &
        DoRestart, DoReadMhData, &
-       nDim, nLat, nLon, nBlock, nParticleMax, &
+       nDim, nBlock, nParticleMax, &
        RMin=>RScMin, RBufferMin=>RIhMin, &
        RBufferMax=>RScMax, RMax=>RIhMax, &
        MHData_VIB, iNode_B, FootPoint_VB, DataInputTime, &
-       nParticle_B, Length_,&
-       LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_,  Ux_, Uz_, T_, &
-       Wave1_, Wave2_,  SI2IO_I, UnitEnergy_
+       nParticle_B, Length_, LagrID_,X_, Y_, Z_
   use CON_comp_info
-  use CON_router, ONLY: IndexPtrType, WeightPtrType
   use CON_coupler, ONLY: &
        set_coord_system, SP_, is_proc0, i_comm, i_proc0, &
        init_decomposition, get_root_decomposition, bcast_decomposition, &
@@ -23,7 +20,7 @@ module SP_wrapper
        Momentum_, RhoUxCouple_, RhoUzCouple_, &
        BField_, BxCouple_, BzCouple_, &
        Wave_, WaveFirstCouple_, WaveLastCouple_
-  use ModConst, ONLY: rSun, cProtonMass
+  use ModConst, ONLY: rSun
   use ModMpi
   use CON_world,  ONLY: is_proc0, is_proc, n_proc
   use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
@@ -46,13 +43,7 @@ module SP_wrapper
   ! field line and particles indexes
   character(len=*), parameter:: NameVarCouple =&
        'rho p mx my mz bx by bz i01 i02 pe'
-  integer :: Model_ = -1
   integer, parameter:: Lower_=0, Upper_=1
-  ! coupling parameters:
-  ! domain boundaries
-  !real :: rInterfaceMin, rInterfaceMax
-  ! buffer boundaries located near lower (Lo) or upper (Up) boudanry of domain
-  !real :: rBufferLo, rBufferUp
   logical :: DoCheck = .true.
 contains
   !============================================================================
@@ -110,7 +101,8 @@ contains
   end subroutine SP_run
   !============================================================================
   subroutine SP_init_session(iSession,TimeSimulation)
-    use SP_ModMain, ONLY: initialize
+    use SP_ModMain, ONLY: initialize, DoRestart, DoReadMhData
+    use SP_ModOriginPoints, ONLY: get_origin_points
     use SP_ModGrid, ONLY: init_grid=>init
     use CON_mflampa, ONLY: set_state_pointer
     use SP_ModUnit, ONLY:  NameEnergyUnit
@@ -130,6 +122,8 @@ contains
          rMin, rMax,                                &
          1/energy_in(NameEnergyUnit))
     call initialize
+    if(.not.(DoRestart.or.DoReadMhData))&
+         call get_origin_points
   end subroutine SP_init_session
   !============================================================================
   subroutine SP_finalize(TimeSimulation)
@@ -190,7 +184,7 @@ contains
   !============================================================================
   subroutine SP_set_grid
     use SP_ModGrid, ONLY: iGridGlobal_IA, Block_, Proc_, &
-          TypeCoordSystem
+          TypeCoordSystem, nLon, nLat
     logical, save:: IsInitialized = .false.
     !--------------------------------------------------------------------------
     if(IsInitialized)RETURN
@@ -233,11 +227,10 @@ contains
     !--------------------------------------------------------------------------
     call get_bounds(iModelIn, rMinIn, rMaxIn, &
        rBufferLoIn, rBufferUpIn)
-    Model_ = iModelIn
     if(DataInputTime >= TimeIn)RETURN
     ! New coupling time, get it and save old state
     DataInputTime = TimeIn
-    if(Model_==Lower_)then
+    if(iModelIn==Lower_)then
        call copy_old_state
     else
        call CON_stop("Time in IHSP coupling differs from that in SCSP")

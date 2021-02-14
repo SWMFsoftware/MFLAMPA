@@ -18,14 +18,6 @@ module SP_ModMain
   implicit none
   SAVE
   private ! except
-  ! Grid size, boundaries, coordinates
-  ! Starting position of field lines in Rs
-  real         :: ROrigin = 2.5
-  ! Size of angular grid, latitude and longitude, at origin
-  ! surface R=ROrigin
-  real         :: LonMin = 0.0, LonMax = 360.0
-  real         :: LatMin = -70.0, LatMax = 70.0
-
   ! Lower/Upper boundary of the domain in Rs
   real         :: RScMin=-1.0, RIhMax = -1.0
   ! Boundaries of the buffer layer between SC and IH Rs
@@ -89,6 +81,7 @@ contains
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
     use SP_ModDistribution, ONLY: read_param_dist       =>read_param
     use SP_ModGrid,         ONLY: read_param_grid       =>read_param
+    use SP_ModOriginPoints, ONLY: read_param_origin     =>read_param
     use SP_ModPlot,         ONLY: read_param_plot       =>read_param
     use SP_ModReadMHData,   ONLY: read_param_mhdata     =>read_param
     use SP_ModTime,         ONLY: read_param_time       =>read_param
@@ -121,11 +114,7 @@ contains
           ! read parameters for each module
        case('#ORIGIN')
           if(IsStandAlone)CYCLE
-          call read_var('ROrigin', ROrigin)
-          call read_var('LonMin', LonMin)
-          call read_var('LatMin', LatMin)
-          call read_var('LonMax', LonMax)
-          call read_var('LatMax', LatMax)
+          call read_param_origin
        case('#COMPDOMAINS','#GRID')
           if(IsStandAlone)CYCLE
           call read_var('RScMin',RScMin)
@@ -228,7 +217,6 @@ contains
     use SP_ModTime,         ONLY: init_time       => init
     use SP_ModTurbulence,   ONLY: init_turbulence => init
     use SP_ModUnit,         ONLY: init_unit       => init
-
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
@@ -239,50 +227,8 @@ contains
     call init_turbulence
     call init_spread
     if(DoRestart) call read_restart
-    if((.not.IsStandAlone).and.(.not.DoRestart).and.(.not.DoReadMhData))&
-         call get_origin_points
     if(IsStandAlone) call init_time
     DoInit=.false.
-    !-------------------------------------------------------------------------
-  contains
-    !==========================================================================
-    subroutine get_origin_points
-      use ModNumConst,       ONLY: cDegToRad
-      use ModCoordTransform, ONLY: rlonlat_to_xyz
-      use SP_ModGrid,        ONLY: Block_, Proc_, iGridGlobal_IA, iNode_II
-      integer:: iLat, iLon, iNode, iBlock
-      ! Sell size on the origin surface, per line
-      real         ::  DLon, DLat
-
-      ! convert angels from degrees to radians
-
-      !------------------------------------------------------------------------
-      LonMax = LonMax*cDegToRad
-      LonMin = LonMin*cDegToRad
-
-      ! angular grid's step
-      DLon = (LonMax - LonMin)/nLon
-
-      ! convert angels from degrees to radians
-      LatMax = LatMax*cDegToRad
-      LatMin = LatMin*cDegToRad
-
-      ! angular grid's step
-      DLat = (LatMax - LatMin)/nLat
-
-      do iLat = 1, nLat
-         do iLon = 1, nLon
-            iNode = iNode_II(iLon, iLat)
-            iBlock = iGridGlobal_IA(Block_, iNode)
-            if(iProc == iGridGlobal_IA(Proc_, iNode))then
-               nParticle_B(iBlock) = 1
-               call rlonlat_to_xyz([ROrigin, LonMin + (iLon - 0.5)*DLon, &
-                    LatMin + (iLat - 0.5)*DLat], MHData_VIB(X_:Z_,1,iBlock))
-            end if
-         end do
-      end do
-    end subroutine get_origin_points
-    !==========================================================================
   end subroutine initialize
   !============================================================================
   subroutine finalize
@@ -414,25 +360,25 @@ contains
 
     character(len=*), parameter:: NameSub = 'check'
     !--------------------------------------------------------------------------
-    if(.not.IsStandAlone)then
-       ! check if the domains for SC and IH are correctly set
-       if(RScMin < 0.0.or. RIhMin < 0.0 .or.RScMax < 0.0 .or.RIhMax < 0.0)&
-            call CON_stop(NameSub//&
-            ': RScMin, RScMax, RIhMin, RIhMax must be set to positive values')
-       if(any([RIhMax, RScMax] < RIhMin) .or. RIhMax < RScMax)&
-            call CON_stop(NameSub//&
-           ': inconsistent values of RIhMin, RScMax, RIhMax')
-       if(.not.(DoRestart.or.DoReadMhData))then
-          ! check consistency of the origin point parameters
-          if(LonMax <= LonMin .or. LatMax <= LatMin)&
-               call CON_stop(NameSub//': Origin surface grid is inconsistent')
-          if(ROrigin <= RScMin)call CON_stop(NameSub//&
-               ': ROrigin, if set, must be greater than RScMin')
-          if(any([RIhMin, RScMax, RIhMax] < ROrigin))&
-               call CON_stop(NameSub//&
-               ': inconsistent values of ROrigin, RIhMin, RScMax, RIhMax')
-       end if
-    end if
+    !if(.not.IsStandAlone)then
+    !   ! check if the domains for SC and IH are correctly set
+    !   if(RScMin < 0.0.or. RIhMin < 0.0 .or.RScMax < 0.0 .or.RIhMax < 0.0)&
+    !        call CON_stop(NameSub//&
+    !        ': RScMin, RScMax, RIhMin, RIhMax must be set to positive values')
+    !   if(any([RIhMax, RScMax] < RIhMin) .or. RIhMax < RScMax)&
+    !        call CON_stop(NameSub//&
+    !       ': inconsistent values of RIhMin, RScMax, RIhMax')
+    !   if(.not.(DoRestart.or.DoReadMhData))then
+    !      ! check consistency of the origin point parameters
+    !      if(LonMax <= LonMin .or. LatMax <= LatMin)&
+    !           call CON_stop(NameSub//': Origin surface grid is inconsistent')
+    !      if(ROrigin <= RScMin)call CON_stop(NameSub//&
+    !           ': ROrigin, if set, must be greater than RScMin')
+    !      if(any([RIhMin, RScMax, RIhMax] < ROrigin))&
+    !           call CON_stop(NameSub//&
+    !           ': inconsistent values of ROrigin, RIhMin, RScMax, RIhMax')
+    !   end if
+    !end if
     ! Make output directory
     if(iProc==0) call make_dir(NamePlotDir)
     ! Initialize timing

@@ -16,6 +16,7 @@ OBJECTS = \
 	ModGrid.o \
 	ModLogAdvection.o \
 	ModMain.o \
+	ModOriginPoints.o \
 	ModProc.o \
 	ModReadMhData.o \
 	ModRestart.o \
