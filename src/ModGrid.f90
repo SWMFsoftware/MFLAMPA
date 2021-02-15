@@ -384,7 +384,7 @@ contains
           end if
           ! Heliocentric Distance
           State_VIB(R_, iParticle, iBlock) = &
-               sqrt(sum(MHData_VIB(X_:Z_, iParticle, iBlock)**2, 1))
+               norm2(MHData_VIB(X_:Z_, iParticle, iBlock))
        end do
     end do
   end subroutine get_other_state_var

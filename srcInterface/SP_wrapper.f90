@@ -23,8 +23,6 @@ module SP_wrapper
   use ModConst, ONLY: rSun
   use ModMpi
   use CON_world,  ONLY: is_proc0, is_proc, n_proc
-  use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
-       rInterfaceMin, rInterfaceMax
   implicit none
   save
   private ! except
@@ -243,6 +241,8 @@ contains
   subroutine SP_adjust_lines(DoInit)
     use SP_ModDistribution, ONLY: offset
     use SP_ModGrid,         ONLY: R_, State_VIB
+    use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
+         rInterfaceMin, rInterfaceMax
     logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
     ! exiting the domain (can happen both at the beginning and the end)
@@ -251,6 +251,8 @@ contains
     logical:: DoAdjustLo, DoAdjustUp
     logical:: IsMissing
 
+    real              :: R
+    
     integer, parameter:: Lo_ = 1, Up_ = 2
     integer, parameter:: iIncrement_II(2,2) =reshape([1,0,0,-1],[2,2])
 
@@ -279,6 +281,7 @@ contains
        end if
        PARTICLE: do while(iParticle_I(1) < iParticle_I(2))
           iParticle = iParticle_I(iLoop)
+          R = State_VIB(R_,iParticle,iBlock)
           ! account for all missing partiles along the line;
           ! --------------------------------------------------------
           ! particle import MUST be performed in order from lower to upper
@@ -311,9 +314,9 @@ contains
           ! when looping Up-2-Lo and particle is in other model ->
           ! adjustments are no longer allowed
           if(iLoop == Up_ .and. (&
-               State_VIB(R_,iParticle,iBlock) <  RInterfaceMin&
+               R <  RInterfaceMin&
                .or.&
-               State_VIB(R_,iParticle,iBlock) >= RInterfaceMax)&
+               R >= RInterfaceMax)&
                )then
              DoAdjustLo = .false.
              DoAdjustUp = .false.
@@ -327,14 +330,14 @@ contains
           end if
 
           ! missing point in the lower part of the domain -> ERROR
-          if(State_VIB(R_,iParticle,iBlock) < RInterfaceMin)&
+          if(R < RInterfaceMin)&
                call CON_stop(NameSub//": particle has been lost")
 
           ! missing point in the upper part of the domain -> IGNORE;
           ! if needed to adjust beginning, then it is done,
           ! switch left -> right end of range and start adjusting
           ! tail of the line, if it has reentered current part of the domain
-          if(State_VIB(R_,iParticle,iBlock) >= RInterfaceMax)then
+          if(R >= RInterfaceMax)then
              if(iLoop == Lo_)&
                   iLoop = Up_
              iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
@@ -346,7 +349,7 @@ contains
           end if
 
           ! if point used to be in a upper buffer -> IGNORE
-          if(is_in_buffer_r(Upper_, State_VIB(R_, iParticle, iBlock)))then
+          if(R >= rBufferUp .and. R < rInterfaceMax)then
              iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
              CYCLE PARTICLE
           end if
@@ -511,20 +514,5 @@ contains
     end subroutine append_particles
     !==========================================================================
   end subroutine SP_adjust_lines
-  !============================================================================
-  function is_in_buffer_r(iBuffer, R) Result(IsInBuffer)
-    integer,intent(in) :: iBuffer
-    real,   intent(in) :: R
-    logical:: IsInBuffer
-    !--------------------------------------------------------------------------
-    select case(iBuffer)
-    case(Lower_)
-       IsInBuffer = R >= rInterfaceMin .and. R < rBufferLo
-    case(Upper_)
-       IsInBuffer = R >= rBufferUp .and. R < rInterfaceMax
-    case default
-        call CON_stop("ERROR: incorrect call of SP_wrapper:is_in_buffer")
-    end select
-  end function is_in_buffer_r
   !============================================================================
 end module SP_wrapper
