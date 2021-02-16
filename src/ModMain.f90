@@ -211,7 +211,8 @@ contains
   subroutine initialize
     use SP_ModAngularSpread, ONLY: init_spread     => init
     use SP_ModDistribution, ONLY: init_dist       => init
-    use SP_ModGrid,         ONLY: iNodeTest, iParticleTest, iPTest
+    use SP_ModGrid,         ONLY: init_indexes,          &
+         iNodeTest, iParticleTest, iPTest
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
     use SP_ModTime,         ONLY: init_time       => init
@@ -220,6 +221,7 @@ contains
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
+    call init_indexes
     call init_unit
     call init_dist
     call init_plot

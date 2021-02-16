@@ -20,6 +20,7 @@ module SP_ModGrid
   public:: read_param          ! read parameters related to grid
   public:: init                ! Initialize arrays on the grid
   public:: init_stand_alone    ! Initialize arrays on the grid
+  public:: init_indexes        ! Initialize index arrays
   public:: copy_old_state      ! save old arrays before getting new ones
   public:: get_other_state_var ! Auxiliary components of state vector
   public:: search_line         ! find particle index corresponding to radius
@@ -68,7 +69,7 @@ module SP_ModGrid
   ! They is the first index values for
   ! the following array
   !
-  integer, public, allocatable:: iGridGlobal_IA(:,:)
+  integer, public, pointer :: iGridGlobal_IA(:,:)
   !
   ! Array for current and present location of shock wave
   !
@@ -100,7 +101,7 @@ module SP_ModGrid
   ! 2nd index - particle index along the field line
   ! 3rd index - local block number
   !
-  real, public, allocatable :: State_VIB(:,:,:)
+  real, public, pointer     :: State_VIB(:,:,:)
   !
   ! Number of variables in the state vector and the identifications
   !
@@ -121,9 +122,9 @@ module SP_ModGrid
        Wave1_      =12, & !                                   |coupler
        Wave2_      =13, & !-Alfven wave turbulence            v
        !-
-       D_          =14, & ! Distance to the next particle  ^derived from
-       S_          =15, & ! Distance from the foot point   |MHdata in
-       R_          =16, & ! Heliocentric distance          |get_other_
+       R_          =14, & ! Heliocentric distance          ^derived from
+       D_          =15, & ! Distance to the next particle  |MHdata in
+       S_          =16, & ! Distance from the foot point   |get_other_
        U_          =17, & ! Plasma speed                   |state_var
        B_          =18, & ! Magnitude of magnetic field    v
        DLogRho_    =19, & ! Dln(Rho), i.e. -div(U) * Dt
@@ -147,9 +148,9 @@ module SP_ModGrid
        'Bz        ', &
        'Wave1     ', &
        'Wave2     ', &
+       'R         ', &
        'D         ', &
        'S         ', &
-       'R         ', &
        'U         ', &
        'B         ', &
        'DLogRho   ', &
@@ -246,51 +247,18 @@ contains
     call check_allocate(iError, NameSub//'iNode_II')
     allocate(iNode_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'iNode_B')
-    allocate(iGridGlobal_IA(Proc_:Block_, nNode), stat=iError)
-    call check_allocate(iError, NameSub//'iGridGlobal_IA')
+      
     allocate(iShock_IB(nShockParam, nBlock), stat=iError)
     call check_allocate(iError, NameSub//'iShock_IB')
+    iShock_IB = NoShock_
+    
     allocate(FootPoint_VB(LagrID_:Length_, nBlock), stat=iError)
     call check_allocate(iError, NameSub//'FootPoint_VB')
+    FootPoint_VB = -1
+    
     allocate(MagneticFluxAbs_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
-    ! Allocate auxiliary State vector
-    allocate(State_VIB( &
-         nMHData+1:nVar, 1:nParticleMax, nBlock), &
-         stat=iError)
-    call check_allocate(iError, NameSub//'State_VIB')
-    State_VIB = -1
-    !
-    ! fill grid containers
-    !
-    iBlock = 1; iProcNode = 0
-    do iLat = 1, nLat
-       do iLon = 1, nLon
-          iNode = iLon + nLon * (iLat-1)
-          iNode_II(iLon, iLat) = iNode
-          !
-          ! iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
-          !
-          if(iProcNode==iProc)then
-             iNode_B(     iBlock) = iNode
-             iShock_IB(:, iBlock) = NoShock_
-          end if
-          iGridGlobal_IA(Proc_,   iNode)  = iProcNode
-          iGridGlobal_IA(Block_,  iNode)  = iBlock
-          if(iNode == ((iProcNode+1)*nNode)/nProc)then
-             !
-             ! This was the last node on the iProcNode
-             !
-             iBlock = 1; iProcNode = iProcNode + 1
-          else
-             iBlock = iBlock + 1
-          end if
-       end do
-    end do
-    !
-    ! reset and fill data containers
-    !
-    FootPoint_VB = -1; MagneticFluxAbs_B = -1
+    MagneticFluxAbs_B = -1
   end subroutine init
   !============================================================================
   subroutine init_stand_alone
@@ -309,9 +277,47 @@ contains
     do iParticle = 1, nParticleMax
        MHData_VIB(LagrID_, iParticle, 1:nBlock) = real(iParticle)
     end do
+    ! Allocate auxiliary State vector
+    allocate(State_VIB(nMHData+1:nVar, 1:nParticleMax, nBlock))
+    State_VIB = -1
     allocate(nParticle_B(nBlock))
     nParticle_B = 0
+    allocate(iGridGlobal_IA(Proc_:Block_, nNode))
   end subroutine init_stand_alone
+  !============================================================================
+  subroutine init_indexes
+    use SP_ModProc,        ONLY: nProc
+    integer:: iLat, iLon, iNode, iBlock, iProcNode, iParticle
+    
+    character(len=*), parameter:: NameSub = 'init_indexes'
+    !--------------------------------------------------------------------------
+    !
+    ! fill grid containers
+    !
+    iBlock = 1; iProcNode = 0
+    do iLat = 1, nLat
+       do iLon = 1, nLon
+          iNode = iLon + nLon * (iLat-1)
+          iNode_II(iLon, iLat) = iNode
+          !
+          ! iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
+          !
+          if(iProcNode==iProc)then
+             iNode_B(     iBlock) = iNode
+          end if
+          iGridGlobal_IA(Proc_,   iNode)  = iProcNode
+          iGridGlobal_IA(Block_,  iNode)  = iBlock
+          if(iNode == ((iProcNode+1)*nNode)/nProc)then
+             !
+             ! This was the last node on the iProcNode
+             !
+             iBlock = 1; iProcNode = iProcNode + 1
+          else
+             iBlock = iBlock + 1
+          end if
+       end do
+    end do
+  end subroutine init_indexes
   !============================================================================
   subroutine get_node_indexes(iNodeIn, iLonOut, iLatOut)
     ! return angular grid's indexes corresponding to this node

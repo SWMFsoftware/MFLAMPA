@@ -2,27 +2,13 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_wrapper
-
-  use SP_ModMain, ONLY: &
-       run, save_restart, &
-       DoRestart, DoReadMhData, &
+  use SP_ModMain, ONLY: run
+  use SP_ModMain, ONLY: DoRestart, DoReadMhData, &
        nDim, nBlock, nParticleMax, &
-       RMin=>RScMin, RBufferMin=>RIhMin, &
-       RBufferMax=>RScMax, RMax=>RIhMax, &
-       MHData_VIB, iNode_B, FootPoint_VB, DataInputTime, &
+       MHData_VIB, FootPoint_VB, DataInputTime, &
        nParticle_B, Length_, LagrID_,X_, Y_, Z_
-  use CON_comp_info
-  use CON_coupler, ONLY: &
-       set_coord_system, SP_, is_proc0, i_comm, i_proc0, &
-       init_decomposition, get_root_decomposition, bcast_decomposition, &
-       iVar_V, DoCoupleVar_V, &
-       Density_, RhoCouple_, Pressure_, PCouple_, &
-       Momentum_, RhoUxCouple_, RhoUzCouple_, &
-       BField_, BxCouple_, BzCouple_, &
-       Wave_, WaveFirstCouple_, WaveLastCouple_
-  use ModConst, ONLY: rSun
-  use ModMpi
-  use CON_world,  ONLY: is_proc0, is_proc, n_proc
+  use CON_coupler, ONLY: SP_, is_proc0, i_comm, i_proc0
+  !use ModMpi
   implicit none
   save
   private ! except
@@ -39,8 +25,6 @@ module SP_wrapper
   public:: SP_put_coupling_param
   ! variables requested via coupling: coordinates,
   ! field line and particles indexes
-  character(len=*), parameter:: NameVarCouple =&
-       'rho p mx my mz bx by bz i01 i02 pe'
   integer, parameter:: Lower_=0, Upper_=1
   logical :: DoCheck = .true.
 contains
@@ -60,6 +44,9 @@ contains
   end subroutine SP_check_ready_for_mh
   !============================================================================
   subroutine SP_get_bounds_comp(ThisModel_, RMinOut, RMaxOut)
+    use SP_ModMain, ONLY:  &
+         RMin=>RScMin, RBufferMin=>RIhMin, &
+         RBufferMax=>RScMax, RMax=>RIhMax
     use ModMpi
     ! return the MHD boundaries as set in SP component
     integer, intent(in )  :: ThisModel_
@@ -100,8 +87,10 @@ contains
   !============================================================================
   subroutine SP_init_session(iSession,TimeSimulation)
     use SP_ModMain, ONLY: initialize, DoRestart, DoReadMhData
+     use SP_ModMain, ONLY:  RMin=>RScMin, RMax=>RIhMax
     use SP_ModOriginPoints, ONLY: get_origin_points
-    use SP_ModGrid, ONLY: init_grid=>init
+    use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB
+    use SP_ModGrid, ONLY: nLon, nLat, iGridGlobal_IA
     use CON_mflampa, ONLY: set_state_pointer
     use SP_ModUnit, ONLY:  NameEnergyUnit
     use ModConst,   ONLY: energy_in
@@ -114,9 +103,11 @@ contains
          RETURN
     IsInitialized = .true.
     call init_grid
-    nullify(MHData_VIB); nullify(nParticle_B)
-    call set_state_pointer(MHData_VIB, nParticle_B, &
-         nBlock, nParticleMax,                      &
+    nullify(MHData_VIB);  nullify(State_VIB)
+    nullify(nParticle_B); nullify(iGridGlobal_IA)
+    call set_state_pointer(MHData_VIB, State_VIB, nParticle_B, &
+         nBlock, nParticleMax, nVar,                &
+         nLon, nLat, iGridGlobal_IA,                &
          rMin, rMax,                                &
          1/energy_in(NameEnergyUnit))
     call initialize
@@ -136,11 +127,15 @@ contains
   end subroutine SP_finalize
   !============================================================================
   subroutine SP_set_param(CompInfo,TypeAction)
+    use CON_comp_info
     use SP_ModTime,  ONLY: StartTimeJulian, StartTime, SPTime,&
          time_real_to_julian
     use SP_ModMain,  ONLY: check, read_param
+    use SP_ModGrid, ONLY: iGridGlobal_IA, TypeCoordSystem, nLon, nLat
+    use ModConst, ONLY: rSun
     use SP_ModProc
     use CON_physics, ONLY: get_time
+    use CON_mflampa, ONLY: MF_set_grid
     type(CompInfoType),intent(inout):: CompInfo
     character(len=*),  intent(in)   :: TypeAction
 
@@ -166,53 +161,20 @@ contains
     case('READ')
        call read_param
     case('GRID')
-       call SP_set_grid
+       call MF_set_grid(SP_, rSun, TypeCoordSystem)
     case default
        call CON_stop('Cannot call SP_set_param for '//trim(TypeAction))
     end select
   end subroutine SP_set_param
   !============================================================================
   subroutine SP_save_restart(TimeSimulation)
+    use SP_ModMain, ONLY: save_restart
     real, intent(in) :: TimeSimulation
     !--------------------------------------------------------------------------
     ! if data are read from files, no need for additional run
     if(.not.DoReadMhData)call run(TimeSimulation)
     call save_restart
   end subroutine SP_save_restart
-  !============================================================================
-  subroutine SP_set_grid
-    use SP_ModGrid, ONLY: iGridGlobal_IA, Block_, Proc_, &
-          TypeCoordSystem, nLon, nLat
-    logical, save:: IsInitialized = .false.
-    !--------------------------------------------------------------------------
-    if(IsInitialized)RETURN
-    IsInitialized = .true.
-    ! Initialize 3D grid with NON-TREE structure
-    call init_decomposition(&
-         GridID_ = SP_,&
-         CompID_ = SP_,&
-         nDim    = nDim)
-    ! Construct decomposition
-
-    if(is_proc0(SP_))&
-         call get_root_decomposition(&
-         GridID_       = SP_,&
-         iRootMapDim_D = [1, nLon, nLat],&
-         CoordMin_D    = [0.50, 0.50, 0.50],&
-         CoordMax_D    = [nParticleMax, nLon, nLat] + 0.50,&
-         nCells_D      = [nParticleMax, 1, 1],&
-         PE_I          = iGridGlobal_IA(Proc_,:),&
-         iBlock_I      = iGridGlobal_IA(Block_,:))
-    call bcast_decomposition(SP_)
-    ! Coordinate system is Heliographic Inertial Coordinate System (HGI)
-    ! with length measured in solar radii
-    call set_coord_system(&
-         GridID_      = SP_, &
-         TypeCoord    = TypeCoordSystem, &
-         TypeGeometry = 'cartesian', &
-         NameVar      = NameVarCouple, &
-         UnitX        = rSun)
-  end subroutine SP_set_grid
   !============================================================================
   subroutine SP_put_coupling_param(iModelIn, rMinIn, rMaxIn, TimeIn,&
        rBufferLoIn, rBufferUpIn)
@@ -242,7 +204,7 @@ contains
     use SP_ModDistribution, ONLY: offset
     use SP_ModGrid,         ONLY: R_, State_VIB
     use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
-         rInterfaceMin, rInterfaceMax
+         rInterfaceMin, rInterfaceMax, rMin
     logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
     ! exiting the domain (can happen both at the beginning and the end)
@@ -413,9 +375,9 @@ contains
       integer, intent(in) :: iBlock
 
       ! existing particle with lowest index along line
-      real:: Xyz1_D(nDim)
+      real:: Xyz1_D(X_:Z_)
       ! direction of the field at Xyz1_D and segment vectors between particles
-      real, dimension(nDim):: Dir0_D, Dist1_D, Dist2_D
+      real, dimension(X_:Z_):: Dir0_D, Dist1_D, Dist2_D
       ! dot product Xyz1 and Dir1 and its sign
       real:: Dot, S
       ! distances between particles
