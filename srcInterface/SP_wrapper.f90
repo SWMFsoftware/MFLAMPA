@@ -20,7 +20,7 @@ module SP_wrapper
 
   ! coupling with MHD components
   public:: SP_adjust_lines
-  public:: SP_get_bounds_comp
+  !public:: SP_get_bounds_comp
   public:: SP_check_ready_for_mh
   public:: SP_put_coupling_param
   ! variables requested via coupling: coordinates,
@@ -43,34 +43,6 @@ contains
     call MPI_Bcast(IsReady, 1, MPI_LOGICAL, i_proc0(SP_), i_comm(), iError)
   end subroutine SP_check_ready_for_mh
   !============================================================================
-  subroutine SP_get_bounds_comp(ThisModel_, RMinOut, RMaxOut)
-    use SP_ModMain, ONLY:  &
-         RMin=>RScMin, RBufferMin=>RIhMin, &
-         RBufferMax=>RScMax, RMax=>RIhMax
-    use ModMpi
-    ! return the MHD boundaries as set in SP component
-    integer, intent(in )  :: ThisModel_
-    real,    intent(out)  :: RMinOut, RMaxOut
-    integer :: iError
-    real    :: rAux_I(2)
-    character(len=*), parameter:: NameSub = 'SP_get_bounds_comp'
-    !--------------------------------------------------------------------------
-    if(is_proc0(SP_))then
-       select case(ThisModel_)
-       case(Lower_)
-          rAux_I(1) = RMin
-          rAux_I(2) = RBufferMax
-       case(Upper_)
-          rAux_I(1) = RBufferMin
-          rAux_I(2) = RMax
-       case default
-          call CON_stop('Incorrect model ID in '//NameSub)
-       end select
-    end if
-    call MPI_Bcast(rAux_I(1), 2, MPI_REAL, i_proc0(SP_), i_comm(), iError)
-       RMinOut = rAux_I(1); RMaxOut = rAux_I(2)
-  end subroutine SP_get_bounds_comp
-  !============================================================================
   ! Above routines may be called from superstructure only.
   subroutine SP_run(TimeSimulation,TimeSimulationLimit)
     real,intent(inout)::TimeSimulation
@@ -87,7 +59,7 @@ contains
   !============================================================================
   subroutine SP_init_session(iSession,TimeSimulation)
     use SP_ModMain, ONLY: initialize, DoRestart, DoReadMhData
-     use SP_ModMain, ONLY:  RMin=>RScMin, RMax=>RIhMax
+    !use SP_ModMain, ONLY:  RMin=>RScMin, RMax=>RIhMax
     use SP_ModOriginPoints, ONLY: get_origin_points
     use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB
     use SP_ModGrid, ONLY: nLon, nLat, iGridGlobal_IA
@@ -108,7 +80,6 @@ contains
     call set_state_pointer(MHData_VIB, State_VIB, nParticle_B, &
          nBlock, nParticleMax, nVar,                &
          nLon, nLat, iGridGlobal_IA,                &
-         rMin, rMax,                                &
          1/energy_in(NameEnergyUnit))
     call initialize
     if(.not.(DoRestart.or.DoReadMhData))&
@@ -204,20 +175,14 @@ contains
     use SP_ModDistribution, ONLY: offset
     use SP_ModGrid,         ONLY: R_, State_VIB
     use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
-         rInterfaceMin, rInterfaceMax, rMin
+         rInterfaceMin, rInterfaceMax, rMin, adjust_line
     logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
     ! exiting the domain (can happen both at the beginning and the end)
     integer:: iParticle, iBlock, iBegin,  iEnd, iOffset ! loop variables
-    integer:: iParticle_I(2), iLoop
-    logical:: DoAdjustLo, DoAdjustUp
-    logical:: IsMissing
-
-    real              :: R
     
-    integer, parameter:: Lo_ = 1, Up_ = 2
-    integer, parameter:: iIncrement_II(2,2) =reshape([1,0,0,-1],[2,2])
-
+    logical:: DoAdjustLo, DoAdjustUp
+ 
     character(len=100):: StringError
 
     character(len=*), parameter:: NameSub = 'SP_adjust_lines'
@@ -230,124 +195,7 @@ contains
        end do
     end if
     BLOCK:do iBlock = 1, nBlock
-       ! Called after the grid points are received from the
-       ! component, nullify offset
-       if(DoAdjustLo)iOffset_B(iBlock) = 0
-       iBegin = 1
-       iEnd   = nParticle_B(  iBlock)
-       iParticle_I(:) = [iBegin, iEnd]
-       if(DoAdjustUp) then
-          iLoop = Up_
-       else
-          iLoop = Lo_
-       end if
-       PARTICLE: do while(iParticle_I(1) < iParticle_I(2))
-          iParticle = iParticle_I(iLoop)
-          R = State_VIB(R_,iParticle,iBlock)
-          ! account for all missing partiles along the line;
-          ! --------------------------------------------------------
-          ! particle import MUST be performed in order from lower to upper
-          ! components (w/respect to radius), e.g. SC, then IH, then OH
-          ! adjustment are made after each import;
-          ! --------------------------------------------------------
-          ! lines are assumed to start in lowest model
-          ! lowest model should NOT have the Lo buffer,
-          ! while the upper most should NOT have Up buffer,
-          ! buffer are REQUIRED between models
-          ! --------------------------------------------------------
-          ! adjust as follows:
-          ! LOWEST model may loose particles at the start of lines
-          ! and (if line ends in the model) in the tail;
-          ! loop over particles Lo-2-Up and mark losses (increase iBegin)
-          ! until particles reach UP buffer;
-          ! if line ends in the model, loop over particles Up-2-Lo
-          ! and mark losses (decrease nParticle_B) until UP buffer is reached;
-          ! after that, if line reenters the model,
-          ! particles within the model may not be lost,
-          !
-          ! MIDDLE models are not allowed to loose particles
-          !
-          ! HIGHEST model may only loose particles in the tail;
-          ! loop Up-2-Lo and mark losses  (decrease nParticle_B)
-          ! until the bottom of Lo buffer is reaced
-          ! --------------------------------------------------------
-          ! whenever a particle is lost in lower models -> ERROR
-
-          ! when looping Up-2-Lo and particle is in other model ->
-          ! adjustments are no longer allowed
-          if(iLoop == Up_ .and. (&
-               R <  RInterfaceMin&
-               .or.&
-               R >= RInterfaceMax)&
-               )then
-             DoAdjustLo = .false.
-             DoAdjustUp = .false.
-          end if
-
-          ! determine whether particle is missing
-          IsMissing = all(MHData_VIB(X_:Z_,iParticle,iBlock)==0.0)
-          if(.not.IsMissing) then
-             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
-             CYCLE PARTICLE
-          end if
-
-          ! missing point in the lower part of the domain -> ERROR
-          if(R < RInterfaceMin)&
-               call CON_stop(NameSub//": particle has been lost")
-
-          ! missing point in the upper part of the domain -> IGNORE;
-          ! if needed to adjust beginning, then it is done,
-          ! switch left -> right end of range and start adjusting
-          ! tail of the line, if it has reentered current part of the domain
-          if(R >= RInterfaceMax)then
-             if(iLoop == Lo_)&
-                  iLoop = Up_
-             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
-             if(DoAdjustLo)then
-                DoAdjustLo = .false.
-                DoAdjustUp = .true.
-             end if
-             CYCLE PARTICLE
-          end if
-
-          ! if point used to be in a upper buffer -> IGNORE
-          if(R >= rBufferUp .and. R < rInterfaceMax)then
-             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
-             CYCLE PARTICLE
-          end if
-
-          ! if need to adjust lower, but not upper boundary -> ADJUST
-          if(DoAdjustLo .and. .not.DoAdjustUp)then
-             ! push iBegin in front of current particle;
-             ! it will be pushed until it finds a non-missing particle
-             iBegin = iParticle + 1
-             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
-             CYCLE PARTICLE
-          end if
-
-          ! if need to adjust upper, but not lower boundary -> ADJUST
-          if(DoAdjustUp .and. .not.DoAdjustLo)then
-             ! push nParticle_B() below current particle;
-             ! it will be pushed until it finds a non-missing particle
-             nParticle_B(iBlock) = iParticle - 1
-             iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
-             CYCLE PARTICLE
-          end if
-
-          ! remaining case:
-          ! need to adjust both boudnaries -> ADJUST,but keep longest range
-          if(iParticle - iBegin > nParticle_B(iBlock) - iParticle)then
-             nParticle_B(iBlock) = iParticle - 1
-             EXIT PARTICLE
-          else
-             iBegin = iParticle + 1
-          end if
-          iParticle_I = iParticle_I + iIncrement_II(:,iLoop)
-       end do PARTICLE
-
-       DoAdjustLo = RBufferLo == RInterfaceMin
-       DoAdjustUp = RBufferUp == RInterfaceMax
-
+       call adjust_line(iBlock, iBegin, DoAdjustLo, DoAdjustUp)
        if(iBegin/=1)then
           ! Offset particle arrays
           iEnd   = nParticle_B(iBlock)
