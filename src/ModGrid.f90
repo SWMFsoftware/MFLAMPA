@@ -41,11 +41,7 @@ module SP_ModGrid
   integer, public :: nLat  = 4
   integer, public :: nNode = 16
 
-  ! Node number based on the field line identified by
-  ! 2 angular grid indices, latitude and longitude;
-  ! 1st index - longitude index
-  ! 2nd index - latitude index
-  integer, public, allocatable:: iNode_II(:,:)
+ 
   !
   ! inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
   !
@@ -55,21 +51,6 @@ module SP_ModGrid
   ! 1st index - block number
   !
   integer, public, allocatable:: iNode_B(:)
-  !
-  ! Various house-keeping information about the node/line;
-  ! 1st index - identification of info field
-  ! 2nd index - node number / block number
-  !
-  ! Proc_ and Block_ number, for a given node:
-  !
-  integer, public, parameter:: &
-       Proc_  = 1, & ! Processor that has this line/node
-       Block_ = 2    ! Block that has this line/node
-  !
-  ! They is the first index values for
-  ! the following array
-  !
-  integer, public, pointer :: iGridGlobal_IA(:,:)
   !
   ! Array for current and present location of shock wave
   !
@@ -243,8 +224,8 @@ contains
     !
     ! allocate data and grid containers
     !
-    allocate(iNode_II(nLon, nLat), stat=iError)
-    call check_allocate(iError, NameSub//'iNode_II')
+    ! allocate(iNode_II(nLon, nLat), stat=iError)
+    !call check_allocate(iError, NameSub//'iNode_II')
     allocate(iNode_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'iNode_B')
       
@@ -282,7 +263,6 @@ contains
     State_VIB = -1
     allocate(nParticle_B(nBlock))
     nParticle_B = 0
-    allocate(iGridGlobal_IA(Proc_:Block_, nNode))
   end subroutine init_stand_alone
   !============================================================================
   subroutine init_indexes
@@ -298,15 +278,12 @@ contains
     do iLat = 1, nLat
        do iLon = 1, nLon
           iNode = iLon + nLon * (iLat-1)
-          iNode_II(iLon, iLat) = iNode
           !
           ! iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
           !
           if(iProcNode==iProc)then
              iNode_B(     iBlock) = iNode
           end if
-          iGridGlobal_IA(Proc_,   iNode)  = iProcNode
-          iGridGlobal_IA(Block_,  iNode)  = iBlock
           if(iNode == ((iProcNode+1)*nNode)/nProc)then
              !
              ! This was the last node on the iProcNode

@@ -32,10 +32,9 @@ contains
   subroutine get_origin_points
     use ModNumConst,       ONLY: cDegToRad
     use ModCoordTransform, ONLY: rlonlat_to_xyz
-    use SP_ModGrid,        ONLY: Block_, Proc_, nLat, nLon, X_, Z_, &
-         iGridGlobal_IA, iNode_II, MHData_VIB, nParticle_B, Proc_, Block_
-    use SP_ModProc,    ONLY: iProc
-
+    use SP_ModGrid,        ONLY: nLat, nLon, X_, Z_, MHData_VIB, nParticle_B,&
+         nBlock, iNode_B, get_node_indexes
+   
     integer:: iLat, iLon, iNode, iBlock
     ! Sell size on the origin surface, per line
     real         ::  DLon, DLat
@@ -55,17 +54,11 @@ contains
 
     ! angular grid's step
     DLat = (LatMax - LatMin)/nLat
-
-    do iLat = 1, nLat
-       do iLon = 1, nLon
-          iNode = iNode_II(iLon, iLat)
-          iBlock = iGridGlobal_IA(Block_, iNode)
-          if(iProc == iGridGlobal_IA(Proc_, iNode))then
-             nParticle_B(iBlock) = 1
-             call rlonlat_to_xyz([ROrigin, LonMin + (iLon - 0.5)*DLon, &
-                  LatMin + (iLat - 0.5)*DLat], MHData_VIB(X_:Z_,1,iBlock))
-          end if
-       end do
+    do iBlock = 1, nBlock
+       call get_node_indexes(iNode_B(iBlock), iLon, iLat)
+       nParticle_B(iBlock) = 1
+       call rlonlat_to_xyz([ROrigin, LonMin + (iLon - 0.5)*DLon, &
+            LatMin + (iLat - 0.5)*DLat], MHData_VIB(X_:Z_,1,iBlock))
     end do
   end subroutine get_origin_points
   !============================================================================
