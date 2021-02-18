@@ -62,8 +62,8 @@ contains
     !use SP_ModMain, ONLY:  RMin=>RScMin, RMax=>RIhMax
     use SP_ModOriginPoints, ONLY: get_origin_points
     use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB
-    use SP_ModGrid, ONLY: nLon, nLat, iGridGlobal_IA
-    use CON_mflampa, ONLY: set_state_pointer
+    use SP_ModGrid, ONLY: nLon, nLat
+    use CON_bline, ONLY: set_state_pointer
     use SP_ModUnit, ONLY:  NameEnergyUnit
     use ModConst,   ONLY: energy_in
     integer,  intent(in) :: iSession         ! session number (starting from 1)
@@ -76,10 +76,9 @@ contains
     IsInitialized = .true.
     call init_grid
     nullify(MHData_VIB);  nullify(State_VIB)
-    nullify(nParticle_B); nullify(iGridGlobal_IA)
+    nullify(nParticle_B)
     call set_state_pointer(MHData_VIB, State_VIB, nParticle_B, &
-         nBlock, nParticleMax, nVar,                &
-         nLon, nLat, iGridGlobal_IA,                &
+         nParticleMax, nVar, nLon, nLat,                       &
          1/energy_in(NameEnergyUnit))
     call initialize
     if(.not.(DoRestart.or.DoReadMhData))&
@@ -102,15 +101,15 @@ contains
     use SP_ModTime,  ONLY: StartTimeJulian, StartTime, SPTime,&
          time_real_to_julian
     use SP_ModMain,  ONLY: check, read_param
-    use SP_ModGrid, ONLY: iGridGlobal_IA, TypeCoordSystem, nLon, nLat
-    use ModConst, ONLY: rSun
+    use SP_ModGrid,  ONLY: TypeCoordSystem
+    use ModConst,    ONLY: rSun
     use SP_ModProc
     use CON_physics, ONLY: get_time
-    use CON_mflampa, ONLY: MF_set_grid
+    use CON_bline,   ONLY: MF_set_grid
     type(CompInfoType),intent(inout):: CompInfo
     character(len=*),  intent(in)   :: TypeAction
 
-    character(len=*), parameter:: NameSub = 'SP_set_param'
+    character(len=*),      parameter:: NameSub = 'SP_set_param'
     !--------------------------------------------------------------------------
     select case(TypeAction)
     case('VERSION')
@@ -150,7 +149,7 @@ contains
   subroutine SP_put_coupling_param(iModelIn, rMinIn, rMaxIn, TimeIn,&
        rBufferLoIn, rBufferUpIn)
     use SP_ModMain, ONLY: copy_old_state
-    use CON_mflampa, ONLY: get_bounds
+    use CON_bline,  ONLY: get_bounds
     integer,        intent(in) :: iModelIn
     real,           intent(in) :: rMinIn, rMaxIn
     real,           intent(in) :: TimeIn
@@ -174,7 +173,7 @@ contains
   subroutine SP_adjust_lines(DoInit)
     use SP_ModDistribution, ONLY: offset
     use SP_ModGrid,         ONLY: R_, State_VIB
-    use CON_mflampa, ONLY: iOffset_B, rBufferLo, rBufferUp, &
+    use CON_bline,          ONLY: iOffset_B, rBufferLo, rBufferUp, &
          rInterfaceMin, rInterfaceMax, rMin, adjust_line
     logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
