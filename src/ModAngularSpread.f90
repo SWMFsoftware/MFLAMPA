@@ -5,9 +5,8 @@ module SP_ModAngularSpread
 
   use ModNumConst, ONLY: cPi, cTwoPi, cTolerance, cSqrtTwo, cDegToRad
   use ModCoordTransform, ONLY: xyz_to_rlonlat
-  use SP_ModGrid, ONLY: search_line, get_node_indexes, &
-       nLon, nLat, nBlock, iNode_B, &
-       MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
+  use SP_ModGrid, ONLY: search_line, iblock_to_lon_lat, nLon, nLat, &
+       nBlock, MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
   use SP_ModSize, ONLY: nDim
   use SP_ModTIme, ONLY: iIter
 
@@ -147,7 +146,7 @@ contains
     allocate(Sigma_B(nBlock))
     allocate(Norm_B(nBlock))
     do iBlock = 1, nBlock
-       call get_node_indexes(iNode_B(iBlock), iLon, iLat)
+       call iblock_to_lon_lat(iBlock, iLon, iLat)
        AuxLon = (iLon-1.0) / (nLon-1)
        AuxLat = (iLat-1.0) / (nLat-1)
        select case(iSigmaMode)
