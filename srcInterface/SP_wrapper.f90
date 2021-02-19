@@ -2,43 +2,39 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_wrapper
-  use SP_ModMain, ONLY: run
-  use SP_ModMain, ONLY: DoRestart, DoReadMhData, &
-       nDim, nBlock, nParticleMax, &
-       MHData_VIB, FootPoint_VB, DataInputTime, &
-       nParticle_B, Length_, LagrID_,X_, Y_, Z_
-  use CON_coupler, ONLY: SP_, is_proc0, i_comm, i_proc0
-  !use ModMpi
+  use SP_ModSize, ONLY: nParticleMax
+  use SP_ModMain, ONLY: run, DoRestart, DoReadMhData, nBlock, &
+       MHData_VIB, FootPoint_VB, DataInputTime, nParticle_B, Length_
   implicit none
   save
   private ! except
-  public:: SP_set_param
   public:: SP_init_session
+  public:: SP_set_param
   public:: SP_run
   public:: SP_save_restart
   public:: SP_finalize
 
   ! coupling with MHD components
   public:: SP_adjust_lines
-  !public:: SP_get_bounds_comp
   public:: SP_check_ready_for_mh
   public:: SP_put_coupling_param
   ! variables requested via coupling: coordinates,
   ! field line and particles indexes
-  integer, parameter:: Lower_=0, Upper_=1
   logical :: DoCheck = .true.
 contains
   !============================================================================
   ! Interface routines to be called from super-structure only
   subroutine SP_check_ready_for_mh(IsReady)
+    use CON_coupler, ONLY: i_proc0, i_comm, is_proc0, SP_
     use ModMpi
     logical, intent(out):: IsReady
 
     integer :: iError
-    character(len=*), parameter:: NameSub = 'SP_check_ready_for_mh'
-    !--------------------------------------------------------------------------
+
     ! when restarting, line data is available, i.e. ready to couple with mh;
     ! get value at SP root and broadcast to all SWMF processors
+    character(len=*), parameter:: NameSub = 'SP_check_ready_for_mh'
+    !--------------------------------------------------------------------------
     if(is_proc0(SP_)) IsReady = DoRestart
     call MPI_Bcast(IsReady, 1, MPI_LOGICAL, i_proc0(SP_), i_comm(), iError)
   end subroutine SP_check_ready_for_mh
@@ -59,17 +55,15 @@ contains
   !============================================================================
   subroutine SP_init_session(iSession,TimeSimulation)
     use SP_ModMain, ONLY: initialize, DoRestart, DoReadMhData
-    !use SP_ModMain, ONLY:  RMin=>RScMin, RMax=>RIhMax
-    use SP_ModOriginPoints, ONLY: get_origin_points
     use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB
     use SP_ModGrid, ONLY: nLon, nLat
-    use CON_bline, ONLY: set_state_pointer
-    use SP_ModUnit, ONLY:  NameEnergyUnit
-    use ModConst,   ONLY: energy_in
+    use CON_bline,  ONLY: BL_init, BL_get_origin_points
+    use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
     integer,  intent(in) :: iSession         ! session number (starting from 1)
     real,     intent(in) :: TimeSimulation   ! seconds from start time
 
     logical, save:: IsInitialized = .false.
+
     !--------------------------------------------------------------------------
     if(IsInitialized)&
          RETURN
@@ -77,12 +71,11 @@ contains
     call init_grid
     nullify(MHData_VIB);  nullify(State_VIB)
     nullify(nParticle_B)
-    call set_state_pointer(MHData_VIB, State_VIB, nParticle_B, &
-         nParticleMax, nVar, nLon, nLat,                       &
-         1/energy_in(NameEnergyUnit))
+    call BL_init(nParticleMax, nLon, nLat,  &
+         MHData_VIB, nParticle_B, nVar, State_VIB)
     call initialize
     if(.not.(DoRestart.or.DoReadMhData))&
-         call get_origin_points
+         call BL_get_origin_points(ROrigin, LonMin, LonMax, LatMin, LatMax)
   end subroutine SP_init_session
   !============================================================================
   subroutine SP_finalize(TimeSimulation)
@@ -102,14 +95,16 @@ contains
          time_real_to_julian
     use SP_ModMain,  ONLY: check, read_param
     use SP_ModGrid,  ONLY: TypeCoordSystem
-    use ModConst,    ONLY: rSun
+    use CON_coupler, ONLY: SP_, is_proc
     use SP_ModProc
+    use SP_ModUnit,  ONLY: Si2Io_V, Io2Si_V, UnitX_, UnitEnergy_
     use CON_physics, ONLY: get_time
-    use CON_bline,   ONLY: MF_set_grid
+    use CON_bline,   ONLY: BL_set_grid
     type(CompInfoType),intent(inout):: CompInfo
     character(len=*),  intent(in)   :: TypeAction
+    real :: UnitX, EnergyCoeff
 
-    character(len=*),      parameter:: NameSub = 'SP_set_param'
+    character(len=*), parameter:: NameSub = 'SP_set_param'
     !--------------------------------------------------------------------------
     select case(TypeAction)
     case('VERSION')
@@ -131,7 +126,11 @@ contains
     case('READ')
        call read_param
     case('GRID')
-       call MF_set_grid(SP_, rSun, TypeCoordSystem)
+       if(is_proc(SP_))then
+          UnitX = Io2Si_V(UnitX_)
+          EnergyCoeff = Si2Io_V(UnitEnergy_)
+       end if
+       call BL_set_grid(TypeCoordSystem, UnitX, EnergyCoeff)
     case default
        call CON_stop('Cannot call SP_set_param for '//trim(TypeAction))
     end select
@@ -140,8 +139,9 @@ contains
   subroutine SP_save_restart(TimeSimulation)
     use SP_ModMain, ONLY: save_restart
     real, intent(in) :: TimeSimulation
-    !--------------------------------------------------------------------------
+
     ! if data are read from files, no need for additional run
+    !--------------------------------------------------------------------------
     if(.not.DoReadMhData)call run(TimeSimulation)
     call save_restart
   end subroutine SP_save_restart
@@ -149,7 +149,7 @@ contains
   subroutine SP_put_coupling_param(iModelIn, rMinIn, rMaxIn, TimeIn,&
        rBufferLoIn, rBufferUpIn)
     use SP_ModMain, ONLY: copy_old_state
-    use CON_bline,  ONLY: get_bounds
+    use CON_bline,  ONLY: get_bounds, Lower_
     integer,        intent(in) :: iModelIn
     real,           intent(in) :: rMinIn, rMaxIn
     real,           intent(in) :: TimeIn
@@ -174,14 +174,15 @@ contains
     use SP_ModDistribution, ONLY: offset
     use SP_ModGrid,         ONLY: R_, State_VIB
     use CON_bline,          ONLY: iOffset_B, rBufferLo, rBufferUp, &
-         rInterfaceMin, rInterfaceMax, rMin, adjust_line
+         rInterfaceMin, rInterfaceMax, rMin, adjust_line, LagrID_, &
+         X_, Z_
     logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
     ! exiting the domain (can happen both at the beginning and the end)
     integer:: iParticle, iBlock, iBegin,  iEnd, iOffset ! loop variables
-    
+
     logical:: DoAdjustLo, DoAdjustUp
- 
+
     character(len=100):: StringError
 
     character(len=*), parameter:: NameSub = 'SP_adjust_lines'
