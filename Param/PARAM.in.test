@@ -24,11 +24,6 @@ T
 F			DoTraceShock
 T			UseDiffusion
 
-#GRID
-1.15			RMin
-19.7			RBufferMin
-21			RBufferMax
-220			RMax
 
 #INCLUDE
 MH_data_e20120123/MH_data.H
