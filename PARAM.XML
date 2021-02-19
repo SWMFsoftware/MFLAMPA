@@ -9,20 +9,6 @@ List of commands used in the PARAM.in file for MFLAMPA configured as the SP
 component of the SWMF.
 
 <commandgroup name="DOMAIN">
-<command name="COMPDOMAINS" alias="GRID">
-  <parameter name="RMin" type="real" min="-1" default="-1" />
-  <parameter name="RBufferMin"  type="real" min="-1" default="-1" />
-  <parameter name="RBufferMax"  type="real" min="-1" default="-1" />
-  <parameter name="RMax"  type="real" min="-1" default="-1" />
-#COMPDOMAINS
-1.15            RScMin [Rs]
-19.0            RIhMin [Rs]
-21.0            RScMax [Rs]
-220.0           RIhMax [Rs]
-
-Sets the ranges of heliocentric distances for domains in SC and IH exchanging
-data with SP.
-</command>
 
 <command name="ORIGIN">
   <parameter name="ROrigin" type="real" min="1" default="2.5"/>
