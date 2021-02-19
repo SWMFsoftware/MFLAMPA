@@ -4,9 +4,8 @@
 module SP_ModRestart
   ! This module contains methods for writing output files
   use SP_ModSize,   ONLY: nParticleMax
-  use SP_ModGrid,   ONLY: get_node_indexes, LagrID_, Z_,&
-       nBlock, MhData_VIB, iShock_IB, iNode_B, &
-       ! RMin, RBufferMin, RBufferMax, RMax, &
+  use SP_ModGrid,   ONLY: iblock_to_lon_lat, LagrID_, Z_,&
+       nBlock, MhData_VIB, iShock_IB,  &
        FootPoint_VB, nParticle_B, nShockParam, &
        nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
@@ -41,15 +40,14 @@ contains
     ! loop variable
     integer:: iBlock
     ! indexes of corresponding node, latitude and longitude
-    integer:: iNode, iLat, iLon
+    integer:: iLat, iLon
     character(len=*), parameter:: NameSub = 'save_restart'
     !--------------------------------------------------------------------------
 
     call write_restart_header
 
     do iBlock = 1, nBlock
-       iNode = iNode_B(iBlock)
-       call get_node_indexes(iNode, iLon, iLat)
+       call iblock_to_lon_lat(iBlock, iLon, iLat)
 
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
@@ -75,16 +73,14 @@ contains
     ! loop variables
     integer:: iBlock
     ! indexes of corresponding node, latitude and longitude
-    integer:: iNode, iLat, iLon
+    integer:: iLat, iLon
     real   :: Aux, Aux_I(nShockParam) ! For reading integers
     integer:: iError
     character(len=*), parameter:: NameSub = 'read_restart'
     !--------------------------------------------------------------------------
 
     do iBlock = 1, nBlock
-       iNode = iNode_B(iBlock)
-       call get_node_indexes(iNode, iLon, iLat)
-
+       call iBlock_to_lon_lat(iBlock, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameRestartInDir)//'data_',iLon,'_',iLat,&

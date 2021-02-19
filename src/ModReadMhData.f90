@@ -4,9 +4,9 @@
 module SP_ModReadMhData
   ! This module contains methods for reading input MH data
   use SP_ModSize,    ONLY: nDim, nParticleMax
-  use SP_ModGrid,    ONLY: get_node_indexes, get_other_state_var,&
+  use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,&
        nMHData,  nBlock, Z_,&
-       iNode_B, FootPoint_VB, nParticle_B, MHData_VIB,  LagrID_
+       FootPoint_VB, nParticle_B, MHData_VIB,  LagrID_
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
   use ModPlotFile,   ONLY: read_plot_file
@@ -114,7 +114,7 @@ contains
     ! loop variables
     integer:: iBlock
     ! indexes of corresponding node, latitude and longitude
-    integer:: iNode, iLat, iLon
+    integer:: iLat, iLon
     ! size of the offset to apply compared to the previous state
     integer:: iOffset
     ! local value of DoOffset
@@ -146,8 +146,7 @@ contains
     DataInputTimeOld = DataInputTime
     ! read the data
     BLOCK:do iBlock = 1, nBlock
-       iNode = iNode_B(iBlock)
-       call get_node_indexes(iNode, iLon, iLat)
+       call iblock_to_lon_lat(iBlock, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameInputDir)//NameMHData//'_',iLon,&
