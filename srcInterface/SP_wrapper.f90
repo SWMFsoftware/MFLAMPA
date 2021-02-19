@@ -16,18 +16,17 @@ module SP_wrapper
 
   ! coupling with MHD components
   public:: SP_adjust_lines
-  public:: SP_check_ready_for_mh
+  public:: SP_do_extract_lines
   public:: SP_put_coupling_param
-  ! variables requested via coupling: coordinates,
-  ! field line and particles indexes
+
   logical :: DoCheck = .true.
 contains
   !============================================================================
   ! Interface routines to be called from super-structure only
-  subroutine SP_check_ready_for_mh(IsReady)
+  subroutine SP_do_extract_lines(DoExtract)
     use CON_coupler, ONLY: i_proc0, i_comm, is_proc0, SP_
     use ModMpi
-    logical, intent(out):: IsReady
+    logical, intent(out):: DoExtract
 
     integer :: iError
 
@@ -35,9 +34,9 @@ contains
     ! get value at SP root and broadcast to all SWMF processors
     character(len=*), parameter:: NameSub = 'SP_check_ready_for_mh'
     !--------------------------------------------------------------------------
-    if(is_proc0(SP_)) IsReady = DoRestart
-    call MPI_Bcast(IsReady, 1, MPI_LOGICAL, i_proc0(SP_), i_comm(), iError)
-  end subroutine SP_check_ready_for_mh
+    if(is_proc0(SP_)) DoExtract = .not.DoRestart
+    call MPI_Bcast(DoExtract, 1, MPI_LOGICAL, i_proc0(SP_), i_comm(), iError)
+  end subroutine SP_do_extract_lines
   !============================================================================
   ! Above routines may be called from superstructure only.
   subroutine SP_run(TimeSimulation,TimeSimulationLimit)
