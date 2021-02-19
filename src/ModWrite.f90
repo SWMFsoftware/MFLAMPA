@@ -11,9 +11,10 @@ module SP_ModPlot
   use SP_ModDistribution, ONLY: nP, KinEnergySI_I, MomentumSI_I, &
        Distribution_IIB, FluxChannelInit_V,                      &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
-  use SP_ModGrid, ONLY: search_line, get_node_indexes, nVar, nMHData, nBlock, &
-       MHData_VIB, State_VIB, iShock_IB, iNode_B, nParticle_B, Shock_, &
+  use SP_ModGrid, ONLY: search_line, iNode0, nVar, nMHData, nBlock, &
+       MHData_VIB, State_VIB, iShock_IB, nParticle_B, Shock_, &
        X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nNode
+  use SP_ModGrid, ONLY: iblock_to_lon_lat
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nParticleMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
@@ -717,7 +718,7 @@ contains
       do iBlock = 1, nBlock
          call make_file_name(&
               StringBase    = NameMHData,                     &
-              iNode         = iNode_B(iBlock),                &
+              iBlock        = iBlock,                         &
               iIter         = iIter,                          &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
@@ -848,7 +849,7 @@ contains
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
       do iBlock = 1, nBlock
-         iNode  = iNode_B(iBlock)
+         iNode  = iNode0 + iBlock
 
          ! find the particle just above the given radius
          call search_line(iBlock, File_I(iFile)%Radius,&
@@ -1007,7 +1008,7 @@ contains
             call make_file_name(&
                  StringBase    = NameMHData,                     &
                  Radius        = File_I(iFile) % Radius,         &
-                 iNode         = iNode_B(iBlock),                &
+                 iBlock        = iBlock,                         &
                  NameExtension = File_I(iFile)%NameFileExtension,&
                  NameOut       = NameFile)
 
@@ -1036,7 +1037,7 @@ contains
          call make_file_name(&
               StringBase    = NameMHData,                     &
               Radius        = File_I(iFile) % Radius,         &
-              iNode         = iNode_B(iBlock),                &
+              iBlock        = iBlock,                         &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
 
@@ -1129,7 +1130,7 @@ contains
       ! loop variables
       integer:: iBlock, iParticle, iVarPlot
       ! indexes of corresponding node, latitude and longitude
-      integer:: iNode, iLat, iLon
+      integer:: iLat, iLon
       ! index of first/last particle on the field line
       integer:: iLast
       ! scale and conversion factor
@@ -1148,13 +1149,12 @@ contains
          Factor_I= DMomentumOverDEnergy_I
       end select
       do iBlock = 1, nBlock
-         iNode = iNode_B(iBlock)
-         call get_node_indexes(iNode, iLon, iLat)
+         call iblock_to_lon_lat(iBlock, iLon, iLat)
 
             ! set the file name
             call make_file_name(&
                  StringBase    = 'Distribution_',                &
-                 iNode         = iNode_B(iBlock),                &
+                 iBlock        = iBlock,                         &
                  iIter         = iIter,                          &
                  NameExtension = File_I(iFile)%NameFileExtension,&
                  NameOut       = NameFile)
@@ -1562,7 +1562,7 @@ contains
   end subroutine get_date_time_string
   !============================================================================
   subroutine make_file_name(StringBase, Radius, Longitude, Latitude,&
-       iNode, iIter, NameExtension, NameOut)
+       iBlock, iIter, NameExtension, NameOut)
     ! creates a string with file name and stores in NameOut;
     ! result is as follows:
     !   StringBase[_R=?.?][_Lon=?.?_Lat=?.?][_???_???][_t?_n?].NameExtension
@@ -1571,7 +1571,7 @@ contains
     real,            optional, intent(in) :: Radius
     real,            optional, intent(in) :: Longitude
     real,            optional, intent(in) :: Latitude
-    integer,         optional, intent(in) :: iNode
+    integer,         optional, intent(in) :: iBlock
     integer,         optional, intent(in) :: iIter
     character(len=*),          intent(in) :: NameExtension
     character(len=100),        intent(out):: NameOut
@@ -1623,8 +1623,8 @@ contains
 
     end if
 
-    if(present(iNode))then
-       call get_node_indexes(iNode, iLon, iLat)
+    if(present(iBlock))then
+       call iblock_to_lon_lat(iBlock, iLon, iLat)
        write(NameOut,'(a,i3.3,a,i3.3)') &
             trim(NameOut)//'_',iLon,'_',iLat
     end if
