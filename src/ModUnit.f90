@@ -40,7 +40,7 @@ module SP_ModUnit
   ! Unit conversions
   integer, public, parameter:: &
        UnitX_ = 1, UnitRho_ = 2, UnitEnergy_ = 3, UnitFlux_ = 4, UnitEFlux_ = 5
-  real, public, dimension(UnitX_:UnitEFlux_) :: IO2SI_I, SI2IO_I
+  real, public, dimension(UnitX_:UnitEFlux_) :: Io2Si_V, Si2Io_V
 
   ! Unit for all the state variables:
   ! Length is in the unit of Rs, Rho is in the unit of amu/m^3,
@@ -100,13 +100,13 @@ contains
     if(.not.DoInit)RETURN
 
     ! unit conversion
-    IO2SI_I(UnitX_)      = Rsun
-    IO2SI_I(UnitRho_)    = cProtonMass
-    IO2SI_I(UnitEnergy_) = energy_in(NameEnergyUnit)
-    IO2SI_I(UnitFlux_)   = UnitParticleFluxSI
-    IO2SI_I(UnitEFlux_)  = IO2SI_I(UnitEnergy_) * IO2SI_I(UnitFlux_)
+    Io2Si_V(UnitX_)      = Rsun
+    Io2Si_V(UnitRho_)    = cProtonMass
+    Io2Si_V(UnitEnergy_) = energy_in(NameEnergyUnit)
+    Io2Si_V(UnitFlux_)   = UnitParticleFluxSI
+    Io2Si_V(UnitEFlux_)  = IO2SI_V(UnitEnergy_) * IO2SI_V(UnitFlux_)
 
-    SI2IO_I = 1.0 / IO2SI_I
+    Si2Io_V = 1.0 / Io2Si_V
 
     DoInit = .false.
   end subroutine init
