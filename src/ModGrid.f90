@@ -20,7 +20,6 @@ module SP_ModGrid
   public:: read_param          ! read parameters related to grid
   public:: init                ! Initialize arrays on the grid
   public:: init_stand_alone    ! Initialize arrays on the grid
-  public:: init_indexes        ! Initialize index arrays
   public:: copy_old_state      ! save old arrays before getting new ones
   public:: get_other_state_var ! Auxiliary components of state vector
   public:: search_line         ! find particle index corresponding to radius
@@ -30,27 +29,34 @@ module SP_ModGrid
   !
   ! Grid info
   !
-  ! Number of blocks on this processor
-  integer, public              :: nBlock
-  ! Number of particles per block (line):
-  integer, public,     pointer :: nParticle_B(:)
+  ! Angular grid at origin surface
   !
-  !
-  ! angular grid at origin surface
   integer, public :: nLon  = 4
   integer, public :: nLat  = 4
+  !
+  ! Total number of magnetic field lines on all PEs (just a product of nLat * nLon)
+  !
   integer, public :: nNode = 16
+  !
+  ! All nodes are enumerated. The last node number on the previous proc (iProc-1)
+  ! equals (iProc*nNode)/nProc. Store this:
+  !
+  integer, public :: iNode0
+  !
+  ! The nodes on a given PE have node numbers ranging from iNode0 +1 to
+  ! iNodeLast =((iProc + 1)*nNode)/nProc. The iBlock index to enumerate lines on
+  ! a given proc ranges from 1 to iNodeLast. nBlock = nNodeLast - iNode0 is the number of
+  ! lines (blocks) on this processor. For iBlock=1:nBlock iNode = iNode0+1:iNodeLast
+  !
+  integer, public              :: nBlock
+  !
+  ! Number of particles (vertexes, Lagrangian meshes) per block (line):
+  integer, public,     pointer :: nParticle_B(:)
+  !
+  ! Function converting block number to lon-lat location of the line
+  !
+  public :: iBlock_to_lon_lat
 
- 
-  !
-  ! inverse function:get_node_indexes(iNodeIn,iLonOut,iLatOut)
-  !
-  public :: get_node_indexes
-  !
-  ! Node number based on the local block number
-  ! 1st index - block number
-  !
-  integer, public, allocatable:: iNode_B(:)
   !
   ! Array for current and present location of shock wave
   !
@@ -112,8 +118,8 @@ module SP_ModGrid
        RhoOld_     =20, & ! Background plasma density      ! copy_
        BOld_       =21    ! Magnitude of magnetic field    ! old_state
   !
-  !
   ! variable names
+  !
   character(len=10), public, parameter:: NameVar_V(LagrID_:nVar)&
         = ['LagrID    ', &
        'X         ', &
@@ -204,7 +210,7 @@ contains
     use SP_ModProc,        ONLY: nProc
 
     integer:: iError
-    integer:: iLat, iLon, iNode, iBlock, iProcNode, iParticle
+    integer:: iNodeLast
 
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
@@ -215,7 +221,9 @@ contains
     !
     if(nNode < nProc)call CON_stop(NameSub//&
          ': There are more processors than field lines')
-    nBlock = ((iProc+1)*nNode) / nProc - (iProc*nNode) / nProc
+    iNode0 = (iProc*nNode) / nProc
+    iNodeLast =  ((iProc+1)*nNode) / nProc
+    nBlock = iNodeLast - iNode0
     !
     ! check consistency
     !
@@ -224,19 +232,14 @@ contains
     !
     ! allocate data and grid containers
     !
-    ! allocate(iNode_II(nLon, nLat), stat=iError)
-    !call check_allocate(iError, NameSub//'iNode_II')
-    allocate(iNode_B(nBlock), stat=iError)
-    call check_allocate(iError, NameSub//'iNode_B')
-      
     allocate(iShock_IB(nShockParam, nBlock), stat=iError)
     call check_allocate(iError, NameSub//'iShock_IB')
     iShock_IB = NoShock_
-    
+
     allocate(FootPoint_VB(LagrID_:Length_, nBlock), stat=iError)
     call check_allocate(iError, NameSub//'FootPoint_VB')
     FootPoint_VB = -1
-    
+
     allocate(MagneticFluxAbs_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
     MagneticFluxAbs_B = -1
@@ -265,46 +268,21 @@ contains
     nParticle_B = 0
   end subroutine init_stand_alone
   !============================================================================
-  subroutine init_indexes
-    use SP_ModProc,        ONLY: nProc
-    integer:: iLat, iLon, iNode, iBlock, iProcNode, iParticle
-    
-    character(len=*), parameter:: NameSub = 'init_indexes'
-    !--------------------------------------------------------------------------
-    !
-    ! fill grid containers
-    !
-    iBlock = 1; iProcNode = 0
-    do iLat = 1, nLat
-       do iLon = 1, nLon
-          iNode = iLon + nLon * (iLat-1)
-          !
-          ! iProcNode = ceiling(real(iNode*nProc)/nNode) - 1
-          !
-          if(iProcNode==iProc)then
-             iNode_B(     iBlock) = iNode
-          end if
-          if(iNode == ((iProcNode+1)*nNode)/nProc)then
-             !
-             ! This was the last node on the iProcNode
-             !
-             iBlock = 1; iProcNode = iProcNode + 1
-          else
-             iBlock = iBlock + 1
-          end if
-       end do
-    end do
-  end subroutine init_indexes
-  !============================================================================
-  subroutine get_node_indexes(iNodeIn, iLonOut, iLatOut)
-    ! return angular grid's indexes corresponding to this node
-    integer, intent(in) :: iNodeIn
+  subroutine iblock_to_lon_lat(iBlockIn, iLonOut, iLatOut)
+    ! return angular grid's indexes corresponding to this block
+    integer, intent(in) :: iBlockIn
     integer, intent(out):: iLonOut
     integer, intent(out):: iLatOut
+
+    integer :: iNode
     !--------------------------------------------------------------------------
-    iLatOut = 1 + (iNodeIn-1) / nLon
-    iLonOut = iNodeIn - nLon * (iLatOut-1)
-  end subroutine get_node_indexes
+    !
+    ! Get node number from block number
+    !
+    iNode = iBlockIn + iNode0
+    iLatOut = 1 + (iNode - 1)/nLon
+    iLonOut = iNode - nLon*(iLatOut - 1)
+  end subroutine iblock_to_lon_lat
   !============================================================================
   subroutine copy_old_state
     ! copy current state to old state for all field lines
