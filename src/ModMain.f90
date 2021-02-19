@@ -6,22 +6,18 @@ module SP_ModMain
   use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
        Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
        Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
-       RhoOld_, iShock_IB, iNode_B, State_VIB, MHData_VIB,        &
-       FootPoint_VB, nLat, nLon, nNode
+       RhoOld_, iShock_IB, State_VIB, MHData_VIB,        &
+       FootPoint_VB, nLat, nLon
   use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
   use SP_ModProc,    ONLY: iProc
   use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
   use SP_ModRestart, ONLY: save_restart, read_restart
   use SP_ModSize,    ONLY: nDim, nParticleMax
   use SP_ModTime,    ONLY: SPTime, DataInputTime, iIter
-  use SP_ModUnit,    ONLY: SI2IO_I, UnitEnergy_
+  use SP_ModUnit,    ONLY: Si2Io_V, UnitEnergy_
   implicit none
   SAVE
   private ! except
-  ! Lower/Upper boundary of the domain in Rs
-  real         :: RScMin=-1.0, RIhMax = -1.0
-  ! Boundaries of the buffer layer between SC and IH Rs
-  real         :: RIhMin=-1.0, RScMax=-1.0
   ! Stopping conditions. These variables are only used in stand alone mode.
   real   :: TimeMax  = -1.0, CpuTimeMax = -1.0
   integer:: nIterMax = -1
@@ -50,20 +46,19 @@ module SP_ModMain
 
   ! Methods and variables from ModSize
   public:: &
-       nDim, nLat, nLon, nNode, nParticleMax
+       nDim, nLat, nLon, nParticleMax
 
   ! Methods and variables from ModGrid
   public:: &
        LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_, Ux_, Uz_, T_, R_,   &
        Wave1_, Wave2_, Length_, nBlock, nParticle_B, Shock_,   &
-       ShockOld_, RScMin, RIhMin, RScMax, RIhMax,              &
-       iShock_IB, iNode_B, MHData_VIB, FootPoint_VB
+       ShockOld_, iShock_IB, MHData_VIB, FootPoint_VB
 
   ! Methods and variables from ModReadMhData
   public:: DoReadMhData
 
   ! Methods and variables from ModUnit
-  public:: SI2IO_I, UnitEnergy_
+  public:: Si2Io_V, UnitEnergy_
 
   ! Logicals for actions
   !----------------------------------------------------------------------------
@@ -115,12 +110,6 @@ contains
        case('#ORIGIN')
           if(IsStandAlone)CYCLE
           call read_param_origin
-       case('#COMPDOMAINS','#GRID')
-          if(IsStandAlone)CYCLE
-          call read_var('RScMin',RScMin)
-          call read_var('RIhMin', RIhMin)
-          call read_var('RScMax', RScMax)
-          call read_var('RIhMax',RIhMax)
        case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
             '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
           if(i_session_read() /= 1)CYCLE
@@ -211,7 +200,7 @@ contains
   subroutine initialize
     use SP_ModAngularSpread, ONLY: init_spread     => init
     use SP_ModDistribution, ONLY: init_dist       => init
-    use SP_ModGrid,         ONLY: init_indexes,          &
+    use SP_ModGrid,         ONLY: &
          iNodeTest, iParticleTest, iPTest
     use SP_ModPlot,         ONLY: init_plot       => init
     use SP_ModReadMhData,   ONLY: init_mhdata     => init
@@ -221,7 +210,6 @@ contains
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
-    call init_indexes
     call init_unit
     call init_dist
     call init_plot
@@ -360,9 +348,7 @@ contains
   subroutine check
     use ModUtilities, ONLY: make_dir
 
-    character(len=*), parameter:: NameSub = 'check'
-    !--------------------------------------------------------------------------
-    !if(.not.IsStandAlone)then
+    ! if(.not.IsStandAlone)then
     !   ! check if the domains for SC and IH are correctly set
     !   if(RScMin < 0.0.or. RIhMin < 0.0 .or.RScMax < 0.0 .or.RIhMax < 0.0)&
     !        call CON_stop(NameSub//&
@@ -380,8 +366,10 @@ contains
     !           call CON_stop(NameSub//&
     !           ': inconsistent values of ROrigin, RIhMin, RScMax, RIhMax')
     !   end if
-    !end if
+    ! end if
     ! Make output directory
+    character(len=*), parameter:: NameSub = 'check'
+    !--------------------------------------------------------------------------
     if(iProc==0) call make_dir(NamePlotDir)
     ! Initialize timing
     if(iProc==0)then
