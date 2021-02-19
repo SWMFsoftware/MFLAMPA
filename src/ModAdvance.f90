@@ -9,13 +9,13 @@ module SP_ModAdvance
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
-       iNode_B,      &
+       iNode0,      &
        Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
   use SP_ModUnit, ONLY: UnitX_, UnitRho_, UnitEnergy_,                        &
-       NameParticle, IO2SI_I, kinetic_energy_to_momentum
+       NameParticle, Io2Si_V, kinetic_energy_to_momentum
 
   implicit none
   SAVE
@@ -168,14 +168,14 @@ contains
        ! are in SI units. So to convert the IO units, only need three
        ! conversion factors are needed:
        ! UnitX_, UnitRho_, UnitEnergy_
-       XyzSI_DI(x_,1:iEnd) = MhData_VIB(x_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
-       XyzSI_DI(y_,1:iEnd) = MhData_VIB(y_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
-       XyzSI_DI(z_,1:iEnd) = MhData_VIB(z_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
-       DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
-       RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iBlock)*IO2SI_I(UnitX_)
+       XyzSI_DI(x_,1:iEnd) = MhData_VIB(x_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
+       XyzSI_DI(y_,1:iEnd) = MhData_VIB(y_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
+       XyzSI_DI(z_,1:iEnd) = MhData_VIB(z_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
+       DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
+       RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
        uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iBlock)
        BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iBlock)
-       RhoOldSI_I( 1:iEnd) = State_VIB(RhoOld_,1:iEnd,iBlock)*IO2SI_I(UnitRho_)
+       RhoOldSI_I( 1:iEnd) = State_VIB(RhoOld_,1:iEnd,iBlock)*IO2SI_V(UnitRho_)
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iBlock)
@@ -206,7 +206,7 @@ contains
                State_VIB(RhoOld_,1:iEnd,iBlock))
 
           nSI_I(1:iEnd)   = n_I(1:iEnd)
-          RhoSI_I(1:iEnd) = n_I(1:iEnd)*IO2SI_I(UnitRho_)
+          RhoSI_I(1:iEnd) = n_I(1:iEnd)*Io2Si_V(UnitRho_)
 
           ! dimensionless
           DLogRho_I(1:iEnd)=log(RhoSI_I(1:iEnd)/RhoOldSI_I(1:iEnd))
@@ -318,7 +318,7 @@ contains
                         DiffCoeffMinSI/DOuterSI_I(1:iEnd))
                 end if
 
-                if (DoTestDiffusion .and. iNode_B(iBlock) == iNodeTest) then
+                if (DoTestDiffusion .and. iNode0 + iBlock == iNodeTest) then
                    if (iP == iPTest) then
                       write(*,'(a,i3,a,i3,a,es15.7)') NameSub//': iStep =', &
                            iStep, ' iProgress =',  iProgress,               &
@@ -477,7 +477,7 @@ contains
          ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic
          ! temperature.
          MomentumSI = kinetic_energy_to_momentum(                  &
-              MHData_VIB(T_,iParticle,iBlock)*IO2SI_I(UnitEnergy_))
+              MHData_VIB(T_,iParticle,iBlock)*Io2Si_V(UnitEnergy_))
          Distribution_IIB(0,iParticle,iBlock) =                    &
               CoefInj*1.0/(4*(SpectralIndex-3)*cPi)                &
               * nSI_I(iParticle)/MomentumSI**3                     &
