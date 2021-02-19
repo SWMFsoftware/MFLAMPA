@@ -8,7 +8,7 @@ module SP_ModDistribution
   use ModConst,   ONLY: cLightSpeed, energy_in
   use SP_ModSize, ONLY: nParticleMax, nP=>nMomentum
   use SP_ModUnit, ONLY: NameFluxUnit, NameEnergyFluxUnit,&
-       IO2SI_I, SI2IO_I, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
+       IO2SI_V, SI2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid, ONLY: nBlock, nParticle_B
   implicit none
@@ -90,8 +90,8 @@ contains
     DoInit = .false.
 
     ! convert energies to momenta
-    MomentumInjSI= kinetic_energy_to_momentum(EnergyInjIo*IO2SI_I(UnitEnergy_))
-    MomentumMaxSI= kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_I(UnitEnergy_))
+    MomentumInjSI= kinetic_energy_to_momentum(EnergyInjIo*IO2SI_V(UnitEnergy_))
+    MomentumMaxSI= kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_V(UnitEnergy_))
 
     ! grid size in the log momentum space
     DLogP = log(MomentumMaxSI/MomentumInjSI)/nP
@@ -119,7 +119,7 @@ contains
           do iP = 0, nP +1
              Distribution_IIB(iP,iParticle,iBlock) =                         &
                   FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSI_I(iP)**2   &
-                  *IO2SI_I(UnitFlux_)/IO2SI_I(UnitEnergy_)
+                  *IO2SI_V(UnitFlux_)/IO2SI_V(UnitEnergy_)
 
           end do
        end do
@@ -157,9 +157,9 @@ contains
     FluxChannelInit_V(0) = FluxInitIo
     FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
          (EnergyMaxIo-EChannelIO_I(:)) / (EnergyMaxIo-EnergyInjIo)
-    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2SI_I(UnitFlux_) * &
-         0.5 * (EnergyMaxIo + EnergyInjIo) * IO2SI_I(UnitEnergy_) * &
-         SI2IO_I(UnitEFlux_)
+    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2SI_V(UnitFlux_) * &
+         0.5 * (EnergyMaxIo + EnergyInjIo) * IO2SI_V(UnitEnergy_) * &
+         SI2IO_V(UnitEFlux_)
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
@@ -349,11 +349,11 @@ contains
 
           ! store the results
           Flux_VIB(Flux0_,              iParticle, iBlock) = &
-               Flux   * SI2IO_I(UnitFlux_)
+               Flux   * SI2IO_V(UnitFlux_)
           Flux_VIB(FluxFirst_:FluxLast_,iParticle, iBlock) = &
-               Flux_I * SI2IO_I(UnitFlux_)
+               Flux_I * SI2IO_V(UnitFlux_)
           Flux_VIB(EFlux_,              iParticle, iBlock) = &
-               EFlux  * SI2IO_I(UnitEFlux_)
+               EFlux  * SI2IO_V(UnitEFlux_)
        end do
     end do
 
