@@ -168,7 +168,7 @@ contains
           end if
           ! amount of the offset is determined from difference
           ! in LagrID_
-          iOffset = FootPoint_VB(LagrID_,iBlock) - Param_I(LagrID_)
+          iOffset = nint(FootPoint_VB(LagrID_,iBlock) - Param_I(LagrID_))
        else
           iOffset = 0
        end if
