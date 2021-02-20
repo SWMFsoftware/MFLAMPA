@@ -4,13 +4,16 @@
 module SP_ModDistribution
   ! The module contains the velocity/momentum distribution function
   ! and methods for initializing it as well as the offset routine.
+#ifdef OPENACC
+  use ModUtilities, ONLY: norm2
+#endif
   use ModNumConst, ONLY: cTiny
-  use ModConst,   ONLY: cLightSpeed, energy_in
-  use SP_ModSize, ONLY: nParticleMax, nP=>nMomentum
-  use SP_ModUnit, ONLY: NameFluxUnit, NameEnergyFluxUnit,&
+  use ModConst,    ONLY: cLightSpeed, energy_in
+  use SP_ModSize,  ONLY: nParticleMax, nP=>nMomentum
+  use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        IO2SI_V, SI2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
-  use SP_ModGrid, ONLY: nBlock, nParticle_B
+  use SP_ModGrid,  ONLY: nBlock, nParticle_B
   implicit none
   SAVE
   PRIVATE
@@ -236,10 +239,10 @@ contains
        Distribution_IIB(:,2:nParticle_B(iBlock), iBlock)&
             = Distribution_IIB(:,1:nParticle_B(iBlock)-1, iBlock)
        ! Extrapolate state vector components and VDF at iparticle=1
-       Distance2ToMin = sqrt(sum((MHData_VIB(X_:Z_,2,iBlock) - &
-               FootPoint_VB(X_:Z_,iBlock))**2))
-          Distance3To2   = sqrt(sum((MHData_VIB(X_:Z_,3,iBlock) - &
-                MHData_VIB(X_:Z_,2,iBlock))**2))
+       Distance2ToMin = norm2(MHData_VIB(X_:Z_,2,iBlock) - &
+               FootPoint_VB(X_:Z_,iBlock))
+          Distance3To2   = norm2(MHData_VIB(X_:Z_,3,iBlock) - &
+                MHData_VIB(X_:Z_,2,iBlock))
           Alpha = Distance2ToMin/(Distance2ToMin + Distance3To2)
        State_VIB([RhoOld_, BOld_], 1, iBlock) = &
             (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iBlock) &

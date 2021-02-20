@@ -3,8 +3,7 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_wrapper
   use SP_ModSize, ONLY: nParticleMax
-  use SP_ModMain, ONLY: run, DoRestart, DoReadMhData, nBlock, &
-       MHData_VIB, FootPoint_VB, DataInputTime, nParticle_B, Length_
+  use SP_ModMain, ONLY: run, DoRestart, DoReadMhData, DataInputTime
   implicit none
   save
   private ! except
@@ -15,9 +14,9 @@ module SP_wrapper
   public:: SP_finalize
 
   ! coupling with MHD components
-  public:: SP_adjust_lines
   public:: SP_do_extract_lines
   public:: SP_put_coupling_param
+  public:: SP_adjust_lines
 
   logical :: DoCheck = .true.
 contains
@@ -54,8 +53,8 @@ contains
   !============================================================================
   subroutine SP_init_session(iSession,TimeSimulation)
     use SP_ModMain, ONLY: initialize, DoRestart, DoReadMhData
-    use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB
-    use SP_ModGrid, ONLY: nLon, nLat
+    use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB, MHData_VIB
+    use SP_ModGrid, ONLY: nLon, nLat, nParticle_B, FootPoint_VB
     use CON_bline,  ONLY: BL_init, BL_get_origin_points
     use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
     integer,  intent(in) :: iSession         ! session number (starting from 1)
@@ -64,15 +63,18 @@ contains
     logical, save:: IsInitialized = .false.
 
     !--------------------------------------------------------------------------
-    if(IsInitialized)&
-         RETURN
+    if(IsInitialized)RETURN
     IsInitialized = .true.
+    
     call init_grid
-    nullify(MHData_VIB);  nullify(State_VIB)
-    nullify(nParticle_B)
+
+    nullify(MHData_VIB) ;  nullify(State_VIB)
+    nullify(nParticle_B);  nullify(FootPoint_VB)
+
     call BL_init(nParticleMax, nLon, nLat,  &
-         MHData_VIB, nParticle_B, nVar, State_VIB)
+         MHData_VIB, nParticle_B, nVar, State_VIB, FootPoint_VB)
     call initialize
+
     if(.not.(DoRestart.or.DoReadMhData))&
          call BL_get_origin_points(ROrigin, LonMin, LonMax, LatMin, LatMax)
   end subroutine SP_init_session
@@ -80,9 +82,7 @@ contains
   subroutine SP_finalize(TimeSimulation)
     use SP_ModMain, ONLY: finalize
     real,intent(in)::TimeSimulation
-
     ! if data are read from files, no special finalization is needed
-
     !--------------------------------------------------------------------------
     if(.not.DoReadMhData)call run(TimeSimulation)
     call finalize
@@ -171,10 +171,11 @@ contains
   ! grid points should be added/deleted
   subroutine SP_adjust_lines(DoInit)
     use SP_ModDistribution, ONLY: offset
-    use SP_ModGrid,         ONLY: R_, State_VIB
+    use SP_ModGrid,         ONLY: R_, State_VIB, nBlock, MHData_VIB, &
+         nParticle_B, Length_, FootPoint_VB
     use CON_bline,          ONLY: iOffset_B, rBufferLo, rBufferUp, &
          rInterfaceMin, rInterfaceMax, rMin, adjust_line, LagrID_, &
-         X_, Z_
+         X_, Z_, SP_set_line_foot_b
     logical, intent(in) :: DoInit
     ! once new geometry of lines has been put, account for some particles
     ! exiting the domain (can happen both at the beginning and the end)
@@ -217,68 +218,7 @@ contains
     ! in IH yet and no need to correct their ID
     if(DoAdjustUp.or.DoInit)iOffset_B(1:nBlock) = 0
   contains
-    !==========================================================================
-    subroutine SP_set_line_foot_b(iBlock)
-      integer, intent(in) :: iBlock
 
-      ! existing particle with lowest index along line
-      real:: Xyz1_D(X_:Z_)
-      ! direction of the field at Xyz1_D and segment vectors between particles
-      real, dimension(X_:Z_):: Dir0_D, Dist1_D, Dist2_D
-      ! dot product Xyz1 and Dir1 and its sign
-      real:: Dot, S
-      ! distances between particles
-      real:: Dist1, Dist2
-      ! variable to compute coords of the footprints
-      real:: Alpha
-      !------------------------------------------------------------------------
-      ! get the coordinates of lower particle
-      Xyz1_D = MHData_VIB(X_:Z_, 1, iBlock)
-
-      ! generally, field direction isn't known
-      ! approximate it using directions of first 2 segments of the line
-      Dist1_D = MHData_VIB(X_:Z_, 1, iBlock) - &
-           MHData_VIB(X_:Z_, 2, iBlock)
-      Dist1 = sqrt(sum(Dist1_D**2))
-      Dist2_D = MHData_VIB(X_:Z_, 2, iBlock) - &
-           MHData_VIB(X_:Z_, 3, iBlock)
-      Dist2 = sqrt(sum(Dist2_D**2))
-      Dir0_D = ((2*Dist1 + Dist2)*Dist1_D - Dist1*Dist2_D)/(Dist1 + Dist2)
-
-      Dir0_D = Dir0_D/sqrt(sum(Dir0_D**2))
-
-      ! dot product and sign: used in computation below
-      Dot = sum(Dir0_D*Xyz1_D)
-      S   = sign(1.0, Dot)
-
-      ! there are 2 possible failures of the algorithm:
-      ! Failure (1):
-      ! no intersection of smoothly extended line with the sphere R = RMin
-      if(Dot**2 - sum(Xyz1_D**2) + RMin**2 < 0)then
-         ! project first particle for new footpoint
-         FootPoint_VB(X_:Z_,iBlock) = Xyz1_D * RMin / sqrt(sum(Xyz1_D**2))
-      else
-         ! Xyz0, the footprint, is distance Alpha away from Xyz1:
-         ! Xyz0 = Xyz1 + Alpha * Dir0 and R0 = RMin =>
-         Alpha = S * sqrt(Dot**2 - sum(Xyz1_D**2) + RMin**2) - Dot
-         ! Failure (2):
-         ! intersection is too far from the current beginning of the line,
-         ! use distance between 2nd and 3rd particles on the line as measure
-         if(abs(Alpha) > Dist2)then
-            ! project first particle for new footpoint
-            FootPoint_VB(X_:Z_,iBlock) = Xyz1_D * RMin / sqrt(sum(Xyz1_D**2))
-         else
-            ! store newly found footpoint of the line
-            FootPoint_VB(X_:Z_,iBlock) = Xyz1_D + Alpha * Dir0_D
-         end if
-      end if
-
-      ! length is used to decide when need to append new particles:
-      ! use distance between 2nd and 3rd particles on the line
-      FootPoint_VB(Length_,    iBlock) = Dist2
-      FootPoint_VB(LagrID_,    iBlock) = MHData_VIB(LagrID_,1,iBlock) - 1.0
-    end subroutine SP_set_line_foot_b
-    !==========================================================================
     subroutine append_particles
       use SP_ModGrid, ONLY: R_, State_VIB
       ! appends a new particle at the beginning of lines if necessary

@@ -6,8 +6,7 @@ module SP_ModMain
   use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
        Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
        Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
-       RhoOld_, iShock_IB, State_VIB, MHData_VIB,        &
-       FootPoint_VB, nLat, nLon
+       RhoOld_, iShock_IB, State_VIB, MHData_VIB    
   use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
   use SP_ModProc,    ONLY: iProc
   use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
@@ -43,16 +42,6 @@ module SP_ModMain
        UseTiming, nTiming, nTimingDepth, TimingStyle,         &
        IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax,&
        IsStandAlone, copy_old_state
-
-  ! Methods and variables from ModSize
-  public:: &
-       nDim, nLat, nLon, nParticleMax
-
-  ! Methods and variables from ModGrid
-  public:: &
-       LagrID_,X_, Y_, Z_, Rho_, Bx_, Bz_, Ux_, Uz_, T_, R_,   &
-       Wave1_, Wave2_, Length_, nBlock, nParticle_B, Shock_,   &
-       ShockOld_, iShock_IB, MHData_VIB, FootPoint_VB
 
   ! Methods and variables from ModReadMhData
   public:: DoReadMhData

@@ -70,7 +70,7 @@ module SP_ModGrid
   ! the Lagrangian (0) and Cartesian (1:3) coordinates, and
   integer, public, parameter :: &! init length of segment 1-2:
        Length_ = 4               ! control appending  new particles
-  real, public, allocatable:: FootPoint_VB(:,:)
+  real, public, pointer :: FootPoint_VB(:,:)
   !
   ! Magnetic flux (absolute value) associated with lines
   !
@@ -236,10 +236,6 @@ contains
     call check_allocate(iError, NameSub//'iShock_IB')
     iShock_IB = NoShock_
 
-    allocate(FootPoint_VB(LagrID_:Length_, nBlock), stat=iError)
-    call check_allocate(iError, NameSub//'FootPoint_VB')
-    FootPoint_VB = -1
-
     allocate(MagneticFluxAbs_B(nBlock), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
     MagneticFluxAbs_B = -1
@@ -266,6 +262,9 @@ contains
     State_VIB = -1
     allocate(nParticle_B(nBlock))
     nParticle_B = 0
+    allocate(FootPoint_VB(LagrID_:Length_, nBlock))
+    FootPoint_VB = -1
+
   end subroutine init_stand_alone
   !============================================================================
   subroutine iblock_to_lon_lat(iBlockIn, iLonOut, iLatOut)
