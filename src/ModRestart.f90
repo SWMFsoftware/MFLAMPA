@@ -3,10 +3,10 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModRestart
   ! This module contains methods for writing output files
-  use SP_ModSize,   ONLY: nParticleMax
+  use SP_ModSize,   ONLY: nVertexMax
   use SP_ModGrid,   ONLY: iblock_to_lon_lat, LagrID_, Z_,&
-       nBlock, MhData_VIB, iShock_IB,  &
-       FootPoint_VB, nParticle_B, nShockParam, &
+       nLine, MhData_VIB, iShock_IB,  &
+       FootPoint_VB, nVertex_B, nShockParam, &
        nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
   use SP_ModTime,   ONLY: SPTime, iIter
@@ -38,7 +38,7 @@ contains
     ! name of the output file
     character(len=100):: NameFile
     ! loop variable
-    integer:: iBlock
+    integer:: iLine
     ! indexes of corresponding node, latitude and longitude
     integer:: iLat, iLon
     character(len=*), parameter:: NameSub = 'save_restart'
@@ -46,8 +46,8 @@ contains
 
     call write_restart_header
 
-    do iBlock = 1, nBlock
-       call iblock_to_lon_lat(iBlock, iLon, iLat)
+    do iLine = 1, nLine
+       call iblock_to_lon_lat(iLine, iLon, iLat)
 
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
@@ -55,12 +55,12 @@ contains
             '.rst'
        call open_file(file=NameFile, form='UNFORMATTED',&
             NameCaller=NameSub)
-       write(UnitTmp_)real(nParticle_B(iBlock)),&
-            real(iShock_IB(:, iBlock))
+       write(UnitTmp_)real(nVertex_B(iLine)),&
+            real(iShock_IB(:, iLine))
        write(UnitTmp_)&
-            FootPoint_VB(:, iBlock),&
-            MhData_VIB(LagrID_:Z_,1:nParticle_B(iBlock), iBlock),&
-            Distribution_IIB(:,1:nParticle_B(iBlock), iBlock)
+            FootPoint_VB(:, iLine),&
+            MhData_VIB(LagrID_:Z_,1:nVertex_B(iLine), iLine),&
+            Distribution_IIB(:,1:nVertex_B(iLine), iLine)
        call close_file
     end do
   end subroutine save_restart
@@ -71,7 +71,7 @@ contains
     ! name of the input file
     character(len=100):: NameFile
     ! loop variables
-    integer:: iBlock
+    integer:: iLine
     ! indexes of corresponding node, latitude and longitude
     integer:: iLat, iLon
     real   :: Aux, Aux_I(nShockParam) ! For reading integers
@@ -79,8 +79,8 @@ contains
     character(len=*), parameter:: NameSub = 'read_restart'
     !--------------------------------------------------------------------------
 
-    do iBlock = 1, nBlock
-       call iBlock_to_lon_lat(iBlock, iLon, iLat)
+    do iLine = 1, nLine
+       call iBlock_to_lon_lat(iLine, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameRestartInDir)//'data_',iLon,'_',iLat,&
@@ -89,18 +89,18 @@ contains
             form='UNFORMATTED', NameCaller=NameSub)
        read(UnitTmp_,iostat = iError)Aux, Aux_I
        if(iError>0)then
-          write(*,*)'Error in reading nPoint in Block=', iBlock
+          write(*,*)'Error in reading nPoint in line=', iLine
           call close_file
           call CON_stop('Run stops')
        end if
        ! process buffer
-       nParticle_B(iBlock) = nint(Aux)
+       nVertex_B(iLine) = nint(Aux)
        ! general parameters
-       iShock_IB(:, iBlock) = nint(Aux_I)
+       iShock_IB(:, iLine) = nint(Aux_I)
        read(UnitTmp_, iostat = iError) &
-            FootPoint_VB(:, iBlock),&
-            MhData_VIB(LagrID_:Z_,1:nParticle_B(iBlock), iBlock),&
-            Distribution_IIB(:,1:nParticle_B(iBlock), iBlock)
+            FootPoint_VB(:, iLine),&
+            MhData_VIB(LagrID_:Z_,1:nVertex_B(iLine), iLine),&
+            Distribution_IIB(:,1:nVertex_B(iLine), iLine)
        call close_file
     end do
   end subroutine read_restart
@@ -123,7 +123,7 @@ contains
     write(UnitTmp_,'(a)')'T'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
-    write(UnitTmp_,'(i8,a32)') nParticleMax,'nParticleMax'
+    write(UnitTmp_,'(i8,a32)') nVertexMax,'nVertexMax'
     write(UnitTmp_,'(i8,a32)') nLon,     'nLon'
     write(UnitTmp_,'(i8,a32)') nLat,     'nLat'
     write(UnitTmp_,*)

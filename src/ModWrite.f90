@@ -11,12 +11,12 @@ module SP_ModPlot
   use SP_ModDistribution, ONLY: nP, KinEnergySI_I, MomentumSI_I, &
        Distribution_IIB, FluxChannelInit_V,                      &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
-  use SP_ModGrid, ONLY: search_line, iNode0, nVar, nMHData, nBlock, &
-       MHData_VIB, State_VIB, iShock_IB, nParticle_B, Shock_, &
-       X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nNode
+  use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
+       MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_, &
+       X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
   use SP_ModGrid, ONLY: iblock_to_lon_lat
   use SP_ModProc, ONLY: iProc
-  use SP_ModSize, ONLY: nParticleMax
+  use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
   use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I
   use ModCoordTransform, ONLY: xyz_to_rlonlat
@@ -139,7 +139,7 @@ module SP_ModPlot
   !
   !
   ! auxilary array, used to write data on a sphere
-  ! contains integers 1:nNode
+  ! contains integers 1:nLineAll
   integer, allocatable:: iNodeIndex_I(:)
   !
   !
@@ -218,12 +218,12 @@ contains
           case(MH1D_)
              allocate(File_I(iFile) % Buffer_II(&
                   File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-                  File_I(iFile)%nFluxVar, 1:nParticleMax))
+                  File_I(iFile)%nFluxVar, 1:nVertexMax))
           case(MH2D_)
              ! extra space is reserved for longitude and latitude
              allocate(File_I(iFile) % Buffer_II(&
                   2 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-                  File_I(iFile)%nFluxVar, nNode))
+                  File_I(iFile)%nFluxVar, nLineAll))
           case(MHTime_)
              ! note extra space reserved for time of the output
              allocate(File_I(iFile) % Buffer_II(&
@@ -231,7 +231,7 @@ contains
                   File_I(iFile)%nFluxVar, 1))
           case(Distr1D_)
              allocate(File_I(iFile) % &
-                  Buffer_II(nP,1:nParticleMax))
+                  Buffer_II(nP,1:nVertexMax))
           case(Flux2D_)
              if(.not.IsReadySpreadGrid) &
                   call CON_stop(NameSub//&
@@ -289,7 +289,7 @@ contains
     ! set parameters of output files: file format, kind of output etc.
     character(len=300):: StringPlot
     ! loop variables
-    integer:: iFile, iNode, iVar
+    integer:: iFile, iLineAll, iVar
     integer:: nStringPlot
     character(len=20):: TypeFile, KindData, StringPlot_I(2*nVar)
 
@@ -300,11 +300,11 @@ contains
        ! initialize auxilary arrays
        !
        ! auxilary array, used to write data on a sphere
-       ! contains integers 1:nNode
+       ! contains integers 1:nLineAll
        if (.not. allocated(iNodeIndex_I)) &
-            allocate(iNodeIndex_I(nNode))
-       do iNode = 1, nNode
-          iNodeIndex_I(iNode) = iNode
+            allocate(iNodeIndex_I(nLineAll))
+       do iLineAll = 1, nLineAll
+          iNodeIndex_I(iLineAll) = iLineAll
        end do
 
        ! number of output files
@@ -530,7 +530,7 @@ contains
 
          ! for data on a sphere compute and output average position and spread
          if(trim(StringPlot_I(iStringPlot)) == 'spread' .and.&
-              File_I(iFile)%iKindData == MH2D_ .and. nNode > 1)then
+              File_I(iFile)%iKindData == MH2D_ .and. nLineAll > 1)then
             File_I(iFile)%DoPlotSpread = .true.
             CYCLE
          end if
@@ -673,7 +673,7 @@ contains
       ! header for the file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iBlock, iVarPlot
+      integer:: iLine, iVarPlot
       ! index of last particle on the field line
       integer:: iLast
       ! for better readability
@@ -715,35 +715,35 @@ contains
            'MFLAMPA: data along a field line; '//&
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
-      do iBlock = 1, nBlock
+      do iLine = 1, nLine
          call make_file_name(&
               StringBase    = NameMHData,                     &
-              iBlock        = iBlock,                         &
+              iLine        = iLine,                         &
               iIter         = iIter,                          &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
 
          ! get min and max particle indexes on this field line
-         iLast  = nParticle_B(   iBlock)
+         iLast  = nVertex_B(   iLine)
          ! fill the output buffer
          if(nMhdVar>0)File_I(iFile) % Buffer_II(1:nMhdVar, 1:iLast) = &
               MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), &
-              1:iLast, iBlock)
+              1:iLast, iLine)
          if(nExtraVar>0)File_I(iFile) % Buffer_II(nMhdVar+1:nMhdVar+nExtraVar,&
               1:iLast) = State_VIB(File_I(iFile) % iVarExtra_V(1:nExtraVar), &
-              1:iLast, iBlock)
+              1:iLast, iLine)
          if(File_I(iFile)%DoPlotFlux) then
             File_I(iFile)%Buffer_II(&
                  nMhdVar + nExtraVar + 1:nMhdVar + nExtraVar + nFluxVar,&
-                 1:iLast) = Flux_VIB(Flux0_:FluxMax_, 1:iLast, iBlock)
+                 1:iLast) = Flux_VIB(Flux0_:FluxMax_, 1:iLast, iLine)
          end if
 
          ! Parameters
-         Param_I(LagrID_:Z_) = FootPoint_VB(LagrID_:Z_,iBlock)
+         Param_I(LagrID_:Z_) = FootPoint_VB(LagrID_:Z_,iLine)
          ! shock location
-         if(iShock_IB(Shock_,iBlock)/=NoShock_)then
-            iShock             = iShock_IB(Shock_,iBlock)
-            Param_I(RShock_)   = State_VIB(R_,iShock,iBlock)
+         if(iShock_IB(Shock_,iLine)/=NoShock_)then
+            iShock             = iShock_IB(Shock_,iLine)
+            Param_I(RShock_)   = State_VIB(R_,iShock,iLine)
             Param_I(RShock_-1) = real(iShock)
          else
             Param_I(RShock_-1:RShock_) = -1.0
@@ -760,8 +760,8 @@ contains
               nDimIn        = 1, &
               TimeIn        = SPTime, &
               nStepIn       = iIter, &
-              CoordMinIn_D  = [MHData_VIB(LagrID_,1,iBlock)], &
-              CoordMaxIn_D  = [MHData_VIB(LagrID_,iLast,iBlock)], &
+              CoordMinIn_D  = [MHData_VIB(LagrID_,1,iLine)], &
+              CoordMaxIn_D  = [MHData_VIB(LagrID_,iLast,iLine)], &
               NameVarIn     = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
@@ -784,9 +784,9 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iBlock, iParticle, iVarPlot, iVarIndex
+      integer:: iLine, iVertex, iVarPlot, iVarIndex
       ! indexes of corresponding node, latitude and longitude
-      integer:: iNode
+      integer:: iLineAll
       ! index of particle just above the radius
       integer:: iAbove
       ! xyz coordinate of intersection point or average direction
@@ -802,7 +802,7 @@ contains
       ! MPI error
       integer:: iError
       ! skip a field line not reaching radius of output sphere
-      logical:: DoPrint_I(nNode)
+      logical:: DoPrint_I(nLineAll)
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
@@ -848,61 +848,61 @@ contains
 
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
-      do iBlock = 1, nBlock
-         iNode  = iNode0 + iBlock
+      do iLine = 1, nLine
+         iLineAll  = iLineAll0 + iLine
 
          ! find the particle just above the given radius
-         call search_line(iBlock, File_I(iFile)%Radius,&
-              iAbove, DoPrint_I(iNode), Weight)
-         DoPrint_I(iNode) = DoPrint_I(iNode) .and. iAbove /= 1
+         call search_line(iLine, File_I(iFile)%Radius,&
+              iAbove, DoPrint_I(iLineAll), Weight)
+         DoPrint_I(iLineAll) = DoPrint_I(iLineAll) .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
-         if(.not.DoPrint_I(iNode)) CYCLE
+         if(.not.DoPrint_I(iLineAll)) CYCLE
 
          ! intersection is found -> get data at that location;
          ! find coordinates of intersection
          Xyz_D =  &
-              MHData_VIB(X_:Z_, iAbove-1, iBlock) * (1-Weight) + &
-              MHData_VIB(X_:Z_, iAbove,   iBlock) *    Weight
+              MHData_VIB(X_:Z_, iAbove-1, iLine) * (1-Weight) + &
+              MHData_VIB(X_:Z_, iAbove,   iLine) *    Weight
          call xyz_to_rlonlat(Xyz_D, Aux, LonPoint, LatPoint)
          ! put longitude and latitude to output
-         File_I(iFile) % Buffer_II(iVarLon, iNode) = LonPoint
-         File_I(iFile) % Buffer_II(iVarLat, iNode) = LatPoint
+         File_I(iFile) % Buffer_II(iVarLon, iLineAll) = LonPoint
+         File_I(iFile) % Buffer_II(iVarLat, iLineAll) = LatPoint
          ! interpolate each requested variable
          do iVarPlot = 1, nMhdVar
             iVarIndex = File_I(iFile) % iVarMhd_V(iVarPlot)
-            File_I(iFile) % Buffer_II(iVarPlot, iNode) = &
-                 MHData_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
-                 MHData_VIB(iVarIndex, iAbove,   iBlock) *    Weight
+            File_I(iFile) % Buffer_II(iVarPlot, iLineAll) = &
+                 MHData_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
+                 MHData_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          do iVarPlot = 1, nExtraVar
             iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
-            File_I(iFile) % Buffer_II(iVarPlot + nMhdVar, iNode) = &
-                 State_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
-                 State_VIB(iVarIndex, iAbove,   iBlock) *    Weight
+            File_I(iFile) % Buffer_II(iVarPlot + nMhdVar, iLineAll) = &
+                 State_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
+                 State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile)%Buffer_II(1 + iVarLat:nFluxVar + iVarLat,iNode)=&
-              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
-              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
-      end do !  iBlock
+              File_I(iFile)%Buffer_II(1 + iVarLat:nFluxVar + iVarLat,iLineAll)=&
+              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
+              Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
+      end do !  iLine
 
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
             call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 nNode * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum, &
+                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum, &
                  0, iComm, iError)
             call MPI_Reduce(MPI_IN_PLACE, DoPrint_I, &
-                 nNode, MPI_Logical, MPI_Land, &
+                 nLineAll, MPI_Logical, MPI_Land, &
                  0, iComm, iError)
          else
             call MPI_Reduce(File_I(iFile)%Buffer_II, &
                  File_I(iFile)%Buffer_II,&
-                 nNode * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum,&
+                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum,&
                  0, iComm, iError)
             call MPI_Reduce(DoPrint_I, DoPrint_I, &
-                 nNode, MPI_Logical, MPI_Land, &
+                 nLineAll, MPI_Logical, MPI_Land, &
                  0, iComm, iError)
          end if
       end if
@@ -951,7 +951,7 @@ contains
            trim(File_I(iFile) % NameAuxPlot), &
            VarIn_VI      = &
            reshape(&
-           pack(File_I(iFile) % Buffer_II(1:iVarLat + nFluxVar,1:nNode),&
+           pack(File_I(iFile) % Buffer_II(1:iVarLat + nFluxVar,1:nLineAll),&
            MASK = spread(DoPrint_I, 1,iVarLat + nFluxVar)), &
            [iVarLat + nFluxVar, count(DoPrint_I)]))
     end subroutine write_mh_2d
@@ -965,7 +965,7 @@ contains
       ! name of the output file
       character(len=100):: NameFile
       ! loop variables
-      integer:: iBlock, iParticle, iVarPlot, iVarIndex
+      integer:: iLine, iVertex, iVarPlot, iVarIndex
       ! index of particle just above the radius
       integer:: iAbove
       ! interpolation weight
@@ -1003,12 +1003,12 @@ contains
          ! mark that the 1st call has already happened
          File_I(iFile) % IsFirstCall = .false.
          ! go over list of lines and remove file for each one
-         do iBlock = 1, nBlock
+         do iLine = 1, nLine
             ! set the file name
             call make_file_name(&
                  StringBase    = NameMHData,                     &
                  Radius        = File_I(iFile) % Radius,         &
-                 iBlock        = iBlock,                         &
+                 iLine        = iLine,                         &
                  NameExtension = File_I(iFile)%NameFileExtension,&
                  NameOut       = NameFile)
 
@@ -1021,13 +1021,13 @@ contains
 
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present
-      do iBlock = 1, nBlock
+      do iLine = 1, nLine
 
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
 
          ! find the particle just above the given radius
-         call search_line(iBlock,File_I(iFile)%Radius,iAbove,DoPrint,Weight)
+         call search_line(iLine,File_I(iFile)%Radius,iAbove,DoPrint,Weight)
          DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
@@ -1037,7 +1037,7 @@ contains
          call make_file_name(&
               StringBase    = NameMHData,                     &
               Radius        = File_I(iFile) % Radius,         &
-              iBlock        = iBlock,                         &
+              iLine        = iLine,                         &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
 
@@ -1079,20 +1079,20 @@ contains
          do iVarPlot = 1, nMhdVar
             iVarIndex = File_I(iFile)%iVarMhd_V(iVarPlot)
             File_I(iFile)%Buffer_II(iVarPlot, nDataLine) = &
-                 MhData_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
-                 MhData_VIB(iVarIndex, iAbove,   iBlock) *    Weight
+                 MhData_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
+                 MhData_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          do iVarPlot = 1, nExtraVar
             iVarIndex = File_I(iFile)%iVarExtra_V(iVarPlot)
             File_I(iFile)%Buffer_II(iVarPlot + nMhdVar, nDataLine) = &
-                 State_VIB(iVarIndex, iAbove-1, iBlock) * (1-Weight) + &
-                 State_VIB(iVarIndex, iAbove,   iBlock) *    Weight
+                 State_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
+                 State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
               File_I(iFile)%Buffer_II(1 + nMhdVar + nExtraVar:nFluxVar + &
               nMhdVar + nExtraVar, nDataLine)=&
-             Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
-             Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight
+             Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
+             Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
 
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime
@@ -1128,7 +1128,7 @@ contains
       ! name of the output file
       character(len=100):: NameFile
       ! loop variables
-      integer:: iBlock, iParticle, iVarPlot
+      integer:: iLine, iVertex, iVarPlot
       ! indexes of corresponding node, latitude and longitude
       integer:: iLat, iLon
       ! index of first/last particle on the field line
@@ -1148,36 +1148,36 @@ contains
          Scale_I = Log10KinEnergySI_I
          Factor_I= DMomentumOverDEnergy_I
       end select
-      do iBlock = 1, nBlock
-         call iblock_to_lon_lat(iBlock, iLon, iLat)
+      do iLine = 1, nLine
+         call iblock_to_lon_lat(iLine, iLon, iLat)
 
             ! set the file name
             call make_file_name(&
                  StringBase    = 'Distribution_',                &
-                 iBlock        = iBlock,                         &
+                 iLine        = iLine,                         &
                  iIter         = iIter,                          &
                  NameExtension = File_I(iFile)%NameFileExtension,&
                  NameOut       = NameFile)
 
          ! get max particle indexes on this field line
-         iLast  = nParticle_B(   iBlock)
+         iLast  = nVertex_B(   iLine)
 
-         do iParticle = 1, nParticleMax
+         do iVertex = 1, nVertexMax
             ! reset values outside the line's range
-            if(iParticle > iLast)then
-               File_I(iFile) % Buffer_II(:,iParticle) = 0.0
+            if(iVertex > iLast)then
+               File_I(iFile) % Buffer_II(:,iVertex) = 0.0
                CYCLE
             end if
             ! the actual distribution
-            File_I(iFile) % Buffer_II(:,iParticle) = &
-                 log10(Distribution_IIB(1:nP,iParticle,iBlock)*Factor_I(1:nP))
+            File_I(iFile) % Buffer_II(:,iVertex) = &
+                 log10(Distribution_IIB(1:nP,iVertex,iLine)*Factor_I(1:nP))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
                ! do nothing
             case(DEF_)
-               File_I(iFile) % Buffer_II(:,iParticle) = &
-                    File_I(iFile) % Buffer_II(:,iParticle) + &
+               File_I(iFile) % Buffer_II(:,iVertex) = &
+                    File_I(iFile) % Buffer_II(:,iVertex) + &
                     2*Log10MomentumSI_I
             end select
          end do
@@ -1189,7 +1189,7 @@ contains
               TimeIn     = SPTime, &
               nStepIn    = iIter, &
               Coord1In_I = Scale_I, &
-              Coord2In_I = State_VIB(S_,1:iLast,iBlock), &
+              Coord2In_I = State_VIB(S_,1:iLast,iLine), &
               NameVarIn  = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
@@ -1208,7 +1208,7 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iBlock, iFlux
+      integer:: iLine, iFlux
       ! index of particle just above the radius
       integer:: iAbove
       ! interpolation weight
@@ -1248,12 +1248,12 @@ contains
 
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
-      do iBlock = 1, nBlock
+      do iLine = 1, nLine
          ! reset, all field lines are printed reaching output sphere
          DoPrint = .true.
 
          ! find the particle just above the given radius
-         call search_line(iBlock,File_I(iFile)%Radius,iAbove,DoPrint,Weight)
+         call search_line(iLine,File_I(iFile)%Radius,iAbove,DoPrint,Weight)
          DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
@@ -1261,7 +1261,7 @@ contains
 
          ! intersection is found -> get data at that location;
          ! compute spread over grid for current line
-         call get_normalized_spread(iBlock, File_I(iFile) % Radius, &
+         call get_normalized_spread(iLine, File_I(iFile) % Radius, &
               File_I(iFile) % Spread_II)
 
          ! apply spread to excess fluxes above background/initial flux
@@ -1269,8 +1269,8 @@ contains
             File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:) =    &
                  File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:)+&
                  File_I(iFile)%Spread_II(:,:) * (                            &
-                 Flux_VIB(Flux0_+iFlux-1, iAbove-1, iBlock) * (1-Weight) +   &
-                 Flux_VIB(Flux0_+iFlux-1, iAbove,   iBlock) *    Weight  -   &
+                 Flux_VIB(Flux0_+iFlux-1, iAbove-1, iLine) * (1-Weight) +   &
+                 Flux_VIB(Flux0_+iFlux-1, iAbove,   iLine) *    Weight  -   &
                  FluxChannelInit_V(Flux0_+iFlux-1))
          end do
       end do
@@ -1332,7 +1332,7 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iBlock
+      integer:: iLine
       ! index of particle just above the radius
       integer:: iAbove
       ! interpolation weight
@@ -1422,13 +1422,13 @@ contains
 
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present and compute contribution to fluxes
-      do iBlock = 1, nBlock
+      do iLine = 1, nLine
 
          ! reset, the field line contrubtes unless fail to reach output sphere
          DoPrint = .true.
 
          ! find the particle just above the given radius
-         call search_line(iBlock,File_I(iFile)%Radius,iAbove,DoPrint, Weight)
+         call search_line(iLine,File_I(iFile)%Radius,iAbove,DoPrint, Weight)
          DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
@@ -1436,14 +1436,14 @@ contains
 
          ! interpolate data and fill buffer
          call get_normalized_spread(&
-              iBlock, File_I(iFile)%Radius, &
+              iLine, File_I(iFile)%Radius, &
               File_I(iFile)%Lon, File_I(iFile)%Lat, Spread)
 
          ! apply spread to excess fluxes above background/initial flux
          File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) = &
               File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) + Spread * (&
-              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iBlock) * (1-Weight) + &
-              Flux_VIB(Flux0_:FluxMax_, iAbove,   iBlock) *    Weight  - &
+              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
+              Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight  - &
               FluxChannelInit_V(Flux0_:FluxMax_))
       end do
 
@@ -1510,7 +1510,7 @@ contains
          NameCaller=NameSub)
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
-    write(UnitTmp_,'(i8,a32)') nParticleMax,'nParticleMax'
+    write(UnitTmp_,'(i8,a32)') nVertexMax,'nVertexMax'
     write(UnitTmp_,'(i8,a32)') nLon,     'nLon'
     write(UnitTmp_,'(i8,a32)') nLat,     'nLat'
     write(UnitTmp_,*)
@@ -1562,16 +1562,16 @@ contains
   end subroutine get_date_time_string
   !============================================================================
   subroutine make_file_name(StringBase, Radius, Longitude, Latitude,&
-       iBlock, iIter, NameExtension, NameOut)
+       iLine, iIter, NameExtension, NameOut)
     ! creates a string with file name and stores in NameOut;
     ! result is as follows:
     !   StringBase[_R=?.?][_Lon=?.?_Lat=?.?][_???_???][_t?_n?].NameExtension
-    ! parts in [] are written if present: Radius, iNode, iIter
+    ! parts in [] are written if present: Radius, iLineAll, iIter
     character(len=*),          intent(in) :: StringBase
     real,            optional, intent(in) :: Radius
     real,            optional, intent(in) :: Longitude
     real,            optional, intent(in) :: Latitude
-    integer,         optional, intent(in) :: iBlock
+    integer,         optional, intent(in) :: iLine
     integer,         optional, intent(in) :: iIter
     character(len=*),          intent(in) :: NameExtension
     character(len=100),        intent(out):: NameOut
@@ -1580,7 +1580,7 @@ contains
     character(len=15):: StringTime
     ! write format
     character(len=100)::StringFmt
-    ! lon, lat indexes corresponding to iNode
+    ! lon, lat indexes corresponding to iLineAll
     integer:: iLon, iLat
     !--------------------------------------------------------------------------
     write(NameOut,'(a)')trim(NamePlotDir)//trim(StringBase)
@@ -1623,8 +1623,8 @@ contains
 
     end if
 
-    if(present(iBlock))then
-       call iblock_to_lon_lat(iBlock, iLon, iLat)
+    if(present(iLine))then
+       call iblock_to_lon_lat(iLine, iLon, iLat)
        write(NameOut,'(a,i3.3,a,i3.3)') &
             trim(NameOut)//'_',iLon,'_',iLat
     end if

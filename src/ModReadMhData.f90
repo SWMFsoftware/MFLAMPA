@@ -3,10 +3,10 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModReadMhData
   ! This module contains methods for reading input MH data
-  use SP_ModSize,    ONLY: nDim, nParticleMax
+  use SP_ModSize,    ONLY: nDim, nVertexMax
   use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,&
-       nMHData,  nBlock, Z_,&
-       FootPoint_VB, nParticle_B, MHData_VIB,  LagrID_
+       nMHData,  nLine, Z_,&
+       FootPoint_VB, nVertex_B, MHData_VIB,  LagrID_
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
   use ModPlotFile,   ONLY: read_plot_file
@@ -112,7 +112,7 @@ contains
     ! name of the input file
     character(len=100):: NameFile
     ! loop variables
-    integer:: iBlock
+    integer:: iLine
     ! indexes of corresponding node, latitude and longitude
     integer:: iLat, iLon
     ! size of the offset to apply compared to the previous state
@@ -145,8 +145,8 @@ contains
     ! save the current data input time
     DataInputTimeOld = DataInputTime
     ! read the data
-    BLOCK:do iBlock = 1, nBlock
-       call iblock_to_lon_lat(iBlock, iLon, iLat)
+    line:do iLine = 1, nLine
+       call iblock_to_lon_lat(iLine, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameInputDir)//NameMHData//'_',iLon,&
@@ -155,7 +155,7 @@ contains
        call read_plot_file(NameFile          ,&
             TypeFileIn = TypeMhDataFile      ,&
             TimeOut    = DataInputTime       ,&
-            n1out      = nParticle_B(iBlock) ,&
+            n1out      = nVertex_B(iLine) ,&
             ParamOut_I = Param_I(LagrID_:StartJulian_))
        ! find offset in data between new and old states
        if(DoOffset)then
@@ -168,22 +168,22 @@ contains
           end if
           ! amount of the offset is determined from difference
           ! in LagrID_
-          iOffset = nint(FootPoint_VB(LagrID_,iBlock) - Param_I(LagrID_))
+          iOffset = nint(FootPoint_VB(LagrID_,iLine) - Param_I(LagrID_))
        else
           iOffset = 0
        end if
        ! Parameters
-       FootPoint_VB(LagrID_:Z_,iBlock) = Param_I(LagrID_:Z_)
+       FootPoint_VB(LagrID_:Z_,iLine) = Param_I(LagrID_:Z_)
        ! read MH data
        call read_plot_file(NameFile           ,&
             TypeFileIn = TypeMhDataFile       ,&
             Coord1Out_I= MHData_VIB(LagrID_   ,&
-            1:nParticle_B(iBlock),iBlock)     ,&
+            1:nVertex_B(iLine),iLine)     ,&
             VarOut_VI  = MHData_VIB(1:nMHData ,&
-            1:nParticle_B(iBlock),iBlock))
+            1:nVertex_B(iLine),iLine))
        ! apply offset
-       call offset(iBlock, iOffset)
-    end do BLOCK
+       call offset(iLine, iOffset)
+    end do line
   end subroutine read_mh_data
   !============================================================================
 end module SP_ModReadMhData

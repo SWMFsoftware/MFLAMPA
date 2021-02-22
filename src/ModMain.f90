@@ -5,13 +5,13 @@ module SP_ModMain
   use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
   use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
        Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
-       Length_, nBlock, nParticle_B, Shock_, ShockOld_, DLogRho_, &
+       Length_, nLine, nVertex_B, Shock_, ShockOld_, DLogRho_, &
        RhoOld_, iShock_IB, State_VIB, MHData_VIB    
   use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
   use SP_ModProc,    ONLY: iProc
   use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
   use SP_ModRestart, ONLY: save_restart, read_restart
-  use SP_ModSize,    ONLY: nDim, nParticleMax
+  use SP_ModSize,    ONLY: nDim, nVertexMax
   use SP_ModTime,    ONLY: SPTime, DataInputTime, iIter
   use SP_ModUnit,    ONLY: Si2Io_V, UnitEnergy_
   implicit none
@@ -285,27 +285,27 @@ contains
   contains
     !==========================================================================
     subroutine lagr_time_derivative
-      integer:: iBlock, iParticle
+      integer:: iLine, iVertex
       !------------------------------------------------------------------------
-      do iBlock = 1, nBlock
-         do iParticle = 1, nParticle_B(  iBlock)
+      do iLine = 1, nLine
+         do iVertex = 1, nVertex_B(  iLine)
             ! divergence of plasma velocity
-            State_VIB(DLogRho_,iParticle,iBlock) = log(&
-                 MHData_VIB(Rho_,iParticle,iBlock)/&
-                 State_VIB(RhoOld_,iParticle,iBlock))
+            State_VIB(DLogRho_,iVertex,iLine) = log(&
+                 MHData_VIB(Rho_,iVertex,iLine)/&
+                 State_VIB(RhoOld_,iVertex,iLine))
          end do
          ! location of shock
-         call get_shock_location(iBlock)
+         call get_shock_location(iLine)
       end do
     end subroutine lagr_time_derivative
     !==========================================================================
   end subroutine run
   !============================================================================
-  subroutine get_shock_location(iBlock)
+  subroutine get_shock_location(iLine)
     use SP_ModAdvance, ONLY: nWidth
     use SP_ModGrid,    ONLY: R_, NoShock_
-    integer, intent(in) :: iBlock
-    ! find location of a shock wave on a given line (block)
+    integer, intent(in) :: iLine
+    ! find location of a shock wave on a given line (line)
     ! Do not search too close to the Sun
     integer         :: iShockMin
     real, parameter :: RShockMin = 1.20  !*RSun
@@ -318,20 +318,20 @@ contains
 
     !--------------------------------------------------------------------------
     if(.not.DoTraceShock)then
-       iShock_IB(Shock_, iBlock) = NoShock_
+       iShock_IB(Shock_, iLine) = NoShock_
        RETURN
     end if
     ! shock front is assumed to be location of max gradient log(Rho1/Rho2);
     ! shock never moves back
-    iShockMin = max(iShock_IB(ShockOld_, iBlock), 1 + nWidth )
-    iShockMax = nParticle_B(iBlock) - nWidth - 1
+    iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
+    iShockMax = nVertex_B(iLine) - nWidth - 1
     iShockCandidate = iShockMin - 1 + maxloc(&
-         State_VIB(DLogRho_,iShockMin:iShockMax,iBlock),&
+         State_VIB(DLogRho_,iShockMin:iShockMax,iLine),&
          1, MASK = &
-         State_VIB(R_,      iShockMin:iShockMax,iBlock) > RShockMin .and. &
-         State_VIB(DLogRho_,iShockMin:iShockMax,iBlock) > DLogRhoThreshold)
+         State_VIB(R_,      iShockMin:iShockMax,iLine) > RShockMin .and. &
+         State_VIB(DLogRho_,iShockMin:iShockMax,iLine) > DLogRhoThreshold)
     if(iShockCandidate >= iShockMin)&
-         iShock_IB(Shock_, iBlock) = iShockCandidate
+         iShock_IB(Shock_, iLine) = iShockCandidate
   end subroutine get_shock_location
   !============================================================================
   subroutine check

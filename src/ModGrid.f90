@@ -9,7 +9,7 @@ module SP_ModGrid
 #ifdef OPENACC
   use ModUtilities, ONLY: norm2
 #endif
-  use SP_ModSize,  ONLY: nParticleMax
+  use SP_ModSize,  ONLY: nVertexMax
   use SP_ModProc,  ONLY: iProc
   use ModNumConst, ONLY: cTwoPi, cPi
   implicit none
@@ -36,24 +36,24 @@ module SP_ModGrid
   !
   ! Total number of magnetic field lines on all PEs (just a product of nLat * nLon)
   !
-  integer, public :: nNode = 16
+  integer, public :: nLineAll = 16
   !
   ! All nodes are enumerated. The last node number on the previous proc (iProc-1)
-  ! equals (iProc*nNode)/nProc. Store this:
+  ! equals (iProc*nLineAll)/nProc. Store this:
   !
-  integer, public :: iNode0
+  integer, public :: iLineAll0
   !
-  ! The nodes on a given PE have node numbers ranging from iNode0 +1 to
-  ! iNodeLast =((iProc + 1)*nNode)/nProc. The iBlock index to enumerate lines on
-  ! a given proc ranges from 1 to iNodeLast. nBlock = nNodeLast - iNode0 is the number of
-  ! lines (blocks) on this processor. For iBlock=1:nBlock iNode = iNode0+1:iNodeLast
+  ! The nodes on a given PE have node numbers ranging from iLineAll0 +1 to
+  ! iNodeLast =((iProc + 1)*nLineAll)/nProc. The iLine index to enumerate lines on
+  ! a given proc ranges from 1 to iNodeLast. nLine = nNodeLast - iLineAll0 is the number of
+  ! lines (blocks) on this processor. For iLine=1:nLine iLineAll = iLineAll0+1:iNodeLast
   !
-  integer, public              :: nBlock
+  integer, public              :: nLine
   !
-  ! Number of particles (vertexes, Lagrangian meshes) per block (line):
-  integer, public,     pointer :: nParticle_B(:)
+  ! Number of particles (vertexes, Lagrangian meshes) per line (line):
+  integer, public,     pointer :: nVertex_B(:)
   !
-  ! Function converting block number to lon-lat location of the line
+  ! Function converting line number to lon-lat location of the line
   !
   public :: iBlock_to_lon_lat
 
@@ -79,14 +79,14 @@ module SP_ModGrid
   ! MHD state vector;
   ! 1st index - identification of variable (LagrID_:Wave2_)
   ! 2nd index - particle index along the field line
-  ! 3rd index - local block number
+  ! 3rd index - local line number
   !
   real, public, pointer     :: MHData_VIB(:,:,:)
   !
   ! Aux state vector;
   ! 1st index - identification of variable (D_:BOld_)
   ! 2nd index - particle index along the field line
-  ! 3rd index - local block number
+  ! 3rd index - local line number
   !
   real, public, pointer     :: State_VIB(:,:,:)
   !
@@ -165,7 +165,7 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#CHECKGRIDSIZE')
-       call read_var('nParticleMax',nParticleCheck)
+       call read_var('nVertexMax',nParticleCheck)
        call read_var('nLon',     nLonCheck)
        call read_var('nLat',     nLatCheck)
        if(iProc==0.and.any(&
@@ -175,10 +175,10 @@ contains
                nLonCheck, nLatCheck
        nLon = nLonCheck
        nLat = nLatCheck
-       nNode = nLon*nLat
-       if(nParticleCheck > nParticleMax)then
+       nLineAll = nLon*nLat
+       if(nParticleCheck > nVertexMax)then
           if(iProc==0)write(*,*)&
-              'nParticleMax is too small, use ./Config.pl -g=',nParticleCheck
+              'nVertexMax is too small, use ./Config.pl -g=',nParticleCheck
           call CON_stop('Code stopped')
        end if
     case('#COORDSYSTEM','#COORDINATESYSTEM')
@@ -194,7 +194,7 @@ contains
     case('#GRIDNODE')
        call read_var('nLat',  nLat)
        call read_var('nLon',  nLon)
-       nNode = nLat * nLon
+       nLineAll = nLat * nLon
     case('#TESTPOS')
        call read_var('iNodeTest',     iNodeTest)
        call read_var('iParticleTest', iParticleTest)
@@ -219,11 +219,11 @@ contains
     !
     ! distribute nodes between processors
     !
-    if(nNode < nProc)call CON_stop(NameSub//&
+    if(nLineAll < nProc)call CON_stop(NameSub//&
          ': There are more processors than field lines')
-    iNode0 = (iProc*nNode) / nProc
-    iNodeLast =  ((iProc+1)*nNode) / nProc
-    nBlock = iNodeLast - iNode0
+    iLineAll0 = (iProc*nLineAll) / nProc
+    iNodeLast =  ((iProc+1)*nLineAll) / nProc
+    nLine = iNodeLast - iLineAll0
     !
     ! check consistency
     !
@@ -232,11 +232,11 @@ contains
     !
     ! allocate data and grid containers
     !
-    allocate(iShock_IB(nShockParam, nBlock), stat=iError)
+    allocate(iShock_IB(nShockParam, nLine), stat=iError)
     call check_allocate(iError, NameSub//'iShock_IB')
     iShock_IB = NoShock_
 
-    allocate(MagneticFluxAbs_B(nBlock), stat=iError)
+    allocate(MagneticFluxAbs_B(nLine), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
     MagneticFluxAbs_B = -1
   end subroutine init
@@ -244,126 +244,126 @@ contains
   subroutine init_stand_alone
     ! allocate the grid used in this model
     use ModUtilities,      ONLY: check_allocate
-    integer :: iParticle, iError
+    integer :: iVertex, iError
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
     ! Allocate here if stand alone
-    allocate(MHData_VIB(LagrID_:nMHData, 1:nParticleMax, nBlock))
+    allocate(MHData_VIB(LagrID_:nMHData, 1:nVertexMax, nLine))
     !
     MHData_VIB(1:nMHData,:,:) = 0.0
     !
     ! reset lagrangian ids
     !
-    do iParticle = 1, nParticleMax
-       MHData_VIB(LagrID_, iParticle, 1:nBlock) = real(iParticle)
+    do iVertex = 1, nVertexMax
+       MHData_VIB(LagrID_, iVertex, 1:nLine) = real(iVertex)
     end do
     ! Allocate auxiliary State vector
-    allocate(State_VIB(nMHData+1:nVar, 1:nParticleMax, nBlock))
+    allocate(State_VIB(nMHData+1:nVar, 1:nVertexMax, nLine))
     State_VIB = -1
-    allocate(nParticle_B(nBlock))
-    nParticle_B = 0
-    allocate(FootPoint_VB(LagrID_:Length_, nBlock))
+    allocate(nVertex_B(nLine))
+    nVertex_B = 0
+    allocate(FootPoint_VB(LagrID_:Length_, nLine))
     FootPoint_VB = -1
 
   end subroutine init_stand_alone
   !============================================================================
   subroutine iblock_to_lon_lat(iBlockIn, iLonOut, iLatOut)
-    ! return angular grid's indexes corresponding to this block
+    ! return angular grid's indexes corresponding to this line
     integer, intent(in) :: iBlockIn
     integer, intent(out):: iLonOut
     integer, intent(out):: iLatOut
 
-    integer :: iNode
+    integer :: iLineAll
     !--------------------------------------------------------------------------
     !
-    ! Get node number from block number
+    ! Get node number from line number
     !
-    iNode = iBlockIn + iNode0
-    iLatOut = 1 + (iNode - 1)/nLon
-    iLonOut = iNode - nLon*(iLatOut - 1)
+    iLineAll = iBlockIn + iLineAll0
+    iLatOut = 1 + (iLineAll - 1)/nLon
+    iLonOut = iLineAll - nLon*(iLatOut - 1)
   end subroutine iblock_to_lon_lat
   !============================================================================
   subroutine copy_old_state
     ! copy current state to old state for all field lines
-    integer:: iEnd, iBlock
+    integer:: iEnd, iLine
     !--------------------------------------------------------------------------
-    do iBlock = 1, nBlock
-       iEnd   = nParticle_B(  iBlock)
-       iShock_IB(ShockOld_,iBlock) = iShock_IB(Shock_, iBlock)
-       State_VIB(RhoOld_, 1:iEnd, iBlock) = &
-            MHData_VIB(Rho_,  1:iEnd, iBlock)
-       State_VIB(BOld_, 1:iEnd, iBlock) = &
-            State_VIB(B_,  1:iEnd, iBlock)
+    do iLine = 1, nLine
+       iEnd   = nVertex_B(  iLine)
+       iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
+       State_VIB(RhoOld_, 1:iEnd, iLine) = &
+            MHData_VIB(Rho_,  1:iEnd, iLine)
+       State_VIB(BOld_, 1:iEnd, iLine) = &
+            State_VIB(B_,  1:iEnd, iLine)
        ! reset variables read from file or received via coupler
-       MHData_VIB(1:nMHData, 1:iEnd, iBlock) = 0.0
+       MHData_VIB(1:nMHData, 1:iEnd, iLine) = 0.0
     end do
   end subroutine copy_old_state
   !============================================================================
   subroutine get_other_state_var
-    integer:: iBlock, iParticle, iEnd
+    integer:: iLine, iVertex, iEnd
     integer:: iAux1, iAux2
     real   :: XyzAux1_D(x_:z_), XyzAux2_D(x_:z_)
     !--------------------------------------------------------------------------
-    do iBlock = 1, nBlock
-       iEnd   = nParticle_B(  iBlock)
-       do iParticle = 1, iEnd
+    do iLine = 1, nLine
+       iEnd   = nVertex_B(  iLine)
+       do iVertex = 1, iEnd
           ! plasma speed
-          State_VIB(U_,iParticle, iBlock) = &
-               norm2(MHData_VIB(Ux_:Uz_,iParticle,iBlock))
+          State_VIB(U_,iVertex, iLine) = &
+               norm2(MHData_VIB(Ux_:Uz_,iVertex,iLine))
           ! magnetic field
-          State_VIB(B_,iParticle, iBlock) = &
-               norm2(MHData_VIB(Bx_:Bz_,iParticle,iBlock))
+          State_VIB(B_,iVertex, iLine) = &
+               norm2(MHData_VIB(Bx_:Bz_,iVertex,iLine))
           ! distances between particles
           if(.not.DoSmooth)then
-             if(iParticle /=nParticle_B(iBlock))&
-                  State_VIB(D_, iParticle, iBlock) = norm2(&
-                  MHData_VIB(X_:Z_, iParticle    , iBlock) - &
-                  MHData_VIB(X_:Z_, iParticle + 1, iBlock))
+             if(iVertex /=nVertex_B(iLine))&
+                  State_VIB(D_, iVertex, iLine) = norm2(&
+                  MHData_VIB(X_:Z_, iVertex    , iLine) - &
+                  MHData_VIB(X_:Z_, iVertex + 1, iLine))
           else
              ! smoothing is done by groups:
              ! nSmooth particles are aggeregated into single effective one,
              ! find length increment between effective particles are used
              ! to find length increment between regular particles
              iAux1 = nSmooth * max(1, min(&
-                  iParticle/nSmooth,nParticle_B(iBlock)/nSmooth-1))
+                  iVertex/nSmooth,nVertex_B(iLine)/nSmooth-1))
              iAux2 = iAux1 + nSmooth
              XyzAux1_D = sum(MHData_VIB(&
-                  X_:Z_,iAux1-nSmooth+1:iAux1,iBlock),DIM=2)/nSmooth
+                  X_:Z_,iAux1-nSmooth+1:iAux1,iLine),DIM=2)/nSmooth
              XyzAux2_D = sum(MHData_VIB(&
-                  X_:Z_,iAux2-nSmooth+1:iAux2,iBlock),DIM=2)/nSmooth
-             State_VIB(D_, iParticle, iBlock) = &
+                  X_:Z_,iAux2-nSmooth+1:iAux2,iLine),DIM=2)/nSmooth
+             State_VIB(D_, iVertex, iLine) = &
                   sqrt(sum((XyzAux2_D - XyzAux1_D)**2)) / nSmooth
           end if
           ! distance from the beginning of the line
-          if(iParticle == 1)then
-             State_VIB(S_, iParticle, iBlock) = 0.0
+          if(iVertex == 1)then
+             State_VIB(S_, iVertex, iLine) = 0.0
           else
-             State_VIB(S_, iParticle, iBlock) = &
-                  State_VIB(S_, iParticle-1, iBlock) + &
-                  State_VIB(D_, iParticle-1, iBlock)
+             State_VIB(S_, iVertex, iLine) = &
+                  State_VIB(S_, iVertex-1, iLine) + &
+                  State_VIB(D_, iVertex-1, iLine)
           end if
           ! Heliocentric Distance
-          State_VIB(R_, iParticle, iBlock) = &
-               norm2(MHData_VIB(X_:Z_, iParticle, iBlock))
+          State_VIB(R_, iVertex, iLine) = &
+               norm2(MHData_VIB(X_:Z_, iVertex, iLine))
        end do
     end do
   end subroutine get_other_state_var
   !============================================================================
-  subroutine search_line(iBlock, Radius, iParticleOut, IsFound, Weight)
+  subroutine search_line(iLine, Radius, iParticleOut, IsFound, Weight)
     ! performs search along given line
     ! for FIRST location ABOVE given heliocentric radius;
     ! if found, IsFound is set to .true. (.false. otherwise)
     ! and iParticleOut is set to index of particle just above Radius
-    integer,      intent(in) :: iBlock ! block/line index
+    integer,      intent(in) :: iLine ! line/line index
     real,         intent(in) :: Radius ! heliocentric distance to find
     integer,      intent(out):: iParticleOut ! result: index
     logical,      intent(out):: IsFound! result: whether search was successful
     real,optional,intent(out):: Weight ! interpolation weight for output index
 
-    integer:: iParticle ! loop variable
+    integer:: iVertex ! loop variable
     !--------------------------------------------------------------------------
     ! check whether line reaches given radial distance
-    if(State_VIB(R_, nParticle_B(iBlock), iBlock) < Radius)then
+    if(State_VIB(R_, nVertex_B(iLine), iLine) < Radius)then
        ! mark failure to find location
        IsFound = .false.
        iParticleOut = -1
@@ -373,9 +373,9 @@ contains
     ! line reaches given radial distance
     IsFound = .true.
     ! find index of first particle above Radius
-    do iParticle = 1, nParticle_B(iBlock)
-       if(State_VIB(R_, iParticle, iBlock) > Radius)then
-          iParticleOut = iParticle
+    do iVertex = 1, nVertex_B(iLine)
+       if(State_VIB(R_, iVertex, iLine) > Radius)then
+          iParticleOut = iVertex
           EXIT
        end if
     end do
@@ -383,9 +383,9 @@ contains
     ! get interpolation weight is necessary
     if(present(Weight))then
        if(iParticleOut > 1)then
-          Weight = (Radius - State_VIB(R_,iParticleOut-1, iBlock)) / (&
-               State_VIB(R_,iParticleOut,  iBlock) - &
-               State_VIB(R_,iParticleOut-1,iBlock))
+          Weight = (Radius - State_VIB(R_,iParticleOut-1, iLine)) / (&
+               State_VIB(R_,iParticleOut,  iLine) - &
+               State_VIB(R_,iParticleOut-1,iLine))
        else
           Weight = 1.0
        end if

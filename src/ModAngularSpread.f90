@@ -6,7 +6,7 @@ module SP_ModAngularSpread
   use ModNumConst, ONLY: cPi, cTwoPi, cTolerance, cSqrtTwo, cDegToRad
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use SP_ModGrid, ONLY: search_line, iblock_to_lon_lat, nLon, nLat, &
-       nBlock, MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
+       nLine, MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
   use SP_ModSize, ONLY: nDim
   use SP_ModTIme, ONLY: iIter
 
@@ -135,7 +135,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine init
-    integer:: iBlock, iLon, iLat
+    integer:: iLine, iLon, iLat
     real:: DLon, DLat, AuxLon, AuxLat
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
@@ -143,21 +143,21 @@ contains
          RETURN
 
     ! compute characterisitc spreads for lines and corresponding normalizations
-    allocate(Sigma_B(nBlock))
-    allocate(Norm_B(nBlock))
-    do iBlock = 1, nBlock
-       call iblock_to_lon_lat(iBlock, iLon, iLat)
+    allocate(Sigma_B(nLine))
+    allocate(Norm_B(nLine))
+    do iLine = 1, nLine
+       call iblock_to_lon_lat(iLine, iLon, iLat)
        AuxLon = (iLon-1.0) / (nLon-1)
        AuxLat = (iLat-1.0) / (nLat-1)
        select case(iSigmaMode)
        case(SigmaConst_)
-          Sigma_B(iBlock) = SigmaIo_I(1)
+          Sigma_B(iLine) = SigmaIo_I(1)
        case(SigmaLinearLon_)
-          Sigma_B(iBlock) = SigmaIo_I(1) * (1-AuxLon) + SigmaIo_I(2) * AuxLon
+          Sigma_B(iLine) = SigmaIo_I(1) * (1-AuxLon) + SigmaIo_I(2) * AuxLon
        case(SigmaLinearLat_)
-          Sigma_B(iBlock) = SigmaIo_I(1) * (1-AuxLat) + SigmaIo_I(2) * AuxLat
+          Sigma_B(iLine) = SigmaIo_I(1) * (1-AuxLat) + SigmaIo_I(2) * AuxLat
        case(SigmaBiLinear_)
-          Sigma_B(iBlock) = &
+          Sigma_B(iLine) = &
                SigmaIo_I(1) * (1-AuxLon) * (1-AuxLat) + &
                SigmaIo_I(2) *    AuxLon  * (1-AuxLat) + &
                SigmaIo_I(3) * (1-AuxLon) *    AuxLat  + &
@@ -166,7 +166,7 @@ contains
           call CON_stop(NameSub//&
                ': invalid mode for setting characteristic angular spread')
        end select
-       call get_angular_spread_normalization(Sigma_B(iBlock), Norm_B(iBlock))
+       call get_angular_spread_normalization(Sigma_B(iLine), Norm_B(iLine))
     end do
 
     ! initialize and fill angular grid
@@ -190,26 +190,26 @@ contains
   !============================================================================
   subroutine get_magnetic_flux
     ! fill MagneticFluxAbs_B with reference value and radius from PARAM.in
-    integer:: iBlock
+    integer:: iLine
     integer:: iRef
     logical:: IsFoundRef
     real:: Weight
     real:: Xyz_D(nDim)
 
     !--------------------------------------------------------------------------
-    do iBlock = 1, nBlock
-       call search_line(iBlock, RadiusRef, iRef, IsFoundRef, Weight)
+    do iLine = 1, nLine
+       call search_line(iLine, RadiusRef, iRef, IsFoundRef, Weight)
        if(IsFoundRef .and. iRef > 1)then
           Xyz_D = &
-               MHData_VIB(X_:Z_,iRef-1,iBlock) * (1-Weight) + &
-               MHData_VIB(X_:Z_,iRef,  iBlock) *    Weight
-          MagneticFluxAbs_B(iBlock) = SolidAngleRef * RadiusRef * abs(&
+               MHData_VIB(X_:Z_,iRef-1,iLine) * (1-Weight) + &
+               MHData_VIB(X_:Z_,iRef,  iLine) *    Weight
+          MagneticFluxAbs_B(iLine) = SolidAngleRef * RadiusRef * abs(&
                sum(Xyz_D*(&
-               MHData_VIB(Bx_:Bz_,iRef-1,iBlock) * (1-Weight) + &
-               MHData_VIB(Bx_:Bz_,iRef,  iBlock) *    Weight )))
+               MHData_VIB(Bx_:Bz_,iRef-1,iLine) * (1-Weight) + &
+               MHData_VIB(Bx_:Bz_,iRef,  iLine) *    Weight )))
        else
           ! mark that failed to find magnetic flux with given reference radius
-          MagneticFluxAbs_B(iBlock) = -1.0
+          MagneticFluxAbs_B(iLine) = -1.0
        end if
     end do
   end subroutine get_magnetic_flux
@@ -282,11 +282,11 @@ contains
   end function spread_shape
   !============================================================================
   subroutine get_normalized_spread_point(&
-       iBlock, Radius, LonPoint, LatPoint, Spread)
+       iLine, Radius, LonPoint, LatPoint, Spread)
     ! value of normalized angular spread function:
     ! equal to probability of particle deviation to be within some solid angle
     ! centered around LonPoint, LatPoint
-    integer,         intent(in) :: iBlock  ! line index on processor
+    integer,         intent(in) :: iLine  ! line index on processor
     real,            intent(in) :: Radius  ! heliocentric radius
     real,            intent(in) :: LonPoint! longitude of location
     real,            intent(in) :: LatPoint! latitude of location
@@ -300,7 +300,7 @@ contains
     real,    save:: RadiusPrevCall = -1.0
     ! result of previous call
     logical, save:: IsFound
-    integer, save:: iParticle
+    integer, save:: iVertex
     real,    save:: SolidAngle
     real,    save:: LonLine, LatLine
     ! miscallaneous values
@@ -312,7 +312,7 @@ contains
 
     ! check whether value of magnetic flux has been found for this line
     !--------------------------------------------------------------------------
-    if(MagneticFluxAbs_B(iBlock) < 0)then
+    if(MagneticFluxAbs_B(iLine) < 0)then
        Spread = 0
        RETURN
     end if
@@ -322,18 +322,18 @@ contains
     ! e.g. multiple calls for same line at the same timestep
     !---------------------------------------------------------------
     ! determine whether to perform full computation
-    DoReset = iBlock/=iBlockPrevCall .or. Radius/=RadiusPrevCall .or.&
+    DoReset = iLine/=iBlockPrevCall .or. Radius/=RadiusPrevCall .or.&
          iIter/= iIterPrevCall
 
     if(DoReset)then
        ! update parameters that determine similarity of consequitive calls
        iIterPrevCall  = iIter
-       iBlockPrevCall = iBlock
+       iBlockPrevCall = iLine
        RadiusPrevCall = Radius
-       call search_line(iBlock, Radius, iParticle, IsFound, Weight)
+       call search_line(iLine, Radius, iVertex, IsFound, Weight)
     end if
 
-    if(.not.(IsFound.and.iParticle > 1))then
+    if(.not.(IsFound.and.iVertex > 1))then
        ! if location not found, do not apply spread
        Spread = 0
        RETURN
@@ -342,26 +342,26 @@ contains
     if(DoReset)then
        ! spread is computed based on interpolated coordinates and field
        Xyz_D = &
-            MHData_VIB(X_:Z_,iParticle-1,iBlock) * (1-Weight) + &
-            MHData_VIB(X_:Z_,iParticle,  iBlock) *    Weight
+            MHData_VIB(X_:Z_,iVertex-1,iLine) * (1-Weight) + &
+            MHData_VIB(X_:Z_,iVertex,  iLine) *    Weight
        call xyz_to_rlonlat(Xyz_D, Aux, LonLine, LatLine)
        ! Aux = B \cdot Xyz
        Aux = abs(sum(Xyz_D * (&
-            MHData_VIB(Bx_:Bz_,iParticle-1,iBlock) * (1-Weight) + &
-            MHData_VIB(Bx_:Bz_,iParticle,  iBlock) *    Weight)))
+            MHData_VIB(Bx_:Bz_,iVertex-1,iLine) * (1-Weight) + &
+            MHData_VIB(Bx_:Bz_,iVertex,  iLine) *    Weight)))
        ! solid angle of line's flux tube section on sphere
-       SolidAngle = MagneticFluxAbs_B(iBlock) / Aux / Radius
+       SolidAngle = MagneticFluxAbs_B(iLine) / Aux / Radius
     end if
     ! Aux = angle of arc between line and locaiton of interest
     Aux = angle(LonLine, LatLine, LonPoint, LatPoint)
 
-    Spread = spread_shape(Aux, Sigma_B(iBlock))  * SolidAngle / Norm_B(iBlock)
+    Spread = spread_shape(Aux, Sigma_B(iLine))  * SolidAngle / Norm_B(iLine)
   end subroutine get_normalized_spread_point
   !============================================================================
-  subroutine get_normalized_spread_grid(iBlock, Radius, Spread_II)
+  subroutine get_normalized_spread_grid(iLine, Radius, Spread_II)
     ! value of normalized angular spread on rectangular angular grid
     ! defined by SpreadLon_I and SpreadLat_I;
-    integer, intent(in) :: iBlock
+    integer, intent(in) :: iLine
     real,    intent(in) :: Radius
     real,    intent(out):: Spread_II(nSpreadLon,nSpreadLat)
 
@@ -370,7 +370,7 @@ contains
     ! compute spread over grid for current line
     do iLon = 1, nSpreadLon
        do iLat = 1, nSpreadLat
-          call get_normalized_spread_point(iBlock, Radius, &
+          call get_normalized_spread_point(iLine, Radius, &
                SpreadLon_I(iLon), SpreadLat_I(iLat), Spread_II(iLon, iLat))
        end do
     end do

@@ -9,11 +9,11 @@ module SP_ModDistribution
 #endif
   use ModNumConst, ONLY: cTiny
   use ModConst,    ONLY: cLightSpeed, energy_in
-  use SP_ModSize,  ONLY: nParticleMax, nP=>nMomentum
+  use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        IO2SI_V, SI2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
-  use SP_ModGrid,  ONLY: nBlock, nParticle_B
+  use SP_ModGrid,  ONLY: nLine, nVertex_B
   implicit none
   SAVE
   PRIVATE
@@ -71,7 +71,7 @@ module SP_ModDistribution
   ! Number of points along the momentum axis is set in ModSize
   ! 1st index - log(momentum)
   ! 2nd index - particle index along the field line
-  ! 3rd index - local block number
+  ! 3rd index - local line number
   real, public, allocatable :: Distribution_IIB(:,:,:)
 
   ! distribution is initialized to have integral flux:
@@ -86,7 +86,7 @@ contains
     use SP_ModUnit,   ONLY: momentum_to_kinetic_energy
     use ModUtilities, ONLY: check_allocate
     ! set the initial distribution on all lines
-    integer:: iBlock, iParticle, iP, iError
+    integer:: iLine, iVertex, iP, iError
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
@@ -108,19 +108,19 @@ contains
     end do
 
     ! Distribution function
-    allocate(Distribution_IIB(0:nP+1,1:nParticleMax,nBlock), stat=iError)
+    allocate(Distribution_IIB(0:nP+1,1:nVertexMax,nLine), stat=iError)
     call check_allocate(iError, 'Distribution_IIB')
 
     ! initialization depends on momentum, however, this corresponds
     ! to a constant differential flux (intensity), thus ensuring
     ! uniform backgound while visualizing this quantity
-    do iBlock = 1, nBlock
-       do iParticle = 1, nParticleMax
+    do iLine = 1, nLine
+       do iVertex = 1, nVertexMax
           ! Overall density of the fast particles is of the order
           ! of 10^-6 m^-3. Integral flux is less than 100 per
           ! (m^2 ster s). Differential background flux is constant.
           do iP = 0, nP +1
-             Distribution_IIB(iP,iParticle,iBlock) =                         &
+             Distribution_IIB(iP,iVertex,iLine) =                         &
                   FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSI_I(iP)**2   &
                   *IO2SI_V(UnitFlux_)/IO2SI_V(UnitEnergy_)
 
@@ -147,7 +147,7 @@ contains
     end if
 
     if (.not. allocated(Flux_VIB)) then
-       allocate(Flux_VIB(Flux0_:FluxMax_,1:nParticleMax,nBlock), &
+       allocate(Flux_VIB(Flux0_:FluxMax_,1:nVertexMax,nLine), &
             stat=iError); call check_allocate(iError, 'Flux_VIB')
        Flux_VIB = -1.0
     else
@@ -220,59 +220,59 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine offset(iBlock, iOffset)
+  subroutine offset(iLine, iOffset)
     use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_, ShockOld_, &
          iShock_IB,  State_VIB, MHData_VIB, X_, Z_, FootPoint_VB
     ! shift in the data arrays is required if the grid point(s) is
     ! appended or removed at the foot point of the magnetic field
     ! line. SHIFTED ARE: State_VIB(/RhoOld_,BOld_),Distribution_IIB
     ! as well as ShockOld_
-    integer, intent(in)        :: iBlock
+    integer, intent(in)        :: iLine
     integer, intent(in)        :: iOffset
     real :: Alpha, Distance2ToMin, Distance3To2
     character(len=*), parameter:: NameSub = 'offset'
     !--------------------------------------------------------------------------
     if(iOffset==0)RETURN
     if(iOffset==1)then
-       State_VIB([RhoOld_,BOld_],2:nParticle_B(iBlock),iBlock) &
-            = State_VIB([RhoOld_,BOld_],1:nParticle_B(iBlock)-1,iBlock)
-       Distribution_IIB(:,2:nParticle_B(iBlock), iBlock)&
-            = Distribution_IIB(:,1:nParticle_B(iBlock)-1, iBlock)
-       ! Extrapolate state vector components and VDF at iparticle=1
-       Distance2ToMin = norm2(MHData_VIB(X_:Z_,2,iBlock) - &
-               FootPoint_VB(X_:Z_,iBlock))
-          Distance3To2   = norm2(MHData_VIB(X_:Z_,3,iBlock) - &
-                MHData_VIB(X_:Z_,2,iBlock))
+       State_VIB([RhoOld_,BOld_],2:nVertex_B(iLine),iLine) &
+            = State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine)-1,iLine)
+       Distribution_IIB(:,2:nVertex_B(iLine), iLine)&
+            = Distribution_IIB(:,1:nVertex_B(iLine)-1, iLine)
+       ! Extrapolate state vector components and VDF at iVertex=1
+       Distance2ToMin = norm2(MHData_VIB(X_:Z_,2,iLine) - &
+               FootPoint_VB(X_:Z_,iLine))
+          Distance3To2   = norm2(MHData_VIB(X_:Z_,3,iLine) - &
+                MHData_VIB(X_:Z_,2,iLine))
           Alpha = Distance2ToMin/(Distance2ToMin + Distance3To2)
-       State_VIB([RhoOld_, BOld_], 1, iBlock) = &
-            (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iBlock) &
-            -Alpha     * State_VIB([RhoOld_, BOld_], 3, iBlock)
-       Distribution_IIB(:,1,iBlock) = Distribution_IIB(:,2,iBlock) + &
-            Alpha*(Distribution_IIB(:,2,iBlock) - &
-            Distribution_IIB(:,3,iBlock))
+       State_VIB([RhoOld_, BOld_], 1, iLine) = &
+            (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iLine) &
+            -Alpha     * State_VIB([RhoOld_, BOld_], 3, iLine)
+       Distribution_IIB(:,1,iLine) = Distribution_IIB(:,2,iLine) + &
+            Alpha*(Distribution_IIB(:,2,iLine) - &
+            Distribution_IIB(:,3,iLine))
        ! extrapolation may introduced negative values
        ! for strictly positive quantities; such occurences need fixing
-       where(State_VIB([RhoOld_,BOld_],1,iBlock) <= 0.0)
-          State_VIB([RhoOld_,BOld_],1,iBlock) = &
-               0.01 * State_VIB([RhoOld_,BOld_],2,iBlock)
+       where(State_VIB([RhoOld_,BOld_],1,iLine) <= 0.0)
+          State_VIB([RhoOld_,BOld_],1,iLine) = &
+               0.01 * State_VIB([RhoOld_,BOld_],2,iLine)
        end where
-       where(Distribution_IIB(:,1,iBlock) <= 0.0)
-          Distribution_IIB(:,1,iBlock) = &
-               0.01 * Distribution_IIB(:,2,iBlock)
+       where(Distribution_IIB(:,1,iLine) <= 0.0)
+          Distribution_IIB(:,1,iLine) = &
+               0.01 * Distribution_IIB(:,2,iLine)
        end where
     elseif(iOffset < 0)then
-       State_VIB([RhoOld_,BOld_],1:nParticle_B(iBlock),iBlock) &
-            =  State_VIB([RhoOld_,BOld_],1-iOffset:nParticle_B(iBlock)&
-       - iOffset, iBlock)
-       Distribution_IIB(:,1:nParticle_B(iBlock), iBlock)&
-            = Distribution_IIB(:,1-iOffset:nParticle_B(iBlock)-iOffset, &
-            iBlock)
+       State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &
+            =  State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
+       - iOffset, iLine)
+       Distribution_IIB(:,1:nVertex_B(iLine), iLine)&
+            = Distribution_IIB(:,1-iOffset:nVertex_B(iLine)-iOffset, &
+            iLine)
     else
        call CON_stop('No algorithm for iOffset >1 in '//NameSub)
     end if
-    if(iShock_IB(ShockOld_, iBlock)/=NoShock_)&
-         iShock_IB(ShockOld_, iBlock) = &
-         max(iShock_IB(ShockOld_, iBlock) + iOffset, 1)
+    if(iShock_IB(ShockOld_, iLine)/=NoShock_)&
+         iShock_IB(ShockOld_, iLine) = &
+         max(iShock_IB(ShockOld_, iLine) + iOffset, 1)
   end subroutine offset
   !============================================================================
   subroutine get_integral_flux
@@ -280,7 +280,7 @@ contains
     ! compute the total (simulated) integral flux of particles as well as
     ! particle flux in the 6 GOES channels; also compute total energy flux
 
-    integer:: iBlock, iParticle, iP, iFlux ! loop variables
+    integer:: iLine, iVertex, iP, iFlux ! loop variables
     real   :: EFlux ! the value of energy flux
     real   :: dFlux, dFlux1 ! increments
     real   :: Flux          ! the value of particle flux
@@ -293,8 +293,8 @@ contains
 
     EChannelSI_I = EChannelIO_I * energy_in('MeV')
 
-    do iBlock = 1, nBlock
-       do iParticle = 1, nParticle_B( iBlock)
+    do iLine = 1, nLine
+       do iVertex = 1, nVertex_B( iLine)
           ! Integration loop with midpoint rule
           ! reset values
           EFlux = 0.0
@@ -304,10 +304,10 @@ contains
              ! the flux increment from iP
              dFlux = 0.5 * &
                   (KinEnergySI_I(iP+1) - KinEnergySI_I(iP)) * (&
-                  Distribution_IIB(iP,  iParticle,iBlock)*&
+                  Distribution_IIB(iP,  iVertex,iLine)*&
                   MomentumSI_I(iP)**2 &
                   +&
-                  Distribution_IIB(iP+1,iParticle,iBlock)*&
+                  Distribution_IIB(iP+1,iVertex,iLine)*&
                   MomentumSI_I(iP+1)**2)
 
              ! increase the total flux
@@ -327,10 +327,10 @@ contains
                    dFlux1 =&
                         ((-0.50*(KinEnergySI_I(iP) + EChannelSI_I(iFlux)) + &
                         KinEnergySI_I(iP+1) )*&
-                        Distribution_IIB(iP,iParticle,iBlock)*&
+                        Distribution_IIB(iP,iVertex,iLine)*&
                         MomentumSI_I(iP)**2  &
                         -0.50*(KinEnergySI_I(iP)-EChannelSI_I(iFlux))*&
-                        Distribution_IIB(iP+1,iParticle,iBlock)*&
+                        Distribution_IIB(iP+1,iVertex,iLine)*&
                         MomentumSI_I(iP+1)**2)*&
                         (KinEnergySI_I(iP)-EChannelSI_I(iFlux))/&
                         (KinEnergySI_I(iP+1)-KinEnergySI_I(iP))
@@ -341,21 +341,21 @@ contains
              ! increase total energy flux
              EFlux = EFlux + 0.5 * &
                   (KinEnergySI_I(iP+1) - KinEnergySI_I(iP)) * (&
-                  Distribution_IIB(iP,  iParticle,iBlock)*&
+                  Distribution_IIB(iP,  iVertex,iLine)*&
                   KinEnergySI_I(iP) * &
                   MomentumSI_I(iP)**2 &
                   +&
-                  Distribution_IIB(iP+1,iParticle,iBlock)*&
+                  Distribution_IIB(iP+1,iVertex,iLine)*&
                   KinEnergySI_I(iP+1) * &
                   MomentumSI_I(iP+1)**2)
           end do
 
           ! store the results
-          Flux_VIB(Flux0_,              iParticle, iBlock) = &
+          Flux_VIB(Flux0_,              iVertex, iLine) = &
                Flux   * SI2IO_V(UnitFlux_)
-          Flux_VIB(FluxFirst_:FluxLast_,iParticle, iBlock) = &
+          Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
                Flux_I * SI2IO_V(UnitFlux_)
-          Flux_VIB(EFlux_,              iParticle, iBlock) = &
+          Flux_VIB(EFlux_,              iVertex, iLine) = &
                EFlux  * SI2IO_V(UnitEFlux_)
        end do
     end do

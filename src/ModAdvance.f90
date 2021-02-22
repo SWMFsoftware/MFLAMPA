@@ -5,12 +5,12 @@ module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
   use ModNumConst, ONLY: cPi
   use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
-  use SP_ModSize, ONLY: nParticleMax
+  use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
-       iNode0,      &
-       Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nBlock, nParticle_B
+       iLineAll0,      &
+       Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
@@ -100,8 +100,8 @@ contains
          iPTest, iParticleTest, iNodeTest
     real, intent(in):: TimeLimit
     ! Loop variables
-    integer  :: iP, iParticle, iBlock
-    ! For a given block: nParticle_B, iShock_IB:
+    integer  :: iP, iVertex, iLine
+    ! For a given line: nVertex_B, iShock_IB:
     integer  :: iEnd, iShock, iShockOld
     ! Upper limit and variable for the Loop which makes
     ! a time step so short that the shock wave passes
@@ -136,19 +136,19 @@ contains
     real      :: DtReduction
 
     ! Local arrays to store the position and state vectors in SI units
-    real :: XyzSI_DI(3, 1:nParticleMax)
-    real, dimension(1:nParticleMax):: RadiusSI_I, DsSI_I,    &
+    real :: XyzSI_DI(3, 1:nVertexMax)
+    real, dimension(1:nVertexMax):: RadiusSI_I, DsSI_I,    &
          RhoSI_I, RhoOldSI_I, nSI_I, uSI_I, BSI_I, BOldSI_I, &
          n_I ! n_I is in the IO unit
 
     ! Lagrangian derivatives
-    real, dimension(1:nParticleMax):: DLogRho_I, FermiFirst_I
+    real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
 
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter =BSI in the cell center
     ! DInner = DiffusionCoefficient/BSI at the face
-    real, dimension(1:nParticleMax):: &
+    real, dimension(1:nVertexMax):: &
          DOuterSI_I, DInnerSI_I, CoefDInnerSI_I
 
     character(len=*), parameter:: NameSub = 'advance'
@@ -157,9 +157,9 @@ contains
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
 
-    BLOCK:do iBlock = 1, nBlock
+    line:do iLine = 1, nLine
        ! the active particles on the line
-       iEnd   = nParticle_B( iBlock)
+       iEnd   = nVertex_B( iLine)
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
@@ -168,18 +168,18 @@ contains
        ! are in SI units. So to convert the IO units, only need three
        ! conversion factors are needed:
        ! UnitX_, UnitRho_, UnitEnergy_
-       XyzSI_DI(x_,1:iEnd) = MhData_VIB(x_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
-       XyzSI_DI(y_,1:iEnd) = MhData_VIB(y_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
-       XyzSI_DI(z_,1:iEnd) = MhData_VIB(z_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
-       DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
-       RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iBlock)*IO2SI_V(UnitX_)
-       uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iBlock)
-       BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iBlock)
-       RhoOldSI_I( 1:iEnd) = State_VIB(RhoOld_,1:iEnd,iBlock)*IO2SI_V(UnitRho_)
+       XyzSI_DI(x_,1:iEnd) = MhData_VIB(x_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
+       XyzSI_DI(y_,1:iEnd) = MhData_VIB(y_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
+       XyzSI_DI(z_,1:iEnd) = MhData_VIB(z_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
+       DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
+       RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
+       uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
+       BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
+       RhoOldSI_I( 1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)*IO2SI_V(UnitRho_)
 
        ! find how far shock has travelled on this line: nProgress
-       iShock    = iShock_IB(Shock_,   iBlock)
-       iShockOld = iShock_IB(ShockOld_,iBlock)
+       iShock    = iShock_IB(Shock_,   iLine)
+       iShockOld = iShock_IB(ShockOld_,iLine)
        if(DoTraceShock)then
           nProgress = MAX(1, iShock - iShockOld)
           iShockOld = MIN(iShockOld, iShock-1)
@@ -201,9 +201,9 @@ contains
           ! And we only consider protons, so in principle,
           ! State_VIB(Rho_/RhoOld_) gives number density in the SI unit.
           ! nSI is needed to set up the distribution at the injection.
-          n_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iBlock) +Alpha *&
-               (MhData_VIB(Rho_,  1:iEnd,iBlock) - &
-               State_VIB(RhoOld_,1:iEnd,iBlock))
+          n_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine) +Alpha *&
+               (MhData_VIB(Rho_,  1:iEnd,iLine) - &
+               State_VIB(RhoOld_,1:iEnd,iLine))
 
           nSI_I(1:iEnd)   = n_I(1:iEnd)
           RhoSI_I(1:iEnd) = n_I(1:iEnd)*Io2Si_V(UnitRho_)
@@ -211,9 +211,9 @@ contains
           ! dimensionless
           DLogRho_I(1:iEnd)=log(RhoSI_I(1:iEnd)/RhoOldSI_I(1:iEnd))
 
-          BSI_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iBlock) + Alpha*&
-               (State_VIB(B_,  1:iEnd,iBlock) - &
-               State_VIB(BOld_,1:iEnd,iBlock))
+          BSI_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha*&
+               (State_VIB(B_,  1:iEnd,iLine) - &
+               State_VIB(BOld_,1:iEnd,iLine))
 
           iShock = iShockOld + iProgress
 
@@ -276,17 +276,17 @@ contains
              call set_advection_bc
 
              ! advection in the momentum space
-             do iParticle = 2, iEnd
-                if(any(Distribution_IIB(0:nP+1,iParticle,iBlock) <0.0 )) then
+             do iVertex = 2, iEnd
+                if(any(Distribution_IIB(0:nP+1,iVertex,iLine) <0.0 )) then
                    write(*,*) NameSub, ': Distribution_IIB < 0'
                    write(*,*) ' Distribution_IIB ='
-                   write(*,*) Distribution_IIB(0:nP+1,iParticle,iBlock)
+                   write(*,*) Distribution_IIB(0:nP+1,iVertex,iLine)
                    call CON_stop(NameSub)
                 end if
 
                 call advance_log_advection(&
-                     FermiFirst_I(iParticle), nP, 1, 1,        &
-                     Distribution_IIB(0:nP+1,iParticle,iBlock),&
+                     FermiFirst_I(iVertex), nP, 1, 1,        &
+                     Distribution_IIB(0:nP+1,iVertex,iLine),&
                      .false.)
              end do
              if(.not.UseDiffusion) CYCLE STEP
@@ -302,11 +302,11 @@ contains
                 ! of the diffusion coefficient on momentum
                 ! D\propto r_L*v\propto Momentum**2/TotalEnergy
                 if (UseTurbulentSpectrum) then
-                   do iParticle=1,iEnd
-                      DInnerSI_I(iParticle) =                          &
-                           Dxx(iParticle, iP, MomentumSI_I(iP),        &
-                           SpeedSI_I(iP), BSI_I(iParticle))          / &
-                           BSI_I(iParticle)
+                   do iVertex=1,iEnd
+                      DInnerSI_I(iVertex) =                          &
+                           Dxx(iVertex, iP, MomentumSI_I(iP),        &
+                           SpeedSI_I(iP), BSI_I(iVertex))          / &
+                           BSI_I(iVertex)
                    end do
                 else
                    ! Add v (= p*c^2/E_total in the relativistic case)
@@ -318,7 +318,7 @@ contains
                         DiffCoeffMinSI/DOuterSI_I(1:iEnd))
                 end if
 
-                if (DoTestDiffusion .and. iNode0 + iBlock == iNodeTest) then
+                if (DoTestDiffusion .and. iLineAll0 + iLine == iNodeTest) then
                    if (iP == iPTest) then
                       write(*,'(a,i3,a,i3,a,es15.7)') NameSub//': iStep =', &
                            iStep, ' iProgress =',  iProgress,               &
@@ -328,21 +328,21 @@ contains
 
                 call advance_diffusion(Dt, iEnd,              &
                      DsSI_I(1:iEnd),                          &
-                     Distribution_IIB(iP,1:iEnd,iBlock),      &
+                     Distribution_IIB(iP,1:iEnd,iLine),      &
                      DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
              end do MOMENTUM
 
              ! if(UseTurbulentSpectrum .and. .true.)then
              !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
              !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
-             !         Distribution_IIB(:,1:iEnd,iBlock),BSI_I(1:iEnd), &
+             !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
              !         RhoSI_I(1:iEnd),Dt)
              ! end if
 
           end do STEP
           DoInitSpectrum = .true.
        end do PROGRESS
-    end do BLOCK
+    end do line
   contains
     !==========================================================================
     function mach_alfven() result(MachAlfven)
@@ -368,20 +368,20 @@ contains
     subroutine steepen_shock
       ! change the density profile near the shock front so it becomes steeper
       ! for the current line
-      integer:: iParticle ! loop variable
+      integer:: iVertex ! loop variable
       real   :: DLogRhoExcessIntegral, DLogRhoExcess
       real, parameter:: DLogRhoBackground = 0.01
       !------------------------------------------------------------------------
       ! find the excess of DLogRho within the shock compared to background
       ! averaged over length
       DLogRhoExcessIntegral = 0.0
-      do iParticle = iShock - nWidth, iShock + nWidth - 1
-         DLogRhoExcess = 0.5*(DLogRho_I(iParticle) + DLogRho_I(iParticle+1)) &
+      do iVertex = iShock - nWidth, iShock + nWidth - 1
+         DLogRhoExcess = 0.5*(DLogRho_I(iVertex) + DLogRho_I(iVertex+1)) &
               - DLogRhoBackground ! D log(rho)/Dt*\Delta t = -\div U*\Delta t
          if(DLogRhoExcess>0) then
             ! This is a jump in velocity accross the shock wave * \Delta t
             DLogRhoExcessIntegral = DLogRhoExcessIntegral + &
-                 DLogRhoExcess*DsSI_I(iParticle)
+                 DLogRhoExcess*DsSI_I(iVertex)
          end if
       end do
 
@@ -394,7 +394,7 @@ contains
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
       DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral/&
-           DsSI_I(iParticle)
+           DsSI_I(iVertex)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
       BSI_I(iShock+1-nWidth:iShock+1)=maxval(BSI_I(iShock+1-nWidth:iShock+1))
@@ -404,7 +404,7 @@ contains
     !==========================================================================
     subroutine set_coef_diffusion
       ! set diffusion coefficient for the current line
-      real, dimension(1:nParticleMax):: ScaleSI_I
+      real, dimension(1:nVertexMax):: ScaleSI_I
       real, parameter:: cCoef = 81./7/cPi/(2*cPi)**(2./3)
 
       !------------------------------------------------------------------------
@@ -437,7 +437,7 @@ contains
                  *(cLightSpeed/cGEV)**(1.0/3)
          elsewhere
             CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-                 (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+                 (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iLine),1))*    &
                  (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
          end where
       else    ! .not.UseFixedMFPUpstream
@@ -449,7 +449,7 @@ contains
          ! effective level of turbulence is different for different momenta:
          ! (\delta B)**2 \propto Gyroradius^(1/3)
          CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-              (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iBlock),1))*    &
+              (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iLine),1))*    &
               (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
       end if
 
@@ -457,8 +457,8 @@ contains
       CoefDInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
 
       ! set the left boundary condition for diffusion
-      Distribution_IIB(1:nP+1, 1, iBlock) = &
-           Distribution_IIB(0, 1, iBlock) * &
+      Distribution_IIB(1:nP+1, 1, iLine) = &
+           Distribution_IIB(0, 1, iLine) * &
            (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
 
     end subroutine set_coef_diffusion
@@ -466,21 +466,21 @@ contains
     subroutine set_advection_bc
       ! set boundary conditions on grid point on the current line
       ! LOCAL VARIABLES:
-      integer:: iParticle     ! loop variable
+      integer:: iVertex     ! loop variable
       real   :: MomentumSI    ! Momentum for the thermal energy k_BTi
 
       !------------------------------------------------------------------------
-      do iParticle = 1, iEnd
+      do iVertex = 1, iEnd
          ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
          ! f = CoefInj/8/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
          !   = CoefInj/8/pi * N / p^3 * (p/p_inj)^5
          ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic
          ! temperature.
          MomentumSI = kinetic_energy_to_momentum(                  &
-              MHData_VIB(T_,iParticle,iBlock)*Io2Si_V(UnitEnergy_))
-         Distribution_IIB(0,iParticle,iBlock) =                    &
+              MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
+         Distribution_IIB(0,iVertex,iLine) =                    &
               CoefInj*1.0/(4*(SpectralIndex-3)*cPi)                &
-              * nSI_I(iParticle)/MomentumSI**3                     &
+              * nSI_I(iVertex)/MomentumSI**3                     &
               * (MomentumSI/MomentumInjSI)**SpectralIndex
       end do
     end subroutine set_advection_bc

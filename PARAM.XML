@@ -209,7 +209,7 @@ To do the check the CpuTimeMax variable has to be set to a positive value.
 <commandgroup name="GRID">
 Parameters of the Lagrangian grid used in MFLAMPA 
 <command name="CHECKGRIDSIZE">
-	<parameter name="nParticleMax" type="integer" default="2000" />
+	<parameter name="nVertexMax" type="integer" default="2000" />
 	<parameter name="nLon"  type="integer" default="20" />
 	<parameter name="nLat"  type="integer" default="20" />
 
