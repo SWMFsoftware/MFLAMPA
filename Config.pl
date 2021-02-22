@@ -84,11 +84,11 @@ sub get_settings{
     open(FILE, $NameSizeFile) or die "$ERROR could not open $NameSizeFile\n";
     while(<FILE>){
 	next if /^\s*!/;
-	$nP   =$1 if /\bnParticleMax\s*=[^0-9]*(\d+)/i;
+	$nP   =$1 if /\bnVertexMax\s*=[^0-9]*(\d+)/i;
     }
     close FILE;
 
-    die "$ERROR could not read nParticleMax from $NameSizeFile\n" 
+    die "$ERROR could not read nVertexMax from $NameSizeFile\n" 
 	unless length($nP);                         
 
     $GridSize = "$nP";
@@ -115,7 +115,7 @@ sub set_grid_size{
     @ARGV = ($NameSizeFile);
     while(<>){
 	if(/^\s*!/){print; next} # Skip commented out lines
-	s/\b(nParticleMax\s*=[^0-9]*)(\d+)/$1$nP/i;
+	s/\b(nVertexMax\s*=[^0-9]*)(\d+)/$1$nP/i;
 	print;
     }
 }
