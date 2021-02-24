@@ -48,7 +48,7 @@ module SP_ModGrid
   ! a given proc ranges from 1 to iNodeLast. nLine = nNodeLast - iLineAll0 is the number of
   ! lines (blocks) on this processor. For iLine=1:nLine iLineAll = iLineAll0+1:iNodeLast
   !
-  integer, public              :: nLine
+  integer, public :: nLine
   !
   ! Number of particles (vertexes, Lagrangian meshes) per line (line):
   integer, public,     pointer :: nVertex_B(:)
