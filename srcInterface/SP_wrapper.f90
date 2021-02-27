@@ -4,7 +4,8 @@
 module SP_wrapper
   use CON_coupler,ONLY: SP_
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModMain, ONLY: run, DoRestart, DoReadMhData, DataInputTime
+  use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
+  use SP_ModTime, ONLY: DataInputTime
   implicit none
   save
   private ! except
@@ -138,7 +139,7 @@ contains
   end subroutine SP_finalize
   !============================================================================
   subroutine SP_save_restart(TimeSimulation)
-    use SP_ModMain, ONLY: save_restart
+    use SP_ModRestart, ONLY: save_restart
     real, intent(in) :: TimeSimulation
 
     ! if data are read from files, no need for additional run
@@ -148,7 +149,7 @@ contains
   end subroutine SP_save_restart
   !============================================================================
   subroutine SP_put_coupling_param(Source_, TimeIn)
-    use SP_ModMain, ONLY: copy_old_state
+    use SP_ModGrid, ONLY: copy_old_state
     use CON_bline,  ONLY: Lower_
     integer,        intent(in) :: Source_
     real,           intent(in) :: TimeIn
