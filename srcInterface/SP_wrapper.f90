@@ -3,7 +3,6 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_wrapper
   use CON_coupler,ONLY: SP_
-  use SP_ModSize, ONLY: nVertexMax
   use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
   use SP_ModTime, ONLY: DataInputTime
   implicit none
@@ -90,11 +89,12 @@ contains
   !============================================================================
   ! The following routines are called  on  PEs of the SP model only
   subroutine SP_init_session(iSession,TimeSimulation)
-    use SP_ModMain, ONLY: initialize, DoRestart, DoReadMhData
-    use SP_ModGrid, ONLY: init_grid=>init, nVar, State_VIB, MHData_VIB
-    use SP_ModGrid, ONLY: nLon, nLat, nVertex_B, FootPoint_VB
-    use CON_bline,  ONLY: BL_init, BL_get_origin_points
+    use SP_ModMain,         ONLY: initialize, DoRestart, DoReadMhData
+    use SP_ModGrid,         ONLY: init_grid=>init, nVar, nLon, nLat, &
+         State_VIB, MHData_VIB, nVertex_B, FootPoint_VB
     use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
+    use SP_ModSize,         ONLY: nVertexMax
+    use CON_bline,          ONLY: BL_init, BL_get_origin_points
     integer,  intent(in) :: iSession         ! session number (starting from 1)
     real,     intent(in) :: TimeSimulation   ! seconds from start time
 
