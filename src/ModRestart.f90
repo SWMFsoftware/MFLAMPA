@@ -18,7 +18,7 @@ module SP_ModRestart
   SAVE
   private ! except
   ! Public members
-  public:: save_restart, read_restart, check_restart, read_param
+  public:: save_restart, read_restart, stand_alone_save_restart, read_param
   public:: NameRestartInDir, NameRestartOutDir
 
   !----------------------------------------------------------------
@@ -47,7 +47,7 @@ contains
          call CON_stop(NameSub//': incorrectly set ')
   end subroutine read_param
   !============================================================================
-  subroutine check_restart(Dt)
+  subroutine stand_alone_save_restart(Dt)
     real, intent(in) :: Dt
     !--------------------------------------------------------------------------
     if(.not.DoSaveRestart) RETURN
@@ -63,7 +63,7 @@ contains
        end if
        nIterSinceRestart = 0
     end if
-  end subroutine check_restart
+  end subroutine stand_alone_save_restart
   !============================================================================
   subroutine save_restart
     use ModIoUnit,     ONLY: UnitTmp_

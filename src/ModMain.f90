@@ -2,75 +2,51 @@
 ! portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModMain
-  use SP_ModAdvance, ONLY: DoTraceShock, UseDiffusion, advance
-  use SP_ModGrid,    ONLY: copy_old_state, LagrID_, X_,  Y_, Z_,  &
-       Rho_, Bx_, By_, Bz_, Ux_, Uy_, Uz_, T_, Wave1_, Wave2_, R_,&
-       Length_, nLine, nVertex_B, Shock_, ShockOld_, DLogRho_, &
-       RhoOld_, iShock_IB, State_VIB, MHData_VIB    
-  use SP_ModPlot,    ONLY: save_plot_all, NamePlotDir
-  use SP_ModProc,    ONLY: iProc
-  use SP_ModReadMhData, ONLY: read_mh_data, DoReadMhData
-  use SP_ModRestart, ONLY: save_restart, read_restart
-  use SP_ModSize,    ONLY: nDim, nVertexMax
-  use SP_ModTime,    ONLY: SPTime, DataInputTime, iIter
-  use SP_ModUnit,    ONLY: Si2Io_V, UnitEnergy_
+  use SP_ModProc,       ONLY: iProc
+  use SP_ModReadMhData, ONLY: DoReadMhData
   implicit none
   SAVE
   private ! except
-  ! Stopping conditions. These variables are only used in stand alone mode.
-  real   :: TimeMax  = -1.0, CpuTimeMax = -1.0
-  integer:: nIterMax = -1
-  logical:: UseStopFile = .true.
-  logical:: IsLastRead=.false.
+  
   ! Indicator of stand alone mode
   logical:: IsStandAlone=.false.
-  ! Whether and when to save the restart file (STAND ALONE ONLY)
-  logical:: DoSaveRestart=.false.
-  integer:: DnSaveRestart=-1,  nIterSinceRestart = 0
-  real   :: DtSaveRestart=-1.0, TimeSinceRestart = 0.0
 
-  ! Timing variables
-  logical:: UseTiming = .true.
-  integer:: nTiming = -2
-  integer:: nTimingDepth = -1
-  character(len=10):: TimingStyle = 'cumm'
+  ! Stopping conditions. These variables are only used in stand alone mode.
+  real    :: TimeMax     = -1.0, CpuTimeMax = -1.0
+  integer :: nIterMax    = -1
+  logical :: UseStopFile = .true.
+  logical :: IsLastRead  = .false.
 
-  ! Methods and variables from this module
-  public:: &
-       read_param, initialize, finalize, run, check, save_restart, &
-       SPTime, iIter, DataInputTime, DoRestart,     &
-       UseTiming, nTiming, nTimingDepth, TimingStyle,         &
-       IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax,&
-       IsStandAlone, copy_old_state
-
-  ! Methods and variables from ModReadMhData
-  public:: DoReadMhData
-
-  ! Methods and variables from ModUnit
-  public:: Si2Io_V, UnitEnergy_
-
+  
   ! Logicals for actions
   !----------------------------------------------------------------------------
   ! run the component
   logical:: DoRun = .true.
   ! restart the run
   logical:: DoRestart = .false.
-  ! perform initialization
-  logical:: DoInit = .true.
+  ! Methods and variables from ModReadMhData
+  public :: DoReadMhData
+
+  ! Methods and variables from this module
+  public:: read_param, initialize, finalize, run, check, DoRestart,        &
+       IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax, IsStandAlone
 contains
   !============================================================================
 
   subroutine read_param
-    use SP_ModAdvance,      ONLY: read_param_adv        =>read_param
+    use SP_ModAdvance,       ONLY: DoTraceShock, UseDiffusion  
+    use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
-    use SP_ModDistribution, ONLY: read_param_dist       =>read_param
-    use SP_ModGrid,         ONLY: read_param_grid       =>read_param
-    use SP_ModOriginPoints, ONLY: read_param_origin     =>read_param
-    use SP_ModPlot,         ONLY: read_param_plot       =>read_param
-    use SP_ModReadMHData,   ONLY: read_param_mhdata     =>read_param
-    use SP_ModTime,         ONLY: read_param_time       =>read_param
-    use SP_ModTurbulence,   ONLY: read_param_turbulence =>read_param
-    use SP_ModUnit,         ONLY: read_param_unit       =>read_param
+    use SP_ModDistribution,  ONLY: read_param_dist       =>read_param
+    use SP_ModGrid,          ONLY: read_param_grid       =>read_param
+    use SP_ModOriginPoints,  ONLY: read_param_origin     =>read_param
+    use SP_ModPlot,          ONLY: read_param_plot       =>read_param
+    use SP_ModReadMHData,    ONLY: read_param_mhdata     =>read_param
+    use SP_ModRestart,       ONLY: read_param_restart    =>read_param
+    use SP_ModTime,          ONLY: read_param_time       =>read_param
+    use SP_ModTiming,        ONLY: read_param_timing     =>read_param
+    use SP_ModTurbulence,    ONLY: read_param_turbulence =>read_param
+    use SP_ModUnit,          ONLY: read_param_unit       =>read_param
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: &
@@ -122,11 +98,7 @@ contains
        case('#DORUN')
           call read_var('DoRun',DoRun)
        case('#TIMING')
-          call read_var('UseTiming',UseTiming)
-          if(.not.UseTiming) CYCLE
-          call read_var('DnTiming',nTiming)
-          call read_var('nDepthTiming',nTimingDepth)
-          call read_var('TypeTimingReport',TimingStyle)
+          call  read_param_timing
        case('#TEST')
           ! various test modes allowing to disable certain features
           call read_var('DoTraceShock', DoTraceShock)
@@ -163,11 +135,7 @@ contains
        case('#SAVERESTART')
           if(i_session_read() /= 1)CYCLE
           call check_stand_alone
-          call read_var("DoSaveRestart",DoSaveRestart)
-          call read_var("DnSaveRestart",DnSaveRestart)
-          call read_var("DtSaveRestart",DtSaveRestart)
-          if(DtSaveRestart < 0. .and. DnSaveRestart < 0)&
-               call CON_stop(NameSub//': incorrectly set '//NameCommand)
+          call read_param_restart
        case default
           call CON_stop(NameSub//': Unknown command '//NameCommand)
        end select
@@ -183,19 +151,18 @@ contains
            ' is only allowed in stand alone mode, correct PARAM.in')
     end subroutine check_stand_alone
     !==========================================================================
-
   end subroutine read_param
   !============================================================================
   subroutine initialize
     use SP_ModAngularSpread, ONLY: init_spread     => init
-    use SP_ModDistribution, ONLY: init_dist       => init
-    use SP_ModGrid,         ONLY: &
-         iNodeTest, iParticleTest, iPTest
-    use SP_ModPlot,         ONLY: init_plot       => init
-    use SP_ModReadMhData,   ONLY: init_mhdata     => init
-    use SP_ModTime,         ONLY: init_time       => init
-    use SP_ModTurbulence,   ONLY: init_turbulence => init
-    use SP_ModUnit,         ONLY: init_unit       => init
+    use SP_ModDistribution,  ONLY: init_dist       => init
+    use SP_ModPlot,          ONLY: init_plot       => init
+    use SP_ModReadMhData,    ONLY: init_mhdata     => init
+    use SP_ModRestart,       ONLY: &
+         read_restart
+    use SP_ModTime,          ONLY: init_time       => init
+    use SP_ModTurbulence,    ONLY: init_turbulence => init
+    use SP_ModUnit,          ONLY: init_unit       => init
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
@@ -207,7 +174,6 @@ contains
     call init_spread
     if(DoRestart) call read_restart
     if(IsStandAlone) call init_time
-    DoInit=.false.
   end subroutine initialize
   !============================================================================
   subroutine finalize
@@ -224,8 +190,14 @@ contains
   !============================================================================
 
   subroutine run(TimeLimit)
+    use SP_ModAdvance,       ONLY: DoTraceShock, advance   
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
-    use SP_ModGrid, ONLY: get_other_state_var
+    use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
+       Rho_, nLine, nVertex_B,  DLogRho_, RhoOld_, State_VIB, MHData_VIB
+    use SP_ModReadMhData,    ONLY: read_mh_data
+    use SP_ModRestart,       ONLY: stand_alone_save_restart
+    use SP_ModPlot,          ONLY: save_plot_all
+    use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
     logical, save:: IsFirstCall = .true.
@@ -268,20 +240,7 @@ contains
     call save_plot_all
 
     ! save restart in the stand alone mod
-    if(IsStandAlone .and. DoSaveRestart)then
-       nIterSinceRestart = nIterSinceRestart + 1
-       TimeSinceRestart  = TimeSinceRestart  + Dt
-       if(  DtSaveRestart > 0..and.  TimeSinceRestart >= DtSaveRestart .or. &
-            DnSaveRestart > 0 .and. nIterSinceRestart == DnSaveRestart)then
-          call save_restart
-          if(DtSaveRestart > 0.)then
-             TimeSinceRestart  = modulo(TimeSinceRestart, DtSaveRestart)
-          else
-             TimeSinceRestart = 0.
-          end if
-          nIterSinceRestart = 0
-       end if
-    end if
+    if(IsStandAlone)call stand_alone_save_restart(Dt)
   contains
     !==========================================================================
     subroutine lagr_time_derivative
@@ -299,73 +258,51 @@ contains
       end do
     end subroutine lagr_time_derivative
     !==========================================================================
+    subroutine get_shock_location(iLine)
+      use SP_ModAdvance, ONLY: nWidth
+      use SP_ModGrid,    ONLY: R_, NoShock_, Shock_, ShockOld_, iShock_IB
+      integer, intent(in) :: iLine
+      ! find location of a shock wave on a given line (line)
+      ! Do not search too close to the Sun
+      integer         :: iShockMin
+      real, parameter :: RShockMin = 1.20  ! *RSun
+      ! Threshold for shock tracing
+      real, parameter :: DLogRhoThreshold = 0.01
+      ! Do not search too close to the heliosphere boundary
+      integer:: iShockMax
+      ! Misc
+      integer:: iShockCandidate
+      !------------------------------------------------------------------------
+      if(.not.DoTraceShock)then
+         iShock_IB(Shock_, iLine) = NoShock_
+         RETURN
+      end if
+      ! shock front is assumed to be location of max gradient log(Rho1/Rho2);
+      ! shock never moves back
+      iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
+      iShockMax = nVertex_B(iLine) - nWidth - 1
+      iShockCandidate = iShockMin - 1 + maxloc(&
+           State_VIB(DLogRho_,iShockMin:iShockMax,iLine),&
+           1, MASK = &
+           State_VIB(R_,      iShockMin:iShockMax,iLine) > RShockMin .and. &
+           State_VIB(DLogRho_,iShockMin:iShockMax,iLine) > DLogRhoThreshold)
+      if(iShockCandidate >= iShockMin)&
+           iShock_IB(Shock_, iLine) = iShockCandidate
+    end subroutine get_shock_location
+    !==========================================================================
   end subroutine run
-  !============================================================================
-  subroutine get_shock_location(iLine)
-    use SP_ModAdvance, ONLY: nWidth
-    use SP_ModGrid,    ONLY: R_, NoShock_
-    integer, intent(in) :: iLine
-    ! find location of a shock wave on a given line (line)
-    ! Do not search too close to the Sun
-    integer         :: iShockMin
-    real, parameter :: RShockMin = 1.20  !*RSun
-    ! Threshold for shock tracing
-    real, parameter :: DLogRhoThreshold = 0.01
-    ! Do not search too close to the heliosphere boundary
-    integer:: iShockMax
-    ! Misc
-    integer:: iShockCandidate
-
-    !--------------------------------------------------------------------------
-    if(.not.DoTraceShock)then
-       iShock_IB(Shock_, iLine) = NoShock_
-       RETURN
-    end if
-    ! shock front is assumed to be location of max gradient log(Rho1/Rho2);
-    ! shock never moves back
-    iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
-    iShockMax = nVertex_B(iLine) - nWidth - 1
-    iShockCandidate = iShockMin - 1 + maxloc(&
-         State_VIB(DLogRho_,iShockMin:iShockMax,iLine),&
-         1, MASK = &
-         State_VIB(R_,      iShockMin:iShockMax,iLine) > RShockMin .and. &
-         State_VIB(DLogRho_,iShockMin:iShockMax,iLine) > DLogRhoThreshold)
-    if(iShockCandidate >= iShockMin)&
-         iShock_IB(Shock_, iLine) = iShockCandidate
-  end subroutine get_shock_location
   !============================================================================
   subroutine check
     use ModUtilities, ONLY: make_dir
-
-    ! if(.not.IsStandAlone)then
-    !   ! check if the domains for SC and IH are correctly set
-    !   if(RScMin < 0.0.or. RIhMin < 0.0 .or.RScMax < 0.0 .or.RIhMax < 0.0)&
-    !        call CON_stop(NameSub//&
-    !        ': RScMin, RScMax, RIhMin, RIhMax must be set to positive values')
-    !   if(any([RIhMax, RScMax] < RIhMin) .or. RIhMax < RScMax)&
-    !        call CON_stop(NameSub//&
-    !       ': inconsistent values of RIhMin, RScMax, RIhMax')
-    !   if(.not.(DoRestart.or.DoReadMhData))then
-    !      ! check consistency of the origin point parameters
-    !      if(LonMax <= LonMin .or. LatMax <= LatMin)&
-    !           call CON_stop(NameSub//': Origin surface grid is inconsistent')
-    !      if(ROrigin <= RScMin)call CON_stop(NameSub//&
-    !           ': ROrigin, if set, must be greater than RScMin')
-    !      if(any([RIhMin, RScMax, RIhMax] < ROrigin))&
-    !           call CON_stop(NameSub//&
-    !           ': inconsistent values of ROrigin, RIhMin, RScMax, RIhMax')
-    !   end if
-    ! end if
+    use SP_ModPlot,   ONLY: NamePlotDir
+    use SP_ModTiming, ONLY: check_timing => check
     ! Make output directory
     character(len=*), parameter:: NameSub = 'check'
     !--------------------------------------------------------------------------
-    if(iProc==0) call make_dir(NamePlotDir)
-    ! Initialize timing
-    if(iProc==0)then
-       call timing_active(UseTiming)
-       call timing_step(0)
-       call timing_depth(nTimingDepth)
-       call timing_report_style(TimingStyle)
+    if(iProc==0) then
+       call make_dir(NamePlotDir)
+       ! Initialize timing
+       call check_timing
     end if
   end subroutine check
   !============================================================================

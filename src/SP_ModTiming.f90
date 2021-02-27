@@ -4,14 +4,11 @@
 module SP_ModTiming
   implicit none
   SAVE
-  PRIVATE ! Except
   ! Timing variables
-  logical, public :: UseTiming = .true.
-  integer, public :: nTiming = -2
-  integer, public :: nTimingDepth = -1
-  character(len=10), public:: TimingStyle = 'cumm'
-  public :: read_param
-  public :: check
+  logical :: UseTiming = .true.
+  integer :: nTiming = -2
+  integer :: nTimingDepth = -1
+  character(len=10) :: TimingStyle = 'cumm'
 contains
   subroutine read_param
     ! Read input parameters for SP component
