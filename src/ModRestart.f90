@@ -18,7 +18,7 @@ module SP_ModRestart
   SAVE
   private ! except
   ! Public members
-  public:: save_restart, read_restart
+  public:: save_restart, read_restart, check_restart, read_param
   public:: NameRestartInDir, NameRestartOutDir
 
   !----------------------------------------------------------------
@@ -28,7 +28,42 @@ module SP_ModRestart
   ! name of the header file
   character (len=100) :: NameHeaderFile   ="restart.H"
   !----------------------------------------------------------------
+  ! Whether and when to save the restart file (STAND ALONE ONLY)
+  logical:: DoSaveRestart=.false.
+  integer:: DnSaveRestart=-1,  nIterSinceRestart = 0
+  real   :: DtSaveRestart=-1.0, TimeSinceRestart = 0.0
+
 contains
+  !============================================================================
+  subroutine read_param
+    use ModReadParam, ONLY: read_var
+
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
+    call read_var("DoSaveRestart",DoSaveRestart)
+    call read_var("DnSaveRestart",DnSaveRestart)
+    call read_var("DtSaveRestart",DtSaveRestart)
+    if(DtSaveRestart < 0. .and. DnSaveRestart < 0)&
+         call CON_stop(NameSub//': incorrectly set ')
+  end subroutine read_param
+  !============================================================================
+  subroutine check_restart(Dt)
+    real, intent(in) :: Dt
+    !--------------------------------------------------------------------------
+    if(.not.DoSaveRestart) RETURN
+    nIterSinceRestart = nIterSinceRestart + 1
+    TimeSinceRestart  = TimeSinceRestart  + Dt
+    if(  DtSaveRestart > 0..and.  TimeSinceRestart >= DtSaveRestart .or. &
+         DnSaveRestart > 0 .and. nIterSinceRestart == DnSaveRestart)then
+       call save_restart
+       if(DtSaveRestart > 0.)then
+          TimeSinceRestart  = modulo(TimeSinceRestart, DtSaveRestart)
+       else
+          TimeSinceRestart = 0.
+       end if
+       nIterSinceRestart = 0
+    end if
+  end subroutine check_restart
   !============================================================================
   subroutine save_restart
     use ModIoUnit,     ONLY: UnitTmp_
@@ -147,4 +182,3 @@ contains
   end subroutine write_restart_header
   !============================================================================
 end module SP_ModRestart
-!==============================================================================
