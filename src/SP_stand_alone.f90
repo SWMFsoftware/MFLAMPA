@@ -4,27 +4,28 @@
 !==================================================================
 program MFLAMPA
   use ModKind
-  use SP_ModProc,  ONLY: iProc, nProc, iComm
+  use SP_ModProc,   ONLY: iProc, nProc, iComm
   use ModUtilities, ONLY: remove_file, touch_file
-  use SP_ModMain, ONLY: &
-       nTiming, IsLastRead, IsStandAlone, &
-       iIter, SPTime, TimeMax, nIterMax,  &
+  use SP_ModTime,   ONLY: iIter
+  use SP_ModTiming, ONLY: nTiming
+  use SP_ModMain,   ONLY: &
+       IsLastRead, IsStandAlone,          &
+       TimeMax, nIterMax,                 &
        SP_read_param => read_param,       &
        SP_check      => check,            &
        SP_initialize => initialize,       &
-       SP_run        => run, &
+       SP_run        => run,              &
        SP_finalize   => finalize
-  use SP_ModGrid, ONLY: &
-       init_stand_alone, init_grid=>init
+  use SP_ModGrid,   ONLY: init_stand_alone, init_grid=>init
   use ModReadParam, ONLY: read_file, read_init
   use ModMpi
   
   implicit none
 
-  integer:: iError
-  integer:: iSession = 1  
+  integer      :: iError
+  integer      :: iSession = 1  
   real(Real8_) :: CpuTimeStart
-  logical:: IsFirstSession = .true.
+  logical      :: IsFirstSession = .true.
   !------------------------------------------------
   !\                                                                        
   ! Initialization of MPI/parallel message passing.                        
@@ -103,7 +104,7 @@ program MFLAMPA
      if(IsLastRead)exit SESSIONLOOP
      if(iProc==0) &
           write(*,*)'----- End of Session   ',iSession,' ------'   
-     iSession=iSession+1
+     iSession       = iSession + 1
      IsFirstSession = .false.
      if (nTiming > -2) call timing_report
      call timing_reset_all
@@ -135,6 +136,7 @@ program MFLAMPA
 contains
   function stop_condition_true() result(IsStopCondition)
     use SP_ModMain, ONLY: nIterMax
+    use SP_ModTime, ONLY: SPTime
     logical :: IsStopCondition
     !--------------------------
     IsStopCondition = .false.
@@ -167,7 +169,7 @@ contains
   end function is_time_to_stop
   !===================================================================
   subroutine show_progress
-    use SP_ModMain, ONLY: UseTiming
+    use SP_ModTiming, ONLY: UseTiming
     real(Real8_), external :: timing_func_d
     real(Real8_) :: CpuTimeMFLAMPA, CpuTimeAdvance
     integer:: nProgress1 = 0, nProgress2 = 10
@@ -216,7 +218,7 @@ subroutine CON_stop(StringError)
   stop
 end subroutine CON_stop
 !============================================================================
-subroutine CON_set_do_test(String,DoTest,DoTestMe)
+subroutine CON_set_do_test(String, DoTest, DoTestMe)
   implicit none
   character (len=*), intent(in)  :: String
   logical          , intent(out) :: DoTest, DoTestMe

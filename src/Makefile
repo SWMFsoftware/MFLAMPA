@@ -22,6 +22,7 @@ OBJECTS = \
 	ModRestart.o \
 	ModSize.o \
 	ModTime.o \
+	SP_ModTiming.o \
 	ModUnit.o \
 	ModWrite.o \
 	ModTurbulence.o
