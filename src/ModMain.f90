@@ -166,6 +166,11 @@ contains
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
+    if(iProc==0)then
+       write(*,'(a)')'SP: '
+       write(*,'(a)')'SP: initialize'
+       write(*,'(a)')'SP: '
+    end if
     call init_unit
     call init_dist
     call init_plot
