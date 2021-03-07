@@ -141,8 +141,9 @@ contains
   end subroutine read_restart
   !============================================================================
   subroutine write_restart_header
-    use SP_ModPlot, ONLY: nTag
-    use SP_ModProc, ONLY: iProc
+    use SP_ModPlot,         ONLY: nTag
+    use SP_ModProc,         ONLY: iProc
+    use ModUtilities,       ONLY: cTab
     use SP_ModDistribution, ONLY: nP, EnergyInjIo, EnergyMaxIo
     ! full name of the header file
     character(len=100):: NameFile
@@ -155,27 +156,27 @@ contains
     call open_file(file=NameFile, NameCaller=NameSub)
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#RESTART'
-    write(UnitTmp_,'(a)')'T'
+    write(UnitTmp_,'(a)')'T'//cTab//cTab//cTab//'DoRestart'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
-    write(UnitTmp_,'(i8,a32)') nVertexMax,'nVertexMax'
-    write(UnitTmp_,'(i8,a32)') nLon,     'nLon'
-    write(UnitTmp_,'(i8,a32)') nLat,     'nLat'
+    write(UnitTmp_,'(i8,a)') nVertexMax,cTab//cTab//'nVertexMax'
+    write(UnitTmp_,'(i8,a)') nLon,     cTab//cTab//'nLon'
+    write(UnitTmp_,'(i8,a)') nLat,     cTab//cTab//'nLat'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#NSTEP'
-    write(UnitTmp_,'(i8,a32)')iIter,'nStep'
+    write(UnitTmp_,'(i8,a)')iIter,cTab//cTab//'nStep'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#TIMESIMULATION'
-    write(UnitTmp_,'(es22.15,a18)')SPTime,'tSimulation'
+    write(UnitTmp_,'(es22.15,a)')SPTime,cTab//cTab//'tSimulation'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#NTAG'
-    write(UnitTmp_,'(i8,a32)')nTag,'nTag'
+    write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//'nTag'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#MOMENTUMGRID'
-    write(UnitTmp_,'(es22.15,a18)')EnergyInjIo,'EnergyMin'
-    write(UnitTmp_,'(es22.15,a18)')EnergyMaxIo,'EnergyMax'
-    write(UnitTmp_,'(i8,a32)')nP,'nP'
-    write(UnitTmp_,'(a8,a32)')NameEnergyUnit,'NameEnergyUnit'
+    write(UnitTmp_,'(es22.15,a)')EnergyInjIo,cTab//cTab//'EnergyMin'
+    write(UnitTmp_,'(es22.15,a)')EnergyMaxIo,cTab//cTab//'EnergyMax'
+    write(UnitTmp_,'(i8,a)')nP,cTab//cTab//'nP'
+    write(UnitTmp_,'(a8,a)')NameEnergyUnit,cTab//cTab//'NameEnergyUnit'
     write(UnitTMP_,'(a)')'#END'
     write(UnitTmp_,*)
     call close_file
