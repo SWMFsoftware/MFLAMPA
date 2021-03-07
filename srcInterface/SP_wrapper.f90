@@ -2,7 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_wrapper
-  use CON_coupler,ONLY: SP_
+  use CON_coupler, ONLY: SP_
   use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
   use SP_ModTime, ONLY: DataInputTime
   implicit none
@@ -32,6 +32,7 @@ contains
 
     ! when restarting, line data is available, i.e. ready to couple with mh;
     ! get value at SP root and broadcast to all SWMF processors
+
     character(len=*), parameter:: NameSub = 'SP_do_extract_lines'
     !--------------------------------------------------------------------------
     if(is_proc0(SP_)) DoExtract = .not.DoRestart
@@ -69,6 +70,11 @@ contains
     case('CHECK')
        if(.not.DoCheck)RETURN
        DoCheck = .false.
+       if(iProc==0)then
+          write(*,'(a)')'SP:'
+          write(*,'(a)')'SP:  check parameters'
+          write(*,'(a)')'SP:'
+       end if
        call get_time(tSimulationOut = SPTime, tStartOut = StartTime)
        call time_real_to_julian(StartTime, StartTimeJulian)
        DataInputTime = SPTime
@@ -79,14 +85,19 @@ contains
        if(is_proc(SP_))then
           UnitX = Io2Si_V(UnitX_)
           EnergyCoeff = Si2Io_V(UnitEnergy_)
+          if(iProc==0)then
+          write(*,'(a)')'SP:'
+          write(*,'(a)')'SP:  set grid'
+          write(*,'(a)')'SP:'
+       end if
        end if
        call BL_set_grid(TypeCoordSystem, UnitX, EnergyCoeff)
     case default
        call CON_stop('Cannot call SP_set_param for '//trim(TypeAction))
     end select
   end subroutine SP_set_param
-  ! Above two routines are be called from superstructure  on all PEs
   !============================================================================
+  ! Above two routines are be called from superstructure  on all PEs
   ! The following routines are called  on  PEs of the SP model only
   subroutine SP_init_session(iSession,TimeSimulation)
     use SP_ModMain,         ONLY: initialize, DoRestart, DoReadMhData
@@ -95,6 +106,7 @@ contains
     use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
     use SP_ModSize,         ONLY: nVertexMax
     use CON_bline,          ONLY: BL_init, BL_get_origin_points
+    use SP_ModProc,         ONLY: iProc
     integer,  intent(in) :: iSession         ! session number (starting from 1)
     real,     intent(in) :: TimeSimulation   ! seconds from start time
 
@@ -103,8 +115,13 @@ contains
     !--------------------------------------------------------------------------
     if(IsInitialized)RETURN
     IsInitialized = .true.
-    
+
     call init_grid
+    if(iProc==0)then
+       write(*,'(a)')'BL:'
+       write(*,'(a,i2)')'BL: init   session=', iSession
+       write(*,'(a)')'BL:'
+    end if
 
     nullify(MHData_VIB) ;  nullify(State_VIB)
     nullify(nVertex_B);  nullify(FootPoint_VB)
@@ -133,6 +150,7 @@ contains
     use SP_ModMain, ONLY: finalize
     real,intent(in)::TimeSimulation
     ! if data are read from files, no special finalization is needed
+
     !--------------------------------------------------------------------------
     if(.not.DoReadMhData)call run(TimeSimulation)
     call finalize
@@ -143,6 +161,7 @@ contains
     real, intent(in) :: TimeSimulation
 
     ! if data are read from files, no need for additional run
+
     !--------------------------------------------------------------------------
     if(.not.DoReadMhData)call run(TimeSimulation)
     call save_restart
@@ -179,12 +198,12 @@ contains
     call BL_adjust_lines(DoInit, Source_)
     if(Source_ == Lower_)then
        do iLine = 1, nLine
-          !Offset the distribution function array, if needed
+          ! Offset the distribution function array, if needed
           call offset(iLine, iOffset=iOffset_B(iLine))
        end do
     end if
     ! Called after the grid points are received from the
-    ! component, nullify offset. 
+    ! component, nullify offset.
     if(Source_ == Upper_)iOffset_B(1:nLine) = 0
   end subroutine SP_adjust_lines
   !============================================================================
