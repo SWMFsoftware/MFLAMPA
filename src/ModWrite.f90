@@ -202,7 +202,7 @@ contains
                   trim(File_I(iFile)%NameVarPlot)//' '//&
                   trim(NameFluxChannel_I(iVar))
              select case(File_I(iFile)%TypeFile)
-             case('tec')
+             case('tec','tcp')
                 File_I(iFile)%NameVarPlot = &
                      trim(File_I(iFile)%NameVarPlot)//'_['//&
                      trim(NameFluxUnit_I(iVar))//']'
@@ -353,7 +353,7 @@ contains
           TypeFile = StringPlot_I(nStringPlot)
           ! check whether set properly
           select case(TypeFile)
-          case('tec')
+          case('tec','tcp')
              File_I(iFile) % NameFileExtension='.dat'
              File_I(iFile) % TypeFile  ='tec'
           case('idl','ascii')
@@ -371,7 +371,7 @@ contains
           File_I(iFile) % NameVarPlot = ''
           File_I(iFile) % NameAuxPlot = ''
           select case(File_I(iFile)%TypeFile)
-          case('tec')
+          case('tec','tcp')
              File_I(iFile) % StringHeaderAux = ''
           case default
              File_I(iFile) % StringHeaderAux = 'Units:'
@@ -399,7 +399,7 @@ contains
              call process_mh
              ! add line index, lon and lat to variable names
              select case(File_I(iFile) % TypeFile)
-             case('tec')
+             case('tec','tcp')
              File_I(iFile) % NameVarPlot = &
                   'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
                   ' Longitude_[deg] Latitude_[deg]'
@@ -438,7 +438,7 @@ contains
              File_I(iFile) % DoPlotFlux = .true.
              ! add longitude and latitude with units to variable names
              select case(File_I(iFile) % TypeFile)
-             case('tec')
+             case('tec','tcp')
                 File_I(iFile) % NameVarPlot = &
                      'Longitude_[deg] Latitude_[deg]'
              case default
@@ -553,7 +553,7 @@ contains
               trim(File_I(iFile)%NameVarPlot)//' '//&
               trim(NameVar_V(iVar))
          select case(File_I(iFile)%TypeFile)
-         case('tec')
+         case('tec','tcp')
             File_I(iFile)%NameVarPlot = &
                  trim(File_I(iFile)%NameVarPlot)//'_['//&
                  trim(NameVarUnit_V(iVar))//']'
