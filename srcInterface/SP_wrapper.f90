@@ -4,7 +4,8 @@
 module SP_wrapper
   use CON_coupler, ONLY: SP_
   use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
-  use SP_ModTime, ONLY: DataInputTime
+  use SP_ModTime, ONLY: DataInputTime, SPTime
+  use SP_ModProc, ONLY: iProc
   implicit none
   save
   private ! except
@@ -86,10 +87,10 @@ contains
           UnitX = Io2Si_V(UnitX_)
           EnergyCoeff = Si2Io_V(UnitEnergy_)
           if(iProc==0)then
-          write(*,'(a)')'SP:'
-          write(*,'(a)')'SP:  set grid'
-          write(*,'(a)')'SP:'
-       end if
+             write(*,'(a)')'SP:'
+             write(*,'(a)')'SP:  set grid'
+             write(*,'(a)')'SP:'
+          end if
        end if
        call BL_set_grid(TypeCoordSystem, UnitX, EnergyCoeff)
     case default
@@ -138,6 +139,9 @@ contains
     real,intent(in)::TimeSimulationLimit
 
     !--------------------------------------------------------------------------
+    if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                   &
+         'Call run from SP_run, DataInputTime=', DataInputTime,         &
+         ' SPTime=', SPTime
     call run(TimeSimulationLimit)
     if(DoReadMhData)then
        TimeSimulation = DataInputTime
@@ -152,7 +156,13 @@ contains
     ! if data are read from files, no special finalization is needed
 
     !--------------------------------------------------------------------------
-    if(.not.DoReadMhData)call run(TimeSimulation)
+    if(.not.DoReadMhData)then
+       if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                    &
+            'Call run from SP_finalize, DataInputTime=', DataInputTime,     &
+            ' SPTime=', SPTime
+       call run(TimeSimulation)
+    end if
+
     call finalize
   end subroutine SP_finalize
   !============================================================================
@@ -163,7 +173,12 @@ contains
     ! if data are read from files, no need for additional run
 
     !--------------------------------------------------------------------------
-    if(.not.DoReadMhData)call run(TimeSimulation)
+    if(.not.DoReadMhData)then
+       if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                    &
+            'Call run from SP_save_restart, DataInputTime=', DataInputTime, &
+            ' SPTime=', SPTime
+       call run(TimeSimulation)
+    end if
     call save_restart
   end subroutine SP_save_restart
   !============================================================================
