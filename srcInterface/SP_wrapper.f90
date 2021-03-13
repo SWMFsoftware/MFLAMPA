@@ -201,16 +201,15 @@ contains
   ! Called from coupler after the updated grid point lo<cation are
   ! received from the other component (SC, IH). Determines whether some
   ! grid points should be added/deleted
-  subroutine SP_adjust_lines(DoInit, Source_)
+  subroutine SP_adjust_lines(Source_)
     use SP_ModDistribution, ONLY: offset
     use CON_bline,          ONLY: &
          iOffset_B, BL_adjust_lines,  Lower_, Upper_, nLine
-    logical, intent(in) :: DoInit
     integer, intent(in) :: Source_
     integer:: iLine  ! loop variable
     character(len=*), parameter:: NameSub = 'SP_adjust_lines'
     !--------------------------------------------------------------------------
-    call BL_adjust_lines(DoInit, Source_)
+    call BL_adjust_lines(Source_)
     if(Source_ == Lower_)then
        do iLine = 1, nLine
           ! Offset the distribution function array, if needed
@@ -218,7 +217,7 @@ contains
        end do
     end if
     ! Called after the grid points are received from the
-    ! component, nullify offset.
+    ! component, nullify offset
     if(Source_ == Upper_)iOffset_B(1:nLine) = 0
   end subroutine SP_adjust_lines
   !============================================================================
