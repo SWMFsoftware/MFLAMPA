@@ -212,6 +212,9 @@ contains
 
     !--------------------------------------------------------------------------
     if(IsFirstCall)then
+       ! recompute the derived components of state vector, e.g.
+       ! magnitude of magnetic field and velocity etc. Smooth if needed.
+       if(.not.DoReadMhData)call get_other_state_var
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
        ! compute magnetic fluxes associated with lines if needed
