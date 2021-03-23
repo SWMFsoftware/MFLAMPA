@@ -700,10 +700,12 @@ contains
             ! create date_time-iteration tag
             call get_date_time_string(SPTime, StringTime)
             write(UnitTmp_,'(a,i6.6)') 'e'//StringTime//'_n',iIter
+            write(*,'(a,i6.6)')'Write plot file  e'//StringTime//'_n',iIter
          else
             ! create time-iteration tag
             call get_time_string(SPTime, StringTime(1:8))
             write(UnitTmp_,'(a,i6.6)') 't'//StringTime(1:8)//'_n',iIter
+            write(*,'(a,i6.6)')'Write plot file t'//StringTime(1:8)//'_n',iIter
          end if
          call close_file
       end if
