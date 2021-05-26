@@ -10,7 +10,7 @@ module SP_ModAdvance
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
        iLineAll0,      &
-       Shock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
+       Shock_, NoShock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
        update_spectrum
@@ -271,7 +271,6 @@ contains
           call set_coef_diffusion
 
           STEP:do iStep = 1, nStep
-
              ! update bc for advection
              call set_advection_bc
 
@@ -468,7 +467,7 @@ contains
       ! LOCAL VARIABLES:
       integer:: iVertex     ! loop variable
       real   :: MomentumSI    ! Momentum for the thermal energy k_BTi
-
+      real   :: CoefInjLocal, DistributionBc
       !------------------------------------------------------------------------
       do iVertex = 1, iEnd
          ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
@@ -476,13 +475,24 @@ contains
          !   = CoefInj/8/pi * N / p^3 * (p/p_inj)^5
          ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic
          ! temperature.
-         MomentumSI = kinetic_energy_to_momentum(                  &
+         CoefInjLocal = 1E-10
+         MomentumSI   = kinetic_energy_to_momentum(                     &
               MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
-         Distribution_IIB(0,iVertex,iLine) =                    &
-              CoefInj*1.0/(4*(SpectralIndex-3)*cPi)                &
-              * nSI_I(iVertex)/MomentumSI**3                     &
+
+         DistributionBc = 1.0/(4*(SpectralIndex-3)*cPi)                 &
+              * nSI_I(iVertex)/MomentumSI**3                            &
               * (MomentumSI/MomentumInjSI)**SpectralIndex
+              
+         if (iShock /= NoShock_           .and.                         &
+            iVertex <= iShock + nWidth    .and.                         &
+            iVertex >= iShock - nWidth) then
+               CoefInjLocal = CoefInj
+         endif
+
+         Distribution_IIB(0,iVertex,iLine) = DistributionBc * CoefInjLocal
+                  
       end do
+
     end subroutine set_advection_bc
     !==========================================================================
   end subroutine advance
