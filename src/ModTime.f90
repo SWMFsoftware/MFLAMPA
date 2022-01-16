@@ -2,8 +2,12 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTime
+
   use ModKind,    ONLY: Real8_
+  use ModUtilities, ONLY: CON_stop
+
   implicit none
+
   SAVE
   ! Iteration and time in SP
   integer      :: iIter   = 0
@@ -63,9 +67,10 @@ module SP_ModTime
 
 contains
   !============================================================================
-
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
+    
     character(len=*), intent(in):: NameCommand ! From PARAM.in
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
@@ -87,17 +92,21 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
+
   end subroutine read_param
   !============================================================================
   subroutine init
+
     use ModTimeConvert, ONLY: time_int_to_real
     !--------------------------------------------------------------------------
     call time_int_to_real(iStartTime_I, StartTime)
     ! also save the start time in Julian days;
     call time_int_to_julian(iStartTime_I, StartTimeJulian)
+
   end subroutine init
   !============================================================================
   subroutine time_real_to_julian(Time, TimeJulian)
+
     use ModTimeConvert, ONLY: time_real_to_int
     ! convert real time info into real julian time
     real, intent(in)  :: Time
@@ -107,9 +116,11 @@ contains
     !--------------------------------------------------------------------------
     call time_real_to_int(Time, iTime_I)
     call time_int_to_julian(iTime_I, TimeJulian)
+
   end subroutine time_real_to_julian
   !============================================================================
   subroutine time_int_to_julian(iTime_I, TimeJulian)
+
     ! convert integer time info into real julian time
     integer, intent(in)  :: iTime_I(1:7)
     real,    intent(out) :: TimeJulian
@@ -123,5 +134,5 @@ contains
                (iTime_I(4)+iTime_I(5)/60.+iTime_I(6)/3600.)/24.
   end subroutine time_int_to_julian
   !============================================================================
-
 end module SP_ModTime
+!==============================================================================

@@ -2,16 +2,20 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModGrid
+
   ! Multi-line grid, D.Borovikov & I.Sokolov, Dec,17, 2017.
   ! Dec.23 2017: exclude fluxes from the state vector.
   ! Dec.25 2017: standard init and read_param
   ! Dec.25 2017: rename nVarRead=>nMHData, add NoShock_ param.
+
 #ifdef OPENACC
   use ModUtilities, ONLY: norm2
 #endif
+  use ModUtilities, ONLY: CON_stop
   use SP_ModSize,  ONLY: nVertexMax
   use SP_ModProc,  ONLY: iProc
   use ModNumConst, ONLY: cTwoPi, cPi
+
   implicit none
   SAVE
 
@@ -154,6 +158,7 @@ module SP_ModGrid
 
   ! Test position and momentum
   integer, public :: iPTest =1, iParticleTest = 99, iNodeTest =1
+
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -202,9 +207,11 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
+    
   end subroutine read_param
   !============================================================================
   subroutine init
+
     ! allocate the grid used in this model
     use ModUtilities,      ONLY: check_allocate
     use SP_ModProc,        ONLY: nProc
@@ -239,9 +246,11 @@ contains
     allocate(MagneticFluxAbs_B(nLine), stat=iError)
     call check_allocate(iError, NameSub//'MagneticFluxAbs_B')
     MagneticFluxAbs_B = -1
+
   end subroutine init
   !============================================================================
   subroutine init_stand_alone
+
     ! allocate the grid used in this model
     use ModUtilities,      ONLY: check_allocate
     integer :: iVertex, iError
@@ -268,6 +277,7 @@ contains
   end subroutine init_stand_alone
   !============================================================================
   subroutine iblock_to_lon_lat(iBlockIn, iLonOut, iLatOut)
+
     ! return angular grid's indexes corresponding to this line
     integer, intent(in) :: iBlockIn
     integer, intent(out):: iLonOut
@@ -281,9 +291,11 @@ contains
     iLineAll = iBlockIn + iLineAll0
     iLatOut = 1 + (iLineAll - 1)/nLon
     iLonOut = iLineAll - nLon*(iLatOut - 1)
+
   end subroutine iblock_to_lon_lat
   !============================================================================
   subroutine copy_old_state
+
     ! copy current state to old state for all field lines
     integer:: iEnd, iLine
     !--------------------------------------------------------------------------
@@ -297,9 +309,11 @@ contains
        ! reset variables read from file or received via coupler
        MHData_VIB(1:nMHData, 1:iEnd, iLine) = 0.0
     end do
+    
   end subroutine copy_old_state
   !============================================================================
   subroutine get_other_state_var
+
     integer:: iLine, iVertex, iEnd
     integer:: iAux1, iAux2
     real   :: XyzAux1_D(x_:z_), XyzAux2_D(x_:z_)
@@ -347,9 +361,11 @@ contains
                norm2(MHData_VIB(X_:Z_, iVertex, iLine))
        end do
     end do
+
   end subroutine get_other_state_var
   !============================================================================
   subroutine search_line(iLine, Radius, iParticleOut, IsFound, Weight)
+
     ! performs search along given line
     ! for FIRST location ABOVE given heliocentric radius;
     ! if found, IsFound is set to .true. (.false. otherwise)
@@ -390,6 +406,8 @@ contains
           Weight = 1.0
        end if
     end if
+
   end subroutine search_line
   !============================================================================
 end module SP_ModGrid
+!==============================================================================

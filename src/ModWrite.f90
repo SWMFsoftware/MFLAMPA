@@ -23,8 +23,10 @@ module SP_ModPlot
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cPi,cTwoPi, cDegToRad,cRadToDeg, cTolerance
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
-  use ModUtilities, ONLY: open_file, close_file, remove_file
+  use ModUtilities, ONLY: open_file, close_file, remove_file, CON_stop
+
   implicit none
+
   SAVE
   private ! except
   !
@@ -1646,6 +1648,5 @@ contains
     write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)
   end subroutine make_file_name
   !============================================================================
-
 end module SP_ModPlot
 !==============================================================================

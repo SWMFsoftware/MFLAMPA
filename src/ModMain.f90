@@ -2,9 +2,13 @@
 ! portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModMain
+
   use SP_ModProc,       ONLY: iProc
   use SP_ModReadMhData, ONLY: DoReadMhData
+  use ModUtilities, ONLY: CON_stop
+
   implicit none
+
   SAVE
   private ! except
   
@@ -19,7 +23,7 @@ module SP_ModMain
 
   
   ! Logicals for actions
-  !----------------------------------------------------------------------------
+  !----------------------
   ! run the component
   logical:: DoRun = .true.
   ! restart the run
@@ -32,8 +36,8 @@ module SP_ModMain
        IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax, IsStandAlone
 contains
   !============================================================================
-
   subroutine read_param
+
     use SP_ModAdvance,       ONLY: DoTraceShock, UseDiffusion  
     use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
@@ -60,7 +64,6 @@ contains
     character (len=100) :: NameCommand
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
-
     ! Read the corresponding section of input file
     do
        if(.not.read_line() ) then
@@ -143,6 +146,7 @@ contains
   contains
     !==========================================================================
     subroutine check_stand_alone
+
       ! certain options are only available for stand alone mode;
       ! check whether the mode is used and stop the code if it's no the case
       !------------------------------------------------------------------------
@@ -154,6 +158,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine initialize
+
     use SP_ModAngularSpread, ONLY: init_spread     => init
     use SP_ModDistribution,  ONLY: init_dist       => init
     use SP_ModPlot,          ONLY: init_plot       => init
@@ -179,9 +184,11 @@ contains
     call init_spread
     if(DoRestart) call read_restart
     if(IsStandAlone) call init_time
+
   end subroutine initialize
   !============================================================================
   subroutine finalize
+
     use SP_ModPlot,       ONLY: finalize_plot       =>finalize
     use SP_ModReadMhData, ONLY: finalize_read       =>finalize
     use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
@@ -191,10 +198,11 @@ contains
     call finalize_plot
     call finalize_read
     call finalize_turbulence
+
   end subroutine finalize
   !============================================================================
-
   subroutine run(TimeLimit)
+
     use SP_ModAdvance,       ONLY: DoTraceShock, advance   
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
@@ -209,7 +217,6 @@ contains
     real:: Dt ! time increment in the current call
 
     ! write the initial background state to the output file
-
     !--------------------------------------------------------------------------
     if(IsFirstCall)then
        ! recompute the derived components of state vector, e.g.
@@ -249,9 +256,11 @@ contains
 
     ! save restart in the stand alone mod
     if(IsStandAlone)call stand_alone_save_restart(Dt)
+
   contains
     !==========================================================================
     subroutine lagr_time_derivative
+      
       integer:: iLine, iVertex
       !------------------------------------------------------------------------
       do iLine = 1, nLine
@@ -264,11 +273,14 @@ contains
          ! location of shock
          call get_shock_location(iLine)
       end do
+
     end subroutine lagr_time_derivative
     !==========================================================================
     subroutine get_shock_location(iLine)
+
       use SP_ModAdvance, ONLY: nWidth
       use SP_ModGrid,    ONLY: R_, NoShock_, Shock_, ShockOld_, iShock_IB
+
       integer, intent(in) :: iLine
       ! find location of a shock wave on a given line (line)
       ! Do not search too close to the Sun
@@ -296,11 +308,13 @@ contains
            State_VIB(DLogRho_,iShockMin:iShockMax,iLine) > DLogRhoThreshold)
       if(iShockCandidate >= iShockMin)&
            iShock_IB(Shock_, iLine) = iShockCandidate
+
     end subroutine get_shock_location
     !==========================================================================
   end subroutine run
   !============================================================================
   subroutine check
+
     use ModUtilities, ONLY: make_dir
     use SP_ModPlot,   ONLY: NamePlotDir
     use SP_ModTiming, ONLY: check_timing => check
@@ -312,6 +326,7 @@ contains
        ! Initialize timing
        call check_timing
     end if
+
   end subroutine check
   !============================================================================
 end module SP_ModMain

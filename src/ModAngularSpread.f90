@@ -9,6 +9,7 @@ module SP_ModAngularSpread
        nLine, MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
   use SP_ModSize, ONLY: nDim
   use SP_ModTIme, ONLY: iIter
+  use ModUtilities, ONLY: CON_stop
 
   implicit none
   SAVE

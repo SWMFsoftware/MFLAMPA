@@ -2,11 +2,14 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModDistribution
+
   ! The module contains the velocity/momentum distribution function
   ! and methods for initializing it as well as the offset routine.
+
 #ifdef OPENACC
   use ModUtilities, ONLY: norm2
 #endif
+  use ModUtilities, ONLY: CON_stop
   use ModNumConst, ONLY: cTiny
   use ModConst,    ONLY: cLightSpeed, energy_in
   use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum
@@ -14,9 +17,12 @@ module SP_ModDistribution
        IO2SI_V, SI2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid,  ONLY: nLine, nVertex_B
+
   implicit none
+
   SAVE
-  PRIVATE
+
+  private ! except
 
   ! Public members:
   public:: init              ! Initialize Distribution_IIB
@@ -83,6 +89,7 @@ module SP_ModDistribution
 contains
   !============================================================================
   subroutine init
+
     use SP_ModUnit,   ONLY: momentum_to_kinetic_energy
     use ModUtilities, ONLY: check_allocate
     ! set the initial distribution on all lines
@@ -166,6 +173,7 @@ contains
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in):: NameCommand ! From PARAM.in
@@ -218,9 +226,11 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
+    
   end subroutine read_param
   !============================================================================
   subroutine offset(iLine, iOffset)
+
     use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_, ShockOld_, &
          iShock_IB,  State_VIB, MHData_VIB, X_, Z_, FootPoint_VB
     ! shift in the data arrays is required if the grid point(s) is
@@ -276,6 +286,7 @@ contains
   end subroutine offset
   !============================================================================
   subroutine get_integral_flux
+
     use ModConst, ONLY: energy_in
     ! compute the total (simulated) integral flux of particles as well as
     ! particle flux in the 6 GOES channels; also compute total energy flux
@@ -365,3 +376,4 @@ contains
   end subroutine get_integral_flux
   !============================================================================
 end module SP_ModDistribution
+!==============================================================================

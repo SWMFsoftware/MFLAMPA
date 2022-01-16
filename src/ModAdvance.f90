@@ -1,8 +1,11 @@
 !  Copyright (C) 2002 Regents of the University of Michigan,
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
+
 module SP_ModAdvance
+
   ! The module contains methods for advancing the solution in time
+
   use ModNumConst, ONLY: cPi
   use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
   use SP_ModSize, ONLY: nVertexMax
@@ -16,10 +19,14 @@ module SP_ModAdvance
        update_spectrum
   use SP_ModUnit, ONLY: UnitX_, UnitRho_, UnitEnergy_,                        &
        NameParticle, Io2Si_V, kinetic_energy_to_momentum
-
+  use ModUtilities, ONLY: CON_stop
+  
   implicit none
+
   SAVE
+
   PRIVATE ! except
+
   ! Public members:
   public:: read_param  ! read injection parameters
   public:: advance     ! Advance solution Distribution_IIB

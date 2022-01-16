@@ -2,22 +2,30 @@
 !  portions used with permission 
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModDiffusion
-  !Solve the diffusion term in the Parker equation
-  !Revision history:
-  !Prototype:Sp/FLAMPA/src/SP_ModDiffusion.f90 
-  !Adapted for the use in MFLAMPA (Dist_I is an input paramater, 
-  !fixed contributions to M_I in the end points)-D.Borovikov, 2017
-  !Updated (identation, comments):  I.Sokolov, Dec.17, 2017
+
+  ! Solve the diffusion term in the Parker equation
+  ! Revision history:
+  ! Prototype:Sp/FLAMPA/src/SP_ModDiffusion.f90 
+  ! Adapted for the use in MFLAMPA (Dist_I is an input paramater, 
+  ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
+  ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
+
+  use ModUtilities, ONLY: CON_stop
+
   implicit none
+
   PRIVATE
   public:: advance_diffusion
+
 contains
   !=========================================================================
-  ! This routine solves the diffusion equation:
-  !         f_t-D_outer(D_inner*f_x)_x=0,
-  ! with zero Neumann boundary condition. The solution is advanced in time
-  ! using fully implicit scheme.
   subroutine advance_diffusion(Dt,n,Dist_I,F_I,DOuter_I,DInner_I)
+
+    ! This routine solves the diffusion equation:
+    !         f_t-D_outer(D_inner*f_x)_x=0,
+    ! with zero Neumann boundary condition. The solution is advanced in time
+    ! using fully implicit scheme.
+
     use ModNumConst, ONLY: cTiny
 
     real,   intent(in   ):: Dt     !Time step                       
@@ -101,16 +109,18 @@ contains
     !/
     R_I = F_I
     call tridiag(n,Lower_I,Main_I,Upper_I,R_I,F_I)
-  end subroutine advance_diffusion
-  !================================================================
-  ! This routine solves three-diagonal system of equations: 
-  !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
-  !  ||l_2 m_2 u_2...        || ||w_2|| ||r_2||
-  !  || 0  l_3 m_3 u_3       ||.||w_3||=||r_3||
-  !  ||...                   || ||...|| ||...||
-  !  ||.............0 l_n m_n|| ||w_n|| ||r_n||
-  ! From: Numerical Recipes, Chapter 2.6, p.40.                               
+
+  end subroutine advance_diffusion 
+  !===========================================================================
   subroutine tridiag(n, L_I, M_I, U_I, R_I, W_I)
+    
+    ! This routine solves three-diagonal system of equations: 
+    !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
+    !  ||l_2 m_2 u_2...        || ||w_2|| ||r_2||
+    !  || 0  l_3 m_3 u_3       ||.||w_3||=||r_3||
+    !  ||...                   || ||...|| ||...||
+    !  ||.............0 l_n m_n|| ||w_n|| ||r_n||
+    ! From: Numerical Recipes, Chapter 2.6, p.40. 
     !\
     ! input parameters
     !/
@@ -145,4 +155,6 @@ contains
        W_I(j) = W_I(j)-Aux_I(j+1)*W_I(j+1)
     end do
   end subroutine tridiag
+  !===========================================================================
 end module SP_ModDiffusion
+!=============================================================================

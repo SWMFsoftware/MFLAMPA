@@ -10,7 +10,10 @@ module SP_ModUnit
        gen_kin_energy_to_momentum=>kinetic_energy_to_momentum, &
        gen_momentum_to_kin_energy=>momentum_to_kinetic_energy, &
        gen_momentum_to_energy    =>momentum_to_energy
+  use ModUtilities, ONLY: CON_stop
+
   implicit none
+
   SAVE
   private ! Except
 

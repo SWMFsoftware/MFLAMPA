@@ -2,13 +2,17 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_wrapper
-  use CON_coupler, ONLY: SP_
+
+  use CON_coupler, ONLY: SP_, CON_stop
   use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
   use SP_ModTime, ONLY: DataInputTime, SPTime
   use SP_ModProc, ONLY: iProc
+
   implicit none
-  save
+
+  SAVE
   private ! except
+
   public:: SP_set_param
   public:: SP_init_session
   public:: SP_run
@@ -21,6 +25,7 @@ module SP_wrapper
   public:: SP_adjust_lines
 
   logical :: DoCheck = .true.
+
 contains
   !============================================================================
   subroutine SP_do_extract_lines(DoExtract)
@@ -40,8 +45,10 @@ contains
     call MPI_Bcast(DoExtract, 1, MPI_LOGICAL, i_proc0(SP_), i_comm(), iError)
   end subroutine SP_do_extract_lines
   !============================================================================
-  ! Interface routine to be called from super-structure on all PEs
   subroutine SP_set_param(CompInfo,TypeAction)
+
+    ! Interface routine to be called from super-structure on all PEs
+
     use CON_comp_info
     use SP_ModTime,  ONLY: StartTimeJulian, StartTime, SPTime,&
          time_real_to_julian
@@ -98,9 +105,11 @@ contains
     end select
   end subroutine SP_set_param
   !============================================================================
-  ! Above two routines are be called from superstructure  on all PEs
-  ! The following routines are called  on  PEs of the SP model only
   subroutine SP_init_session(iSession,TimeSimulation)
+
+    ! Above two routines are be called from superstructure  on all PEs
+    ! The following routines are called  on  PEs of the SP model only
+
     use SP_ModMain,         ONLY: initialize, DoRestart, DoReadMhData
     use SP_ModGrid,         ONLY: init_grid=>init, nVar, nLon, nLat, &
          State_VIB, MHData_VIB, nVertex_B, FootPoint_VB
@@ -198,10 +207,12 @@ contains
     end if
   end subroutine SP_put_coupling_param
   !============================================================================
-  ! Called from coupler after the updated grid point lo<cation are
-  ! received from the other component (SC, IH). Determines whether some
-  ! grid points should be added/deleted
   subroutine SP_adjust_lines(Source_)
+
+    ! Called from coupler after the updated grid point lo<cation are
+    ! received from the other component (SC, IH). Determines whether some
+    ! grid points should be added/deleted
+
     use SP_ModDistribution, ONLY: offset
     use CON_bline,          ONLY: &
          iOffset_B, BL_adjust_lines,  Lower_, Upper_, nLine
@@ -222,3 +233,4 @@ contains
   end subroutine SP_adjust_lines
   !============================================================================
 end module SP_wrapper
+!==============================================================================

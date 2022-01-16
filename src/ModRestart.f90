@@ -2,6 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModRestart
+
   ! This module contains methods for writing output files
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModGrid,   ONLY: iblock_to_lon_lat, LagrID_, Z_,&
@@ -12,22 +13,25 @@ module SP_ModRestart
   use SP_ModTime,   ONLY: SPTime, iIter
   use SP_ModUnit,   ONLY: NameEnergyUnit
   use ModPlotFile,  ONLY: save_plot_file, read_plot_file
-  use ModUtilities, ONLY: open_file, close_file
+  use ModUtilities, ONLY: open_file, close_file, CON_stop
   use ModIoUnit,    ONLY: UnitTmp_
+
   implicit none
+
   SAVE
+
   private ! except
+
   ! Public members
   public:: save_restart, read_restart, stand_alone_save_restart, read_param
   public:: NameRestartInDir, NameRestartOutDir
 
-  !----------------------------------------------------------------
   ! the restart directory
   character (len=100) :: NameRestartOutDir="SP/restartOUT/"
   character (len=100) :: NameRestartInDir ="SP/restartIN/"
   ! name of the header file
   character (len=100) :: NameHeaderFile   ="restart.H"
-  !----------------------------------------------------------------
+
   ! Whether and when to save the restart file (STAND ALONE ONLY)
   logical:: DoSaveRestart=.false.
   integer:: DnSaveRestart=-1,  nIterSinceRestart = 0
@@ -45,9 +49,11 @@ contains
     call read_var("DtSaveRestart",DtSaveRestart)
     if(DtSaveRestart < 0. .and. DnSaveRestart < 0)&
          call CON_stop(NameSub//': incorrectly set ')
+
   end subroutine read_param
   !============================================================================
   subroutine stand_alone_save_restart(Dt)
+
     real, intent(in) :: Dt
     !--------------------------------------------------------------------------
     if(.not.DoSaveRestart) RETURN
@@ -63,9 +69,11 @@ contains
        end if
        nIterSinceRestart = 0
     end if
+
   end subroutine stand_alone_save_restart
   !============================================================================
   subroutine save_restart
+
     use ModIoUnit,     ONLY: UnitTmp_
     use ModUtilities,  ONLY: open_file, close_file
     ! write the restart data
@@ -98,9 +106,11 @@ contains
             Distribution_IIB(:,1:nVertex_B(iLine), iLine)
        call close_file
     end do
+
   end subroutine save_restart
   !============================================================================
   subroutine read_restart
+
     ! read the restart data
 
     ! name of the input file
@@ -138,9 +148,11 @@ contains
             Distribution_IIB(:,1:nVertex_B(iLine), iLine)
        call close_file
     end do
+
   end subroutine read_restart
   !============================================================================
   subroutine write_restart_header
+
     use SP_ModPlot,         ONLY: nTag
     use SP_ModProc,         ONLY: iProc
     use ModUtilities,       ONLY: cTab
@@ -180,6 +192,8 @@ contains
     write(UnitTMP_,'(a)')'#END'
     write(UnitTmp_,*)
     call close_file
+
   end subroutine write_restart_header
   !============================================================================
 end module SP_ModRestart
+!==============================================================================

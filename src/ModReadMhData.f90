@@ -2,7 +2,9 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModReadMhData
+
   ! This module contains methods for reading input MH data
+
   use SP_ModSize,    ONLY: nDim, nVertexMax
   use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,&
        nMHData,  nLine, Z_,&
@@ -10,11 +12,15 @@ module SP_ModReadMhData
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
   use ModPlotFile,   ONLY: read_plot_file
-  use ModUtilities,  ONLY: fix_dir_name, open_file, close_file
+  use ModUtilities,  ONLY: fix_dir_name, open_file, close_file, CON_stop
   use ModIoUnit,     ONLY: io_unit_new
+
   implicit none
+
   SAVE
+
   private ! except
+
   ! Public members
   public:: init         ! Initialize module variables
   public:: read_param   ! Read module variables
@@ -36,6 +42,7 @@ module SP_ModReadMhData
 contains
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     ! set parameters of input files with background data
     integer :: nFileRead
@@ -71,9 +78,11 @@ contains
        ! name of the file with the list of tags
        call read_var('NameTagFile', NameTagFile)
     end select
+
   end subroutine read_param
   !============================================================================
   subroutine init
+  
     use SP_ModPLot, ONLY: nTag
     ! initialize by setting the time and interation index of input files
     integer:: iTag
@@ -95,16 +104,21 @@ contains
     call read_mh_data(DoOffsetIn = .false.)
     call get_other_state_var
     SPTime = DataInputTime
+
   end subroutine init
   !============================================================================
   subroutine finalize
+    
     ! close currentl opend files
     !--------------------------------------------------------------------------
     if(DoReadMhData) call close_file(iUnitIn=iIOTag)
+
   end subroutine finalize
   !============================================================================
   subroutine read_mh_data(DoOffsetIn)
+
     use SP_ModPlot,    ONLY: NameMHData
+
     logical, optional, intent(in ):: DoOffsetIn
     ! read 1D MH data, which are produced by write_mh_1d n ModWrite
     ! separate file is read for each field line, name format is
@@ -184,6 +198,7 @@ contains
        ! apply offset
        call offset(iLine, iOffset)
     end do line
+
   end subroutine read_mh_data
   !============================================================================
 end module SP_ModReadMhData
