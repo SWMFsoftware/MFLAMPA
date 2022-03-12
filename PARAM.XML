@@ -236,17 +236,21 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 
 </command>
 <command name="MOMENTUMGRID" if="$_IsFirstSession">
-  <parameter name ="EnergyMin" type="real" />
-  <parameter name ="EnergyMax" type="real" />
-  <parameter name ="nP" type="integer" />
+  <parameter name="EnergyMin" type="real" />
+  <parameter name="EnergyMax" type="real" />
+  <parameter name="nP" type="integer" />
+  <parameter name="NameEnergyUnit" type="string"/>
 
 #MOMENTUMGRID
 1.0                   EnergyMin
 1000.0                EnergyMax
 100                   nP
+kev                   NameEnergyUnit
        
-Read energy range and a number of energy bins
+Read energy range, the number of energy bins and the energy unit.
+Usually read from the restart.H file. 
 </command>
+
 </commandgroup>
 
 <commandgroup name="ADVANCE">
