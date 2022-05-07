@@ -18,6 +18,7 @@ contains
   subroutine read_param
     ! Read input parameters for SP component
     use ModReadParam, ONLY: read_var
+    use CON_axes,     ONLY: dLongitudeHgrDeg
 
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
@@ -26,6 +27,11 @@ contains
     call read_var('LatMin' , LatMin )
     call read_var('LonMax' , LonMax )
     call read_var('LatMax' , LatMax )
+
+    ! Correct for Rotation
+    LonMax = LonMax - dLongitudeHgrDeg
+    LonMin = LonMin - dLongitudeHgrDeg
+
     !
     ! convert angels from degrees to radians
 
