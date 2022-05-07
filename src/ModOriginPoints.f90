@@ -28,15 +28,15 @@ contains
     call read_var('LonMax' , LonMax )
     call read_var('LatMax' , LatMax )
 
-    ! Correct for Rotation
-    LonMax = LonMax - dLongitudeHgrDeg
-    LonMin = LonMin - dLongitudeHgrDeg
-
     !
     ! convert angels from degrees to radians
 
     LonMax = LonMax*cDegToRad
     LonMin = LonMin*cDegToRad
+
+    ! Correct for Rotation
+    LonMax = LonMax - dLongitudeHgrDeg
+    LonMin = LonMin - dLongitudeHgrDeg
 
     ! convert angels from degrees to radians
 
