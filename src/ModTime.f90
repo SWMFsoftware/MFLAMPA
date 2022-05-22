@@ -2,7 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTime
-
+  use ModTimeConvert, ONLY: time_int_to_julian, time_real_to_julian
   use ModKind,    ONLY: Real8_
   use ModUtilities, ONLY: CON_stop
 
@@ -96,7 +96,6 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine init
-
     use ModTimeConvert, ONLY: time_int_to_real
     !--------------------------------------------------------------------------
     call time_int_to_real(iStartTime_I, StartTime)
@@ -104,35 +103,5 @@ contains
     call time_int_to_julian(iStartTime_I, StartTimeJulian)
 
   end subroutine init
-  !============================================================================
-  subroutine time_real_to_julian(Time, TimeJulian)
-
-    use ModTimeConvert, ONLY: time_real_to_int
-    ! convert real time info into real julian time
-    real, intent(in)  :: Time
-    real, intent(out) :: TimeJulian
-
-    integer:: iTime_I(7)
-    !--------------------------------------------------------------------------
-    call time_real_to_int(Time, iTime_I)
-    call time_int_to_julian(iTime_I, TimeJulian)
-
-  end subroutine time_real_to_julian
-  !============================================================================
-  subroutine time_int_to_julian(iTime_I, TimeJulian)
-
-    ! convert integer time info into real julian time
-    integer, intent(in)  :: iTime_I(1:7)
-    real,    intent(out) :: TimeJulian
-
-    ! formula is valid for date after March, 1900 to yar 2099
-    !--------------------------------------------------------------------------
-    TimeJulian = 367*iTime_I(1) - &
-               floor(7*(iTime_I(1)+floor((iTime_I(2)+9)/12.))/4.)+&
-               floor(275 * iTime_I(2) / 9.) + &
-               iTime_I(3) + 1721013.5 +&
-               (iTime_I(4)+iTime_I(5)/60.+iTime_I(6)/3600.)/24.
-  end subroutine time_int_to_julian
-  !============================================================================
 end module SP_ModTime
 !==============================================================================
