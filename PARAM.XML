@@ -299,7 +299,7 @@ The default values are shown. ??? Sure ???
 #DORUN
 T	DoRun
 
-Please send an email to Igor Sokolov for more information.
+If DoRun is False, only magnetic field lines are extracted, but the particle distribution function is not solved.
 
 The default values are shown.
 </command>
