@@ -100,9 +100,9 @@ contains
     !\
     ! For i=n:
     !/
-    Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
-         DsMesh_I(n)**2
-    ! free escaping at outerboundary
+    !Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
+    !     DsMesh_I(n)**2
+    !set free escaping at outerboundary for now
     Aux2=0. 
     Main_I( n) = Main_I(n) + Aux2
     Lower_I(n) = -Aux2
