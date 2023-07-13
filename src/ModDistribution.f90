@@ -288,6 +288,7 @@ contains
   subroutine get_integral_flux
 
     use ModConst, ONLY: energy_in
+    use SP_ModGrid,  ONLY: Used_B
     ! compute the total (simulated) integral flux of particles as well as
     ! particle flux in the 6 GOES channels; also compute total energy flux
 
@@ -305,6 +306,7 @@ contains
     EChannelSI_I = EChannelIO_I * energy_in('MeV')
 
     do iLine = 1, nLine
+       if(.not.Used_B(iLine))CYCLE
        do iVertex = 1, nVertex_B( iLine)
           ! Integration loop with midpoint rule
           ! reset values

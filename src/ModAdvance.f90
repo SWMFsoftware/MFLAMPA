@@ -12,7 +12,7 @@ module SP_ModAdvance
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
-       iLineAll0,      &
+       iLineAll0, Used_B,     &
        Shock_, NoShock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
        set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
@@ -165,6 +165,7 @@ contains
     ! go line by line and advance the solution
 
     line:do iLine = 1, nLine
+       if(.not.Used_B(iLine))CYCLE line
        ! the active particles on the line
        iEnd   = nVertex_B( iLine)
 
@@ -285,9 +286,9 @@ contains
              do iVertex = 2, iEnd
                 if(any(Distribution_IIB(0:nP+1,iVertex,iLine) <0.0 )) then
                    write(*,*) NameSub, ': Distribution_IIB < 0'
-                   write(*,*) ' Distribution_IIB ='
-                   write(*,*) Distribution_IIB(0:nP+1,iVertex,iLine)
-                   call CON_stop(NameSub)
+                   Used_B(iLine) = .false.
+                   nVertex_B(iLine) = 0
+                   CYCLE line
                 end if
 
                 call advance_log_advection(&

@@ -80,6 +80,10 @@ module SP_ModGrid
   !
   real, public, allocatable:: MagneticFluxAbs_B(:)
   !
+  ! Logical to mark unusable lines
+  !
+  logical, public, pointer :: Used_B(:)
+  !
   ! MHD state vector;
   ! 1st index - identification of variable (LagrID_:Wave2_)
   ! 2nd index - particle index along the field line
@@ -273,6 +277,7 @@ contains
     nVertex_B = 0
     allocate(FootPoint_VB(LagrID_:Length_, nLine))
     FootPoint_VB = -1
+    allocate(Used_B(nLine)); Used_B = .true.
 
   end subroutine init_stand_alone
   !============================================================================
@@ -300,6 +305,7 @@ contains
     integer:: iEnd, iLine
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
+       if(.not.Used_B(iLine))CYCLE
        iEnd   = nVertex_B(  iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = &
@@ -319,6 +325,7 @@ contains
     real   :: XyzAux1_D(x_:z_), XyzAux2_D(x_:z_)
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
+       if(.not.Used_B(iLine))CYCLE
        iEnd   = nVertex_B(  iLine)
        do iVertex = 1, iEnd
           ! plasma speed

@@ -6,7 +6,7 @@ module SP_ModRestart
   ! This module contains methods for writing output files
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModGrid,   ONLY: iblock_to_lon_lat, LagrID_, Z_,&
-       nLine, MhData_VIB, iShock_IB,  &
+       nLine, MhData_VIB, iShock_IB,  Used_B,&
        FootPoint_VB, nVertex_B, nShockParam, &
        nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
@@ -90,6 +90,7 @@ contains
     call write_restart_header
 
     do iLine = 1, nLine
+       if(.not.Used_B(iLine))CYCLE
        call iblock_to_lon_lat(iLine, iLon, iLat)
 
        ! set the file name
@@ -130,6 +131,13 @@ contains
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameRestartInDir)//'data_',iLon,'_',iLat,&
             '.rst'
+       inquire(file=NameFile,exist=Used_B(iLine))
+       if(.not.Used_B(iLine))then
+          write(*,'(a)')NameSub//': the restart file '//NameFile//' lacks'
+          write(*,'(a)')NameSub//': line is marked as unused'
+          nVertex_B(iLine) = 0
+          CYCLE
+       end if
        call open_file(file=NameFile,  status='old',&
             form='UNFORMATTED', NameCaller=NameSub)
        read(UnitTmp_,iostat = iError)Aux, Aux_I

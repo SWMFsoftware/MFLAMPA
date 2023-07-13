@@ -7,7 +7,7 @@ module SP_ModReadMhData
 
   use SP_ModSize,    ONLY: nDim, nVertexMax
   use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,&
-       nMHData,  nLine, Z_,&
+       nMHData,  nLine, Z_, Used_B,  &
        FootPoint_VB, nVertex_B, MHData_VIB,  LagrID_
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
@@ -160,11 +160,22 @@ contains
     DataInputTimeOld = DataInputTime
     ! read the data
     line:do iLine = 1, nLine
+       if(.not.Used_B(iLine))then
+          nVertex_B(iLine) = 0
+          CYCLE line
+       end if
        call iblock_to_lon_lat(iLine, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameInputDir)//NameMHData//'_',iLon,&
             '_',iLat, '_'//trim(StringTag)//NameFileExtension
+       inquire(file=NameFile,exist=Used_B(iLine))
+       if(.not.Used_B(iLine))then
+          write(*,'(a)')NameSub//': the file '//NameFile//' is not found!'
+          write(*,'(a)')NameSub//': the line marked as unused'
+          nVertex_B(iLine) = 0
+          CYCLE line
+       end if
        ! read the header first
        call read_plot_file(NameFile          ,&
             TypeFileIn = TypeMhDataFile      ,&

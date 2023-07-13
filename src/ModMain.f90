@@ -260,10 +260,13 @@ contains
   contains
     !==========================================================================
     subroutine lagr_time_derivative
+
+      use SP_ModGrid, ONLY: Used_B 
       
       integer:: iLine, iVertex
       !------------------------------------------------------------------------
       do iLine = 1, nLine
+         if(.not.Used_B(iLine))CYCLE
          do iVertex = 1, nVertex_B(  iLine)
             ! divergence of plasma velocity
             State_VIB(DLogRho_,iVertex,iLine) = log(&

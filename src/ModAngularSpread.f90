@@ -6,7 +6,7 @@ module SP_ModAngularSpread
   use ModNumConst, ONLY: cPi, cTwoPi, cTolerance, cSqrtTwo, cDegToRad
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use SP_ModGrid, ONLY: search_line, iblock_to_lon_lat, nLon, nLat, &
-       nLine, MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_
+       nLine, MHData_VIB, MagneticFluxAbs_B, X_, Z_, Bx_, Bz_, Used_B
   use SP_ModSize, ONLY: nDim
   use SP_ModTIme, ONLY: iIter
   use ModUtilities, ONLY: CON_stop
@@ -199,6 +199,7 @@ contains
 
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
+       if(.not.Used_B(iLine))CYCLE
        call search_line(iLine, RadiusRef, iRef, IsFoundRef, Weight)
        if(IsFoundRef .and. iRef > 1)then
           Xyz_D = &

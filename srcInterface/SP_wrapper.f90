@@ -112,7 +112,7 @@ contains
 
     use SP_ModMain,         ONLY: initialize, DoRestart, DoReadMhData
     use SP_ModGrid,         ONLY: init_grid=>init, nVar, nLon, nLat, &
-         State_VIB, MHData_VIB, nVertex_B, FootPoint_VB
+         State_VIB, MHData_VIB, nVertex_B, FootPoint_VB, Used_B
     use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
     use SP_ModSize,         ONLY: nVertexMax
     use CON_bline,          ONLY: BL_init, BL_get_origin_points
@@ -136,7 +136,7 @@ contains
     nullify(MHData_VIB) ;  nullify(State_VIB)
     nullify(nVertex_B);  nullify(FootPoint_VB)
     call BL_init(nVertexMax, nLon, nLat,  &
-         MHData_VIB, nVertex_B, nVar, State_VIB, FootPoint_VB)
+         MHData_VIB, nVertex_B, nVar, State_VIB, FootPoint_VB, Used_B)
     call initialize
 
     if(.not.(DoRestart.or.DoReadMhData))&
@@ -214,6 +214,7 @@ contains
     ! grid points should be added/deleted
 
     use SP_ModDistribution, ONLY: offset
+    use SP_ModGrid,         ONLY: Used_B
     use CON_bline,          ONLY: &
          iOffset_B, BL_adjust_lines,  Lower_, Upper_, nLine
     integer, intent(in) :: Source_
@@ -223,6 +224,7 @@ contains
     call BL_adjust_lines(Source_)
     if(Source_ == Lower_)then
        do iLine = 1, nLine
+          if(.not.Used_B(iLine))CYCLE
           ! Offset the distribution function array, if needed
           call offset(iLine, iOffset=iOffset_B(iLine))
        end do

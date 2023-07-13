@@ -14,7 +14,7 @@ module SP_ModPlot
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_, &
        X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
-  use SP_ModGrid, ONLY: iblock_to_lon_lat
+  use SP_ModGrid, ONLY: iblock_to_lon_lat, Used_B
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
@@ -720,6 +720,7 @@ contains
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
       do iLine = 1, nLine
+         if(.not.Used_B(iLine))CYCLE
          call make_file_name(&
               StringBase    = NameMHData,                     &
               iLine        = iLine,                         &
@@ -853,6 +854,7 @@ contains
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
       do iLine = 1, nLine
+         if(.not.Used_B(iLine))CYCLE
          iLineAll  = iLineAll0 + iLine
 
          ! find the particle just above the given radius
@@ -1008,6 +1010,7 @@ contains
          File_I(iFile) % IsFirstCall = .false.
          ! go over list of lines and remove file for each one
          do iLine = 1, nLine
+            if(.not.Used_B(iLine))CYCLE
             ! set the file name
             call make_file_name(&
                  StringBase    = NameMHData,                     &
@@ -1026,7 +1029,7 @@ contains
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present
       do iLine = 1, nLine
-
+         if(.not.Used_B(iLine))CYCLE
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
 
@@ -1153,6 +1156,7 @@ contains
          Factor_I= DMomentumOverDEnergy_I
       end select
       do iLine = 1, nLine
+         if(.not.Used_B(iLine))CYCLE
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
             ! set the file name
@@ -1253,6 +1257,7 @@ contains
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
       do iLine = 1, nLine
+         if(.not.Used_B(iLine))CYCLE
          ! reset, all field lines are printed reaching output sphere
          DoPrint = .true.
 
@@ -1427,7 +1432,7 @@ contains
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present and compute contribution to fluxes
       do iLine = 1, nLine
-
+         if(.not.Used_B(iLine))CYCLE
          ! reset, the field line contrubtes unless fail to reach output sphere
          DoPrint = .true.
 
