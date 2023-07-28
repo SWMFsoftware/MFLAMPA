@@ -1,8 +1,10 @@
 !  Copyright (C) 2002 Regents of the University of Michigan,
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-module SP_ModLogAdvection
+module SP_ModAdvection
   !DESCRIPTION:
+  ! Solves advection in the momentum space (=first order Fermi acceleration)
+  ! First way - solve advection over log P coordinate.
   ! In space physics applications one often needs to solve the
   ! "log-advection" equations of the kind of:
   !         f_t+A*f_lnp=0             (NC)
@@ -169,4 +171,4 @@ contains
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================
-end module SP_ModLogAdvection
+end module SP_ModAdvection

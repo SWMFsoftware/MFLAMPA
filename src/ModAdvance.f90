@@ -100,7 +100,7 @@ contains
     ! and (3) new steepen_shock
     use SP_ModTime,         ONLY: SPTime
     use SP_ModDiffusion,    ONLY: advance_diffusion
-    use SP_ModLogAdvection, ONLY: advance_log_advection
+    use SP_ModAdvection,    ONLY: advance_log_advection
     use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
          cElectronCharge
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
