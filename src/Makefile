@@ -10,11 +10,11 @@ include ../Makefile.conf
 # Object files included into the library
 OBJECTS = \
 	ModAdvance.o \
+	ModAdvection.o \
 	ModAngularSpread.o \
 	ModDistribution.o \
 	ModDiffusion.o \
 	ModGrid.o \
-	ModLogAdvection.o \
 	ModMain.o \
 	ModOriginPoints.o \
 	ModProc.o \
