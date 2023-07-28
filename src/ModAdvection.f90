@@ -171,4 +171,19 @@ contains
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================
+  subroutine advect_via_poisson_braacket(CflIn, Time, InvRhoOld, InvRho,&
+       nP, nGCLeft, nGCRight, FInOut_I, DeltaLnP)
+
+    real,   intent(in):: CFLIn
+    real,   intent(in):: Time         ! time interval to advance through
+    real,   intent(in):: InvRhoOld, InvRho ! Old and new density (inverse)
+    integer,intent(in):: nP           ! Number of meshes along lnp-coordinate
+    integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
+    integer,intent(in):: nGCRight     ! advanced in time but used as the BCs
+    real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight)  ! Solution
+    ! sol. index 0 is to set boundary condition at the injection energy
+    real,optional,intent(in)::DeltaLnP   
+    !--------------------------------------------------------------------------
+  end subroutine advect_via_poisson_braacket
+  !============================================================================
 end module SP_ModAdvection
