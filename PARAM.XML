@@ -62,6 +62,16 @@ The #STARTTIME command sets the date and time in Greenwich Mean Time
 There is no default value.
 </command>
 
+<command name="TIMEACCURATE" if="$_IsStandAlone">
+	<parameter name="DoTimeAccurate" type="logical" default="T" />
+
+#TIMEACCURATE
+T			DoTimeAccurate
+
+Allows solving steady-state distribution (cosmic rays, seed population)
+by setting DoTimeAccurate to .false.
+</command>
+
 <command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
 	<parameter name="tSimulation" type="real" min="0" default="0.0" />
 

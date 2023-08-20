@@ -51,7 +51,7 @@ contains
 
     use CON_comp_info
     use SP_ModTime,  ONLY: StartTimeJulian, StartTime, SPTime,&
-         time_real_to_julian
+         time_real_to_julian, IsSteadyState
     use SP_ModMain,  ONLY: check, read_param
     use SP_ModGrid,  ONLY: TypeCoordSystem
     use CON_coupler, ONLY: is_proc
@@ -62,6 +62,7 @@ contains
     type(CompInfoType),intent(inout):: CompInfo
     character(len=*),  intent(in)   :: TypeAction
     real :: UnitX, EnergyCoeff
+    logical :: DoTimeAccurate = .true.
 
     character(len=*), parameter:: NameSub = 'SP_set_param'
     !--------------------------------------------------------------------------
@@ -83,7 +84,11 @@ contains
           write(*,'(a)')'SP:  check parameters'
           write(*,'(a)')'SP:'
        end if
-       call get_time(tSimulationOut = SPTime, tStartOut = StartTime)
+       call get_time(&
+            DoTimeAccurateOut=DoTimeAccurate, &
+            tSimulationOut = SPTime,        &
+            tStartOut = StartTime)
+       IsSteadyState = .not. DoTimeAccurate
        call time_real_to_julian(StartTime, StartTimeJulian)
        DataInputTime = SPTime
        call check

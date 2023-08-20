@@ -14,7 +14,7 @@ module SP_ModTime
   real         :: SPTime  = 0.0
   ! Time of the last data output
   real         :: DataInputTime = 0.0
-
+  logical      :: IsSteadyState = .false.
   ! SPTime is the time in the SP model, DataInputTime is the time
   ! of last data input. These two varables are set/modified in the
   ! following ways
@@ -70,8 +70,9 @@ contains
   subroutine read_param(NameCommand)
 
     use ModReadParam, ONLY: read_var
-    
+
     character(len=*), intent(in):: NameCommand ! From PARAM.in
+    logical :: DoTimeAccurate = .true.
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
@@ -89,6 +90,9 @@ contains
           call read_var('iMinute',iStartTime_I(5))
           call read_var('iSecond',iStartTime_I(6))
           iStartTime_I(7) = 0
+       case("#TIMEACCURATE")
+          call read_var('DoTimeAccurate', DoTimeAccurate)
+          IsSteadyState = .not. DoTimeAccurate
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -103,5 +107,6 @@ contains
     call time_int_to_julian(iStartTime_I, StartTimeJulian)
 
   end subroutine init
+  !============================================================================
 end module SP_ModTime
 !==============================================================================

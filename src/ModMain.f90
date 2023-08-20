@@ -11,7 +11,7 @@ module SP_ModMain
 
   SAVE
   private ! except
-  
+
   ! Indicator of stand alone mode
   logical:: IsStandAlone=.false.
 
@@ -21,7 +21,6 @@ module SP_ModMain
   logical :: UseStopFile = .true.
   logical :: IsLastRead  = .false.
 
-  
   ! Logicals for actions
   !----------------------
   ! run the component
@@ -38,7 +37,7 @@ contains
   !============================================================================
   subroutine read_param
 
-    use SP_ModAdvance,       ONLY: DoTraceShock, UseDiffusion  
+    use SP_ModAdvance,       ONLY: DoTraceShock, UseDiffusion
     use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
     use SP_ModDistribution,  ONLY: read_param_dist       =>read_param
@@ -131,7 +130,7 @@ contains
        case('#NSTEP','#TIMESIMULATION')
           if(i_session_read() /= 1)CYCLE
           call read_param_time(NameCommand)
-       case("#STARTTIME", "#SETREALTIME")
+       case("#STARTTIME", "#SETREALTIME",'#TIMEACCURATE')
           if(i_session_read() /= 1)CYCLE
           call check_stand_alone
           call read_param_time(NameCommand)
@@ -203,7 +202,7 @@ contains
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: DoTraceShock, advance   
+    use SP_ModAdvance,       ONLY: DoTraceShock, advance
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
        Rho_, nLine, nVertex_B,  DLogRho_, RhoOld_, State_VIB, MHData_VIB
@@ -261,8 +260,8 @@ contains
     !==========================================================================
     subroutine lagr_time_derivative
 
-      use SP_ModGrid, ONLY: Used_B 
-      
+      use SP_ModGrid, ONLY: Used_B
+
       integer:: iLine, iVertex
       !------------------------------------------------------------------------
       do iLine = 1, nLine
@@ -333,3 +332,4 @@ contains
   end subroutine check
   !============================================================================
 end module SP_ModMain
+!==============================================================================
