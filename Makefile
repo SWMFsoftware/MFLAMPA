@@ -54,9 +54,9 @@ NOMPI:
 COMPONENT = SP
 
 rundir:
-	mkdir -p ${RUNDIR}/${COMPONENT} ${RUNDIR}/${COMPONENT}/restartIN \
-		${RUNDIR}/${COMPONENT}/restartOUT ${RUNDIR}/${COMPONENT}/IO2
-	cd ${RUNDIR}/${COMPONENT}; \
+	mkdir -p ${RUNDIR}/SP 
+	cd ${RUNDIR}/SP; \
+		mkdir restartIN restartOUT IO2; \
 		ln -s ${SPDIR}/Param .
 	@(if [ "$(STANDALONE)" != "NO" ]; then \
 		touch ${DIR}/share/JobScripts/job._TMP_${MACHINE}; \
@@ -67,7 +67,7 @@ rundir:
 		cp -f Param/PARAM.test ${RUNDIR}/PARAM.in; \
 		touch ${RUNDIR}/core; chmod 444 ${RUNDIR}/core; \
 		cd ${RUNDIR}; ln -s ${BINDIR}/${DEFAULT_EXE} .; \
-		ln -s ${COMPONENT}/* .; \
+		ln -s SP/* .; \
 	fi);
 
 clean:  install
