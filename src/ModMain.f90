@@ -84,8 +84,8 @@ contains
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL','#USEFIXEDMFPUPSTREAM', '#TESTDIFFUSION', &
-            '#SCALETURBULENCE')
+       case('#INJECTION','#CFL','#USEFIXEDMFPUPSTREAM', '#DIFFUSION', &
+            '#TRACESHOCK', '#SCALETURBULENCE')
           call read_param_adv(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
@@ -100,9 +100,8 @@ contains
        case('#DORUN')
           call read_var('DoRun',DoRun)
        case('#TIMING')
-          call  read_param_timing
+          call read_param_timing
        case('#TEST')
-          ! various test modes allowing to disable certain features
           call read_var('DoTraceShock', DoTraceShock)
           call read_var('UseDiffusion', UseDiffusion)
        case('#END')
