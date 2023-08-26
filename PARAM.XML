@@ -298,9 +298,8 @@ Please send an email to Igor Sokolov for more information.
 #RESTART
 T	DoRestart
 
-Please send an email to Igor Sokolov for more information.
 
-The default values are shown. ??? Sure ???
+The default value is true.
 </command>
 
 <command name="DORUN">
@@ -309,21 +308,35 @@ The default values are shown. ??? Sure ???
 #DORUN
 T	DoRun
 
-If DoRun is False, only magnetic field lines are extracted, but the particle distribution function is not solved.
+If DoRun is False, only magnetic field lines are extracted, but the particle
+distribution function is not solved.
 
-The default values are shown.
+The default value is True.
 </command>
 
-<command name="TEST">
+<command name="TRACESHOCK">
   <parameter name="DoTraceShock" type="logical" default="T" />
+
+#TRACESHOCK
+T          DoTraceShock
+
+If DoTraceShock is False, the shock wave is not traced and the density
+profile is not sharpened around it.
+
+The default value is true.
+</command>
+
+<command name="DIFFUSION">
   <parameter name="UseDiffusion" type="logical" default="T" />
 
-#TEST
-T           DoTraceShock
+#DIFFUSION
 T           UseDiffusion
 
-Used for testing, to disable diffusion or tracing the shock.
+Used for testing, to disable diffusion, if UseDiffusion = False.
+
+The default value is True
 </command>
+
 
 </commandgroup>
 

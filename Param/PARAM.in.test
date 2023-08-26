@@ -20,9 +20,8 @@ T
 #DORUN
 T
 
-#TEST
+#TRACESHOCK
 F			DoTraceShock
-T			UseDiffusion
 
 
 #INCLUDE

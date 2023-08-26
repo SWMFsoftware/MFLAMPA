@@ -42,7 +42,7 @@ module SP_ModUnit
 
   ! Unit conversions
   integer, public, parameter:: &
-       UnitX_ = 1, UnitRho_ = 2, UnitEnergy_ = 3, UnitFlux_ = 4, UnitEFlux_ = 5
+       UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3, UnitEFlux_ = 4
   real, public, dimension(UnitX_:UnitEFlux_) :: Io2Si_V, Si2Io_V
 
   ! Unit for all the state variables:
@@ -104,7 +104,6 @@ contains
 
     ! unit conversion
     Io2Si_V(UnitX_)      = Rsun
-    Io2Si_V(UnitRho_)    = cProtonMass
     Io2Si_V(UnitEnergy_) = energy_in(NameEnergyUnit)
     Io2Si_V(UnitFlux_)   = UnitParticleFluxSI
     Io2Si_V(UnitEFlux_)  = IO2SI_V(UnitEnergy_) * IO2SI_V(UnitFlux_)
@@ -136,3 +135,4 @@ contains
   end function momentum_to_kinetic_energy
   !============================================================================
 end module SP_ModUnit
+!==============================================================================
