@@ -33,7 +33,7 @@ module SP_ModAdvance
   !||||||||||||||Boundary condition at the injection energy!!!!!!
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
-  real:: CoefInj = 1.0, SpectralIndex = 5.0
+  real:: CoefInj = 0.25, SpectralIndex = 5.0
 
   !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
   real:: CFL=0.9        ! Controls the maximum allowed time step
@@ -467,15 +467,14 @@ contains
       !------------------------------------------------------------------------
       do iVertex = 1, iEnd
          ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
-         ! f = CoefInj/8/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
-         !   = CoefInj/8/pi * N / p^3 * (p/p_inj)^5
-         ! where p = sqrt(2*m*T) is the momentum and T_p is the kinetic
-         ! temperature.
-         CoefInjLocal = 1E-10
+         ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
+         !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
+         ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
+         CoefInjLocal = 2.50E-11
          MomentumSI   = kinetic_energy_to_momentum(                     &
               MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
-         DistributionBc = 1.0/(4*(SpectralIndex-3)*cPi)                 &
+         DistributionBc = (SpectralIndex-3)/(4*cPi)                     &
               * nSI_I(iVertex)/MomentumSI**3                            &
               * (MomentumSI/MomentumInjSI)**SpectralIndex
 

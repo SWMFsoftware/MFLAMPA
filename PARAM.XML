@@ -266,14 +266,21 @@ Usually read from the restart.H file.
 <commandgroup name="ADVANCE">
 
 <command name="INJECTION">
-	<parameter name="CInj" type="real" default="1.0" />
+	<parameter name="CInj" type="real" default="0.25" />
 	<parameter name="SpectralIndex" type="real" default="5.0" />
 
 #INJECTION
 5.0     SpectralIndex
-1.0     Efficency
+0.25     Efficency
 
-Please send an email to Igor Sokolov for more information.
+Set up parameters of the power-law spectrum of sumrathermal
+particles at \sqrt(2m_pT_i} < p < p_inj:
+
+F ~ Efficiency * (Spectral index - 3) / p**SpectralIndex
+
+The injection efficiency mean the ratio of suprathermal proton
+density to the total proton density. Should not exceed one,
+however, somewhat higher than one values may be of use.
 
 </command>
 
