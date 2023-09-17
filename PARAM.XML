@@ -274,7 +274,7 @@ Usually read from the restart.H file.
 0.25     Efficency
 
 Set up parameters of the power-law spectrum of sumrathermal
-particles at \sqrt(2m_pT_i} < p < p_inj:
+particles at \sqrt(2m_pT_i} lt p lt p_inj:
 
 F ~ Efficiency * (Spectral index - 3) / p**SpectralIndex
 
