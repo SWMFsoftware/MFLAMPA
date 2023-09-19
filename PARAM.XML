@@ -266,22 +266,21 @@ Usually read from the restart.H file.
 <commandgroup name="ADVANCE">
 
 <command name="INJECTION">
-	<parameter name="CInj" type="real" default="0.25" />
 	<parameter name="SpectralIndex" type="real" default="5.0" />
+	<parameter name="CInj" type="real" default="0.25" />
 
 #INJECTION
-5.0     SpectralIndex
-0.25     Efficency
+5.0         SpectralIndex
+0.25        Efficency
 
-Set up parameters of the power-law spectrum of sumrathermal
-particles at \sqrt(2m_pT_i} lt p lt p_inj:
+Set up parameters of the power-law spectrum of suprathermal
+particles at sqrt(2 mp Ti) lt p lt Pinj:
 
 F ~ Efficiency * (Spectral index - 3) / p**SpectralIndex
 
-The injection efficiency mean the ratio of suprathermal proton
+The injection efficiency is the ratio of suprathermal proton
 density to the total proton density. Should not exceed one,
 however, somewhat higher than one values may be of use.
-
 </command>
 
 <command name="CFL">
@@ -291,10 +290,8 @@ however, somewhat higher than one values may be of use.
 1.0     Cfl
 
 Please send an email to Igor Sokolov for more information.
-
 </command>
 	
-
 </commandgroup>
 
 <commandgroup name="ACTION">
@@ -318,7 +315,7 @@ T	DoRun
 If DoRun is False, only magnetic field lines are extracted, but the particle
 distribution function is not solved.
 
-The default value is True.
+The default value is true.
 </command>
 
 <command name="TRACESHOCK">
@@ -339,9 +336,9 @@ The default value is true.
 #DIFFUSION
 T           UseDiffusion
 
-Used for testing, to disable diffusion, if UseDiffusion = False.
+Used for testing, to disable diffusion, if UseDiffusion is false.
 
-The default value is True
+The default value is true.
 </command>
 
 
@@ -409,6 +406,7 @@ in cinjunction with the MHD code, these parameters are usually saved into
 the header file, which is then included into the MFLAMPA parameter file
 
 </command>
+
 <command name="NTAG">
   <parameter name="nTag" type="integer" default="0" />
 
