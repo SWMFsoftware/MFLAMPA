@@ -43,6 +43,8 @@ module SP_ModAdvance
   real    :: MeanFreePath0InAu = 1.0
   logical, public:: DoTraceShock = .true., UseDiffusion = .true.
 
+  logical :: UsePoissonBracket = .false.
+
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
   real:: ScaleTurbulenceSI = 0.03 * cAu
@@ -86,6 +88,8 @@ contains
        call read_var('UseDiffusion', UseDiffusion)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)
+    case('#POISSONBRACKET')
+       call read_var('UsePoissonBracket',UsePoissonBracket)
     end select
   end subroutine read_param
   !============================================================================
@@ -100,7 +104,8 @@ contains
     ! and (3) new steepen_shock
     use SP_ModTime,         ONLY: SPTime
     use SP_ModDiffusion,    ONLY: advance_diffusion
-    use SP_ModAdvection,    ONLY: advance_log_advection
+    use SP_ModAdvection,    ONLY: advance_log_advection,&
+         advect_via_poisson_braacket
     use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
          cElectronCharge
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
@@ -285,11 +290,18 @@ contains
                    nVertex_B(iLine) = 0
                    CYCLE line
                 end if
-
-                call advance_log_advection(&
-                     FermiFirst_I(iVertex), nP, 1, 1,        &
-                     Distribution_IIB(0:nP+1,iVertex,iLine),&
-                     .false.)
+                if(UsePoissonBracket)then
+                   !  call advect_via_poisson_braacket(Cfl, Time, InvRhoOld,&
+                   !      InvRho,nP, 1, 1, &
+                   !      Distribution_IIB(0:nP+1,iVertex,iLine), DeltaLnP)
+                   ! Should be specified:
+                   ! Time, InvRhoOld, InvRho, may be DeltaLnP
+                else
+                   call advance_log_advection(&
+                        FermiFirst_I(iVertex), nP, 1, 1,        &
+                        Distribution_IIB(0:nP+1,iVertex,iLine),&
+                        .false.)
+                end if
              end do
              if(.not.UseDiffusion) CYCLE STEP
 

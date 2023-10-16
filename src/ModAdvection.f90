@@ -173,7 +173,7 @@ contains
   !============================================================================
   subroutine advect_via_poisson_braacket(CflIn, Time, InvRhoOld, InvRho,&
        nP, nGCLeft, nGCRight, FInOut_I, DeltaLnP)
-
+    use ModPoissonBracket
     real,   intent(in):: CFLIn
     real,   intent(in):: Time         ! time interval to advance through
     real,   intent(in):: InvRhoOld, InvRho ! Old and new density (inverse)
