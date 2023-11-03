@@ -10,6 +10,7 @@ module SP_ModAdvance
   use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
+        Momentum3SI_I, VolumeP_I,                                             &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
        iLineAll0, Used_B,     &
@@ -105,7 +106,7 @@ contains
     use SP_ModTime,         ONLY: SPTime
     use SP_ModDiffusion,    ONLY: advance_diffusion
     use SP_ModAdvection,    ONLY: advance_log_advection,&
-         advect_via_poisson_braacket
+         advect_via_poisson_bracket
     use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
          cElectronCharge
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
@@ -150,7 +151,8 @@ contains
     ! Local arrays to store the position and state vectors in SI units
     real :: XyzSI_DI(3, 1:nVertexMax)
     real, dimension(1:nVertexMax):: RadiusSi_I, DsSi_I,    &
-         nSi_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I !
+         nSi_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I, VolumeX_I !
+    real, dimension(1:nVertexMax):: InvRhoOld_I, InvRho_I
 
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
@@ -168,10 +170,12 @@ contains
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
 
+   !  write(*, *) nLine
     line:do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE line
        ! the active particles on the line
        iEnd   = nVertex_B( iLine)
+      !  write(*, *) iLine, iEnd
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
@@ -187,7 +191,8 @@ contains
        RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
        uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
        BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
-       nOldSI_I( 1:iEnd)   = State_VIB(RhoOld_,1:iEnd,iLine)
+       nOldSI_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
+       VolumeX_I(  2:iEnd) = 0.5*(DsSI_I(     1:iEnd-1) + DsSI_I(     2:iEnd))
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iLine)
@@ -266,7 +271,9 @@ contains
           end if
 
           nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
-          BOldSI_I(  1:iEnd) = BSI_I(  1:iEnd)
+          BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
+          InvRhoOld_I(1:iEnd) = 1./nOldSI_I(1:iEnd)
+          InvRho_I(1:iEnd) = InvRhoOld_I * exp(-DLogRho_I)
 
           Dt = DtProgress/nStep
 
@@ -281,6 +288,8 @@ contains
           STEP:do iStep = 1, nStep
              ! update bc for advection
              call set_advection_bc
+            ! !  ! update the InvRhoOld 
+            !  InvRhoOld_I(1:iEnd) = InvRho_I(1:iEnd)
 
              ! advection in the momentum space
              do iVertex = 2, iEnd
@@ -291,11 +300,17 @@ contains
                    CYCLE line
                 end if
                 if(UsePoissonBracket)then
-                   !  call advect_via_poisson_braacket(Cfl, Time, InvRhoOld,&
-                   !      InvRho,nP, 1, 1, &
-                   !      Distribution_IIB(0:nP+1,iVertex,iLine), DeltaLnP)
-                   ! Should be specified:
-                   ! Time, InvRhoOld, InvRho, may be DeltaLnP
+                  !  call advect_via_poisson_braacket(FermiFirst_I(iVertex), &
+                  !                                  Time, InvRhoOld,        &
+                  !                                  InvRho, MomentumSI_I, nP, 1, 1,       &
+                  !                                  Distribution_IIB(0:nP+1,iVertex,iLine), &
+                  !                                  DeltaLnP)
+                  ! call advect_via_poisson_bracket(nP, 1, 1, 1, & 
+                  !     FermiFirst_I(iVertex), DtFull, & 
+                  !     InvRhoOld_I(iVertex), InvRho_I(iVertex), MomentumSI_I, &
+                  !     Distribution_IIB(0:nP+1,iVertex,iLine)) ! DeltaLnP
+                  ! Should be specified:
+                  ! Time, InvRhoOld, InvRho, may be DeltaLnP
                 else
                    call advance_log_advection(&
                         FermiFirst_I(iVertex), nP, 1, 1,        &
@@ -303,6 +318,9 @@ contains
                         .false.)
                 end if
              end do
+            !  ! update the InvRho 
+            !  InvRho_I(1:iEnd) = InvRhoOld_I(1:iEnd) + 1./nStep * &
+            !                   (InvRho_I(1:iEnd) - InvRhoOld_I(1:iEnd))
              if(.not.UseDiffusion) CYCLE STEP
 
              ! diffusion along the field line
@@ -344,6 +362,7 @@ contains
              !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
              !         nSi_I(1:iEnd)*cProtonMass,Dt)
              ! end if
+
 
           end do STEP
           DoInitSpectrum = .true.
