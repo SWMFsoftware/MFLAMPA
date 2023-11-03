@@ -50,7 +50,8 @@ module SP_ModDistribution
   ! speed, momentum, kinetic energy and total energy (including the rest
   ! mass energy) at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSI_I, MomentumSI_I, &
-       KinEnergySI_I, EnergySI_I
+       KinEnergySI_I, EnergySI_I, VolumeP_I  
+  real, public :: Momentum3SI_I(-1:nP+1)
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_ = 0
@@ -107,8 +108,11 @@ contains
     DLogP = log(MomentumMaxSI/MomentumInjSI)/nP
 
     ! Functions to convert the grid index to momentum and energy
+    Momentum3SI_I(-1) = (MomentumInjSI*exp(-DLogP))**3/3
     do iP = 0, nP +1
        MomentumSI_I(iP)  = MomentumInjSI*exp(iP*DLogP)
+       Momentum3SI_I(iP) = MomentumSI_I(iP)**3/3
+       VolumeP_I(iP)     = Momentum3SI_I(iP) - Momentum3SI_I(iP-1)
        KinEnergySI_I(iP) = momentum_to_kinetic_energy(MomentumSI_I(iP))
        EnergySI_I(iP)    = momentum_to_energy(MomentumSI_I(iP))
        SpeedSI_I(iP)     = MomentumSI_I(iP)*cLightSpeed**2/EnergySI_I(iP)
