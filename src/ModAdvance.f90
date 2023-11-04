@@ -273,7 +273,7 @@ contains
           nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
           BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
           InvRhoOld_I(1:iEnd) = 1./nOldSI_I(1:iEnd)
-          InvRho_I(1:iEnd) = InvRhoOld_I * exp(-DLogRho_I)
+          InvRho_I(1:iEnd) = InvRhoOld_I(1:iEnd) * exp(-DLogRho_I(1:iEnd))
 
           Dt = DtProgress/nStep
 
