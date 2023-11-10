@@ -37,7 +37,7 @@ module SP_ModAdvance
   real:: CoefInj = 0.25, SpectralIndex = 5.0
 
   !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
-  real:: CFL=0.9        ! Controls the maximum allowed time step
+  real:: Cfl=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMFPUpstream = .false.
@@ -65,7 +65,7 @@ contains
        call read_var('SpectralIndex',SpectralIndex)
        call read_var('Efficiency',   CoefInj)
     case('#CFL')
-       call read_var('Cfl',CFL)
+       call read_var('Cfl',Cfl)
     case('#USEFIXEDMFPUPSTREAM')
        call read_var('UseFixedMFPUpstream',UseFixedMFPUpstream)
        if(UseFixedMFPUpstream)then
@@ -170,12 +170,10 @@ contains
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
 
-   !  write(*, *) nLine
     line:do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE line
        ! the active particles on the line
        iEnd   = nVertex_B( iLine)
-      !  write(*, *) iLine, iEnd
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
@@ -192,12 +190,13 @@ contains
        uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
        BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
        nOldSI_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
-       VolumeX_I(  2:iEnd) = 0.5*(DsSI_I(     1:iEnd-1) + DsSI_I(     2:iEnd))
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iLine)
        iShockOld = iShock_IB(ShockOld_,iLine)
        if(DoTraceShock)then
+          ! This is how many steps should be done to allow the shock to
+          ! the move not more than one mesh size 
           nProgress = MAX(1, iShock - iShockOld)
           iShockOld = MIN(iShockOld, iShock-1)
        else
@@ -218,6 +217,7 @@ contains
           ! the unit of amu/m^3.
           !
           ! nSI is needed to set up the distribution at the injection.
+          ! It is calculated at the end of the iProgress' time step
           nSi_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine) +Alpha *&
                (MhData_VIB(Rho_,  1:iEnd,iLine) - &
                State_VIB(RhoOld_,1:iEnd,iLine))
@@ -258,6 +258,7 @@ contains
              !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
              nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
           else
+             ! How many steps should be done to the CFL criterion is fulfilled
              nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
           end if
 
@@ -269,67 +270,26 @@ contains
                   maxval(abs(FermiFirst_I(2:iEnd)))
              call CON_stop(NameSub//': nStep <= 0????')
           end if
-
-          nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
-          BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
-          InvRhoOld_I(1:iEnd) = 1./nOldSI_I(1:iEnd)
-          InvRho_I(1:iEnd) = InvRhoOld_I(1:iEnd) * exp(-DLogRho_I(1:iEnd))
-
-          Dt = DtProgress/nStep
-
-          FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
-          ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
-
-          ! compute diffusion along the field line
-          ! we calculate: "Outer diffusion"=BSI_I and
-          ! "Inner diffusion at the injection energy (iP=0)
+          ! Store the value at the end of the previous time step
           call set_coef_diffusion
-
-          STEP:do iStep = 1, nStep
-             ! update bc for advection
-             call set_advection_bc
-            ! !  ! update the InvRhoOld 
-            !  InvRhoOld_I(1:iEnd) = InvRho_I(1:iEnd)
-
-             ! advection in the momentum space
-             do iVertex = 2, iEnd
-                if(any(Distribution_IIB(0:nP+1,iVertex,iLine) <0.0 )) then
-                   write(*,*) NameSub, ': Distribution_IIB < 0'
-                   Used_B(iLine) = .false.
-                   nVertex_B(iLine) = 0
-                   CYCLE line
-                end if
-                if(UsePoissonBracket)then
-                  !  call advect_via_poisson_braacket(FermiFirst_I(iVertex), &
-                  !                                  Time, InvRhoOld,        &
-                  !                                  InvRho, MomentumSI_I, nP, 1, 1,       &
-                  !                                  Distribution_IIB(0:nP+1,iVertex,iLine), &
-                  !                                  DeltaLnP)
-                  ! call advect_via_poisson_bracket(nP, 1, 1, 1, & 
-                  !     FermiFirst_I(iVertex), DtFull, & 
-                  !     InvRhoOld_I(iVertex), InvRho_I(iVertex), MomentumSI_I, &
-                  !     Distribution_IIB(0:nP+1,iVertex,iLine)) ! DeltaLnP
-                  ! Should be specified:
-                  ! Time, InvRhoOld, InvRho, may be DeltaLnP
-                else
-                   call advance_log_advection(&
-                        FermiFirst_I(iVertex), nP, 1, 1,        &
-                        Distribution_IIB(0:nP+1,iVertex,iLine),&
-                        .false.)
-                end if
-             end do
-            !  ! update the InvRho 
-            !  InvRho_I(1:iEnd) = InvRhoOld_I(1:iEnd) + 1./nStep * &
-            !                   (InvRho_I(1:iEnd) - InvRhoOld_I(1:iEnd))
-             if(.not.UseDiffusion) CYCLE STEP
-
+          if(UsePoissonBracket)then
+             InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
+             InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
+             ! call advect_via_poisson_bracket(nP, iEnd, & 
+             !     DtProgress,  Cfl,                     & 
+             !     InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),&
+             !     Distribution_IIB(1:nP,1:iEnd,iLine))
+             nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
+             BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
+             ! Call diffusion as frequent as you want or at the
+             ! end of PROGRESS step only:
              ! diffusion along the field line
-
+             
              if(UseTurbulentSpectrum)then
                 call set_dxx(iEnd, nP, BSI_I(1:iEnd))
              end if
-
-             MOMENTUM:do iP = 1, nP
+             
+             do iP = 1, nP
                 ! For each momentum account for dependence
                 ! of the diffusion coefficient on momentum
                 ! D\propto r_L*v\propto Momentum**2/TotalEnergy
@@ -345,16 +305,16 @@ contains
                    ! and (p)^(1/3)
                    DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
                         *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
-
+                   
                    DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
                         DiffCoeffMinSI/DOuterSI_I(1:iEnd))
                 end if
-
+                
                 call advance_diffusion(Dt, iEnd,              &
                      DsSI_I(1:iEnd),                          &
                      Distribution_IIB(iP,1:iEnd,iLine),      &
                      DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
-             end do MOMENTUM
+             end do
 
              ! if(UseTurbulentSpectrum .and. .true.)then
              !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
@@ -362,10 +322,83 @@ contains
              !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
              !         nSi_I(1:iEnd)*cProtonMass,Dt)
              ! end if
+             DoInitSpectrum = .true.
+          else
+             ! No Poisson bracket, use the default algorithm
+             Dt = DtProgress/nStep
+             
+             FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
+             ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
+             
+             ! compute diffusion along the field line
+             ! we calculate: "Outer diffusion"=BSI_I and
+             ! "Inner diffusion at the injection energy (iP=0)
+             STEP:do iStep = 1, nStep
+                ! update bc for advection
+                call set_advection_bc               
+                ! advection in the momentum space
+                do iVertex = 2, iEnd
+                   if(any(Distribution_IIB(0:nP+1,iVertex,iLine) <0.0 )) then
+                      write(*,*) NameSub, ': Distribution_IIB < 0'
+                      Used_B(iLine) = .false.
+                      nVertex_B(iLine) = 0
+                      CYCLE line
+                   end if
+                   
+                   call advance_log_advection(&
+                        FermiFirst_I(iVertex), nP, 1, 1,        &
+                        Distribution_IIB(0:nP+1,iVertex,iLine),&
+                        .false.)
+                end do
+                !  ! update the InvRho 
+                !  InvRho_I(1:iEnd) = InvRhoOld_I(1:iEnd) + 1./nStep * &
+                !                   (InvRho_I(1:iEnd) - InvRhoOld_I(1:iEnd))
+                if(.not.UseDiffusion) CYCLE STEP
+                
+                ! diffusion along the field line
+                
+                if(UseTurbulentSpectrum)then
+                   call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+                end if
+                
+                MOMENTUM:do iP = 1, nP
+                   ! For each momentum account for dependence
+                   ! of the diffusion coefficient on momentum
+                   ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+                   if (UseTurbulentSpectrum) then
+                      do iVertex=1,iEnd
+                         DInnerSI_I(iVertex) =                          &
+                              Dxx(iVertex, iP, MomentumSI_I(iP),        &
+                              SpeedSI_I(iP), BSI_I(iVertex))          / &
+                              BSI_I(iVertex)
+                      end do
+                   else
+                      ! Add v (= p*c^2/E_total in the relativistic case)
+                      ! and (p)^(1/3)
+                      DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
+                           *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+                      
+                      DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
+                           DiffCoeffMinSI/DOuterSI_I(1:iEnd))
+                   end if
+                   
+                   call advance_diffusion(Dt, iEnd,              &
+                        DsSI_I(1:iEnd),                          &
+                        Distribution_IIB(iP,1:iEnd,iLine),      &
+                        DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
+                end do MOMENTUM
 
+                ! if(UseTurbulentSpectrum .and. .true.)then
+                !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
+                !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
+                !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
+                !         nSi_I(1:iEnd)*cProtonMass,Dt)
+                ! end if
 
-          end do STEP
-          DoInitSpectrum = .true.
+                
+             end do STEP
+             DoInitSpectrum = .true.
+          end if
        end do PROGRESS
     end do line
   contains
