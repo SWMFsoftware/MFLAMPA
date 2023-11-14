@@ -10,7 +10,6 @@ module SP_ModAdvance
   use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
-        Momentum3SI_I, VolumeP_I,                                             &
         EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
        iLineAll0, Used_B,     &
@@ -151,7 +150,7 @@ contains
     ! Local arrays to store the position and state vectors in SI units
     real :: XyzSI_DI(3, 1:nVertexMax)
     real, dimension(1:nVertexMax):: RadiusSi_I, DsSi_I,    &
-         nSi_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I, VolumeX_I !
+         nSi_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I
     real, dimension(1:nVertexMax):: InvRhoOld_I, InvRho_I
 
     ! Lagrangian derivatives
@@ -273,12 +272,15 @@ contains
           ! Store the value at the end of the previous time step
           call set_coef_diffusion
           if(UsePoissonBracket)then
+             ! update bc for advection
+                call set_advection_bc   
+             ! store/update the inverse rho arrays
              InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
-             ! call advect_via_poisson_bracket(nP, iEnd, & 
-             !     DtProgress,  Cfl,                     & 
-             !     InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),&
-             !     Distribution_IIB(1:nP,1:iEnd,iLine))
+             call advect_via_poisson_bracket(nP, iEnd, & 
+                 DtProgress,  Cfl,                     & 
+                 InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),&
+                 Distribution_IIB(:,1:iEnd,iLine))
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
              ! Call diffusion as frequent as you want or at the
@@ -350,9 +352,7 @@ contains
                         Distribution_IIB(0:nP+1,iVertex,iLine),&
                         .false.)
                 end do
-                !  ! update the InvRho 
-                !  InvRho_I(1:iEnd) = InvRhoOld_I(1:iEnd) + 1./nStep * &
-                !                   (InvRho_I(1:iEnd) - InvRhoOld_I(1:iEnd))
+
                 if(.not.UseDiffusion) CYCLE STEP
                 
                 ! diffusion along the field line
@@ -394,7 +394,6 @@ contains
                 !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
                 !         nSi_I(1:iEnd)*cProtonMass,Dt)
                 ! end if
-
                 
              end do STEP
              DoInitSpectrum = .true.

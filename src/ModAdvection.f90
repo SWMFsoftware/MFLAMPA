@@ -171,84 +171,97 @@ contains
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================
-  subroutine advect_via_poisson_bracket(nP, nX, nGCLeft, nGCRight, &
-       CflIn, tFinal, InvRhoOld_I, InvRho_I, &
-       Momentum3SI_I, VolumeP_I, VolumeX_I, VolumeNewX_I, &
-       FInOut_I, DeltaLnP)
+  subroutine advect_via_poisson_bracket(nP, nX, &
+       tFinal, CflIn, InvRhoOld_I, InvRho_I, FInOut_I)
     use ModPoissonBracket, ONLY: explicit
+    use SP_ModDistribution, ONLY: Momentum3SI_I, VolumeP_I, DLogP
     integer,intent(in):: nP, nX       ! Number of meshes along lnp-coordinate
-    integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
-    integer,intent(in):: nGCRight     ! advanced in time but used as the BCs
-    real,   intent(in):: CFlIn        ! FermiFirsr_I in ModAdvance
     real,   intent(in):: tFinal       ! time interval to advance through
-    real,   intent(in):: InvRhoOld_I(nX) ! Old density (inverse)
-    real,   intent(in):: InvRho_I(nX)    ! New density (inverse)
-    real,   intent(in):: Momentum3SI_I(-1:nP+1) ! Momentum**3/3 in SI
-    real,   intent(in):: VolumeP_I(0:nP+1) ! Volume of P in SI
-    real,   intent(in):: VolumeX_I(0:nX+1) ! Volume of X in SI
-    real,   intent(in):: VolumeNewX_I(0:nX+1) ! New Volume of X in SI
-    real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight, 1:nX)  ! Solution
-    ! sol. index 0 is to set boundary condition at the injection energy
-    real,optional,intent(in)::DeltaLnP  
+    real,   intent(in):: CflIn        ! FermiFirsr_I in ModAdvance
+    real,   intent(in):: InvRhoOld_I(1:nX) ! Old density (inverse)
+    real,   intent(in):: InvRho_I(1:nX)    ! New density (inverse)
+    real,intent(inout):: FInOut_I(0:nP+1, 1:nX)  ! Solution
     ! Loop variables
-    integer :: iP, iStep, nStep
+    integer :: iP
+    
     ! Extended arrays for the implementation of the Poisson Bracket Alg.
-    real    :: VDF_G(-1:nX+2, -1:nP+2), Dt_C(nX,nP)
-    real    :: Volume_G(0:nX+1, 0:nP+1), VolumeNew_G(0:nX+1, 0:nP+1) 
-    real    :: dVolumeDt_G(0:nX+1, 0:nP+1), dVolumeXDt_G(0:nX+1)
-   !  real    :: Hamiltonian_N(-1:nX+1, -1:nP+1)
+    ! VolumeXOld_I: geometric volume when the subroutine starts
+    ! VolumeX_I: geometric volume when the subroutine ends
+    ! Linearly interpolate the geometric volume from the start to the end
+    ! VolumeSubX_I: current geometric volume at each iteration
+    real, dimension(0:nX+1) :: VolumeXOld_I, VolumeX_I,  &
+          VolumeSubXOld_I, VolumeSubX_I, dVolumeSubXDt_I
+    ! VolumeSub_G: current phase space volume at each iteration
+    real, dimension(0:nX+1, 0:nP+1) :: VolumeSubOld_G,   &
+          VolumeSub_G, dVolumeSubDt_G
     real    :: dHamiltonian02_FY(0:nX+1, -1:nP+1)
-    real    :: Source_C(nX, nP)
-    real    :: CFL, Time, Dt, DtTrial, DtInv, DtNext
+    real    :: VDF_G(-1:nX+2, -1:nP+2), Source_C(nX, nP)
+    real    :: Time, Dt, DtTrial, DtInv, DtNext
     !--------------------------------------------------------------------------
-    ! Now this is the the conservative (-- for the particle number) form
+    ! Now this is the conservative form for the particle number
     
-    ! Initialization
-    nStep = 1 + int(CFlIn); CFL = CFlIn/real(nStep)
-    Source_C = 0.0
-    VDF_G = 1.0e-8 !VDF_G(:,1) = 1/VolumeP_I(1)
-    VDF_G(1:nX, 1-nGCLeft:nP+nGCRight) = transpose(FInOut_I)
+    ! Initialize the CFL number, (sub-)nStep and arrays 
+    Source_C   = 0.0 
+    VDF_G      = 1.0e-8 
+    VDF_G(1:nX, 0:nP+1) = transpose(FInOut_I)
     
-    ! Time 
-    Time = 0.0
-    DtTrial = tFinal/nStep
-    DtInv = 1/DtTrial
-    DtNext = DtTrial
-
-    ! Volume
-    do iP = 0, nP + 1
-       Volume_G(0:nX+1,iP) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
-       VolumeNew_G(0:nX+1,iP) = VolumeP_I(iP)*VolumeNewX_I(0:nX+1)
-    end do
+    ! Volume initialization: use 1 ghost point at each side of the boundary
+    VolumeXOld_I(1:nX)  = InvRhoOld_I
+    VolumeXOld_I(0)     = VolumeXOld_I(1)
+    VolumeXOld_I(nX+1)  = VolumeXOld_I(nX)
+    VolumeX_I(1:nX)     = InvRho_I 
+    VolumeX_I(0)        = VolumeX_I(1)
+    VolumeX_I(nX+1)     = VolumeX_I(nX)
+    VolumeSubX_I        = VolumeXOld_I
+    dVolumeSubXDt_I     = (VolumeX_I-VolumeXOld_I)/tFinal
     
-    ! Advection by Poisson Bracket Alg.
-    do iStep = 1, nStep
-       Dt = min(DtNext, tFinal - Time); DtInv = 1/Dt
-       dVolumeDt_G  = DtInv*(VolumeNew_G  - Volume_G)
-       dVolumeXDt_G = DtInv*(VolumeNewX_I - VolumeX_I)
+    ! Time initialization
+    Time    = 0.0
+    DtTrial = CflIn/maxval(abs(dVolumeSubXDt_I)/max(VolumeX_I, VolumeXOld_I))/(3*DLogP)
+    DtInv   = 1.0/DtTrial
+    DtNext  = DtTrial
+    
+    ! Advection by Poisson Bracket Algorithm
+    do 
+       ! Time Updates
+       Dt = min(DtNext, tFinal - Time); DtInv = 1.0/Dt
+       
+       ! Volume Updates
+       VolumeSubXOld_I = VolumeSubX_I
+       VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
+       do iP = 0, nP+1 
+          VolumeSubOld_G(:,iP) = VolumeP_I(iP)*VolumeSubXOld_I
+          VolumeSub_G(:,iP)    = VolumeP_I(iP)*VolumeSubX_I
+       end do 
+       dVolumeSubDt_G = DtInv*(VolumeSub_G - VolumeSubOld_G)
+       
+       ! calculate: dHamiltonian/dVolumeSubX
        do iP = -1, nP+1
-          dHamiltonian02_FY(:,iP) = - Momentum3SI_I(iP)*dVolumeXDt_G
+          dHamiltonian02_FY(:,iP) = - Momentum3SI_I(iP)*dVolumeSubXDt_I
        end do
-       call explicit(nX, nP, VDF_G, Volume_G, Source_C, &
-            dHamiltonian02_FY=dHamiltonian02_FY,        &
-            dVolumeDt_G = dVolumeDt_G,                  &
+
+       call explicit(nX, nP, VDF_G, VolumeSub_G, Source_C, &
+            dHamiltonian02_FY=dHamiltonian02_FY,           &
+            dVolumeDt_G = dVolumeSubDt_G,                  &
             DtIn=Dt,           & ! Input time step, which may be reduced
-            CFLIn=CFL,         & ! Input CFL to calculate next time step
+            CFLIn=CflIn,       & ! Input CFL to calculate next time step
             DtOut=DtNext)
-       ! Update
+       VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
+
+       ! Update velocity distribution function
        VDF_G(1:nX, 1:nP) = VDF_G(1:nX, 1:nP) + Source_C 
        Time = Time + Dt
+       if(Time > tFinal - 1.0e-8*DtNext) EXIT
 
        ! BCs
-       VDF_G(1:nX, -1:0-nGCLeft) = 1.0e-8
-       VDF_G(1:nX,nP+nGCRight:nP+2) = 1.0e-8
-       VDF_G( 0,      :) = VDF_G(1,       :)
-       VDF_G(-1,      :) = VDF_G(1,       :)
-       VDF_G(nX+1:nX+2,:) = 1.0e-8
-      !  VDF_G(nX+1:nX+2,1) = 1/VolumeP_I(1)
+       VDF_G(1:nX, -1)        = VDF_G(1:nX, 0)
+       VDF_G(1:nX,nP+1:nP+2)  = 1.0e-8
+       VDF_G( 0,      :)      = VDF_G(1,       :)
+       VDF_G(-1,      :)      = VDF_G(1,       :)
+       VDF_G(nX+1:nX+2,:)     = 1.0e-8
     end do
 
-    FInOut_I = transpose(VDF_G(1:nX, 1-nGCLeft:nP+nGCRight))
+    FInOut_I = transpose(VDF_G(1:nX, 0:nP+1))
     
   end subroutine advect_via_poisson_bracket
   !============================================================================
