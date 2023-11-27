@@ -286,44 +286,46 @@ contains
              ! Call diffusion as frequent as you want or at the
              ! end of PROGRESS step only:
              ! diffusion along the field line
-             
-             if(UseTurbulentSpectrum)then
-                call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-             end if
-             
-             do iP = 1, nP
-                ! For each momentum account for dependence
-                ! of the diffusion coefficient on momentum
-                ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-                if (UseTurbulentSpectrum) then
-                   do iVertex=1,iEnd
-                      DInnerSI_I(iVertex) =                          &
-                           Dxx(iVertex, iP, MomentumSI_I(iP),        &
-                           SpeedSI_I(iP), BSI_I(iVertex))          / &
-                           BSI_I(iVertex)
-                   end do
-                else
-                   ! Add v (= p*c^2/E_total in the relativistic case)
-                   ! and (p)^(1/3)
-                   DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
-                        *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
-                   
-                   DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
-                        DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-                end if
-                
-                call advance_diffusion(Dt, iEnd,              &
-                     DsSI_I(1:iEnd),                          &
-                     Distribution_IIB(iP,1:iEnd,iLine),      &
-                     DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
-             end do
 
-             ! if(UseTurbulentSpectrum .and. .true.)then
-             !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
-             !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
-             !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
-             !         nSi_I(1:iEnd)*cProtonMass,Dt)
-             ! end if
+            if (UseDiffusion) call diffuse_distribution
+             
+            !  if(UseTurbulentSpectrum)then
+            !     call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+            !  end if
+             
+            !  do iP = 1, nP
+            !     ! For each momentum account for dependence
+            !     ! of the diffusion coefficient on momentum
+            !     ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+            !     if (UseTurbulentSpectrum) then
+            !        do iVertex=1,iEnd
+            !           DInnerSI_I(iVertex) =                          &
+            !                Dxx(iVertex, iP, MomentumSI_I(iP),        &
+            !                SpeedSI_I(iP), BSI_I(iVertex))          / &
+            !                BSI_I(iVertex)
+            !        end do
+            !     else
+            !        ! Add v (= p*c^2/E_total in the relativistic case)
+            !        ! and (p)^(1/3)
+            !        DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
+            !             *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+                   
+            !        DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
+            !             DiffCoeffMinSI/DOuterSI_I(1:iEnd))
+            !     end if
+                
+            !     call advance_diffusion(Dt, iEnd,              &
+            !          DsSI_I(1:iEnd),                          &
+            !          Distribution_IIB(iP,1:iEnd,iLine),      &
+            !          DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
+            !  end do
+
+            !  ! if(UseTurbulentSpectrum .and. .true.)then
+            !  !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
+            !  !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
+            !  !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
+            !  !         nSi_I(1:iEnd)*cProtonMass,Dt)
+            !  ! end if
              DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
@@ -353,47 +355,47 @@ contains
                         .false.)
                 end do
 
-                if(.not.UseDiffusion) CYCLE STEP
+                if (UseDiffusion) call diffuse_distribution
                 
-                ! diffusion along the field line
+               !  ! diffusion along the field line
                 
-                if(UseTurbulentSpectrum)then
-                   call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-                end if
+               !  if(UseTurbulentSpectrum)then
+               !     call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+               !  end if
                 
-                MOMENTUM:do iP = 1, nP
-                   ! For each momentum account for dependence
-                   ! of the diffusion coefficient on momentum
-                   ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-                   if (UseTurbulentSpectrum) then
-                      do iVertex=1,iEnd
-                         DInnerSI_I(iVertex) =                          &
-                              Dxx(iVertex, iP, MomentumSI_I(iP),        &
-                              SpeedSI_I(iP), BSI_I(iVertex))          / &
-                              BSI_I(iVertex)
-                      end do
-                   else
-                      ! Add v (= p*c^2/E_total in the relativistic case)
-                      ! and (p)^(1/3)
-                      DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
-                           *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+               !  MOMENTUM:do iP = 1, nP
+               !     ! For each momentum account for dependence
+               !     ! of the diffusion coefficient on momentum
+               !     ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+               !     if (UseTurbulentSpectrum) then
+               !        do iVertex=1,iEnd
+               !           DInnerSI_I(iVertex) =                          &
+               !                Dxx(iVertex, iP, MomentumSI_I(iP),        &
+               !                SpeedSI_I(iP), BSI_I(iVertex))          / &
+               !                BSI_I(iVertex)
+               !        end do
+               !     else
+               !        ! Add v (= p*c^2/E_total in the relativistic case)
+               !        ! and (p)^(1/3)
+               !        DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) &
+               !             *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
                       
-                      DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
-                           DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-                   end if
+               !        DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd), &
+               !             DiffCoeffMinSI/DOuterSI_I(1:iEnd))
+               !     end if
                    
-                   call advance_diffusion(Dt, iEnd,              &
-                        DsSI_I(1:iEnd),                          &
-                        Distribution_IIB(iP,1:iEnd,iLine),      &
-                        DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
-                end do MOMENTUM
+               !     call advance_diffusion(Dt, iEnd,              &
+               !          DsSI_I(1:iEnd),                          &
+               !          Distribution_IIB(iP,1:iEnd,iLine),      &
+               !          DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
+               !  end do MOMENTUM
 
-                ! if(UseTurbulentSpectrum .and. .true.)then
-                !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
-                !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
-                !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
-                !         nSi_I(1:iEnd)*cProtonMass,Dt)
-                ! end if
+               !  ! if(UseTurbulentSpectrum .and. .true.)then
+               !  !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,      &
+               !  !         XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),              &
+               !  !         Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
+               !  !         nSi_I(1:iEnd)*cProtonMass,Dt)
+               !  ! end if
                 
              end do STEP
              DoInitSpectrum = .true.
@@ -552,6 +554,53 @@ contains
       end do
 
     end subroutine set_advection_bc
+    !==========================================================================
+    subroutine diffuse_distribution
+      ! set up the diffusion coefficients 
+      ! diffuse the distribution function 
+
+      integer :: iP, iVertex  ! loop variables
+      !------------------------------------------------------------------------
+      ! diffusion along the field line
+
+      if(UseTurbulentSpectrum)then
+         call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+      end if
+
+      MOMENTUM:do iP = 1, nP
+         ! For each momentum account for dependence
+         ! of the diffusion coefficient on momentum
+         ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+         if (UseTurbulentSpectrum) then
+            do iVertex=1, iEnd
+               DInnerSI_I(iVertex) =                        &
+                  Dxx(iVertex, iP, MomentumSI_I(iP),        &
+                  SpeedSI_I(iP), BSI_I(iVertex)) /          &
+                  BSI_I(iVertex)
+            end do
+         else
+            ! Add v (= p*c^2/E_total in the relativistic case)
+            ! and (p)^(1/3)
+            DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
+               *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+            
+            DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
+               DiffCoeffMinSI/DOuterSI_I(1:iEnd))
+         end if
+         
+         call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
+            Distribution_IIB(iP,1:iEnd,iLine),              &
+            DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
+      end do MOMENTUM
+      
+      ! if (UseTurbulentSpectrum .and. .true.) then
+      !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,   &
+      !       XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),             &
+      !       Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
+      !       nSi_I(1:iEnd)*cProtonMass,Dt)
+      ! end if
+
+    end subroutine diffuse_distribution
     !==========================================================================
   end subroutine advance
   !============================================================================
