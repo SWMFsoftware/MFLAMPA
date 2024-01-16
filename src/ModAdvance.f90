@@ -283,14 +283,10 @@ contains
              ! end of PROGRESS step only:
              ! diffusion along the field line
 
-<<<<<<< HEAD
-            if (UseDiffusion) call diffuse_distribution
-=======
              if(UseDiffusion) call diffuse_distribution(nP,    &
                  iLine, iEnd, BSI_I, DOuterSI_I,               &
                  CoefDInnerSI_I, DsSI_I, DtProgress,           &
                  XyzSI_DI, nSI_I)
->>>>>>> dc876bb (Encapsulation of the diffusion subroutine)
              DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
@@ -320,14 +316,10 @@ contains
                         .false.)
                 end do
 
-<<<<<<< HEAD
-                if (UseDiffusion) call diffuse_distribution                
-=======
                 if(UseDiffusion) call diffuse_distribution(nP, &
                     iLine, iEnd, BSI_I, DOuterSI_I,            &
                     CoefDInnerSI_I, DsSI_I, Dt,                &
                     XyzSI_DI, nSI_I)
->>>>>>> dc876bb (Encapsulation of the diffusion subroutine)
              end do STEP
              DoInitSpectrum = .true.
           end if
