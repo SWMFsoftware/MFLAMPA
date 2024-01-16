@@ -10,12 +10,12 @@ module SP_ModAdvance
   use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
-        EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP, SpeedSI_I
+        EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP 
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
        iLineAll0, Used_B,     &
        Shock_, NoShock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
-  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum, set_dxx,  &
-       set_wave_advection_rates, reduce_advection_rates, dxx, init_spectrum,  &
+  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,           &
+       set_wave_advection_rates, reduce_advection_rates, init_spectrum,       &
        update_spectrum
   use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, &
        NameParticle, Io2Si_V, kinetic_energy_to_momentum
@@ -103,7 +103,6 @@ contains
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
     use SP_ModTime,         ONLY: SPTime
-    use SP_ModDiffusion,    ONLY: advance_diffusion
     use SP_ModAdvection,    ONLY: advance_log_advection,&
          advect_via_poisson_bracket
     use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
@@ -137,8 +136,6 @@ contains
     ! the diffusion coefficient! Physically, DiffCoeffMin
     ! should be given by the product of shock wave speed
     ! and local grid spacing.
-    real, parameter::  DiffCoeffMinSI =1.0E+04
-    ! Full difference between DataInputTime and SPTime
     real      :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real      :: DtProgress
@@ -160,8 +157,7 @@ contains
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter =BSI in the cell center
     ! DInner = DiffusionCoefficient/BSI at the face
-    real, dimension(1:nVertexMax):: &
-         DOuterSI_I, DInnerSI_I, CoefDInnerSI_I
+    real, dimension(1:nVertexMax):: DOuterSI_I, CoefDInnerSI_I
 
     ! the full time interval
     character(len=*), parameter:: NameSub = 'advance'
@@ -262,7 +258,7 @@ contains
           end if
 
           ! Check if the number of time steps is positive:
-          if(nStep < 1) then
+          if(nStep < 1)then
              if(UseTurbulentSpectrum) &
                   write(*,*) ' DtReduction               =', DtReduction
              write(*,*) ' maxval(abs(FermiFirst_I)) =', &
@@ -273,7 +269,7 @@ contains
           call set_coef_diffusion
           if(UsePoissonBracket)then
              ! update bc for advection
-                call set_advection_bc   
+             call set_advection_bc   
              ! store/update the inverse rho arrays
              InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
@@ -287,7 +283,14 @@ contains
              ! end of PROGRESS step only:
              ! diffusion along the field line
 
+<<<<<<< HEAD
             if (UseDiffusion) call diffuse_distribution
+=======
+             if(UseDiffusion) call diffuse_distribution(nP,    &
+                 iLine, iEnd, BSI_I, DOuterSI_I,               &
+                 CoefDInnerSI_I, DsSI_I, DtProgress,           &
+                 XyzSI_DI, nSI_I)
+>>>>>>> dc876bb (Encapsulation of the diffusion subroutine)
              DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
@@ -312,12 +315,19 @@ contains
                    end if
                    
                    call advance_log_advection(&
-                        FermiFirst_I(iVertex), nP, 1, 1,        &
+                        FermiFirst_I(iVertex), nP, 1, 1,       &
                         Distribution_IIB(0:nP+1,iVertex,iLine),&
                         .false.)
                 end do
 
+<<<<<<< HEAD
                 if (UseDiffusion) call diffuse_distribution                
+=======
+                if(UseDiffusion) call diffuse_distribution(nP, &
+                    iLine, iEnd, BSI_I, DOuterSI_I,            &
+                    CoefDInnerSI_I, DsSI_I, Dt,                &
+                    XyzSI_DI, nSI_I)
+>>>>>>> dc876bb (Encapsulation of the diffusion subroutine)
              end do STEP
              DoInitSpectrum = .true.
           end if
@@ -328,7 +338,6 @@ contains
     function mach_alfven() result(MachAlfven)
       ! alfvenic mach number for the current line
       real:: MachAlfven
-
       real:: SpeedAlfvenUpstream, SpeedUpstream
 
       ! speed upstream is relative to the shock:
@@ -476,11 +485,37 @@ contains
 
     end subroutine set_advection_bc
     !==========================================================================
-    subroutine diffuse_distribution
+  end subroutine advance
+  !============================================================================
+  subroutine diffuse_distribution(nP, iLine, iEnd, BSI_I,      &
+               DOuterSI_I, CoefDInnerSI_I, DsSI_I, Dt,         &
+               XyzSI_DI, nSI_I)
       ! set up the diffusion coefficients 
       ! diffuse the distribution function 
 
-      integer :: iP, iVertex  ! loop variables
+      use ModConst, ONLY: cProtonMass
+      use SP_ModSize, ONLY: nVertexMax
+      use SP_ModDistribution, ONLY: SpeedSI_I,                 &
+               Distribution_IIB, MomentumSI_I, DLogP 
+      use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+      use SP_ModDiffusion, ONLY: advance_diffusion
+
+      ! Variables as inputs (mandatory)
+      integer, intent(in) :: nP           ! Momentum (P) grid size
+      integer, intent(in) :: iLine, iEnd  ! input line/end indices
+      real, intent(in), dimension(nVertexMax) :: BSI_I, &
+               DOuterSI_I, CoefDInnerSI_I, DsSI_I
+      real, intent(in) :: Dt              ! Time step for diffusion
+      ! Variables as inputs (Optional)
+      real, optional, intent(in) :: XyzSI_DI(3, nVertexMax)
+      real, optional, intent(in) :: nSI_I(nVertexMax)
+
+      ! Variables declared in this subroutine
+      integer :: iP, iVertex              ! loop variables
+      real :: DInnerSI_I(nVertexMax)      ! DInner Coefficients
+      ! Full difference between DataInputTime and SPTime
+      real, parameter :: DiffCoeffMinSI = 1.0E+04
+
       !------------------------------------------------------------------------
       ! diffusion along the field line
 
@@ -494,10 +529,9 @@ contains
          ! D\propto r_L*v\propto Momentum**2/TotalEnergy
          if (UseTurbulentSpectrum) then
             do iVertex=1, iEnd
-               DInnerSI_I(iVertex) =                        &
-                  Dxx(iVertex, iP, MomentumSI_I(iP),        &
-                  SpeedSI_I(iP), BSI_I(iVertex)) /          &
-                  BSI_I(iVertex)
+               DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
+                  MomentumSI_I(iP), SpeedSI_I(iP),          &
+                  BSI_I(iVertex)) / BSI_I(iVertex)
             end do
          else
             ! Add v (= p*c^2/E_total in the relativistic case)
@@ -522,8 +556,6 @@ contains
       ! end if
 
     end subroutine diffuse_distribution
-    !==========================================================================
-  end subroutine advance
   !============================================================================
 end module SP_ModAdvance
 !==============================================================================
