@@ -177,9 +177,7 @@ contains
        ! are in SI units. So to convert the IO units, the three conversion
        ! factors are needed as follows:
        ! UnitX_, UnitRho_, UnitEnergy_
-       XyzSI_DI(x_,1:iEnd) = MhData_VIB(x_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
-       XyzSI_DI(y_,1:iEnd) = MhData_VIB(y_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
-       XyzSI_DI(z_,1:iEnd) = MhData_VIB(z_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
+       XyzSI_DI(x_:z_,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2SI_V(UnitX_)
        DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
        RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
        uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
