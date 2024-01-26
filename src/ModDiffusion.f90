@@ -21,15 +21,15 @@ contains
   !===========================================================================
   subroutine diffuse_distribution(iLine, iEnd, Dt,    &
             Distribution_IIB, XyzSI_DI, nSI_I, BSI_I, &
-            DsSI_I, DOuterSI_I, CoefDInnerSI_I,       &
-            UseTurbulentSpectrum)
+            DsSI_I, DOuterSI_I, CoefDInnerSI_I)!,       &
+            !UseTurbulentSpectrum)
       ! set up the diffusion coefficients 
       ! diffuse the distribution function 
 
       use ModConst, ONLY: cProtonMass
       use SP_ModSize, ONLY: nVertexMax
       use SP_ModDistribution, ONLY: nP, SpeedSI_I, MomentumSI_I, DLogP 
-
+      use SP_ModTurbulence, ONLY: UseTurbulentSpectrum
       ! Variables as inputs
       integer, intent(in) :: iLine, iEnd  ! input line/end indices
       real, intent(in) :: Dt              ! Time step for diffusion
@@ -37,7 +37,7 @@ contains
       real, intent(in) :: XyzSI_DI(3, nVertexMax)
       real, intent(in), dimension(nVertexMax) :: nSI_I, &
                BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I 
-      logical, intent(in) :: UseTurbulentSpectrum
+      ! logical, intent(in) :: UseTurbulentSpectrum
       ! Variables declared in this subroutine
       integer :: iP, iVertex              ! loop variables
       real :: DInnerSI_I(nVertexMax)      ! DInner Coefficients

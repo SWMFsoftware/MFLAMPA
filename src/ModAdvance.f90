@@ -16,7 +16,7 @@ module SP_ModAdvance
        Shock_, NoShock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,           &
        set_wave_advection_rates, reduce_advection_rates, init_spectrum,       &
-       update_spectrum, set_dxx, Dxx
+       update_spectrum, set_dxx
   use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, &
        NameParticle, Io2Si_V, kinetic_energy_to_momentum
   use ModUtilities, ONLY: CON_stop
@@ -107,8 +107,8 @@ contains
     use SP_ModTime,         ONLY: SPTime
     use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_,   &
          U_, T_, iPTest, iParticleTest, iNodeTest
-    use SP_ModAdvection,    ONLY: advance_log_advection, &
-         advect_via_poisson_bracket
+    use SP_ModAdvection,     ONLY: advance_log_advection
+    use SP_ModAdvancePoisson,ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,    ONLY: diffuse_distribution
     real, intent(in):: TimeLimit
     ! Loop variables
@@ -284,7 +284,7 @@ contains
                 Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),        &
                 Distribution_IIB(:,1:iEnd,iLine), iLine, XyzSI_DI, &
                 nSI_I, BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I,  &
-                UseDiffusion, UseTurbulentSpectrum)
+                UseDiffusion)
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
 
@@ -326,7 +326,7 @@ contains
                 if(UseDiffusion) call diffuse_distribution(iLine, iEnd, Dt, &
                    Distribution_IIB(0:nP+1, 1:nVertexMax, iLine),           &
                    XyzSI_DI, nSI_I, BSI_I, DsSI_I,                          &
-                   DOuterSI_I, CoefDInnerSI_I, UseTurbulentSpectrum) 
+                   DOuterSI_I, CoefDInnerSI_I) 
              end do STEP
              DoInitSpectrum = .true.
           end if
