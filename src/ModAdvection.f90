@@ -29,6 +29,7 @@ module SP_ModAdvection
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
   ! Version: Sokolov& Roussev, Jan,2008, SP/FLAMPA/src/ModLogAdvection.f90
+  public :: advance_log_advection, advect_via_poisson_bracket
 contains
   !============================================================================
   !===========advance_log_advection=======================================
@@ -150,7 +151,7 @@ contains
        stop
     end if
     !------------------------------------ DONE -------------------------------!
-  Contains
+  contains
     real function df_lim(i)
       integer, intent(in):: i
 
@@ -171,19 +172,33 @@ contains
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================
-  subroutine advect_via_poisson_bracket(nP, nX, &
-       tFinal, CflIn, InvRhoOld_I, InvRho_I, FInOut_I)
+  subroutine advect_via_poisson_bracket(nP, nX,        &
+       tFinal, CflIn, InvRhoOld_I, InvRho_I, FInOut_I, &
+       iLine, XyzSI_DI, nSI_I, BSI_I,                  &
+       DsSI_I, DOuterSI_I, CoefDInnerSI_I,             &
+       UseDiffusion, UseTurbulentSpectrum)
+    ! advect via Possion Bracket + diffusion by encapsulation
+    
     use ModPoissonBracket, ONLY: explicit
+    use SP_ModSize, ONLY: nVertexMax
     use SP_ModDistribution, ONLY: Momentum3SI_I, VolumeP_I, DLogP
+    use SP_ModDiffusion, ONLY: diffuse_distribution
+    
     integer,intent(in):: nP, nX       ! Number of meshes along lnp-coordinate
     real,   intent(in):: tFinal       ! time interval to advance through
     real,   intent(in):: CflIn        ! FermiFirsr_I in ModAdvance
     real,   intent(in):: InvRhoOld_I(1:nX) ! Old density (inverse)
     real,   intent(in):: InvRho_I(1:nX)    ! New density (inverse)
     real,intent(inout):: FInOut_I(0:nP+1, 1:nX)  ! Solution
+    ! Variables for diffusion
+    integer, intent(in) :: iLine
+    real, intent(in) :: XyzSI_DI(3, nVertexMax)
+    real, intent(in), dimension(nVertexMax) :: nSI_I,  &
+               BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I
+    logical, intent(in) :: UseDiffusion, UseTurbulentSpectrum
+
     ! Loop variables
     integer :: iP
-    
     ! Extended arrays for the implementation of the Poisson Bracket Alg.
     ! VolumeXOld_I: geometric volume when the subroutine starts
     ! VolumeX_I: geometric volume when the subroutine ends
@@ -248,8 +263,17 @@ contains
             DtOut=DtNext)
        VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
 
-       ! Update velocity distribution function
+       ! Update velocity distribution function 
        VDF_G(1:nX, 1:nP) = VDF_G(1:nX, 1:nP) + Source_C 
+       ! Diffuse the distribution function 
+       if (UseDiffusion) then
+          FInOut_I = transpose(VDF_G(1:nX, 0:nP+1))
+          call diffuse_distribution(iLine, nX, Dt, FInOut_I,  &
+                XyzSI_DI, nSI_I, BSI_I, DsSI_I, DOuterSI_I,   &
+                CoefDInnerSI_I, UseTurbulentSpectrum)
+          VDF_G(1:nX, 0:nP+1) = transpose(FInOut_I)
+       end if 
+       ! Update the time 
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
 

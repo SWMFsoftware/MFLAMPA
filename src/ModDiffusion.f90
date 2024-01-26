@@ -15,10 +15,71 @@ module SP_ModDiffusion
   implicit none
 
   PRIVATE
-  public:: advance_diffusion
+  public :: diffuse_distribution, advance_diffusion
 
 contains
-  !=========================================================================
+  !===========================================================================
+  subroutine diffuse_distribution(iLine, iEnd, Dt,    &
+            Distribution_IIB, XyzSI_DI, nSI_I, BSI_I, &
+            DsSI_I, DOuterSI_I, CoefDInnerSI_I,       &
+            UseTurbulentSpectrum)
+      ! set up the diffusion coefficients 
+      ! diffuse the distribution function 
+
+      use ModConst, ONLY: cProtonMass
+      use SP_ModSize, ONLY: nVertexMax
+      use SP_ModDistribution, ONLY: nP, SpeedSI_I, MomentumSI_I, DLogP 
+
+      ! Variables as inputs
+      integer, intent(in) :: iLine, iEnd  ! input line/end indices
+      real, intent(in) :: Dt              ! Time step for diffusion
+      real, intent(inout) :: Distribution_IIB(0:nP+1, nVertexMax)
+      real, intent(in) :: XyzSI_DI(3, nVertexMax)
+      real, intent(in), dimension(nVertexMax) :: nSI_I, &
+               BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I 
+      logical, intent(in) :: UseTurbulentSpectrum
+      ! Variables declared in this subroutine
+      integer :: iP, iVertex              ! loop variables
+      real :: DInnerSI_I(nVertexMax)      ! DInner Coefficients
+      ! Full difference between DataInputTime and SPTime
+      real, parameter :: DiffCoeffMinSI = 1.0E+04
+
+      !------------------------------------------------------------------------
+      ! diffusion along the field line
+      MOMENTUM:do iP = 1, nP
+         ! For each momentum account for dependence
+         ! of the diffusion coefficient on momentum
+         ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+         if (UseTurbulentSpectrum) then
+            ! do iVertex=1, iEnd
+            !    DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
+            !       MomentumSI_I(iP), SpeedSI_I(iP),          &
+            !       BSI_I(iVertex)) / BSI_I(iVertex)
+            ! end do
+         else
+            ! Add v (= p*c^2/E_total in the relativistic case)
+            ! and (p)^(1/3)
+            DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
+               *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+            
+            DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
+               DiffCoeffMinSI/DOuterSI_I(1:iEnd))
+         end if
+         
+         call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
+            Distribution_IIB(iP, 1:iEnd),                   &
+            DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
+      end do MOMENTUM
+      
+      ! if (UseTurbulentSpectrum) then
+      !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,   &
+      !       XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),             &
+      !       Distribution_IIB(:,1:iEnd),BSI_I(1:iEnd), &
+      !       nSi_I(1:iEnd)*cProtonMass,Dt)
+      ! end if
+
+  end subroutine diffuse_distribution
+  !===========================================================================
   subroutine advance_diffusion(Dt,n,Dist_I,F_I,DOuter_I,DInner_I)
 
     ! This routine solves the diffusion equation:

@@ -16,7 +16,7 @@ module SP_ModAdvance
        Shock_, NoShock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
   use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,           &
        set_wave_advection_rates, reduce_advection_rates, init_spectrum,       &
-       update_spectrum
+       update_spectrum, set_dxx, Dxx
   use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, &
        NameParticle, Io2Si_V, kinetic_energy_to_momentum
   use ModUtilities, ONLY: CON_stop
@@ -102,13 +102,14 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
-    use SP_ModTime,         ONLY: SPTime
-    use SP_ModAdvection,    ONLY: advance_log_advection,&
-         advect_via_poisson_bracket
     use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
          cElectronCharge
-    use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_, &
-         iPTest, iParticleTest, iNodeTest
+    use SP_ModTime,         ONLY: SPTime
+    use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_,   &
+         U_, T_, iPTest, iParticleTest, iNodeTest
+    use SP_ModAdvection,    ONLY: advance_log_advection, &
+         advect_via_poisson_bracket
+    use SP_ModDiffusion,    ONLY: diffuse_distribution
     real, intent(in):: TimeLimit
     ! Loop variables
     integer  :: iP, iVertex, iLine
@@ -199,7 +200,7 @@ contains
 
        ! each particles shock has crossed should be
        ! processed separately => reduce the time step
-       DtProgress = DtFull/nProgress
+       DtProgress = DtFull / nProgress
 
        ! go over each crossed particle
        PROGRESS:do iProgress = 1, nProgress
@@ -264,27 +265,37 @@ contains
              call CON_stop(NameSub//': nStep <= 0????')
           end if
           ! Store the value at the end of the previous time step
+          
           call set_coef_diffusion
+          ! if using turbulent spectrum: 
+          ! set_dxx for diffusion along the field line 
+          if(UseTurbulentSpectrum)then
+             call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+          end if
+          
+          ! Advection (with 2 different Algorithms) & Diffusion
           if(UsePoissonBracket)then
              ! update bc for advection
-             call set_advection_bc   
+             call set_advection_bc 
              ! store/update the inverse rho arrays
              InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
-             call advect_via_poisson_bracket(nP, iEnd, & 
-                 DtProgress,  Cfl,                     & 
-                 InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),&
-                 Distribution_IIB(:,1:iEnd,iLine))
+             call advect_via_poisson_bracket(nP, iEnd, DtProgress, &
+                Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),        &
+                Distribution_IIB(:,1:iEnd,iLine), iLine, XyzSI_DI, &
+                nSI_I, BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I,  &
+                UseDiffusion, UseTurbulentSpectrum)
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
-             ! Call diffusion as frequent as you want or at the
-             ! end of PROGRESS step only:
-             ! diffusion along the field line
 
-             if(UseDiffusion) call diffuse_distribution(nP,    &
-                 iLine, iEnd, BSI_I, DOuterSI_I,               &
-                 CoefDInnerSI_I, DsSI_I, DtProgress,           &
-                 XyzSI_DI, nSI_I)
+            ! !  Call diffusion as frequent as you want or at the
+            ! !  end of PROGRESS step only:
+            ! !  diffusion along the field line
+            !  if(UseDiffusion) call diffuse_distribution(       &
+            !     iLine, iEnd, DtProgress,                       &
+            !     Distribution_IIB(0:nP+1, 1:nVertexMax, line),  &
+            !     XyzSI_DI, nSI_I, BSI_I,                        &
+            !     DsSI_I, DOuterSI_I, CoefDInnerSI_I)
              DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
@@ -308,16 +319,14 @@ contains
                       CYCLE line
                    end if
                    
-                   call advance_log_advection(&
-                        FermiFirst_I(iVertex), nP, 1, 1,       &
-                        Distribution_IIB(0:nP+1,iVertex,iLine),&
-                        .false.)
+                   call advance_log_advection(FermiFirst_I(iVertex), nP,    & 
+                      1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
                 end do
 
-                if(UseDiffusion) call diffuse_distribution(nP, &
-                    iLine, iEnd, BSI_I, DOuterSI_I,            &
-                    CoefDInnerSI_I, DsSI_I, Dt,                &
-                    XyzSI_DI, nSI_I)
+                if(UseDiffusion) call diffuse_distribution(iLine, iEnd, Dt, &
+                   Distribution_IIB(0:nP+1, 1:nVertexMax, iLine),           &
+                   XyzSI_DI, nSI_I, BSI_I, DsSI_I,                          &
+                   DOuterSI_I, CoefDInnerSI_I, UseTurbulentSpectrum) 
              end do STEP
              DoInitSpectrum = .true.
           end if
@@ -476,76 +485,6 @@ contains
     end subroutine set_advection_bc
     !==========================================================================
   end subroutine advance
-  !============================================================================
-  subroutine diffuse_distribution(nP, iLine, iEnd, BSI_I,      &
-               DOuterSI_I, CoefDInnerSI_I, DsSI_I, Dt,         &
-               XyzSI_DI, nSI_I)
-      ! set up the diffusion coefficients 
-      ! diffuse the distribution function 
-
-      use ModConst, ONLY: cProtonMass
-      use SP_ModSize, ONLY: nVertexMax
-      use SP_ModDistribution, ONLY: SpeedSI_I,                 &
-               Distribution_IIB, MomentumSI_I, DLogP 
-      use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
-      use SP_ModDiffusion, ONLY: advance_diffusion
-
-      ! Variables as inputs (mandatory)
-      integer, intent(in) :: nP           ! Momentum (P) grid size
-      integer, intent(in) :: iLine, iEnd  ! input line/end indices
-      real, intent(in), dimension(nVertexMax) :: BSI_I, &
-               DOuterSI_I, CoefDInnerSI_I, DsSI_I
-      real, intent(in) :: Dt              ! Time step for diffusion
-      ! Variables as inputs (Optional)
-      real, optional, intent(in) :: XyzSI_DI(3, nVertexMax)
-      real, optional, intent(in) :: nSI_I(nVertexMax)
-
-      ! Variables declared in this subroutine
-      integer :: iP, iVertex              ! loop variables
-      real :: DInnerSI_I(nVertexMax)      ! DInner Coefficients
-      ! Full difference between DataInputTime and SPTime
-      real, parameter :: DiffCoeffMinSI = 1.0E+04
-
-      !------------------------------------------------------------------------
-      ! diffusion along the field line
-
-      if(UseTurbulentSpectrum)then
-         call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-      end if
-
-      MOMENTUM:do iP = 1, nP
-         ! For each momentum account for dependence
-         ! of the diffusion coefficient on momentum
-         ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-         if (UseTurbulentSpectrum) then
-            do iVertex=1, iEnd
-               DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
-                  MomentumSI_I(iP), SpeedSI_I(iP),          &
-                  BSI_I(iVertex)) / BSI_I(iVertex)
-            end do
-         else
-            ! Add v (= p*c^2/E_total in the relativistic case)
-            ! and (p)^(1/3)
-            DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
-               *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
-            
-            DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
-               DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-         end if
-         
-         call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
-            Distribution_IIB(iP,1:iEnd,iLine),              &
-            DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
-      end do MOMENTUM
-      
-      ! if (UseTurbulentSpectrum) then
-      !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,   &
-      !       XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),             &
-      !       Distribution_IIB(:,1:iEnd,iLine),BSI_I(1:iEnd), &
-      !       nSi_I(1:iEnd)*cProtonMass,Dt)
-      ! end if
-
-    end subroutine diffuse_distribution
   !============================================================================
 end module SP_ModAdvance
 !==============================================================================
