@@ -2,16 +2,18 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvancePoisson
-  !DESCRIPTION:
+  ! DESCRIPTION:
+  !   High resolution finite volume method for kinetic equations 
+  !   with Poisson brackets (Sokolov et al., 2023) 
+  !   https://doi.org/10.1016/j.jcp.2023.111923
   implicit none
   public :: advect_via_poisson_bracket
 contains
     !============================================================================
   subroutine advect_via_poisson_bracket(nP, nX,        &
        tFinal, CflIn, InvRhoOld_I, InvRho_I, FInOut_I, &
-       iLine, XyzSI_DI, nSI_I, BSI_I,                  &
-       DsSI_I, DOuterSI_I, CoefDInnerSI_I,             &
-       UseDiffusion)
+       iLine, iShock, XyzSI_DI, nSI_I, BSI_I, DsSI_I,  &
+       RadiusSI_I, UseDiffusion)
     ! advect via Possion Bracket + diffusion by encapsulation
     
     use ModPoissonBracket, ONLY: explicit
@@ -19,18 +21,18 @@ contains
     use SP_ModDistribution, ONLY: Momentum3SI_I, VolumeP_I, DLogP
     use SP_ModDiffusion, ONLY: diffuse_distribution
     
-    integer,intent(in):: nP, nX       ! Number of meshes along lnp-coordinate
-    real,   intent(in):: tFinal       ! time interval to advance through
-    real,   intent(in):: CflIn        ! FermiFirsr_I in ModAdvance
+    integer,intent(in):: nP, nX     ! # of meshes along lnp-coordinate
+    real,   intent(in):: tFinal     ! time interval to advance through
+    real,   intent(in):: CflIn      ! FermiFirsr_I in ModAdvance
     real,   intent(in):: InvRhoOld_I(1:nX) ! Old density (inverse)
     real,   intent(in):: InvRho_I(1:nX)    ! New density (inverse)
     real,intent(inout):: FInOut_I(0:nP+1, 1:nX)  ! Solution
     ! Variables for diffusion
-    integer, intent(in) :: iLine
-    real, intent(in) :: XyzSI_DI(3, nVertexMax)
-    real, intent(in), dimension(nVertexMax) :: nSI_I,  &
-               BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I
-    logical, intent(in) :: UseDiffusion
+    integer, intent(in) :: iLine, iShock
+    real, intent(in) :: XyzSI_DI(3, 1:nVertexMax)
+    real, intent(in), dimension(1:nVertexMax) :: nSI_I,  &
+          BSI_I, DsSI_I, RadiusSI_I
+    logical, intent(in) :: UseDiffusion   ! diffuse_Distribution or not
 
     ! Loop variables
     integer :: iP
@@ -90,9 +92,9 @@ contains
           dHamiltonian02_FY(:,iP) = - Momentum3SI_I(iP)*dVolumeSubXDt_I
        end do
 
-       call explicit(nX, nP, VDF_G, VolumeSub_G, Source_C, &
-            dHamiltonian02_FY=dHamiltonian02_FY,           &
-            dVolumeDt_G = dVolumeSubDt_G,                  &
+       call explicit(nX, nP, VDF_G, VolumeSub_G, Source_C,  &
+            dHamiltonian02_FY=dHamiltonian02_FY,            &
+            dVolumeDt_G = dVolumeSubDt_G,                   &
             DtIn=Dt,           & ! Input time step, which may be reduced
             CFLIn=CflIn,       & ! Input CFL to calculate next time step
             DtOut=DtNext)
@@ -101,11 +103,11 @@ contains
        ! Update velocity distribution function 
        VDF_G(1:nX, 1:nP) = VDF_G(1:nX, 1:nP) + Source_C 
        ! Diffuse the distribution function 
-       if (UseDiffusion) then
+       if(UseDiffusion) then
           FInOut_I = transpose(VDF_G(1:nX, 0:nP+1))
-          call diffuse_distribution(iLine, nX, Dt, FInOut_I,  &
-                XyzSI_DI, nSI_I, BSI_I, DsSI_I, DOuterSI_I,   &
-                CoefDInnerSI_I)
+          call diffuse_distribution(iLine, nX, iShock,      &
+                Dt, FInOut_I, XyzSI_DI, nSI_I,              &
+                BSI_I, DsSI_I, RadiusSI_I)
           VDF_G(1:nX, 0:nP+1) = transpose(FInOut_I)
        end if 
        ! Update the time 

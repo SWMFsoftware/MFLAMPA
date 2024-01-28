@@ -40,6 +40,7 @@ contains
     use SP_ModAdvance,       ONLY: DoTraceShock, UseDiffusion
     use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
+    use SP_ModDiffusion,     ONLY: read_param_diffuse    =>read_param
     use SP_ModDistribution,  ONLY: read_param_dist       =>read_param
     use SP_ModGrid,          ONLY: read_param_grid       =>read_param
     use SP_ModOriginPoints,  ONLY: read_param_origin     =>read_param
@@ -61,7 +62,7 @@ contains
 
     ! The name of the command
     character (len=100) :: NameCommand
-    character(len=*), parameter:: NameSub = 'read_param'
+    character(len=*), parameter :: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     ! Read the corresponding section of input file
     do
@@ -84,9 +85,11 @@ contains
        case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL','#USEFIXEDMFPUPSTREAM', '#DIFFUSION', &
-            '#TRACESHOCK', '#SCALETURBULENCE')
+       case('#INJECTION','#CFL', '#TRACESHOCK', &
+            '#POISSONBRACKET', '#DIFFUSION')!, '#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE')
           call read_param_adv(NameCommand)
+       case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE')
+          call read_param_diffuse(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')

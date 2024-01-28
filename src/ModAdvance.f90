@@ -7,18 +7,17 @@ module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
 
   use ModNumConst, ONLY: cPi
-  use ModConst,   ONLY: cLightSpeed, cGEV, cAu, cMu
+  use ModConst,   ONLY: cMu
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSI_I,           &
-        EnergySI_I, MomentumMaxSI, MomentumInjSI, DLogP 
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,  R_, x_, y_, z_,    &
-       iLineAll0, Used_B,     &
-       Shock_, NoShock_, ShockOld_, DLogRho_, Wave1_, Wave2_, nLine, nVertex_B
-  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,           &
-       set_wave_advection_rates, reduce_advection_rates, init_spectrum,       &
-       update_spectrum, set_dxx
-  use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, &
-       NameParticle, Io2Si_V, kinetic_energy_to_momentum
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB,                &
+        MomentumSI_I, MomentumInjSI, DLogP 
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,            &
+       R_, x_, y_, z_, Used_B, Shock_, NoShock_,                     &
+       ShockOld_, DLogRho_, nLine, nVertex_B
+  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
+       set_wave_advection_rates, reduce_advection_rates, init_spectrum
+  use SP_ModUnit, ONLY: UnitX_, UnitEnergy_,                         &
+       Io2Si_V, kinetic_energy_to_momentum
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -38,18 +37,8 @@ module SP_ModAdvance
   !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
   real:: Cfl=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
-  ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
-  logical, public :: UseFixedMFPUpstream = .false.
-  real    :: MeanFreePath0InAu = 1.0
-  logical, public:: DoTraceShock = .true., UseDiffusion = .true.
-
   logical :: UsePoissonBracket = .false.
-
-  ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
-  ! value of scale turbulence at 1 AU for any type (const or linear)
-  real:: ScaleTurbulenceSI = 0.03 * cAu
-  integer:: iScaleTurbulenceType
-  integer, parameter:: Const_ = 0, Linear_ = 1
+  logical, public:: DoTraceShock = .true., UseDiffusion = .true.
 
 contains
   !============================================================================
@@ -61,35 +50,16 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#INJECTION')
-       call read_var('SpectralIndex',SpectralIndex)
        call read_var('Efficiency',   CoefInj)
+       call read_var('SpectralIndex',SpectralIndex)
     case('#CFL')
        call read_var('Cfl',Cfl)
-    case('#USEFIXEDMFPUPSTREAM')
-       call read_var('UseFixedMFPUpstream',UseFixedMFPUpstream)
-       if(UseFixedMFPUpstream)then
-          ! see Li et al. (2003), doi:10.1029/2002JA009666
-          call read_var('MeanFreePath0 [AU]', MeanFreePath0InAu)
-       end if
-    case('#SCALETURBULENCE')
-       ! cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
-       call read_var('ScaleTurbulenceType', StringScaleTurbulenceType)
-       select case(StringScaleTurbulenceType)
-       case('const', 'constant')
-          iScaleTurbulenceType = Const_
-       case('linear')
-          iScaleTurbulenceType = Linear_
-       case default
-          call CON_stop(NameSub//": unknown scale turbulence type")
-       end select
-       call read_var('ScaleTurbulence [AU] at 1 AU', ScaleTurbulenceSI)
-       ScaleTurbulenceSI = ScaleTurbulenceSI * cAu
-    case('#DIFFUSION')
-       call read_var('UseDiffusion', UseDiffusion)
-    case('#TRACESHOCK')
-       call read_var('DoTraceShock', DoTraceShock)
     case('#POISSONBRACKET')
        call read_var('UsePoissonBracket',UsePoissonBracket)
+    case('#TRACESHOCK')
+       call read_var('DoTraceShock', DoTraceShock)
+    case('#DIFFUSION')
+       call read_var('UseDiffusion', UseDiffusion)
     end select
   end subroutine read_param
   !============================================================================
@@ -102,14 +72,13 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
-    use ModConst,           ONLY: cProtonMass, cGyroradius, Rsun, &
-         cElectronCharge
-    use SP_ModTime,         ONLY: SPTime
-    use SP_ModGrid,         ONLY: D_, Rho_, RhoOld_, B_, BOld_,   &
-         U_, T_, iPTest, iParticleTest, iNodeTest
-    use SP_ModAdvection,     ONLY: advance_log_advection
-    use SP_ModAdvancePoisson,ONLY: advect_via_poisson_bracket
-    use SP_ModDiffusion,    ONLY: diffuse_distribution
+    use ModConst,             ONLY: cProtonMass, Rsun
+    use SP_ModTime,           ONLY: SPTime
+    use SP_ModGrid,           ONLY: D_, Rho_, RhoOld_,   &
+          B_, BOld_, U_, T_
+    use SP_ModAdvection,      ONLY: advance_log_advection
+    use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
+    use SP_ModDiffusion,      ONLY: diffuse_distribution
     real, intent(in):: TimeLimit
     ! Loop variables
     integer  :: iP, iVertex, iLine
@@ -147,18 +116,13 @@ contains
 
     ! Local arrays to store the position and state vectors in SI units
     real :: XyzSI_DI(3, 1:nVertexMax)
-    real, dimension(1:nVertexMax):: RadiusSi_I, DsSi_I,    &
-         nSi_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I
+    real, dimension(1:nVertexMax):: RadiusSi_I, DsSI_I,    &
+         nSI_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I
     real, dimension(1:nVertexMax):: InvRhoOld_I, InvRho_I
+    real, dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
 
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
-
-    ! Coefficients in the diffusion operator
-    ! df/dt = DOuter * d(DInner * df/dx)/dx
-    ! DOuter =BSI in the cell center
-    ! DInner = DiffusionCoefficient/BSI at the face
-    real, dimension(1:nVertexMax):: DOuterSI_I, CoefDInnerSI_I
 
     ! the full time interval
     character(len=*), parameter:: NameSub = 'advance'
@@ -266,12 +230,10 @@ contains
           end if
           ! Store the value at the end of the previous time step
           
-          call set_coef_diffusion
-          ! if using turbulent spectrum: 
-          ! set_dxx for diffusion along the field line 
-          if(UseTurbulentSpectrum)then
-             call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-          end if
+          ! set the left boundary condition (for diffusion)
+          Distribution_IIB(1:nP+1, 1, iLine) = &
+                Distribution_IIB(0, 1, iLine) * &
+                (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
           
           ! Advection (with 2 different Algorithms) & Diffusion
           if(UsePoissonBracket)then
@@ -282,9 +244,8 @@ contains
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
              call advect_via_poisson_bracket(nP, iEnd, DtProgress, &
                 Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),        &
-                Distribution_IIB(:,1:iEnd,iLine), iLine, XyzSI_DI, &
-                nSI_I, BSI_I, DsSI_I, DOuterSI_I, CoefDInnerSI_I,  &
-                UseDiffusion)
+                Distribution_IIB(:,1:iEnd,iLine), iLine, iShock,   &
+                XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
 
@@ -292,10 +253,9 @@ contains
             ! !  end of PROGRESS step only:
             ! !  diffusion along the field line
             !  if(UseDiffusion) call diffuse_distribution(       &
-            !     iLine, iEnd, DtProgress,                       &
-            !     Distribution_IIB(0:nP+1, 1:nVertexMax, line),  &
-            !     XyzSI_DI, nSI_I, BSI_I,                        &
-            !     DsSI_I, DOuterSI_I, CoefDInnerSI_I)
+            !     iLine, iEnd, iShock, DtProgress,               &
+            !     Distribution_IIB(0:nP+1, 1:iEnd, line),        &
+            !     XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
              DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
@@ -309,24 +269,23 @@ contains
              ! "Inner diffusion at the injection energy (iP=0)
              STEP:do iStep = 1, nStep
                 ! update bc for advection
-                call set_advection_bc               
+                call set_advection_bc
                 ! advection in the momentum space
                 do iVertex = 2, iEnd
-                   if(any(Distribution_IIB(0:nP+1,iVertex,iLine) <0.0 )) then
+                   if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
                       write(*,*) NameSub, ': Distribution_IIB < 0'
                       Used_B(iLine) = .false.
                       nVertex_B(iLine) = 0
                       CYCLE line
                    end if
                    
-                   call advance_log_advection(FermiFirst_I(iVertex), nP,    & 
+                   call advance_log_advection(FermiFirst_I(iVertex), nP,   & 
                       1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
                 end do
 
-                if(UseDiffusion) call diffuse_distribution(iLine, iEnd, Dt, &
-                   Distribution_IIB(0:nP+1, 1:nVertexMax, iLine),           &
-                   XyzSI_DI, nSI_I, BSI_I, DsSI_I,                          &
-                   DOuterSI_I, CoefDInnerSI_I) 
+                if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
+                   iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),    &
+                   XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
              end do STEP
              DoInitSpectrum = .true.
           end if
@@ -346,7 +305,7 @@ contains
       ! Hence, below there should be norm2(\vect{U}_d - \vect{U}_u)
       !------------------------------------------------------------------------
       SpeedUpstream = nSi_I(iShock+1-nWidth)*&
-           (uSI_I(  iShock + 1 - nWidth) - uSI_I(  iShock + nWidth))/    &
+           (uSI_I(  iShock + 1 - nWidth) - uSI_I(  iShock + nWidth)) /  &
            (nSi_I(iShock + 1 - nWidth) - nSi_I(iShock + nWidth))
       SpeedAlfvenUpstream = BSI_I(iShock + nWidth)/ &
            sqrt(cMu*nSi_I(iShock + nWidth)*cProtonMass)
@@ -376,12 +335,11 @@ contains
       ! check for zero excess
       if(DLogRhoExcessIntegral == 0.0)RETURN
       ! nullify excess  within the smoothed shock
-      DLogRho_I(iShock-nWidth:iShock+nWidth) = min(&
-           DLogRhoBackground, &
-           DLogRho_I(iShock-nWidth:iShock+nWidth))
+      DLogRho_I(iShock-nWidth:iShock+nWidth) = min(DLogRhoBackground, &
+              DLogRho_I(iShock-nWidth:iShock+nWidth))
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
-      DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral/&
+      DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral / &
            DsSI_I(iVertex)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
@@ -389,67 +347,6 @@ contains
       ! pre shock part
       BSI_I(iShock+1:iShock+nWidth  )=minval(BSI_I(iShock+1:iShock+nWidth))
     end subroutine steepen_shock
-    !==========================================================================
-    subroutine set_coef_diffusion
-      ! set diffusion coefficient for the current line
-      real, dimension(1:nVertexMax):: ScaleSI_I
-      real, parameter:: cCoef = 81./7/cPi/(2*cPi)**(2./3)
-
-      !------------------------------------------------------------------------
-      DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
-
-      if(UseTurbulentSpectrum) RETURN
-
-      ! precompute scale of turbulence along the line
-      select case(iScaleTurbulenceType)
-      case(Const_)
-         ScaleSI_I(1:iEnd) = ScaleTurbulenceSI
-      case(Linear_)
-         ScaleSI_I(1:iEnd) = ScaleTurbulenceSI*RadiusSI_I(1:iEnd)/cAU
-      end select
-      ! Compute the diffusion coefficient without the contribution of
-      ! v (velocity) and p (momentum), as v and p are different for
-      ! different iP
-      if(UseFixedMFPUpstream) then
-         ! diffusion is different up- and down-stream
-         ! Sokolov et al. 2004, paragraphs before and after eq (4)
-         where(RadiusSI_I(1:iEnd) > 0.9 * RadiusSI_I(iShock))
-            ! upstream: reset the diffusion coefficient to
-            ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3)
-            ! see Li et al. (2003), doi:10.1029/2002JA009666
-            ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-            ! 1/AU cancels with unit of Lambda0,no special attention needed;
-            ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
-            CoefDInnerSI_I(1:iEnd) =                     &
-                 (1.0/3)*MeanFreePath0InAU * RadiusSI_I(1:iEnd)&
-                 *(cLightSpeed/cGEV)**(1.0/3)
-         elsewhere
-            CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-                 (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iLine),1))*    &
-                 (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
-         end where
-      else    ! .not.UseFixedMFPUpstream
-         ! Sokolov et al., 2004: eq (4),
-         ! note: Momentum = TotalEnergy * Vel / C**2
-         ! Gyroradius = cGyroRadius * momentum / |B|
-         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B|
-         ! ------------------------------------------------------
-         ! effective level of turbulence is different for different momenta:
-         ! (\delta B)**2 \propto Gyroradius^(1/3)
-         CoefDInnerSI_I(1:iEnd) =  (cCoef/3)*BSI_I(1:iEnd)**2 /       &
-              (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:iEnd,iLine),1))*    &
-              (ScaleSI_I(1:iEnd)**2*cGyroRadius/BSI_I(1:iEnd))**(1./3)
-      end if
-
-      ! Add 1/B as the actual diffusion is D/B
-      CoefDInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)/BSI_I(1:iEnd)
-
-      ! set the left boundary condition for diffusion
-      Distribution_IIB(1:nP+1, 1, iLine) = &
-           Distribution_IIB(0, 1, iLine) * &
-           (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
-
-    end subroutine set_coef_diffusion
     !==========================================================================
     subroutine set_advection_bc
       ! set boundary conditions on grid point on the current line
