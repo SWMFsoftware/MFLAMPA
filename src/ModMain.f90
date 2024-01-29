@@ -1,5 +1,5 @@
 !  Copyright (C) 2002 Regents of the University of Michigan
-! portions used with permission
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModMain
 
@@ -207,7 +207,7 @@ contains
     use SP_ModAdvance,       ONLY: DoTraceShock, advance
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
-       Rho_, nLine, nVertex_B,  DLogRho_, RhoOld_, State_VIB, MHData_VIB
+         Rho_, nLine, nVertex_B,  DLogRho_, RhoOld_, State_VIB, MHData_VIB
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: stand_alone_save_restart
     use SP_ModPlot,          ONLY: save_plot_all

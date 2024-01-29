@@ -10,7 +10,7 @@ module SP_ModAdvance
   use ModConst,   ONLY: cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                &
-        MomentumSI_I, MomentumInjSI, DLogP 
+       MomentumSI_I, MomentumInjSI, DLogP 
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,            &
        R_, x_, y_, z_, Used_B, Shock_, NoShock_,                     &
        ShockOld_, DLogRho_, nLine, nVertex_B
@@ -34,7 +34,7 @@ module SP_ModAdvance
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real:: CoefInj = 0.25, SpectralIndex = 5.0
 
-  !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
   real:: Cfl=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
   logical :: UsePoissonBracket = .false.
@@ -75,7 +75,7 @@ contains
     use ModConst,             ONLY: cProtonMass, Rsun
     use SP_ModTime,           ONLY: SPTime
     use SP_ModGrid,           ONLY: D_, Rho_, RhoOld_,   &
-          B_, BOld_, U_, T_
+         B_, BOld_, U_, T_
     use SP_ModAdvection,      ONLY: advance_log_advection
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,      ONLY: diffuse_distribution
@@ -207,10 +207,10 @@ contains
                   XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
                   dLogP, iShock, CoefInj, MachAlfven)
              ! call set_wave_advection_rates(iEnd,     &
-                 ! BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
-                 ! nSi_I(1:iEnd)*cProtonMass,  nOldSI_I(1:iEnd)*cProtonMass, &
-                 ! XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
-                 ! DLogP, DtProgress, DtReduction)
+             ! BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
+             ! nSi_I(1:iEnd)*cProtonMass,  nOldSI_I(1:iEnd)*cProtonMass, &
+             ! XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
+             ! DLogP, DtProgress, DtReduction)
 
              ! nStep = 1+int(max(DtReduction,                &
              !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
@@ -229,12 +229,12 @@ contains
              call CON_stop(NameSub//': nStep <= 0????')
           end if
           ! Store the value at the end of the previous time step
-          
+
           ! set the left boundary condition (for diffusion)
           Distribution_IIB(1:nP+1, 1, iLine) = &
-                Distribution_IIB(0, 1, iLine) * &
-                (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
-          
+               Distribution_IIB(0, 1, iLine) * &
+               (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
+
           ! Advection (with 2 different Algorithms) & Diffusion
           if(UsePoissonBracket)then
              ! update bc for advection
@@ -243,27 +243,27 @@ contains
              InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
              call advect_via_poisson_bracket(nP, iEnd, DtProgress, &
-                Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),        &
-                Distribution_IIB(:,1:iEnd,iLine), iLine, iShock,   &
-                XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
+                  Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),        &
+                  Distribution_IIB(:,1:iEnd,iLine), iLine, iShock,   &
+                  XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
 
-            ! !  Call diffusion as frequent as you want or at the
-            ! !  end of PROGRESS step only:
-            ! !  diffusion along the field line
-            !  if(UseDiffusion) call diffuse_distribution(       &
-            !     iLine, iEnd, iShock, DtProgress,               &
-            !     Distribution_IIB(0:nP+1, 1:iEnd, line),        &
-            !     XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
+             ! !  Call diffusion as frequent as you want or at the
+             ! !  end of PROGRESS step only:
+             ! !  diffusion along the field line
+             !  if(UseDiffusion) call diffuse_distribution(       &
+             !     iLine, iEnd, iShock, DtProgress,               &
+             !     Distribution_IIB(0:nP+1, 1:iEnd, line),        &
+             !     XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
              DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
              Dt = DtProgress/nStep
-             
+
              FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
              ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
-             
+
              ! compute diffusion along the field line
              ! we calculate: "Outer diffusion"=BSI_I and
              ! "Inner diffusion at the injection energy (iP=0)
@@ -278,14 +278,14 @@ contains
                       nVertex_B(iLine) = 0
                       CYCLE line
                    end if
-                   
+
                    call advance_log_advection(FermiFirst_I(iVertex), nP,   & 
-                      1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
+                        1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
                 end do
 
                 if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
-                   iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),    &
-                   XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
+                     iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),    &
+                     XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
              end do STEP
              DoInitSpectrum = .true.
           end if
@@ -336,7 +336,7 @@ contains
       if(DLogRhoExcessIntegral == 0.0)RETURN
       ! nullify excess  within the smoothed shock
       DLogRho_I(iShock-nWidth:iShock+nWidth) = min(DLogRhoBackground, &
-              DLogRho_I(iShock-nWidth:iShock+nWidth))
+           DLogRho_I(iShock-nWidth:iShock+nWidth))
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
       DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral / &
@@ -370,9 +370,9 @@ contains
               * (MomentumSI/MomentumInjSI)**SpectralIndex
 
          if (iShock /= NoShock_           .and.                         &
-            iVertex <= iShock + nWidth    .and.                         &
-            iVertex >= iShock - nWidth) then
-               CoefInjLocal = CoefInj
+              iVertex <= iShock + nWidth    .and.                         &
+              iVertex >= iShock - nWidth) then
+            CoefInjLocal = CoefInj
          endif
 
          Distribution_IIB(0,iVertex,iLine) = DistributionBc * CoefInjLocal

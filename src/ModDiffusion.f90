@@ -9,7 +9,7 @@ module SP_ModDiffusion
   ! Adapted for the use in MFLAMPA (Dist_I is an input paramater, 
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
-  
+
   use ModNumConst, ONLY: cPi
   use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu
   use SP_ModGrid, ONLY: Wave1_, Wave2_
@@ -17,12 +17,12 @@ module SP_ModDiffusion
   use ModUtilities, ONLY: CON_stop
 
   implicit none
-  
+
   SAVE
 
   PRIVATE 
-  
-  !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
+
+!!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMFPUpstream = .false.
   real    :: MeanFreePath0InAu = 1.0
@@ -68,80 +68,80 @@ contains
   end subroutine read_param
   !===========================================================================
   subroutine diffuse_distribution(iLine, iEnd, iShock, Dt,        &
-            Distribution_IIB, XyzSI_DI, nSI_I, BSI_I,             &
-            DsSI_I, RadiusSi_I)!, DOuterSI_I, CoefDInnerSI_I)
-      ! set up the diffusion coefficients 
-      ! diffuse the distribution function 
+       Distribution_IIB, XyzSI_DI, nSI_I, BSI_I,             &
+       DsSI_I, RadiusSi_I)!, DOuterSI_I, CoefDInnerSI_I)
+    ! set up the diffusion coefficients 
+    ! diffuse the distribution function 
 
-      use ModConst, ONLY: cProtonMass, cGyroradius
-      use SP_ModSize, ONLY: nVertexMax
-      use SP_ModGrid, ONLY: MHData_VIB
-      use SP_ModDistribution, ONLY: nP, SpeedSI_I, MomentumSI_I, DLogP 
-      use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+    use ModConst, ONLY: cProtonMass, cGyroradius
+    use SP_ModSize, ONLY: nVertexMax
+    use SP_ModGrid, ONLY: MHData_VIB
+    use SP_ModDistribution, ONLY: nP, SpeedSI_I, MomentumSI_I, DLogP 
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
-      ! Variables as inputs
-      ! input Line, End (for how many particles), and Shock indices
-      integer, intent(in) :: iLine, iEnd, iShock
-      real, intent(in) :: Dt              ! Time step for diffusion
-      real, intent(inout) :: Distribution_IIB(0:nP+1, 1:iEnd)
-      real, intent(in) :: XyzSI_DI(3, 1:nVertexMax)
-      real, intent(in), dimension(1:nVertexMax) :: nSI_I, BSI_I,  & 
-            DsSI_I, RadiusSi_I
-      ! Variables declared in this subroutine
-      integer :: iP, iVertex              ! loop variables
-      ! Coefficients in the diffusion operator
-      ! df/dt = DOuter * d(DInner * df/dx)/dx
-      ! DOuter =BSI in the cell center
-      ! DInner = DiffusionCoefficient/BSI at the face
-      real, dimension(1:nVertexMax) :: DOuterSI_I, & 
-            DInnerSI_I, CoefDInnerSI_I
-      ! real, dimension(1:nVertexMax) :: DInnerSI_I
-      ! real, intent(in), dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
-      ! Full difference between DataInputTime and SPTime
-      real, parameter :: DiffCoeffMinSI = 1.0E+04
+    ! Variables as inputs
+    ! input Line, End (for how many particles), and Shock indices
+    integer, intent(in) :: iLine, iEnd, iShock
+    real, intent(in) :: Dt              ! Time step for diffusion
+    real, intent(inout) :: Distribution_IIB(0:nP+1, 1:iEnd)
+    real, intent(in) :: XyzSI_DI(3, 1:nVertexMax)
+    real, intent(in), dimension(1:nVertexMax) :: nSI_I, BSI_I,  & 
+         DsSI_I, RadiusSi_I
+    ! Variables declared in this subroutine
+    integer :: iP, iVertex              ! loop variables
+    ! Coefficients in the diffusion operator
+    ! df/dt = DOuter * d(DInner * df/dx)/dx
+    ! DOuter =BSI in the cell center
+    ! DInner = DiffusionCoefficient/BSI at the face
+    real, dimension(1:nVertexMax) :: DOuterSI_I, & 
+         DInnerSI_I, CoefDInnerSI_I
+    ! real, dimension(1:nVertexMax) :: DInnerSI_I
+    ! real, intent(in), dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
+    ! Full difference between DataInputTime and SPTime
+    real, parameter :: DiffCoeffMinSI = 1.0E+04
 
-      !------------------------------------------------------------------------
-      ! diffusion along the field line
+    !------------------------------------------------------------------------
+    ! diffusion along the field line
 
-      call set_coef_diffusion
+    call set_coef_diffusion
 
-      ! if using turbulent spectrum: 
-      ! set_dxx for diffusion along the field line 
-      if(UseTurbulentSpectrum) then
-         call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-      end if
+    ! if using turbulent spectrum: 
+    ! set_dxx for diffusion along the field line 
+    if(UseTurbulentSpectrum) then
+       call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+    end if
 
-      MOMENTUM:do iP = 1, nP
-         ! For each momentum account for dependence
-         ! of the diffusion coefficient on momentum
-         ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-         if (UseTurbulentSpectrum) then
-            do iVertex=1, iEnd
-               DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
+    MOMENTUM:do iP = 1, nP
+       ! For each momentum account for dependence
+       ! of the diffusion coefficient on momentum
+       ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+       if (UseTurbulentSpectrum) then
+          do iVertex=1, iEnd
+             DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
                   MomentumSI_I(iP), SpeedSI_I(iP),          &
                   BSI_I(iVertex)) / BSI_I(iVertex)
-            end do
-         else
-            ! Add v (= p*c^2/E_total in the relativistic case)
-            ! and (p)^(1/3)
-            DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
+          end do
+       else
+          ! Add v (= p*c^2/E_total in the relativistic case)
+          ! and (p)^(1/3)
+          DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
                *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
-            
-            DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
+
+          DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
                DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-         end if
-         
-         call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
+       end if
+
+       call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
             Distribution_IIB(iP, 1:iEnd),                   &
             DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
-      end do MOMENTUM
-      
-      ! if (UseTurbulentSpectrum) then
-      !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,   &
-      !       XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),             &
-      !       Distribution_IIB(:,1:iEnd), BSI_I(1:iEnd),      &
-      !       nSI_I(1:iEnd)*cProtonMass, Dt)
-      ! end if
+    end do MOMENTUM
+
+    ! if (UseTurbulentSpectrum) then
+    !    call update_spectrum(iEnd,nP,MomentumSI_I,DLogP,   &
+    !       XyzSI_DI(:,1:iEnd), DsSI_I(1:iEnd),             &
+    !       Distribution_IIB(:,1:iEnd), BSI_I(1:iEnd),      &
+    !       nSI_I(1:iEnd)*cProtonMass, Dt)
+    ! end if
   contains
     !==========================================================================
     subroutine set_coef_diffusion
@@ -217,7 +217,7 @@ contains
     real,   intent(inout):: F_I(n) !In:sol.to be advanced; Out:advanced sol
     !Laplace multiplier and diffusion coefficient.
     real,   intent(in   ):: DOuter_I(n), DInner_I(n)
-   
+
     !Mesh spacing and face spacing.
     real                 :: DsMesh_I(2:n), DsFace_I(2:n-1)
     !Main, upper, and lower diagonals.
@@ -295,10 +295,10 @@ contains
     R_I = F_I
     call tridiag(n,Lower_I,Main_I,Upper_I,R_I,F_I)
 
-  end subroutine advance_diffusion 
+  end subroutine advance_diffusion
   !===========================================================================
   subroutine tridiag(n, L_I, M_I, U_I, R_I, W_I)
-    
+
     ! This routine solves three-diagonal system of equations: 
     !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
     !  ||l_2 m_2 u_2...        || ||w_2|| ||r_2||
