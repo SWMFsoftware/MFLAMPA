@@ -32,6 +32,7 @@ module SP_ModAdvection
 contains
   !============================================================================
   !===========advance_log_advection=======================================
+  ! The procedure integrates the log-advection equation, in
   ! the conservative or non-conservative formulation, at a logarithmic grid,
   ! using a single-stage second order scheme
   subroutine advance_log_advection(CFLIn, nP, nGCLeft, nGCRight,        &
