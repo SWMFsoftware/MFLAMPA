@@ -211,7 +211,7 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
-    
+
   end subroutine read_param
   !============================================================================
   subroutine init
@@ -315,7 +315,7 @@ contains
        ! reset variables read from file or received via coupler
        MHData_VIB(1:nMHData, 1:iEnd, iLine) = 0.0
     end do
-    
+
   end subroutine copy_old_state
   !============================================================================
   subroutine get_other_state_var

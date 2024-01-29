@@ -50,7 +50,7 @@ module SP_ModDistribution
   ! speed, momentum, kinetic energy and total energy (including the rest
   ! mass energy) at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSI_I, MomentumSI_I, &
-       KinEnergySI_I, EnergySI_I, VolumeP_I  
+       KinEnergySI_I, EnergySI_I, VolumeP_I
   real, public :: Momentum3SI_I(-1:nP+1)
 
   ! Total integral (simulated) particle flux
@@ -230,7 +230,7 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
-    
+
   end subroutine read_param
   !============================================================================
   subroutine offset(iLine, iOffset)

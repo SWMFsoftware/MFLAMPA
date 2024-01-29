@@ -11,15 +11,16 @@ module SP_ModSize
 
   ! Dimensionality
   integer, parameter:: nDim = 3
-      
+
   ! Max possible index of a particle on a line set by Config.pl
   integer, parameter:: nVertexMax = 1000
 
   ! number of points along the phase coords (see ModAdvance);
   integer, parameter:: nMomentum   = 100
-  integer, parameter:: nPitchAngle = 1  
+  integer, parameter:: nPitchAngle = 1
 
   ! whether to use pitch-angle averaged equations
   logical, parameter:: IsPitchAngleAveraged = nPitchAngle == 1
 
 end module SP_ModSize
+!==============================================================================

@@ -62,9 +62,9 @@ contains
 
     ! The name of the command
     character (len=100) :: NameCommand
-    character(len=*), parameter :: NameSub = 'read_param'
-    !--------------------------------------------------------------------------
     ! Read the corresponding section of input file
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
     do
        if(.not.read_line() ) then
           IsLastRead = .true.

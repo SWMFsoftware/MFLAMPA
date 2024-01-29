@@ -2,7 +2,6 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvection
-  !DESCRIPTION:
   ! Solves advection in the momentum space (=first order Fermi acceleration)
   ! First way - solve advection over log P coordinate.
   ! In space physics applications one often needs to solve the
@@ -33,7 +32,6 @@ module SP_ModAdvection
 contains
   !============================================================================
   !===========advance_log_advection=======================================
-  ! DESCRIPTION: the procedure integrates the log-advection equation, in
   ! the conservative or non-conservative formulation, at a logarithmic grid,
   ! using a single-stage second order scheme
   subroutine advance_log_advection(CFLIn, nP, nGCLeft, nGCRight,        &
@@ -80,6 +78,7 @@ contains
     ! For CFL<0:
     ! f^n_(i-1/2)=f^n_(i  )*(1-(1/2)*A*Delta t)-cHalf*(cOne+CFL)*df_lim^n_(i  )
 
+    !--------------------------------------------------------------------------
     if(IsConservative)then
        HalfADtIfNeeded = 0.50*CFLIn*DeltaLnP
        CFL = HalfADtIfneeded/tanh(0.50 * DeltaLnP)
@@ -152,6 +151,7 @@ contains
     end if
     !------------------------------------ DONE -------------------------------!
   contains
+    !==========================================================================
     real function df_lim(i)
       integer, intent(in):: i
 
@@ -173,3 +173,4 @@ contains
   end subroutine advance_log_advection
   !============================================================================
 end module SP_ModAdvection
+!==============================================================================

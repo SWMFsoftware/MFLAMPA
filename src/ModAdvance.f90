@@ -10,7 +10,7 @@ module SP_ModAdvance
   use ModConst,   ONLY: cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                &
-       MomentumSI_I, MomentumInjSI, DLogP 
+       MomentumSI_I, MomentumInjSI, DLogP
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,            &
        R_, x_, y_, z_, Used_B, Shock_, NoShock_,                     &
        ShockOld_, DLogRho_, nLine, nVertex_B
@@ -154,7 +154,7 @@ contains
        iShockOld = iShock_IB(ShockOld_,iLine)
        if(DoTraceShock)then
           ! This is how many steps should be done to allow the shock to
-          ! the move not more than one mesh size 
+          ! the move not more than one mesh size
           nProgress = MAX(1, iShock - iShockOld)
           iShockOld = MIN(iShockOld, iShock-1)
        else
@@ -238,7 +238,7 @@ contains
           ! Advection (with 2 different Algorithms) & Diffusion
           if(UsePoissonBracket)then
              ! update bc for advection
-             call set_advection_bc 
+             call set_advection_bc
              ! store/update the inverse rho arrays
              InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
@@ -279,7 +279,7 @@ contains
                       CYCLE line
                    end if
 
-                   call advance_log_advection(FermiFirst_I(iVertex), nP,   & 
+                   call advance_log_advection(FermiFirst_I(iVertex), nP,   &
                         1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
                 end do
 

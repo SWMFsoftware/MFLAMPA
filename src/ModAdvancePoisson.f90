@@ -2,9 +2,8 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvancePoisson
-  ! DESCRIPTION:
-  !   High resolution finite volume method for kinetic equations 
-  !   with Poisson brackets (Sokolov et al., 2023) 
+  !   High resolution finite volume method for kinetic equations
+  !   with Poisson brackets (Sokolov et al., 2023)
   !   https://doi.org/10.1016/j.jcp.2023.111923
   implicit none
   public :: advect_via_poisson_bracket
@@ -49,19 +48,19 @@ contains
     real    :: dHamiltonian02_FY(0:nX+1, -1:nP+1)
     real    :: VDF_G(-1:nX+2, -1:nP+2), Source_C(nX, nP)
     real    :: Time, Dt, DtTrial, DtInv, DtNext
-    !--------------------------------------------------------------------------
     ! Now this is the conservative form for the particle number
 
-    ! Initialize the CFL number, (sub-)nStep and arrays 
-    Source_C   = 0.0 
-    VDF_G      = 1.0e-8 
+    ! Initialize the CFL number, (sub-)nStep and arrays
+    !--------------------------------------------------------------------------
+    Source_C   = 0.0
+    VDF_G      = 1.0e-8
     VDF_G(1:nX, 0:nP+1) = transpose(FInOut_I)
 
     ! Volume initialization: use 1 ghost point at each side of the boundary
     VolumeXOld_I(1:nX)  = InvRhoOld_I
     VolumeXOld_I(0)     = VolumeXOld_I(1)
     VolumeXOld_I(nX+1)  = VolumeXOld_I(nX)
-    VolumeX_I(1:nX)     = InvRho_I 
+    VolumeX_I(1:nX)     = InvRho_I
     VolumeX_I(0)        = VolumeX_I(1)
     VolumeX_I(nX+1)     = VolumeX_I(nX)
     VolumeSubX_I        = VolumeXOld_I
@@ -74,14 +73,14 @@ contains
     DtNext  = DtTrial
 
     ! Advection by Poisson Bracket Algorithm
-    do 
+    do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time); DtInv = 1.0/Dt
 
        ! Volume Updates
        VolumeSubXOld_I = VolumeSubX_I
        VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
-       do iP = 0, nP+1 
+       do iP = 0, nP+1
           VolumeSubOld_G(:,iP) = VolumeP_I(iP)*VolumeSubXOld_I
           VolumeSub_G(:,iP)    = VolumeP_I(iP)*VolumeSubX_I
        end do
@@ -100,9 +99,9 @@ contains
             DtOut=DtNext)
        VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
 
-       ! Update velocity distribution function 
-       VDF_G(1:nX, 1:nP) = VDF_G(1:nX, 1:nP) + Source_C 
-       ! Diffuse the distribution function 
+       ! Update velocity distribution function
+       VDF_G(1:nX, 1:nP) = VDF_G(1:nX, 1:nP) + Source_C
+       ! Diffuse the distribution function
        if(UseDiffusion) then
           FInOut_I = transpose(VDF_G(1:nX, 0:nP+1))
           call diffuse_distribution(iLine, nX, iShock,      &
@@ -110,7 +109,7 @@ contains
                BSI_I, DsSI_I, RadiusSI_I)
           VDF_G(1:nX, 0:nP+1) = transpose(FInOut_I)
        end if
-       ! Update the time 
+       ! Update the time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
 
@@ -127,3 +126,4 @@ contains
   end subroutine advect_via_poisson_bracket
   !============================================================================
 end module SP_ModAdvancePoisson
+!==============================================================================
