@@ -86,7 +86,7 @@ contains
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
        case('#INJECTION','#CFL', '#TRACESHOCK', &
-            '#POISSONBRACKET', '#DIFFUSION')!, '#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE')
+            '#POISSONBRACKET', '#DIFFUSION')
           call read_param_adv(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE')
           call read_param_diffuse(NameCommand)
