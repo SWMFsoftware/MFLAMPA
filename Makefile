@@ -87,6 +87,7 @@ allclean:
 # Testing
 
 TESTDIR = run_test
+BLESS=NO
 
 test: test_mflampa
 
@@ -116,7 +117,7 @@ test_mflampa_run:
 test_mflampa_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
 		> ${TESTDIR}/SP/IO2/MH_data.outs
-	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
+	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
 		${TESTDIR}/SP/IO2/MH_data.outs \
 		data/output/test_mflampa/MH_data.ref.gz \
 		> test_mflampa.diff
