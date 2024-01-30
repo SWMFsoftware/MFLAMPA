@@ -91,17 +91,12 @@ TESTDIR = run_test
 test: test_mflampa
 
 test_mflampa:
-##### This configures (if needed) and compiles the code
 	@echo "test_mflampa_compile..." > test_mflampa.diff
 	${MAKE} test_mflampa_compile
-##### This creates the run directory and, particularly,
-##### copies the parameter input file (SP/MFLAMPA/Param/PARAM.in.test) to it 
 	@echo "test_mflampa_rundir..." >> test_mflampa.diff
 	${MAKE} test_mflampa_rundir
-##### This runs the code and produces some output results
 	@echo "test_mflampa_run..." >> test_mflampa.diff
 	${MAKE} test_mflampa_run
-##### This compares the output results with the reference solution
 	@echo "test_mflampa_check..." >> test_mflampa.diff
 	${MAKE} test_mflampa_check
 
@@ -120,9 +115,9 @@ test_mflampa_run:
 
 test_mflampa_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
-		> ${TESTDIR}/SP/IO2/MH_dataPoisson.outs
+		> ${TESTDIR}/SP/IO2/MH_data.outs
 	${SCRIPTDIR}/DiffNum.pl -t -r=1e-6 -a=1e-6 \
-		${TESTDIR}/SP/IO2/MH_dataPoisson.outs \
-		data/output/test_mflampa/MH_dataPoisson.ref.gz \
+		${TESTDIR}/SP/IO2/MH_data.outs \
+		data/output/test_mflampa/MH_data.ref.gz \
 		> test_mflampa.diff
 	ls -l test_mflampa.diff
