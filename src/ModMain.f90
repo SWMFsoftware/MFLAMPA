@@ -49,7 +49,7 @@ contains
     use SP_ModRestart,       ONLY: read_param_restart    =>read_param
     use SP_ModTime,          ONLY: read_param_time       =>read_param
     use SP_ModTiming,        ONLY: read_param_timing     =>read_param
-    use SP_ModTurbulence,    ONLY: read_param_turbulence =>read_param
+    ! use SP_ModTurbulence,    ONLY: read_param_turbulence =>read_param
     use SP_ModUnit,          ONLY: read_param_unit       =>read_param
 
     ! Read input parameters for SP component
@@ -94,8 +94,9 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
-       case('#TURBULENTSPECTRUM', '#INITSPECTRUM', '#ADVECTIONWITHALFVENSPEED')
-          call read_param_turbulence(NameCommand)
+          ! case('#TURBULENTSPECTRUM', '#INITSPECTRUM', &
+          ! '#ADVECTIONWITHALFVENSPEED')
+          ! call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')
           call read_param_unit(NameCommand)
        case('#SPREADGRID', '#SPREADSOLIDANGLE', '#SPREADSIGMA')
@@ -167,7 +168,7 @@ contains
     use SP_ModRestart,       ONLY: &
          read_restart
     use SP_ModTime,          ONLY: init_time       => init
-    use SP_ModTurbulence,    ONLY: init_turbulence => init
+    ! use SP_ModTurbulence,    ONLY: init_turbulence => init
     use SP_ModUnit,          ONLY: init_unit       => init
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
@@ -181,7 +182,7 @@ contains
     call init_dist
     call init_plot
     call init_mhdata
-    call init_turbulence
+    ! call init_turbulence
     call init_spread
     if(DoRestart) call read_restart
     if(IsStandAlone) call init_time
@@ -192,13 +193,13 @@ contains
 
     use SP_ModPlot,       ONLY: finalize_plot       =>finalize
     use SP_ModReadMhData, ONLY: finalize_read       =>finalize
-    use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
+    ! use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
     ! finalize the model
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
     call finalize_plot
     call finalize_read
-    call finalize_turbulence
+    ! call finalize_turbulence
 
   end subroutine finalize
   !============================================================================

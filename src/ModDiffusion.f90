@@ -13,7 +13,7 @@ module SP_ModDiffusion
   use ModNumConst, ONLY: cPi
   use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu
   use SP_ModGrid, ONLY: Wave1_, Wave2_
-  use SP_ModTurbulence, ONLY: update_spectrum
+  ! use SP_ModTurbulence, ONLY: update_spectrum
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -77,7 +77,7 @@ contains
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModGrid, ONLY: MHData_VIB
     use SP_ModDistribution, ONLY: nP, SpeedSI_I, MomentumSI_I, DLogP
-    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+    ! use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -107,29 +107,29 @@ contains
 
     ! if using turbulent spectrum:
     ! set_dxx for diffusion along the field line
-    if(UseTurbulentSpectrum) then
-       call set_dxx(iEnd, nP, BSI_I(1:iEnd))
-    end if
+    ! if(UseTurbulentSpectrum) then
+    !   call set_dxx(iEnd, nP, BSI_I(1:iEnd))
+    ! end if
 
     MOMENTUM:do iP = 1, nP
        ! For each momentum account for dependence
        ! of the diffusion coefficient on momentum
        ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-       if (UseTurbulentSpectrum) then
-          do iVertex=1, iEnd
-             DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
-                  MomentumSI_I(iP), SpeedSI_I(iP),          &
-                  BSI_I(iVertex)) / BSI_I(iVertex)
-          end do
-       else
-          ! Add v (= p*c^2/E_total in the relativistic case)
-          ! and (p)^(1/3)
-          DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
-               *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
+       ! if (UseTurbulentSpectrum) then
+       !   do iVertex=1, iEnd
+       !      DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
+       !           MomentumSI_I(iP), SpeedSI_I(iP),          &
+       !           BSI_I(iVertex)) / BSI_I(iVertex)
+       !   end do
+       ! else
+       ! Add v (= p*c^2/E_total in the relativistic case)
+       ! and (p)^(1/3)
+       DInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd)     &
+            *SpeedSI_I(iP)*(MomentumSI_I(iP))**(1.0/3)
 
-          DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
-               DiffCoeffMinSI/DOuterSI_I(1:iEnd))
-       end if
+       DInnerSI_I(1:iEnd) = max(DInnerSI_I(1:iEnd),    &
+            DiffCoeffMinSI/DOuterSI_I(1:iEnd))
+       ! end if
 
        call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
             Distribution_IIB(iP, 1:iEnd),                   &
@@ -152,7 +152,7 @@ contains
       !------------------------------------------------------------------------
       DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
 
-      if(UseTurbulentSpectrum) RETURN
+      ! if(UseTurbulentSpectrum) RETURN
 
       ! precompute scale of turbulence along the line
       select case(iScaleTurbulenceType)

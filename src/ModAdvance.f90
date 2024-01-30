@@ -14,8 +14,8 @@ module SP_ModAdvance
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,            &
        R_, x_, y_, z_, Used_B, Shock_, NoShock_,                     &
        ShockOld_, DLogRho_, nLine, nVertex_B
-  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
-       set_wave_advection_rates, reduce_advection_rates, init_spectrum
+  !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
+    !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
   use SP_ModUnit, ONLY: UnitX_, UnitEnergy_,                         &
        Io2Si_V, kinetic_energy_to_momentum
   use ModUtilities, ONLY: CON_stop
@@ -201,11 +201,11 @@ contains
           ! first order Fermi acceleration for the current line, dimensionless
           FermiFirst_I(1:iEnd) = DLogRho_I(1:iEnd) / (3*DLogP)
 
-          if(UseTurbulentSpectrum)then
+          ! if(UseTurbulentSpectrum)then
              ! Calculate the Alfven speed
-             if (DoInitSpectrum) call init_spectrum(iEnd,              &
-                  XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
-                  dLogP, iShock, CoefInj, MachAlfven)
+             ! if (DoInitSpectrum) call init_spectrum(iEnd,              &
+             !     XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
+             !     dLogP, iShock, CoefInj, MachAlfven)
              ! call set_wave_advection_rates(iEnd,     &
              ! BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
              ! nSi_I(1:iEnd)*cProtonMass,  nOldSI_I(1:iEnd)*cProtonMass, &
@@ -214,16 +214,16 @@ contains
 
              ! nStep = 1+int(max(DtReduction,                &
              !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
-             nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
-          else
-             ! How many steps should be done to the CFL criterion is fulfilled
-             nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
-          end if
+             ! nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
+          ! else
+          ! How many steps should be done to the CFL criterion is fulfilled
+          nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
+          ! end if
 
           ! Check if the number of time steps is positive:
           if(nStep < 1)then
-             if(UseTurbulentSpectrum) &
-                  write(*,*) ' DtReduction               =', DtReduction
+             ! if(UseTurbulentSpectrum) &
+             !     write(*,*) ' DtReduction               =', DtReduction
              write(*,*) ' maxval(abs(FermiFirst_I)) =', &
                   maxval(abs(FermiFirst_I(2:iEnd)))
              call CON_stop(NameSub//': nStep <= 0????')
@@ -248,15 +248,7 @@ contains
                   XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
-
-             ! !  Call diffusion as frequent as you want or at the
-             ! !  end of PROGRESS step only:
-             ! !  diffusion along the field line
-             !  if(UseDiffusion) call diffuse_distribution(       &
-             !     iLine, iEnd, iShock, DtProgress,               &
-             !     Distribution_IIB(0:nP+1, 1:iEnd, line),        &
-             !     XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
-             DoInitSpectrum = .true.
+             ! DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
              Dt = DtProgress/nStep
@@ -287,7 +279,7 @@ contains
                      iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),    &
                      XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
              end do STEP
-             DoInitSpectrum = .true.
+             ! DoInitSpectrum = .true.
           end if
        end do PROGRESS
     end do line

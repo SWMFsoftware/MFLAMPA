@@ -25,8 +25,9 @@ OBJECTS = \
 	ModTime.o \
 	SP_ModTiming.o \
 	ModUnit.o \
-	ModWrite.o \
-	ModTurbulence.o
+	ModWrite.o
+# \
+#	ModTurbulence.o
 
 # Object files not included into the library
 OBJECTS_EXE = SP_stand_alone.o

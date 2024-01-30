@@ -156,9 +156,9 @@ module SP_ModGrid
 
   ! whether to use smoothing of length along lines,
   ! e.g. when random walking lines are used
-  logical:: DoSmooth = .false.
+  ! logical:: DoSmooth = .false.
   ! size of groups used for smoothing
-  integer:: nSmooth = -1
+  ! integer:: nSmooth = -1
 
   ! Test position and momentum
   integer, public :: iPTest =1, iParticleTest = 99, iNodeTest =1
@@ -193,13 +193,13 @@ contains
     case('#COORDSYSTEM','#COORDINATESYSTEM')
        call read_var('TypeCoordSystem', TypeCoordSystem, &
             IsUpperCase=.true.)
-    case('#DOSMOOTH')
-       call read_var('DoSmooth', DoSmooth)
-       if(DoSmooth)then
-          call read_var('nSmooth', nSmooth)
-          if(nSmooth < 1)&
-               call CON_stop(NameSub//': Invalid setting for line smoothing')
-       end if
+    ! case('#DOSMOOTH')
+    !   call read_var('DoSmooth', DoSmooth)
+    !   if(DoSmooth)then
+    !      call read_var('nSmooth', nSmooth)
+    !      if(nSmooth < 1)&
+    !           call CON_stop(NameSub//': Invalid setting for line smoothing')
+    !   end if
     case('#GRIDNODE')
        call read_var('nLat',  nLat)
        call read_var('nLon',  nLon)
@@ -335,26 +335,26 @@ contains
           State_VIB(B_,iVertex, iLine) = &
                norm2(MHData_VIB(Bx_:Bz_,iVertex,iLine))
           ! distances between particles
-          if(.not.DoSmooth)then
-             if(iVertex /=nVertex_B(iLine))&
-                  State_VIB(D_, iVertex, iLine) = norm2(&
-                  MHData_VIB(X_:Z_, iVertex    , iLine) - &
-                  MHData_VIB(X_:Z_, iVertex + 1, iLine))
-          else
-             ! smoothing is done by groups:
-             ! nSmooth particles are aggeregated into single effective one,
-             ! find length increment between effective particles are used
-             ! to find length increment between regular particles
-             iAux1 = nSmooth * max(1, min(&
-                  iVertex/nSmooth,nVertex_B(iLine)/nSmooth-1))
-             iAux2 = iAux1 + nSmooth
-             XyzAux1_D = sum(MHData_VIB(&
-                  X_:Z_,iAux1-nSmooth+1:iAux1,iLine),DIM=2)/nSmooth
-             XyzAux2_D = sum(MHData_VIB(&
-                  X_:Z_,iAux2-nSmooth+1:iAux2,iLine),DIM=2)/nSmooth
-             State_VIB(D_, iVertex, iLine) = &
-                  sqrt(sum((XyzAux2_D - XyzAux1_D)**2)) / nSmooth
-          end if
+          ! if(.not.DoSmooth)then
+          if(iVertex /=nVertex_B(iLine))&
+               State_VIB(D_, iVertex, iLine) = norm2(&
+               MHData_VIB(X_:Z_, iVertex    , iLine) - &
+               MHData_VIB(X_:Z_, iVertex + 1, iLine))
+          ! else
+          ! smoothing is done by groups:
+          ! nSmooth particles are aggeregated into single effective one,
+          ! find length increment between effective particles are used
+          ! to find length increment between regular particles
+          ! iAux1 = nSmooth * max(1, min(&
+          !     iVertex/nSmooth,nVertex_B(iLine)/nSmooth-1))
+          ! iAux2 = iAux1 + nSmooth
+          ! XyzAux1_D = sum(MHData_VIB(&
+          !     X_:Z_,iAux1-nSmooth+1:iAux1,iLine),DIM=2)/nSmooth
+          ! XyzAux2_D = sum(MHData_VIB(&
+          !     X_:Z_,iAux2-nSmooth+1:iAux2,iLine),DIM=2)/nSmooth
+          ! State_VIB(D_, iVertex, iLine) = &
+          !     sqrt(sum((XyzAux2_D - XyzAux1_D)**2)) / nSmooth
+          ! end if
           ! distance from the beginning of the line
           if(iVertex == 1)then
              State_VIB(S_, iVertex, iLine) = 0.0
