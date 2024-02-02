@@ -242,7 +242,7 @@ contains
              ! store/update the inverse rho arrays
              InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
              InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
-             call advect_via_poisson_bracket(nP, iEnd, DtProgress, &
+             call advect_via_poisson_bracket(iEnd, DtProgress,       &
                   Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),        &
                   Distribution_IIB(:,1:iEnd,iLine), iLine, iShock,   &
                   XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)

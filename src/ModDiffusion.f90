@@ -102,7 +102,7 @@ contains
     ! diffusion along the field line
 
     !--------------------------------------------------------------------------
-    call set_coef_diffusion
+    call set_diffusion_coef
 
     ! if using turbulent spectrum:
     ! set_dxx for diffusion along the field line
@@ -143,7 +143,7 @@ contains
     ! end if
   contains
     !==========================================================================
-    subroutine set_coef_diffusion
+    subroutine set_diffusion_coef
       ! set diffusion coefficient for the current line
       real, dimension(1:nVertexMax) :: ScaleSI_I
       real, parameter :: cCoef = 81./7/cPi/(2*cPi)**(2.0/3)
@@ -197,7 +197,7 @@ contains
       ! Add 1/B as the actual diffusion is D/B
       CoefDInnerSI_I(1:iEnd) = CoefDInnerSI_I(1:iEnd) / BSI_I(1:iEnd)
 
-    end subroutine set_coef_diffusion
+    end subroutine set_diffusion_coef
     !==========================================================================
   end subroutine diffuse_distribution
   !============================================================================
