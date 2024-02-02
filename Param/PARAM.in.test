@@ -37,7 +37,7 @@ real8
 #SAVEPLOT
 3
 mh1d flux ascii
-mh2d flux spread ascii
+mh2d flux ascii
 215.0
 mhtime flux ascii
 215.0
