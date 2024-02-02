@@ -89,7 +89,9 @@ allclean:
 TESTDIR = run_test
 BLESS=NO
 
-test: test_mflampa
+test:
+	${MAKE} test_mflampa
+	${MAKE} test_poisson TESTDIR=run_poisson
 
 test_mflampa:
 	@echo "test_mflampa_compile..." > test_mflampa.diff
@@ -100,6 +102,14 @@ test_mflampa:
 	${MAKE} test_mflampa_run
 	@echo "test_mflampa_check..." >> test_mflampa.diff
 	${MAKE} test_mflampa_check
+
+test_poisson:
+	@echo "test_poisson_rundir..." > test_poisson.diff
+	${MAKE} test_poisson_rundir
+	@echo "test_poisson_run..." >> test_poisson.diff
+	${MAKE} test_poisson_run
+	@echo "test_poisson_check..." >> test_poisson.diff
+	${MAKE} test_poisson_check
 
 test_mflampa_compile:
 	./Config.pl -g=20000
@@ -122,3 +132,21 @@ test_mflampa_check:
 		data/output/test_mflampa/MH_data.ref.gz \
 		> test_mflampa.diff
 	ls -l test_mflampa.diff
+
+test_poisson_rundir: 
+	rm -rf ${TESTDIR}
+	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
+	cd ${TESTDIR}; cp -f Param/PARAM.in.testpoisson PARAM.in
+	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
+
+test_poisson_run:
+	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
+
+test_poisson_check:
+	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
+		> ${TESTDIR}/SP/IO2/MH_data.outs
+	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/MH_data.outs \
+		data/output/test_mflampa/MH_poisson_data.ref.gz \
+		> test_poisson.diff
+	ls -l test_*.diff
