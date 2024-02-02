@@ -11,7 +11,7 @@ module SP_ModDiffusion
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
 
   use ModNumConst, ONLY: cPi
-  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu
+  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun
   use SP_ModGrid, ONLY: Wave1_, Wave2_
   ! use SP_ModTurbulence, ONLY: update_spectrum
   use ModUtilities, ONLY: CON_stop
@@ -30,8 +30,8 @@ module SP_ModDiffusion
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
   real :: ScaleTurbulenceSI = 0.03 * cAu
-  integer :: iScaleTurbulenceType
   integer, parameter :: Const_ = 0, Linear_ = 1
+  integer :: iScaleTurbulenceType = Const_
 
   ! Public members:
   public :: read_param, diffuse_distribution, advance_diffusion
@@ -68,8 +68,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine diffuse_distribution(iLine, iEnd, iShock, Dt,        &
-       Distribution_IIB, XyzSI_DI, nSI_I, BSI_I,             &
-       DsSI_I, RadiusSi_I)!, DOuterSI_I, CoefDInnerSI_I)
+       Distribution_IIB, XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSi_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
 
@@ -98,7 +97,7 @@ contains
     ! real, dimension(1:nVertexMax) :: DInnerSI_I
     ! real, intent(in), dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
     ! Full difference between DataInputTime and SPTime
-    real, parameter :: DiffCoeffMinSI = 1.0E+04
+    real, parameter :: DiffCoeffMinSI = 1.0E+04*Rsun
 
     ! diffusion along the field line
 
