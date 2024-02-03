@@ -37,7 +37,7 @@ contains
   !============================================================================
   subroutine read_param
 
-    use SP_ModAdvance,       ONLY: DoTraceShock, UseDiffusion
+    use SP_ModAdvance,       ONLY: DoTraceShock
     use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
     use SP_ModDiffusion,     ONLY: read_param_diffuse    =>read_param
@@ -86,9 +86,9 @@ contains
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
        case('#INJECTION','#CFL', '#TRACESHOCK', &
-            '#POISSONBRACKET', '#DIFFUSION')
+            '#POISSONBRACKET')
           call read_param_adv(NameCommand)
-       case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE')
+       case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
           call read_param_diffuse(NameCommand)
        case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
           call read_param_plot(NameCommand)
@@ -106,8 +106,8 @@ contains
        case('#TIMING')
           call read_param_timing
        case('#TEST')
-          call read_var('DoTraceShock', DoTraceShock)
-          call read_var('UseDiffusion', UseDiffusion)
+          call read_param_adv('#TRACESHOCK')
+          call read_param_diffuse('#DIFFUSION')
        case('#END')
           call check_stand_alone
           IsLastRead=.true.

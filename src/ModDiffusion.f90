@@ -21,7 +21,7 @@ module SP_ModDiffusion
   SAVE
 
   PRIVATE
-
+  logical, public :: UseDiffusion = .true.
   ! Local parameters!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMFPUpstream = .false.
@@ -64,6 +64,8 @@ contains
        end select
        call read_var('ScaleTurbulence [AU] at 1 AU', ScaleTurbulenceSI)
        ScaleTurbulenceSI = ScaleTurbulenceSI * cAu
+    case('#DIFFUSION')
+       call read_var('UseDiffusion', UseDiffusion)
     end select
   end subroutine read_param
   !============================================================================

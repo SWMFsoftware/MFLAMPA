@@ -8,7 +8,7 @@ module SP_ModAdvance
   use ModConst,   ONLY: cPi, cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
-       MomentumSI_I, MomentumInjSI, DLogP
+       MomentumSi_I, MomentumInjSI, DLogP
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
        Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
@@ -35,7 +35,7 @@ module SP_ModAdvance
   real:: Cfl=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
   logical :: UsePoissonBracket = .false.
-  logical, public:: DoTraceShock = .true., UseDiffusion = .true.
+  logical, public:: DoTraceShock = .true.
 
 contains
   !============================================================================
@@ -55,8 +55,8 @@ contains
        call read_var('UsePoissonBracket',UsePoissonBracket)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)
-    case('#DIFFUSION')
-       call read_var('UseDiffusion', UseDiffusion)
+    case default
+       call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
   end subroutine read_param
   !============================================================================
@@ -74,7 +74,7 @@ contains
     use SP_ModGrid,           ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_
     use SP_ModAdvection,      ONLY: advance_log_advection
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
-    use SP_ModDiffusion,      ONLY: diffuse_distribution
+    use SP_ModDiffusion,      ONLY: UseDiffusion, diffuse_distribution
     real, intent(in):: TimeLimit
     ! Loop variables
     integer  :: iP, iVertex, iLine
@@ -107,13 +107,14 @@ contains
     real      :: DtProgress
     ! Time step in the STEP Loop, DtProgress/nStep
     real      :: Dt
-    real      :: MachAlfven
+    ! used only with the turbulence model ON
+    ! real      :: MachAlfven
     real      :: DtReduction
 
     ! Local arrays to store the position and state vectors in SI units
-    real :: XyzSI_DI(3, 1:nVertexMax)
-    real, dimension(1:nVertexMax):: RadiusSi_I, DsSI_I,    &
-         nSI_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I
+    real :: XyzSi_DI(3, 1:nVertexMax)
+    real, dimension(1:nVertexMax):: RadiusSi_I, DsSi_I,    &
+         nSi_I, uSi_I, BSi_I, BOldSi_I, nOldSi_I
 
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
@@ -136,12 +137,12 @@ contains
        ! are in SI units. So to convert the IO units, the three conversion
        ! factors are needed as follows:
        ! UnitX_, UnitRho_, UnitEnergy_
-       XyzSI_DI(x_:z_,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2SI_V(UnitX_)
-       DsSI_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
-       RadiusSI_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iLine)*IO2SI_V(UnitX_)
-       uSI_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
-       BOldSI_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
-       nOldSI_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
+       XyzSi_DI(x_:z_,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2Si_V(UnitX_)
+       DsSi_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iLine)*IO2Si_V(UnitX_)
+       RadiusSi_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iLine)*IO2Si_V(UnitX_)
+       uSi_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
+       BOldSi_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
+       nOldSi_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iLine)
@@ -168,88 +169,85 @@ contains
           ! Recall that MhData_VIB(Rho_) and State_VIB(RhoOld_) are in
           ! the unit of amu/m^3.
           !
-          ! nSI is needed to set up the distribution at the injection.
+          ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
           nSI_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine) + Alpha* &
                (MhData_VIB(Rho_,  1:iEnd,iLine) - &
                State_VIB(RhoOld_,1:iEnd,iLine))
-          ! dimensionless
-          DLogRho_I(1:iEnd)=log(nSI_I(1:iEnd)/nOldSI_I(1:iEnd))
 
-          BSI_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha* &
+          BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha*&
                (State_VIB(B_,  1:iEnd,iLine) - &
                State_VIB(BOld_,1:iEnd,iLine))
 
           iShock = iShockOld + iProgress
-
-          ! find the shock alfven mach number, also steepen the shock
-          if(iShock < iEnd - nWidth.and.iShock > nWidth.and.DoTraceShock)then
-             MachAlfven = mach_alfven()
-             call steepen_shock
-          else
-             MachAlfven = 1.0
-          end if
-
-          ! 1st order Fermi acceleration is responsible for advection
-          ! in momentum space
-          ! first order Fermi acceleration for the current line, dimensionless
-          FermiFirst_I(1:iEnd) = DLogRho_I(1:iEnd)/(3*DLogP)
+          DLogRho_I(1:iEnd)=log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
+          ! steepen the shock
+          if(iShock < iEnd - nWidth.and.iShock > nWidth.and.DoTraceShock)&
+               call steepen_shock
 
           ! if(UseTurbulentSpectrum)then
           ! Calculate the Alfven speed
-          ! if (DoInitSpectrum) call init_spectrum(iEnd,             &
-          !     XyzSI_DI(x_:z_, 1:iEnd),BSI_I(1:iEnd), MomentumSI_I, &
+          ! if(iShock < iEnd - nWidth.and.iShock > nWidth  &
+          ! .and.DoTraceShock)then
+          !    MachAlfven = mach_alfven()
+          ! else
+          !    MachAlfven = 1.0
+          ! end if
+          !
+          ! if (DoInitSpectrum) call init_spectrum(iEnd,              &
+          !     XyzSi_DI(x_:z_, 1:iEnd),BSi_I(1:iEnd), MomentumSi_I, &
           !     dLogP, iShock, CoefInj, MachAlfven)
           ! call set_wave_advection_rates(iEnd,     &
-          ! BSI_I(1:iEnd),    BOldSI_I(1:iEnd),      &
-          ! nSI_I(1:iEnd)*cProtonMass,  nOldSI_I(1:iEnd)*cProtonMass, &
-          ! XyzSI_DI(x_:z_, 1:iEnd), DsSI_I(1:iEnd), &
+          ! BSi_I(1:iEnd),    BOldSi_I(1:iEnd),      &
+          ! nSi_I(1:iEnd)*cProtonMass,  nOldSi_I(1:iEnd)*cProtonMass, &
+          ! XyzSi_DI(x_:z_, 1:iEnd), DsSi_I(1:iEnd), &
           ! DLogP, DtProgress, DtReduction)
 
-          ! nStep = 1+int(max(DtReduction,                &
-          !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
-          ! nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
-          ! else
-          ! How many steps should be done to the CFL criterion is fulfilled
-          nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
-          ! end if
-
-          ! Check if the number of time steps is positive:
-          if(nStep < 1)then
-             ! if(UseTurbulentSpectrum) &
-             !     write(*,*) ' DtReduction =', DtReduction
-             write(*,*) ' maxval(abs(FermiFirst_I)) =', &
-                  maxval(abs(FermiFirst_I(2:iEnd)))
-             call CON_stop(NameSub//': nStep <= 0????')
-          end if
+          ! Store the value at the end of the previous time step
 
           ! set the left boundary condition (for diffusion)
           Distribution_IIB(1:nP+1, 1, iLine) = &
                Distribution_IIB(0, 1, iLine) * &
-               (MomentumSI_I(0)/MomentumSI_I(1:nP+1))**SpectralIndex
+               (MomentumSi_I(0)/MomentumSi_I(1:nP+1))**SpectralIndex
 
           ! Advection (2 different schemes) and Diffusion
           if(UsePoissonBracket)then
              ! update bc for advection
              call set_advection_bc
-             call advect_via_poisson_bracket(iEnd, DtProgress,    &
-                  Cfl, iLine, iShock, XyzSI_DI, nOldSI_I, nSI_I,  &
-                  BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
-             ! store/update the density and B-field arrays
-             ! at the end of the previous time step
-             nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
-             BOldSI_I(1:iEnd) = BSI_I(1:iEnd)
+             ! store/update the inverse rho arrays
+             call advect_via_poisson_bracket(iEnd, DtProgress, &
+                  Cfl,   &
+                  iLine, iShock, XyzSi_DI, nOldSi_I, nSi_I, BSi_I, &
+                  DsSi_I, RadiusSi_I)
+             nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
+             BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
              ! DoInitSpectrum = .true.
           else
              ! No Poisson bracket, use the default algorithm
-             Dt = DtProgress/nStep
+             ! 1st order Fermi acceleration is responsible for advection
+             ! in momentum space
+             ! first order Fermi acceleration for the current line
+             FermiFirst_I(1:iEnd) = DLogRho_I(1:iEnd) / (3*DLogP)
+             ! if(UseTurbulentSpectrum)then
+             ! nStep = 1+int(max(DtReduction,                &
+             !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
+             ! else
+             ! How many steps should be done to the CFL criterion is fulfilled
+             nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
+             ! end if
 
-             FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd)/nStep
+             ! Check if the number of time steps is positive:
+             if(nStep < 1)then
+                ! if(UseTurbulentSpectrum) &
+                !     write(*,*) ' DtReduction               =', DtReduction
+                write(*,*) ' maxval(abs(FermiFirst_I)) =', &
+                     maxval(abs(FermiFirst_I(2:iEnd)))
+                call CON_stop(NameSub//': nStep <= 0????')
+             end if
+             Dt = DtProgress/nStep
+             FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
              ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
 
-             ! compute diffusion along the field line
-             ! we calculate: "Outer diffusion"=BSI_I and
-             ! "Inner diffusion at the injection energy (iP=0)
              STEP:do iStep = 1, nStep
                 ! update bc for advection
                 call set_advection_bc
@@ -265,36 +263,36 @@ contains
                    call advance_log_advection(FermiFirst_I(iVertex), nP,   &
                         1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
                 end do
-
+                ! compute diffusion along the field line
                 if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
                      iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),  &
-                     XyzSI_DI, nSI_I, BSI_I, DsSI_I, RadiusSI_I)
+                     XyzSi_DI, nSi_I, BSi_I, DsSi_I, RadiusSi_I)
              end do STEP
-             ! DoInitSpectrum = .true.
+             ! if(UseDoInitSpectrum = .true.
           end if
        end do PROGRESS
     end do line
   contains
     !==========================================================================
-    function mach_alfven() result(MachAlfven)
-      ! alfvenic mach number for the current line
-      real:: MachAlfven
-      real:: SpeedAlfvenUpstream, SpeedUpstream
+    ! used only with the turbulence model ON
+    ! function mach_alfven() result(MachAlfven)
+    ! alfvenic mach number for the current line
+    !  real:: MachAlfven
+    !  real:: SpeedAlfvenUpstream, SpeedUpstream
 
-      ! speed upstream is relative to the shock:
-      ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
-      !=> V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
-      !=> V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
-      ! Hence, below there should be norm2(\vect{U}_d - \vect{U}_u)
-      !------------------------------------------------------------------------
-      SpeedUpstream = nSI_I(iShock+1-nWidth)*&
-           (uSI_I(iShock + 1 - nWidth) - uSI_I(iShock + nWidth))/ &
-           (nSI_I(iShock + 1 - nWidth) - nSI_I(iShock + nWidth))
-      SpeedAlfvenUpstream = BSI_I(iShock + nWidth)/ &
-           sqrt(cMu*nSI_I(iShock + nWidth)*cProtonMass)
-      MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
-    end function mach_alfven
-    !==========================================================================
+    ! speed upstream is relative to the shock:
+    ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
+    !=> V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
+    !=> V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
+    ! Hence, below there should be norm2(\vect{U}_d - \vect{U}_u)
+    !------------------------------------------------------------------------
+    ! SpeedUpstream = nSi_I(iShock+1-nWidth)*&
+    !     (uSi_I(  iShock + 1 - nWidth) - uSi_I(  iShock + nWidth)) /  &
+    !     (nSi_I(iShock + 1 - nWidth) - nSi_I(iShock + nWidth))
+    ! SpeedAlfvenUpstream = BSi_I(iShock + nWidth)/ &
+    !     sqrt(cMu*nSi_I(iShock + nWidth)*cProtonMass)
+    ! MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
+    ! end function mach_alfven
     subroutine steepen_shock
       ! change the density profile near the shock front so it becomes steeper
       ! for the current line
@@ -311,7 +309,7 @@ contains
          if(DLogRhoExcess>0) then
             ! This is a jump in velocity accross the shock wave * \Delta t
             DLogRhoExcessIntegral = DLogRhoExcessIntegral + &
-                 DLogRhoExcess*DsSI_I(iVertex)
+                 DLogRhoExcess*DsSi_I(iVertex)
          end if
       end do
 
@@ -323,12 +321,12 @@ contains
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
       DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral / &
-           DsSI_I(iVertex)
+           DsSi_I(iVertex)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
-      BSI_I(iShock+1-nWidth:iShock+1)=maxval(BSI_I(iShock+1-nWidth:iShock+1))
+      BSi_I(iShock+1-nWidth:iShock+1)=maxval(BSi_I(iShock+1-nWidth:iShock+1))
       ! pre shock part
-      BSI_I(iShock+1:iShock+nWidth  )=minval(BSI_I(iShock+1:iShock+nWidth))
+      BSi_I(iShock+1:iShock+nWidth  )=minval(BSi_I(iShock+1:iShock+nWidth))
     end subroutine steepen_shock
     !==========================================================================
     subroutine set_advection_bc
@@ -336,7 +334,7 @@ contains
       ! local variables
 
       integer:: iVertex     ! loop variable
-      real   :: MomentumSI    ! Momentum for the thermal energy k_BTi
+      real   :: MomentumSi    ! Momentum for the thermal energy k_BTi
       real   :: CoefInjLocal, DistributionBc
       !------------------------------------------------------------------------
       do iVertex = 1, iEnd
@@ -345,12 +343,12 @@ contains
          !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
          ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
          CoefInjLocal = 2.50E-11
-         MomentumSI   = kinetic_energy_to_momentum(                     &
+         MomentumSi   = kinetic_energy_to_momentum(                     &
               MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
          DistributionBc = (SpectralIndex-3)/(4*cPi)                     &
-              * nSI_I(iVertex)/MomentumSI**3                            &
-              * (MomentumSI/MomentumInjSI)**SpectralIndex
+              * nSi_I(iVertex)/MomentumSi**3                            &
+              * (MomentumSi/MomentumInjSi)**SpectralIndex
 
          if (iShock /= NoShock_           .and.                         &
               iVertex <= iShock + nWidth  .and.                         &
