@@ -20,8 +20,9 @@ T
 #DORUN
 T
 
-#TRACESHOCK
+#TEST
 F			DoTraceShock
+T			UseDiffusion
 
 #INCLUDE
 MH_data_e20120123/MH_data.H
