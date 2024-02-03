@@ -84,7 +84,7 @@ contains
     real, intent(in) :: Dt              ! Time step for diffusion
     real, intent(inout) :: Distribution_IIB(0:nP+1, 1:iEnd)
     real, intent(in) :: XyzSI_DI(3, 1:nVertexMax)
-    real, intent(in), dimension(1:nVertexMax) :: nSI_I, BSI_I,  &
+    real, intent(in), dimension(1:nVertexMax) :: nSI_I, BSI_I,    &
          DsSI_I, RadiusSi_I
     ! Variables declared in this subroutine
     integer :: iP, iVertex              ! loop variables
@@ -117,7 +117,7 @@ contains
        ! if (UseTurbulentSpectrum) then
        !   do iVertex=1, iEnd
        !      DInnerSI_I(iVertex) = Dxx(iVertex, iP,       &
-       !           MomentumSI_I(iP), SpeedSI_I(iP),          &
+       !           MomentumSI_I(iP), SpeedSI_I(iP),        &
        !           BSI_I(iVertex)) / BSI_I(iVertex)
        !   end do
        ! else
@@ -131,7 +131,7 @@ contains
        ! end if
 
        call advance_diffusion(Dt, iEnd, DsSI_I(1:iEnd),   &
-            Distribution_IIB(iP, 1:iEnd),                   &
+            Distribution_IIB(iP, 1:iEnd),                 &
             DOuterSI_I(1:iEnd), DInnerSI_I(1:iEnd))
     end do MOMENTUM
 

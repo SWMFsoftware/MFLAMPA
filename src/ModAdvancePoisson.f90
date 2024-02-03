@@ -9,14 +9,15 @@ module SP_ModAdvancePoisson
   public :: advect_via_poisson_bracket
 contains
   !============================================================================
-  subroutine advect_via_poisson_bracket(nX, tFinal, CflIn,        &
-       InvRhoOld_I, InvRho_I, FInOut_I, iLine, iShock, XyzSI_DI,  &
+  subroutine advect_via_poisson_bracket(nX, tFinal, CflIn,  &
+       InvRhoOld_I, InvRho_I, iLine, iShock, XyzSI_DI,      &
        nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
     ! advect via Possion Bracket + diffusion by encapsulation
 
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
-    use SP_ModDistribution, ONLY: nP, Momentum3SI_I, VolumeP_I, DLogP
+    use SP_ModDistribution, ONLY: nP, Momentum3SI_I,        &
+         VolumeP_I, DLogP, Distribution_IIB
     use SP_ModDiffusion, ONLY: diffuse_distribution
 
     integer,intent(in):: nX         ! # of meshes along lnp-coordinate
@@ -24,14 +25,12 @@ contains
     real,   intent(in):: CflIn      ! FermiFirsr_I in ModAdvance
     real,   intent(in):: InvRhoOld_I(1:nX) ! Old density (inverse)
     real,   intent(in):: InvRho_I(1:nX)    ! New density (inverse)
-    real,intent(inout):: FInOut_I(0:nP+1, 1:nX)  ! Solution
     ! Variables for diffusion
     integer, intent(in) :: iLine, iShock
     real, intent(in) :: XyzSI_DI(3, 1:nVertexMax)
     real, intent(in), dimension(1:nVertexMax) :: nSI_I,  &
          BSI_I, DsSI_I, RadiusSI_I
     logical, intent(in) :: UseDiffusion   ! diffuse_Distribution or not
-
     ! Loop variables
     integer :: iP
     ! Extended arrays for the implementation of the Poisson Bracket Alg.
@@ -53,6 +52,7 @@ contains
     !--------------------------------------------------------------------------
     Source_C   = 0.0
     VDF_G      = 1.0e-8
+    VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
 
     ! Volume initialization: use 1 ghost point at each side of the boundary
     VolumeXOld_I(1:nX)  = InvRhoOld_I
@@ -63,18 +63,15 @@ contains
     VolumeX_I(nX+1)     = VolumeX_I(nX)
     VolumeSubX_I        = VolumeXOld_I
     dVolumeSubXDt_I     = (VolumeX_I-VolumeXOld_I)/tFinal
-
     ! Time initialization
     Time    = 0.0
     DtTrial = CflIn/maxval(abs(dVolumeSubXDt_I)/max(VolumeX_I, VolumeXOld_I))/(3*DLogP)
     DtInv   = 1.0/DtTrial
     DtNext  = DtTrial
-
     ! Advection by Poisson Bracket Algorithm
     do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time); DtInv = 1.0/Dt
-
        ! Volume Updates
        VolumeSubXOld_I = VolumeSubX_I
        VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
@@ -101,7 +98,7 @@ contains
        VDF_G(1:nP, 1:nX) = VDF_G(1:nP, 1:nX) + Source_C
        if(UseDiffusion) then
           call diffuse_distribution(iLine, nX, iShock,   &
-               Dt, FInOut_I, XyzSI_DI, nSI_I,            &
+               Dt, VDF_G(0:nP+1, 1:nX), XyzSI_DI, nSI_I, &
                BSI_I, DsSI_I, RadiusSI_I) ! Diffuse at each time step
        end if
        ! Update the time
@@ -115,6 +112,8 @@ contains
        VDF_G(:, -1  )         = VDF_G(:, 1   )
        VDF_G(:, nX+1:nX+2)    = 1.0e-8
     end do
+
+    Distribution_IIB(:, 1:nX, iLine) = VDF_G(0:nP+1, 1:nX)
 
   end subroutine advect_via_poisson_bracket
   !============================================================================
