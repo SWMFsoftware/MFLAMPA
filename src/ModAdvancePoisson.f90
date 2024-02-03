@@ -65,7 +65,8 @@ contains
     dVolumeSubXDt_I     = (VolumeX_I-VolumeXOld_I)/tFinal
     ! Time initialization
     Time    = 0.0
-    DtTrial = CflIn/maxval(abs(dVolumeSubXDt_I)/max(VolumeX_I, VolumeXOld_I))/(3*DLogP)
+    DtTrial = CflIn/maxval(abs(dVolumeSubXDt_I)/&
+         max(VolumeX_I, VolumeXOld_I))/(3*DLogP)
     DtInv   = 1.0/DtTrial
     DtNext  = DtTrial
     ! Advection by Poisson Bracket Algorithm
