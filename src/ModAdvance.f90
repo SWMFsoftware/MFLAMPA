@@ -5,19 +5,16 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-
-  use ModNumConst, ONLY: cPi
-  use ModConst,   ONLY: cMu
+  use ModConst,   ONLY: cPi, cMu
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB,                &
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
        MomentumSI_I, MomentumInjSI, DLogP
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB,            &
-       R_, x_, y_, z_, Used_B, Shock_, NoShock_,                     &
-       ShockOld_, DLogRho_, nLine, nVertex_B
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
+        Used_B, Shock_, NoShock_, ShockOld_, DLogRho_, nLine, nVertex_B
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
   !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
-  use SP_ModUnit, ONLY: UnitX_, UnitEnergy_,                         &
-       Io2Si_V, kinetic_energy_to_momentum
+  use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, Io2Si_V,                       &
+       kinetic_energy_to_momentum
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -29,12 +26,12 @@ module SP_ModAdvance
   ! Public members:
   public:: read_param  ! read injection parameters
   public:: advance     ! Advance solution Distribution_IIB
-  !||||||||||||||Boundary condition at the injection energy!!!!!!
+  !!!!!!!!!! Boundary condition at the injection energy!!!!!!
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real:: CoefInj = 0.25, SpectralIndex = 5.0
 
-!!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
   real:: Cfl=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
   logical :: UsePoissonBracket = .false.
@@ -74,8 +71,7 @@ contains
     ! and (3) new steepen_shock
     use ModConst,             ONLY: cProtonMass, Rsun
     use SP_ModTime,           ONLY: SPTime
-    use SP_ModGrid,           ONLY: D_, Rho_, RhoOld_,   &
-         B_, BOld_, U_, T_
+    use SP_ModGrid,           ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_
     use SP_ModAdvection,      ONLY: advance_log_advection
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,      ONLY: diffuse_distribution
@@ -118,8 +114,7 @@ contains
     real :: XyzSI_DI(3, 1:nVertexMax)
     real, dimension(1:nVertexMax):: RadiusSi_I, DsSI_I,    &
          nSI_I, uSI_I, BSI_I, BOldSI_I, nOldSi_I
-    real, dimension(1:nVertexMax):: InvRhoOld_I, InvRho_I
-    real, dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
+    ! real, dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
 
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
@@ -240,11 +235,9 @@ contains
              ! update bc for advection
              call set_advection_bc
              ! store/update the inverse rho arrays
-             InvRhoOld_I(1:iEnd) = 1.0/nOldSI_I(1:iEnd)
-             InvRho_I(1:iEnd)    = 1.0/nSi_I(1:iEnd)
              call advect_via_poisson_bracket(iEnd, DtProgress, &
-                  Cfl, InvRhoOld_I(1:iEnd), InvRho_I(1:iEnd),  &
-                  iLine, iShock, XyzSI_DI, nSI_I, BSI_I,       &
+                  Cfl,   &
+                  iLine, iShock, XyzSI_DI, nOldSI_I, nSI_I, BSI_I, &
                   DsSI_I, RadiusSI_I, UseDiffusion)
              nOldSI_I(1:iEnd) = nSI_I(1:iEnd)
              BOldSI_I(1:iEnd) = BSI_I(1:iEnd)

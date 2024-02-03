@@ -10,7 +10,7 @@ module SP_ModAdvancePoisson
 contains
   !============================================================================
   subroutine advect_via_poisson_bracket(nX, tFinal, CflIn,  &
-       InvRhoOld_I, InvRho_I, iLine, iShock, XyzSI_DI,      &
+       iLine, iShock, XyzSI_DI, nOldSI_I,      &
        nSI_I, BSI_I, DsSI_I, RadiusSI_I, UseDiffusion)
     ! advect via Possion Bracket + diffusion by encapsulation
 
@@ -22,23 +22,21 @@ contains
 
     integer,intent(in):: nX         ! # of meshes along lnp-coordinate
     real,   intent(in):: tFinal     ! time interval to advance through
-    real,   intent(in):: CflIn      ! FermiFirsr_I in ModAdvance
-    real,   intent(in):: InvRhoOld_I(1:nX) ! Old density (inverse)
-    real,   intent(in):: InvRho_I(1:nX)    ! New density (inverse)
+    real,   intent(in):: CflIn      !
     ! Variables for diffusion
     integer, intent(in) :: iLine, iShock
     real, intent(in) :: XyzSI_DI(3, 1:nVertexMax)
-    real, intent(in), dimension(1:nVertexMax) :: nSI_I,  &
+    real, intent(in), dimension(1:nVertexMax) :: nOldSI_I, nSI_I,  &
          BSI_I, DsSI_I, RadiusSI_I
     logical, intent(in) :: UseDiffusion   ! diffuse_Distribution or not
     ! Loop variables
     integer :: iP
     ! Extended arrays for the implementation of the Poisson Bracket Alg.
-    ! VolumeXOld_I: geometric volume when the subroutine starts
-    ! VolumeX_I: geometric volume when the subroutine ends
+    ! VolumeXStart_I: geometric volume when the subroutine starts
+    ! VolumeXEnd_I: geometric volume when the subroutine ends
     ! Linearly interpolate the geometric volume from the start to the end
     ! VolumeSubX_I: current geometric volume at each iteration
-    real, dimension(0:nX+1) :: VolumeXOld_I, VolumeX_I,  &
+    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeXEnd_I,  &
          VolumeSubXOld_I, VolumeSubX_I, dVolumeSubXDt_I
     ! VolumeSub_G: current phase space volume at each iteration
     real, dimension(0:nP+1, 0:nX+1) :: VolumeSubOld_G,   &
@@ -55,19 +53,22 @@ contains
     VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
 
     ! Volume initialization: use 1 ghost point at each side of the boundary
-    VolumeXOld_I(1:nX)  = InvRhoOld_I
-    VolumeXOld_I(0)     = VolumeXOld_I(1)
-    VolumeXOld_I(nX+1)  = VolumeXOld_I(nX)
-    VolumeX_I(1:nX)     = InvRho_I
-    VolumeX_I(0)        = VolumeX_I(1)
-    VolumeX_I(nX+1)     = VolumeX_I(nX)
-    VolumeSubX_I        = VolumeXOld_I
-    dVolumeSubXDt_I     = (VolumeX_I-VolumeXOld_I)/tFinal
+    VolumeXStart_I(1:nX)  = 1/nOldSI_I(1:nX)
+    VolumeXStart_I(0)     = VolumeXStart_I(1)
+    VolumeXStart_I(nX+1)  = VolumeXStart_I(nX)
+    VolumeXEnd_I(1:nX)     = 1/nSI_I(1:nX)
+    VolumeXEnd_I(0)        = VolumeXEnd_I(1)
+    VolumeXEnd_I(nX+1)     = VolumeXEnd_I(nX)
+    VolumeSubX_I        = VolumeXStart_I
+    dVolumeSubXDt_I     = (VolumeXEnd_I-VolumeXStart_I)/tFinal
+    ! calculate: dHamiltonian/dVolumeSubX
+    do iP = -1, nP+1
+       dHamiltonian01_FX(iP,:) = - Momentum3SI_I(iP)*dVolumeSubXDt_I
+    end do
     ! Time initialization
     Time    = 0.0
     DtTrial = CflIn/maxval(abs(dVolumeSubXDt_I)/&
-         max(VolumeX_I, VolumeXOld_I))/(3*DLogP)
-    DtInv   = 1.0/DtTrial
+         max(VolumeXEnd_I, VolumeXStart_I))/(3*DLogP)
     DtNext  = DtTrial
     ! Advection by Poisson Bracket Algorithm
     do
@@ -81,11 +82,6 @@ contains
           VolumeSub_G(iP,:)    = VolumeP_I(iP)*VolumeSubX_I
        end do
        dVolumeSubDt_G = DtInv*(VolumeSub_G - VolumeSubOld_G)
-
-       ! calculate: dHamiltonian/dVolumeSubX
-       do iP = -1, nP+1
-          dHamiltonian01_FX(iP,:) = - Momentum3SI_I(iP)*dVolumeSubXDt_I
-       end do
 
        call explicit(nP, nX, VDF_G, VolumeSub_G, Source_C,  &
             dHamiltonian01_FX=dHamiltonian01_FX,            &

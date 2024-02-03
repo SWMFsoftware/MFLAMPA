@@ -22,7 +22,7 @@ module SP_ModDiffusion
 
   PRIVATE
 
-!!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
+  ! Local parameters!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMFPUpstream = .false.
   real    :: MeanFreePath0InAu = 1.0
@@ -94,8 +94,6 @@ contains
     ! DInner = DiffusionCoefficient/BSI at the face
     real, dimension(1:nVertexMax) :: DOuterSI_I, &
          DInnerSI_I, CoefDInnerSI_I
-    ! real, dimension(1:nVertexMax) :: DInnerSI_I
-    ! real, intent(in), dimension(1:nVertexMax) :: DOuterSI_I, CoefDInnerSI_I
     ! Full difference between DataInputTime and SPTime
     real, parameter :: DiffCoeffMinSI = 1.0E+04*Rsun
 
