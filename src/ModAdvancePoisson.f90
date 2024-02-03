@@ -34,71 +34,80 @@ contains
     ! Extended arrays for the implementation of the Poisson Bracket Alg.
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
-    ! Linearly interpolate the geometric volume from the start to the end
-    ! VolumeSubX_I: current geometric volume at each iteration
-    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeXEnd_I,  &
-         VolumeSubXOld_I, VolumeSubX_I, dVolumeSubXDt_I
-    ! VolumeSub_G: current phase space volume at each iteration
-    real, dimension(0:nP+1, 0:nX+1) :: VolumeSubOld_G,   &
-         VolumeSub_G, dVolumeSubDt_G
+    ! dVolumeXDt_I: time derivative of geometric volume
+    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
+    ! Volume_G: phase space volume at the end of each iteration
+    ! VolumeOld_G : phase space volume at the end of each iteration
+    ! dVolumeDt_G : phase space time derivative
+    real, dimension(0:nP+1, 0:nX+1) :: VolumeOld_G, Volume_G, dVolumeDt_G
+    ! DeltaHamiltonian
     real    :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
-    real    :: VDF_G(-1:nP+2, -1:nX+2), Source_C(nP, nX)
-    real    :: Time, Dt, DtTrial, DtInv, DtNext
+    ! Extended array for distribution function
+    real    :: VDF_G(-1:nP+2, -1:nX+2)
+    ! Advection term
+    real    :: Source_C(nP, nX)
+    ! Time, ranging from 0 to tFinal
+    real    :: Time
+    ! Time step
+    real    :: Dt
+    ! Prediction for the next time step:
+    real    :: DtNext
     ! Now this is the conservative form for the particle number
 
-    ! Initialize the CFL number, (sub-)nStep and arrays
+    ! Initialize arrays
     !--------------------------------------------------------------------------
     Source_C   = 0.0
     VDF_G      = 1.0e-8
     VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
 
-    ! Volume initialization: use 1 ghost point at each side of the boundary
+    ! Geometric volume: use 1 ghost point at each side of the boundary
+    ! Start volume
     VolumeXStart_I(1:nX)  = 1/nOldSI_I(1:nX)
     VolumeXStart_I(0)     = VolumeXStart_I(1)
     VolumeXStart_I(nX+1)  = VolumeXStart_I(nX)
-    VolumeXEnd_I(1:nX)     = 1/nSI_I(1:nX)
-    VolumeXEnd_I(0)        = VolumeXEnd_I(1)
-    VolumeXEnd_I(nX+1)     = VolumeXEnd_I(nX)
-    VolumeSubX_I        = VolumeXStart_I
-    dVolumeSubXDt_I     = (VolumeXEnd_I-VolumeXStart_I)/tFinal
+    ! End volume
+    VolumeXEnd_I(1:nX)    = 1/nSI_I(1:nX)
+    VolumeXEnd_I(0)       = VolumeXEnd_I(1)
+    VolumeXEnd_I(nX+1)    = VolumeXEnd_I(nX)
+    ! Time derivative
+    dVolumeXDt_I       = (VolumeXEnd_I - VolumeXStart_I)/tFinal
+    ! Phase volume: initial and time derivative
+    do iP = 0, nP+1
+       Volume_G(iP,:)    = VolumeP_I(iP)*VolumeXStart_I
+       dVolumeDt_G(iP,:) = VolumeP_I(iP)*dVolumeXDt_I
+    end do
     ! calculate: dHamiltonian/dVolumeSubX
     do iP = -1, nP+1
-       dHamiltonian01_FX(iP,:) = - Momentum3SI_I(iP)*dVolumeSubXDt_I
+       dHamiltonian01_FX(iP,:) = - Momentum3SI_I(iP)*dVolumeXDt_I
     end do
     ! Time initialization
     Time    = 0.0
-    DtTrial = CflIn/maxval(abs(dVolumeSubXDt_I)/&
+    ! Trial timestep
+    DtNext  = CflIn/maxval(abs(dVolumeXDt_I)/&
          max(VolumeXEnd_I, VolumeXStart_I))/(3*DLogP)
-    DtNext  = DtTrial
     ! Advection by Poisson Bracket Algorithm
     do
        ! Time Updates
-       Dt = min(DtNext, tFinal - Time); DtInv = 1.0/Dt
+       Dt = min(DtNext, tFinal - Time)
        ! Volume Updates
-       VolumeSubXOld_I = VolumeSubX_I
-       VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
-       do iP = 0, nP+1
-          VolumeSubOld_G(iP,:) = VolumeP_I(iP)*VolumeSubXOld_I
-          VolumeSub_G(iP,:)    = VolumeP_I(iP)*VolumeSubX_I
-       end do
-       dVolumeSubDt_G = DtInv*(VolumeSub_G - VolumeSubOld_G)
+       VolumeOld_G = Volume_G
+       Volume_G = VolumeOld_G + Dt*dVolumeDt_G
 
-       call explicit(nP, nX, VDF_G, VolumeSub_G, Source_C,  &
-            dHamiltonian01_FX=dHamiltonian01_FX,            &
-            dVolumeDt_G = dVolumeSubDt_G,                   &
+       call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
+            dHamiltonian01_FX=dHamiltonian01_FX,         &
+            dVolumeDt_G = dVolumeDt_G,                   &
             DtIn=Dt,           & ! Input time step, which may be reduced
             CFLIn=CflIn,       & ! Input CFL to calculate next time step
             DtOut=DtNext)
-       VolumeSubX_I = VolumeSubXOld_I + Dt*dVolumeSubXDt_I
+       ! May need to correct the volume if the time step has been reduced
+       Volume_G = VolumeOld_G + Dt*dVolumeDt_G
 
        ! Update velocity distribution function
        VDF_G(1:nP, 1:nX) = VDF_G(1:nP, 1:nX) + Source_C
-       if(UseDiffusion) then
-          call diffuse_distribution(iLine, nX, iShock,   &
-               Dt, VDF_G(0:nP+1, 1:nX), XyzSI_DI, nSI_I, &
-               BSI_I, DsSI_I, RadiusSI_I) ! Diffuse at each time step
-       end if
-       ! Update the time
+       if(UseDiffusion)call diffuse_distribution(iLine, nX, iShock,   &
+            Dt, VDF_G(0:nP+1, 1:nX), XyzSI_DI, nSI_I, &
+            BSI_I, DsSI_I, RadiusSI_I)
+       ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
 
