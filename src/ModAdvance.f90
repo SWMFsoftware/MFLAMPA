@@ -10,7 +10,7 @@ module SP_ModAdvance
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
        MomentumSi_I, MomentumInjSI, DLogP
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
-       Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B
+       D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
   !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
   use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, Io2Si_V,                       &
@@ -71,7 +71,7 @@ contains
     ! and (3) new steepen_shock
     use ModConst,             ONLY: cProtonMass, Rsun
     use SP_ModTime,           ONLY: SPTime
-    use SP_ModGrid,           ONLY: D_, Rho_, RhoOld_, B_, BOld_, U_, T_
+    use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_, T_
     use SP_ModAdvection,      ONLY: advance_log_advection
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,      ONLY: UseDiffusion, diffuse_distribution
@@ -111,10 +111,8 @@ contains
     ! real      :: MachAlfven
     real      :: DtReduction
 
-    ! Local arrays to store the position and state vectors in SI units
-    real :: XyzSi_DI(3, 1:nVertexMax)
-    real, dimension(1:nVertexMax):: RadiusSi_I, DsSi_I,    &
-         nSi_I, uSi_I, BSi_I, BOldSi_I, nOldSi_I
+    ! Local arrays to store the  state vectors in SI units
+    real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
 
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
@@ -137,9 +135,6 @@ contains
        ! are in SI units. So to convert the IO units, the three conversion
        ! factors are needed as follows:
        ! UnitX_, UnitRho_, UnitEnergy_
-       XyzSi_DI(x_:z_,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2Si_V(UnitX_)
-       DsSi_I(     1:iEnd) = State_VIB(D_,     1:iEnd,iLine)*IO2Si_V(UnitX_)
-       RadiusSi_I( 1:iEnd) = State_VIB(R_,     1:iEnd,iLine)*IO2Si_V(UnitX_)
        uSi_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
        BOldSi_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
        nOldSi_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
@@ -183,7 +178,7 @@ contains
           DLogRho_I(1:iEnd)=log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
           ! steepen the shock
           if(iShock < iEnd - nWidth.and.iShock > nWidth.and.DoTraceShock)&
-               call steepen_shock
+               call steepen_shock(iEnd)
 
           ! if(UseTurbulentSpectrum)then
           ! Calculate the Alfven speed
@@ -215,10 +210,8 @@ contains
              ! update bc for advection
              call set_advection_bc
              ! store/update the inverse rho arrays
-             call advect_via_poisson_bracket(iEnd, DtProgress, &
-                  Cfl,   &
-                  iLine, iShock, XyzSi_DI, nOldSi_I, nSi_I, BSi_I, &
-                  DsSi_I, RadiusSi_I)
+             call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
+                  iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
              ! DoInitSpectrum = .true.
@@ -266,7 +259,7 @@ contains
                 ! compute diffusion along the field line
                 if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
                      iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),  &
-                     XyzSi_DI, nSi_I, BSi_I, DsSi_I, RadiusSi_I)
+                     nSi_I, BSi_I)
              end do STEP
              ! if(UseDoInitSpectrum = .true.
           end if
@@ -293,9 +286,11 @@ contains
     !     sqrt(cMu*nSi_I(iShock + nWidth)*cProtonMass)
     ! MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
     ! end function mach_alfven
-    subroutine steepen_shock
+    subroutine steepen_shock(iEnd)
+      integer, intent(in) :: iEnd ! To limit the range of search
       ! change the density profile near the shock front so it becomes steeper
       ! for the current line
+      real   :: DsSi_I(1:iEnd)
       integer:: iVertex ! loop variable
       real   :: DLogRhoExcessIntegral, DLogRhoExcess
       real, parameter:: DLogRhoBackground = 0.01
@@ -303,6 +298,7 @@ contains
       ! find the excess of DLogRho within the shock compared to background
       ! averaged over length
       DLogRhoExcessIntegral = 0.0
+      DsSi_I = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
       do iVertex = iShock - nWidth, iShock + nWidth - 1
          DLogRhoExcess = 0.5*(DLogRho_I(iVertex) + DLogRho_I(iVertex+1)) &
               - DLogRhoBackground ! D log(rho)/Dt*\Delta t = -\div U*\Delta t

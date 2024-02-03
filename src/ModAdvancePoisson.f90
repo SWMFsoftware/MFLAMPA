@@ -14,8 +14,7 @@ module SP_ModAdvancePoisson
 contains
   !============================================================================
   subroutine advect_via_poisson_bracket(nX, tFinal, CflIn,  &
-       iLine, iShock, XyzSi_DI, nOldSi_I,      &
-       nSi_I, BSi_I, DsSi_I, RadiusSi_I)
+       iLine, iShock, nOldSi_I, nSi_I, BSi_I)
     ! advect via Possion Bracket + diffusion by encapsulation
 
     use ModPoissonBracket, ONLY: explicit
@@ -29,9 +28,7 @@ contains
     real,   intent(in):: CflIn      !
     ! Variables for diffusion
     integer, intent(in) :: iLine, iShock
-    real, intent(in) :: XyzSi_DI(3, 1:nVertexMax)
-    real, intent(in), dimension(1:nVertexMax) :: nOldSi_I, nSi_I,  &
-         BSi_I, DsSi_I, RadiusSi_I
+    real, intent(in), dimension(1:nX) :: nOldSi_I, nSi_I,  BSi_I
     ! Loop variables
     integer :: iP
     ! Extended arrays for implementation of the Poisson Bracket Alg.
@@ -109,8 +106,7 @@ contains
        ! Update velocity distribution function
        VDF_G(1:nP, 1:nX) = VDF_G(1:nP, 1:nX) + Source_C
        if(UseDiffusion)call diffuse_distribution(iLine, nX, iShock,   &
-            Dt, VDF_G(0:nP+1, 1:nX), XyzSi_DI, nSi_I, &
-            BSi_I, DsSi_I, RadiusSi_I)
+            Dt, VDF_G(0:nP+1, 1:nX), nSi_I, BSi_I)
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
