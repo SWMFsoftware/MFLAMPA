@@ -144,7 +144,7 @@ contains
     subroutine set_diffusion_coef
       ! set diffusion coefficient for the current line
       real, dimension(1:nVertexMax) :: ScaleSI_I
-      real, parameter :: cCoef = 81./7/cPi/(2*cPi)**(2.0/3)
+      real, parameter :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
 
       !------------------------------------------------------------------------
       DOuterSI_I(1:iEnd) = BSI_I(1:iEnd)
@@ -199,7 +199,7 @@ contains
     !==========================================================================
   end subroutine diffuse_distribution
   !============================================================================
-  subroutine advance_diffusion(Dt,n,Dist_I,F_I,DOuter_I,DInner_I)
+  subroutine advance_diffusion(Dt, n, Dist_I, F_I, DOuter_I, DInner_I)
 
     ! This routine solves the diffusion equation:
     !         f_t-D_outer(D_inner*f_x)_x=0,
@@ -218,9 +218,9 @@ contains
     ! Mesh spacing and face spacing.
     real                 :: DsMesh_I(2:n), DsFace_I(2:n-1)
     ! Main, upper, and lower diagonals.
-    real, dimension(n)   :: Main_I,Upper_I,Lower_I, R_I
+    real, dimension(n)   :: Main_I, Upper_I, Lower_I, R_I
     integer:: i
-    real:: Aux1,Aux2
+    real:: Aux1, Aux2
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA D_I(i) is the distance between meshes i   and i+1
@@ -257,16 +257,16 @@ contains
     Main_I = 1.0
 
     ! For i=1:
-    Aux1 = Dt*DOuter_I(1)*0.50*(DInner_I(1)+DInner_I(2))/&
+    Aux1 = Dt*DOuter_I(1)*0.5*(DInner_I(1)+DInner_I(2))/&
          DsMesh_I(2)**2
     Main_I( 1) = Main_I(1)+Aux1
     Upper_I(1) = -Aux1
 
     ! For i=2,n-1:
     do i=2,n-1
-       Aux1 = Dt*DOuter_I(i)*0.50*(DInner_I(i  ) + DInner_I(i+1))/&
+       Aux1 = Dt*DOuter_I(i)*0.5*(DInner_I(i  ) + DInner_I(i+1))/&
             (DsMesh_I(i+1)*DsFace_I(i))
-       Aux2 = Dt*DOuter_I(i)*0.50*(DInner_I(i-1) + DInner_I(i  ))/&
+       Aux2 = Dt*DOuter_I(i)*0.5*(DInner_I(i-1) + DInner_I(i  ))/&
             (DsMesh_I(i  )*DsFace_I(i))
        Main_I(i)  = Main_I(i) + Aux1 + Aux2
        Upper_I(i) = -Aux1

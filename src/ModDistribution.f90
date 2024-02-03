@@ -134,7 +134,6 @@ contains
              Distribution_IIB(iP,iVertex,iLine) =                         &
                   FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSI_I(iP)**2   &
                   *IO2SI_V(UnitFlux_)/IO2SI_V(UnitEnergy_)
-
           end do
        end do
     end do
@@ -254,10 +253,10 @@ contains
             = Distribution_IIB(:,1:nVertex_B(iLine)-1, iLine)
        ! Extrapolate state vector components and VDF at iVertex=1
        Distance2ToMin = norm2(MHData_VIB(X_:Z_,2,iLine) - &
-               FootPoint_VB(X_:Z_,iLine))
-          Distance3To2   = norm2(MHData_VIB(X_:Z_,3,iLine) - &
-                MHData_VIB(X_:Z_,2,iLine))
-          Alpha = Distance2ToMin/(Distance2ToMin + Distance3To2)
+            FootPoint_VB(X_:Z_,iLine))
+       Distance3To2   = norm2(MHData_VIB(X_:Z_,3,iLine) - &
+            MHData_VIB(X_:Z_,2,iLine))
+       Alpha = Distance2ToMin/(Distance2ToMin + Distance3To2)
        State_VIB([RhoOld_, BOld_], 1, iLine) = &
             (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iLine) &
             -Alpha     * State_VIB([RhoOld_, BOld_], 3, iLine)
@@ -277,7 +276,7 @@ contains
     elseif(iOffset < 0)then
        State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &
             =  State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
-       - iOffset, iLine)
+            - iOffset, iLine)
        Distribution_IIB(:,1:nVertex_B(iLine), iLine)&
             = Distribution_IIB(:,1-iOffset:nVertex_B(iLine)-iOffset, &
             iLine)
