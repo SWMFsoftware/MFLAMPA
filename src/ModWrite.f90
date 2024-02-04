@@ -8,7 +8,7 @@ module SP_ModPlot
   use SP_ModAngularSpread, ONLY: get_normalized_spread, &
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModDistribution, ONLY: nP, KinEnergySI_I, MomentumSI_I, &
+  use SP_ModDistribution, ONLY: nP, KinEnergySi_I, MomentumSi_I, &
        Distribution_IIB, FluxChannelInit_V,                      &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
@@ -136,7 +136,7 @@ module SP_ModPlot
   !
   !
   ! Arrays used to visualize the distribution function
-  real, dimension(0:nP+1) :: Log10MomentumSI_I, Log10KinEnergySI_I,      &
+  real, dimension(0:nP+1) :: Log10MomentumSi_I, Log10KinEnergySi_I,      &
        DMomentumOverDEnergy_I
   !
   !
@@ -173,7 +173,7 @@ contains
   !============================================================================
   subroutine init
     use ModConst,           ONLY: cLightSpeed
-    use SP_ModDistribution, ONLY: EnergySI_I
+    use SP_ModDistribution, ONLY: EnergySi_I
     ! storage for existing tags (possible during restart
     character(len=50),allocatable:: StringTag_I(:)
     ! full tag file name
@@ -186,9 +186,9 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
     ! Array for plotting distribution function
-    Log10MomentumSI_I      = log10(MomentumSI_I)
-    Log10KinEnergySI_I     = log10(KinEnergySI_I)
-    DMomentumOverDEnergy_I = EnergySI_I/(MomentumSI_I*cLightSpeed**2)
+    Log10MomentumSi_I      = log10(MomentumSi_I)
+    Log10KinEnergySi_I     = log10(KinEnergySi_I)
+    DMomentumOverDEnergy_I = EnergySi_I/(MomentumSi_I*cLightSpeed**2)
 
     !
     ! Finalize setting output files:
@@ -1149,10 +1149,10 @@ contains
       !------------------------------------------------------------------------
       select case(File_I(iFile)%iScale)
       case(Momentum_)
-         Scale_I = Log10MomentumSI_I
+         Scale_I = Log10MomentumSi_I
          Factor_I= Unity_I
       case(Energy_)
-         Scale_I = Log10KinEnergySI_I
+         Scale_I = Log10KinEnergySi_I
          Factor_I= DMomentumOverDEnergy_I
       end select
       do iLine = 1, nLine
@@ -1186,7 +1186,7 @@ contains
             case(DEF_)
                File_I(iFile) % Buffer_II(:,iVertex) = &
                     File_I(iFile) % Buffer_II(:,iVertex) + &
-                    2*Log10MomentumSI_I
+                    2*Log10MomentumSi_I
             end select
          end do
          ! print data to file

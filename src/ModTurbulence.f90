@@ -24,10 +24,10 @@ module SP_ModTurbulence
   real    :: dLogK
 
   real, allocatable :: Gamma_I(:,:)
-  real, allocatable :: IPlusSI_IX(:,:),IMinusSI_IX(:,:),ICSI_X(:)
-  real, allocatable :: vAlfvenSI_I(:)
-  real, allocatable :: kOverBSI_I(:)
-  real, allocatable :: kSI_I(:)
+  real, allocatable :: IPlusSi_IX(:,:),IMinusSi_IX(:,:),ICSi_X(:)
+  real, allocatable :: vAlfvenSi_I(:)
+  real, allocatable :: kOverBSi_I(:)
+  real, allocatable :: kSi_I(:)
 
   ! Rate of advection in k space, neglecting
   ! a spacial advection with the Alfven speed
@@ -96,11 +96,11 @@ contains
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
 
-    allocate(IPlusSI_IX(0:nP+1,1:nVertexMax), &
-         IMinusSI_IX(0:nP+1,1:nVertexMax))
-    allocate(kOverBSI_I(0:nP+1), kSI_I(0:nP+1))
-    allocate(ICSI_X(1:nVertexMax),CorrectionMode_X(1:nVertexMax))
-    allocate(vAlfvenSI_I(1:nVertexMax))
+    allocate(IPlusSi_IX(0:nP+1,1:nVertexMax), &
+         IMinusSi_IX(0:nP+1,1:nVertexMax))
+    allocate(kOverBSi_I(0:nP+1), kSi_I(0:nP+1))
+    allocate(ICSi_X(1:nVertexMax),CorrectionMode_X(1:nVertexMax))
+    allocate(vAlfvenSi_I(1:nVertexMax))
     allocate(DispersionA_I(1:nVertexMax))
 
     allocate(RhoCompression_I(1:nVertexMax))
@@ -127,10 +127,10 @@ contains
 
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
-    deallocate(IPlusSI_IX,IMinusSI_IX)
-    deallocate(kOverBSI_I, kSI_I)
-    deallocate(ICSI_X,CorrectionMode_X)
-    deallocate(vAlfvenSI_I)
+    deallocate(IPlusSi_IX,IMinusSi_IX)
+    deallocate(kOverBSi_I, kSi_I)
+    deallocate(ICSi_X,CorrectionMode_X)
+    deallocate(vAlfvenSi_I)
     deallocate(DispersionA_I)
 
     deallocate(RhoCompression_I)
@@ -146,7 +146,7 @@ contains
 
   end subroutine finalize
   !============================================================================
-  subroutine init_spectrum(iEnd, XyzSI_DI, BSI_I, MomentumSI_I, dLogP, iShock,&
+  subroutine init_spectrum(iEnd, XyzSi_DI, BSi_I, MomentumSi_I, dLogP, iShock,&
        CoefInj, AlfvenMach)
     !==============Initial spectrum of turbulence=============================!
     ! We recover the initial spectrum of turbulence from the spatial
@@ -157,13 +157,13 @@ contains
     integer, intent(in)::  iEnd
 
     ! Coordinates of Lagrangian Meshes in SI unit [m]
-    real,dimension(1:3,1:iEnd),intent(in) :: XyzSI_DI
+    real,dimension(1:3,1:iEnd),intent(in) :: XyzSi_DI
 
     ! Magnetic field intensity in SI unit [T]
-    real,dimension(1:iEnd),intent(in) :: BSI_I
+    real,dimension(1:iEnd),intent(in) :: BSi_I
 
     ! momentum in SI unit
-    real,intent(in)     :: MomentumSI_I(0:nP+1)
+    real,intent(in)     :: MomentumSi_I(0:nP+1)
 
     ! delta log p in SI unit
     real,intent(in)     :: dLogP
@@ -178,13 +178,13 @@ contains
     integer, intent(in) :: iShock
 
     integer :: iVertex,iK
-    real    :: ICOldSI, kSI
-    real    :: rSI , rShockSI
+    real    :: ICOldSi, kSi
+    real    :: rSi , rShockSi
 
     !--------------------------------------------------------------------------
 
-    IPlusSI_IX  = 0.0; IMinusSI_IX   = 0.0
-    vAlfvenSI_I = 0.0; DispersionA_I = 0.0
+    IPlusSi_IX  = 0.0; IMinusSi_IX   = 0.0
+    vAlfvenSi_I = 0.0; DispersionA_I = 0.0
 
     RhoCompression_I = 0.0
 
@@ -207,39 +207,39 @@ contains
     ! k = e*B/p => dlog(k) = - dlog(p)
     dLogK = dLogP
 
-    kOverBSI_I = cElectronCharge/MomentumSI_I
+    kOverBSi_I = cElectronCharge/MomentumSi_I
 
-    rShockSI = sqrt(sum(XyzSI_DI(:,iShock)**2))
+    rShockSi = sqrt(sum(XyzSi_DI(:,iShock)**2))
 
     call assign_kolmogorov_spectrum(1,iEnd, 0, nP+1, &
-         XyzSI_DI(:, 1:iEnd), BSI_I(1:iEnd))
+         XyzSi_DI(:, 1:iEnd), BSi_I(1:iEnd))
 
     CorrectionMode_X=1.0
 
     do iVertex=1,iEnd
-       rSI   = sqrt(sum(XyzSI_DI(:,iVertex)**2))
-       kSI_I = kOverBSI_I*BSI_I(iVertex)
+       rSi   = sqrt(sum(XyzSi_DI(:,iVertex)**2))
+       kSi_I = kOverBSi_I*BSi_I(iVertex)
 
-       if (rSI < 1.1*rShockSI .and. .false.) then
+       if (rSi < 1.1*rShockSi .and. .false.) then
           ! In this part of the spectrum another equation governs the diffusion
-          ICOldSI    = ICSI_X(iVertex)
+          ICOldSi    = ICSi_X(iVertex)
 
           !!!!
-          ICSI_X(iVertex) = CoefInj *                                 &
-               10.0*BSI_I(iVertex)**2*max(AlfvenMach,2.0)/(cMu*3.0) * &
-               min(1.0, rSI/rShockSI/(1.0-Alpha))
+          ICSi_X(iVertex) = CoefInj *                                 &
+               10.0*BSi_I(iVertex)**2*max(AlfvenMach,2.0)/(cMu*3.0) * &
+               min(1.0, rSi/rShockSi/(1.0-Alpha))
 
-          if(ICSI_X(iVertex) > ICOldSI)then
-             IPlusSI_IX(:,  iVertex) = &
-                  (1.0 - Alpha)*ICSI_X(iVertex)/kSI_I
-             IMinusSI_IX(:, iVertex) = &
-                  Alpha/(1.0 - Alpha)*IPlusSI_IX(:,iVertex)
+          if(ICSi_X(iVertex) > ICOldSi)then
+             IPlusSi_IX(:,  iVertex) = &
+                  (1.0 - Alpha)*ICSi_X(iVertex)/kSi_I
+             IMinusSi_IX(:, iVertex) = &
+                  Alpha/(1.0 - Alpha)*IPlusSi_IX(:,iVertex)
 
              CorrectionMode_X(iVertex)=2
           else
              ! Do not change if the newly calculated value is less than the
              ! old one
-             ICSI_X(iVertex) = ICOldSI
+             ICSi_X(iVertex) = ICOldSi
           end if
        end if
     end do
@@ -249,94 +249,94 @@ contains
   end subroutine init_spectrum
   !============================================================================
   subroutine assign_kolmogorov_spectrum(iParticleFirst, iParticleLast, &
-       iKFirst, iKLast, XyzSI_DI, BSI_I)
+       iKFirst, iKLast, XyzSi_DI, BSi_I)
 
     integer, intent(in):: iParticleFirst, iParticleLast, iKFirst, iKLast
-    real,    intent(in):: XyzSI_DI(1:3,iParticleFirst:iParticleLast)
-    real,    intent(in):: BSI_I(iParticleFirst:iParticleLast)
+    real,    intent(in):: XyzSi_DI(1:3,iParticleFirst:iParticleLast)
+    real,    intent(in):: BSi_I(iParticleFirst:iParticleLast)
 
     integer :: iVertex
-    real    :: kSI_I(iKFirst:iKLast), kr0SI, rSI
+    real    :: kSi_I(iKFirst:iKLast), kr0Si, rSi
     !--------------------------------------------------------------------------
     do iVertex=iParticleFirst,iParticleLast
        ! kr0 = c*e*B/(1 GeV) in SI unit.
-       kr0SI = cElectronCharge*BSI_I(iVertex)*cLightSpeed/cGeV
+       kr0Si = cElectronCharge*BSi_I(iVertex)*cLightSpeed/cGeV
 
-       rSI = sqrt(sum(XyzSI_DI(:,iVertex)**2))
+       rSi = sqrt(sum(XyzSi_DI(:,iVertex)**2))
 
-       ICSI_X(iVertex)=54*BSI_I(iVertex)**2/(7.0*cPi*cMu*Lambda0InAu*rSi) &
-            /kr0SI**(1.0/3)
+       ICSi_X(iVertex)=54*BSi_I(iVertex)**2/(7.0*cPi*cMu*Lambda0InAu*rSi) &
+            /kr0Si**(1.0/3)
 
-       ! kOverBSI_I = cElectronCharge/MomentumSI_I
-       kSI_I = kOverBSI_I(iKFirst:iKLast)*BSI_I(iVertex)
+       ! kOverBSi_I = cElectronCharge/MomentumSi_I
+       kSi_I = kOverBSi_I(iKFirst:iKLast)*BSi_I(iVertex)
 
        ! I_{+} + I_{-} = IC/k^(5/3)
        ! I_{+}(k)=(1-\Alpha)*IC/K^{5/3} and I_{-}=\Alpha*I_{+}/(1-\Alpha),
        ! where IC=54*B^2/(7*pi*mu0*Lambda_0*kr0^{1/3}*(r/1 [AU])) and
        ! \Lambda_0=0.4 [AU], and kr0 = c*e*B/(1 GeV), all in SI unit
-       IPlusSI_IX(iKFirst:iKLast,iVertex)  =  &
-            (1.0-Alpha)*ICSI_X(iVertex)/kSI_I**(5.0/3)
-       IMinusSI_IX(iKFirst:iKLast,iVertex) =  &
-            Alpha/(1.0-Alpha)*IPlusSI_IX(iKFirst:iKLast,iVertex)
+       IPlusSi_IX(iKFirst:iKLast,iVertex)  =  &
+            (1.0-Alpha)*ICSi_X(iVertex)/kSi_I**(5.0/3)
+       IMinusSi_IX(iKFirst:iKLast,iVertex) =  &
+            Alpha/(1.0-Alpha)*IPlusSi_IX(iKFirst:iKLast,iVertex)
     end do
   end subroutine assign_kolmogorov_spectrum
   !============================================================================
-  subroutine set_wave_advection_rates(iEnd, BSI_I, BOldSI_I, RhoSI_I, &
-    RhoOldSI_I, XyzSI_DI, DsSI_I, DLogP, Dt, DtReduction)
+  subroutine set_wave_advection_rates(iEnd, BSi_I, BOldSi_I, RhoSi_I, &
+    RhoOldSi_I, XyzSi_DI, DsSi_I, DLogP, Dt, DtReduction)
     !=======================Set advection rate in k-space======================
     integer, intent(in) :: iEnd
-    real, intent(in)    :: BSI_I(1:iEnd), BOldSI_I(1:iEnd)
-    real, intent(in)    :: RhoSI_I(1:iEnd), RhoOldSI_I(1:iEnd)
-    real, intent(in)    :: XyzSI_DI(1:3,1:iEnd)
-    real, intent(in)    :: DsSI_I(1:iEnd)
+    real, intent(in)    :: BSi_I(1:iEnd), BOldSi_I(1:iEnd)
+    real, intent(in)    :: RhoSi_I(1:iEnd), RhoOldSi_I(1:iEnd)
+    real, intent(in)    :: XyzSi_DI(1:3,1:iEnd)
+    real, intent(in)    :: DsSi_I(1:iEnd)
     real, intent(in)    :: DLogP, Dt
     real, intent(out)   :: DtReduction
 
     ! local vars
-    integer :: iVertex, DsSI, DLogRho, DLogB
+    integer :: iVertex, DsSi, DLogRho, DLogB
     !--------------------------------------------------------------------------
 
     ! Calculate alfven speed in SI unit
-    vAlfvenSI_I = BSI_I/sqrt(cMu*RhoSI_I)
+    vAlfvenSi_I = BSi_I/sqrt(cMu*RhoSi_I)
 
-    RhoCompression_I=1.50*log(RhoSI_I/RhoOldSI_I) - log(BSI_I/BOldSI_I)
+    RhoCompression_I=1.50*log(RhoSi_I/RhoOldSi_I) - log(BSi_I/BOldSi_I)
 
     ! Contribution to the advection in k_space from the Lagrangian derivatives:
     ! Dispersion = Dt * [ (D ln {\rho})/(Dt) - 2 (D ln { B })/(D t) ] + ...
 
-    DispersionA_I = log(RhoSI_I*BOldSI_I**2/(RhoOldSI_I*BSI_I**2))
+    DispersionA_I = log(RhoSi_I*BOldSi_I**2/(RhoOldSi_I*BSi_I**2))
 
     if(UseAdvectionWithAlfvenSpeed)then
        do iVertex =1,iEnd
           ! In this case, only first order accuracy between 2 - iEnd-1
           ! based on L323 in ModGrid.
           if (iVertex /= iEnd) then
-             DsSI = DsSI_I(iVertex)
+             DsSi = DsSi_I(iVertex)
           else
-             ! Seems DsSI_I(iEnd) is not defined.
-             DsSI = DsSI_I(iEnd-1)
+             ! Seems DsSi_I(iEnd) is not defined.
+             DsSi = DsSi_I(iEnd-1)
           end if
 
-          CFL_I(iVertex) = Dt*vAlfvenSI_I(iVertex)/DsSI
+          CFL_I(iVertex) = Dt*vAlfvenSi_I(iVertex)/DsSi
        end do
 
        ! Now add the contribution from the spacial derivative:
        ! ... + Dt * [ \partial ((1/2) ln {rho})/(\partial s)-2\partial( ln{B})/(\partial s) ]
        ! for the "plus" wave
 
-       DLogRho = log(RhoSI_I(2)/ RhoSI_I(1))
-       DLogB   = log(BSI_I(2)  / BSI_I(1))
+       DLogRho = log(RhoSi_I(2)/ RhoSi_I(1))
+       DLogB   = log(BSi_I(2)  / BSi_I(1))
        DispersionPlus_I(1)  =                                       &
             DispersionA_I(1)+CFL_I(1 )*(0.5*DLogRho-2.0*DLogB)
 
-       DLogRho = log(RhoSI_I(iEnd)/ RhoSI_I(iEnd-1))
-       DLogB   = log(BSI_I(iEnd)  / BSI_I(iEnd-1))
+       DLogRho = log(RhoSi_I(iEnd)/ RhoSi_I(iEnd-1))
+       DLogB   = log(BSi_I(iEnd)  / BSi_I(iEnd-1))
        DispersionPlus_I(iEnd) =                                     &
             DispersionA_I(iEnd)+CFL_I(iEnd)*(0.5*DLogRho-2.0*DLogB)
 
        do iVertex=2,iEnd-1
-          DLogRho = log(RhoSI_I(iVertex+1)/ RhoSI_I(iVertex-1))/2
-          DLogB   = log(BSI_I(iVertex+1)  / BSI_I(iVertex-1))/2
+          DLogRho = log(RhoSi_I(iVertex+1)/ RhoSi_I(iVertex-1))/2
+          DLogB   = log(BSi_I(iVertex+1)  / BSi_I(iVertex-1))/2
 
           DispersionPlus_I(iVertex) = DispersionA_I(iVertex)    &
                + CFL_I(iVertex)*(0.5*DLogRho-2.0*DLogB)
@@ -375,14 +375,14 @@ contains
     RhoCompression_I=RhoCompression_I/real(nStep)
   end subroutine reduce_advection_rates
   !============================================================================
-  subroutine set_dxx(iEnd, nP, BSI_I)
+  subroutine set_dxx(iEnd, nP, BSi_I)
     integer,intent(in) :: iEnd,nP
-    real,intent(in)    :: BSI_I(iEnd)
+    real,intent(in)    :: BSi_I(iEnd)
 
     integer:: iVertex,iK
     real :: F01,F02,F11,F12
-    real :: k0SI,k1SI
-    real :: SpectralIndexAtKMax, ISumSI
+    real :: k0Si,k1Si
+    real :: SpectralIndexAtKMax, ISumSi
 
     logical :: DoTestMe = .false.
 
@@ -410,17 +410,17 @@ contains
           SpectralIndexAtKMax = 1.0
        end select
 
-       kSI_I = BSI_I(iVertex)*kOverBSI_I
+       kSi_I = BSi_I(iVertex)*kOverBSi_I
 
        ! Initially from kMax
-       k0SI = kSI_I(1)
+       k0Si = kSi_I(1)
 
        ! The sum of I_{plus}+I_{minus} at P_max
-       ISumSI = IPlusSI_IX(1,iVertex)+IMinusSI_IX(1,iVertex)
+       ISumSi = IPlusSi_IX(1,iVertex)+IMinusSi_IX(1,iVertex)
 
        ! The integrand for AK_I, BK_I
-       F01 = 1.0/(k0SI**2)/ISumSI
-       F02 = 1.0/(k0SI**4)/ISumSI
+       F01 = 1.0/(k0Si**2)/ISumSi
+       F02 = 1.0/(k0Si**4)/ISumSi
 
        ! As the starting values for AK_I and BK_I at the minimum momentum,
        ! solve the integrals from K_{max} up to \infty, assuming the
@@ -430,13 +430,13 @@ contains
 
        if (iVertex == iParticleTest .and. DoTestMe) then
           write(*,*) 'SpectralIndex   =', SpectralIndexAtKMax
-          write(*,*) 'kOverBSI_I(1)   =', kOverBSI_I(1)
-          write(*,*) 'BSI_I(iVertex)=', BSI_I(iVertex)
-          write(*,*) 'k0SI            =', k0SI
-          write(*,*) 'ISumSI          =', ISumSI
-          write(*,*) 'expected ISum   =', 54*BSI_I(iVertex)**2 &
+          write(*,*) 'kOverBSi_I(1)   =', kOverBSi_I(1)
+          write(*,*) 'BSi_I(iVertex)=', BSi_I(iVertex)
+          write(*,*) 'k0Si            =', k0Si
+          write(*,*) 'ISumSi          =', ISumSi
+          write(*,*) 'expected ISum   =', 54*BSi_I(iVertex)**2 &
                /(7*cPi*cMu*Lambda0InAu*9.3286125374064124E+08) &
-               *(cGev/cLightSpeed/cElectronCharge/BSI_I(iVertex))**(1./3)
+               *(cGev/cLightSpeed/cElectronCharge/BSi_I(iVertex))**(1./3)
           write(*,*) 'AK_II(1,iVertex), BK_II(1,iVertex) =', &
                AK_II(1,iVertex), BK_II(1,iVertex)
        end if
@@ -448,14 +448,14 @@ contains
           ! the wave number intervals.
 
           ! The current value of the wave number
-          k1SI = kSI_I(iK)
+          k1Si = kSi_I(iK)
 
           ! The sum of I_{plus}+I_{minus} at P
-          ISumSI = IPlusSI_IX(iK,iVertex)+IMinusSI_IX(iK,iVertex)
+          ISumSi = IPlusSi_IX(iK,iVertex)+IMinusSi_IX(iK,iVertex)
 
           ! The integrands at the lower value of the wave number
-          F11 = 1.0/(k1SI**2)/ ISumSI
-          F12 = 1.0/(k1SI**4)/ ISumSI
+          F11 = 1.0/(k1Si**2)/ ISumSi
+          F12 = 1.0/(k1Si**4)/ ISumSi
 
           ! Calculate the new partial sums
 
@@ -464,13 +464,13 @@ contains
 
           ! current values saved as the initial values for the next step in
           ! the loop
-          k0SI = k1SI; F01=F11; F02=F12
+          k0Si = k1Si; F01=F11; F02=F12
        end do
     end do
   end subroutine set_dxx
   !============================================================================
-  subroutine update_spectrum(iEnd, nP, MomentumSI_I, DLogP, &
-       XyzSI_DI, DsSI_I, F_II, BSI_I, RhoSI_I, SP_Dt)
+  subroutine update_spectrum(iEnd, nP, MomentumSi_I, DLogP, &
+       XyzSi_DI, DsSi_I, F_II, BSi_I, RhoSi_I, SP_Dt)
 
     ! This is the subroutine which advances the wave spectrum through
     ! a time step, by solving the equations
@@ -483,14 +483,14 @@ contains
     ! The number of points and the number of the energy intervals
     integer,intent(in)::iEnd,nP
 
-    real, intent(in) :: MomentumSI_I(0:nP+1), DLogP, SP_Dt
+    real, intent(in) :: MomentumSi_I(0:nP+1), DLogP, SP_Dt
     ! Coordinates of the Lagrangian points
-    real, intent(in) :: XyzSI_DI(3, 1:iEnd)
-    real, intent(in) :: DsSI_I(1:iEnd)
+    real, intent(in) :: XyzSi_DI(3, 1:iEnd)
+    real, intent(in) :: DsSi_I(1:iEnd)
     ! The distribution function
     real, intent(in) :: F_II(0:nP+1,1:iEnd)
     ! The magnetic field intensity and the particle number density in SI
-    real, intent(in) :: BSI_I(1:iEnd), RhoSI_I(1:iEnd)
+    real, intent(in) :: BSi_I(1:iEnd), RhoSi_I(1:iEnd)
 
     integer :: iVertex,iK,iP
 
@@ -507,7 +507,7 @@ contains
     real:: K
 
     ! Forward and backward values for Ds
-    real:: DsPlusSI,DsMinusSI
+    real:: DsPlusSi,DsMinusSi
 
     ! Spatial derivatives of the distribution function at given values
     ! of the momentum
@@ -527,17 +527,17 @@ contains
        ! Advection in k space:
        if(UseAdvectionWithAlfvenSpeed)then
           call advance_log_advection(DispersionPlus_I(iVertex),  nP, 1, 1, &
-               IPlusSI_IX( :,iVertex),IsConservative=.true., &
+               IPlusSi_IX( :,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
           call advance_log_advection(DispersionMinus_I(iVertex), nP, 1, 1, &
-               IMinusSI_IX(:,iVertex),IsConservative=.true., &
+               IMinusSi_IX(:,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
        else
           call advance_log_advection(DispersionA_I(iVertex), nP, 0, 0, &
-               IPlusSI_IX( 1:nP,iVertex),IsConservative=.true., &
+               IPlusSi_IX( 1:nP,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
           call advance_log_advection(DispersionA_I(iVertex), nP, 0, 0, &
-               IMinusSI_IX(1:nP,iVertex),IsConservative=.true., &
+               IMinusSi_IX(1:nP,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
        end if
 
@@ -560,31 +560,31 @@ contains
        ! at the maximal energy
 
        if (iVertex==1) then
-          DsPlusSI = max(cTiny, DsSI_I(1))
+          DsPlusSi = max(cTiny, DsSi_I(1))
 
           ! Use the forward spatial derivative
-          DfDs0=(F_II(nP,iVertex+1)-F_II(nP,iVertex))/DsPlusSI
+          DfDs0=(F_II(nP,iVertex+1)-F_II(nP,iVertex))/DsPlusSi
 
        else if (iVertex==iEnd) then
-          ! again, DsSI_I(iEnd) is not defined...
-          DsMinusSI = max(cTiny, DsSI_I(iEnd-1))
+          ! again, DsSi_I(iEnd) is not defined...
+          DsMinusSi = max(cTiny, DsSi_I(iEnd-1))
 
           ! Use the backward spatial derivative
-          DfDs0=(F_II(nP,iVertex)-F_II(nP,iVertex-1))/DsMinusSI
+          DfDs0=(F_II(nP,iVertex)-F_II(nP,iVertex-1))/DsMinusSi
 
        else
-          DsPlusSI  = max(cTiny, DsSI_I(iVertex))
-          DsMinusSI = max(cTiny, DsSI_I(iVertex-1))
+          DsPlusSi  = max(cTiny, DsSi_I(iVertex))
+          DsMinusSi = max(cTiny, DsSi_I(iVertex-1))
 
           ! Use the average between the forward and backward spatial derivatives
-          DfDs0=0.5*((F_II(nP,iVertex+1)-F_II(nP,iVertex  ))/DsPlusSI+&
-               (F_II(nP,iVertex  )-F_II(nP,iVertex-1))/DsMinusSI)
+          DfDs0=0.5*((F_II(nP,iVertex+1)-F_II(nP,iVertex  ))/DsPlusSi+&
+               (F_II(nP,iVertex  )-F_II(nP,iVertex-1))/DsMinusSi)
 
        end if
 
        ! The momentum at the maximal energy
 
-       P0 = MomentumSI_I(nP+1)
+       P0 = MomentumSi_I(nP+1)
 
        ! We calculate the partial sums for a set of the momentum values.
        ! The integral is taken from pRes up to infinity, so we start from the
@@ -594,18 +594,18 @@ contains
        do iP=nP,1,-1
 
           ! Calculate the momentum at the lower energy
-          P1 = MomentumSI_I(iP)
+          P1 = MomentumSi_I(iP)
 
           ! Calculate the distribution function gradient at the lower energy
 
           if (iVertex == 1) then
-             DfDs1 = (F_II(iP,iVertex+1)-F_II(iP,iVertex  ))/DsPlusSI
+             DfDs1 = (F_II(iP,iVertex+1)-F_II(iP,iVertex  ))/DsPlusSi
           else if (iVertex == iEnd) then
-             DfDs1 = (F_II(iP,iVertex  )-F_II(iP,iVertex-1))/DsMinusSI
+             DfDs1 = (F_II(iP,iVertex  )-F_II(iP,iVertex-1))/DsMinusSi
           else
              DfDs1 = 0.5* &
-                  ( (F_II(iP,iVertex+1)-F_II(iP,iVertex  ))/DsPlusSI  +&
-                  (  F_II(iP,iVertex  )-F_II(iP,iVertex-1))/DsMinusSI )
+                  ( (F_II(iP,iVertex+1)-F_II(iP,iVertex  ))/DsPlusSi  +&
+                  (  F_II(iP,iVertex  )-F_II(iP,iVertex-1))/DsMinusSi )
           end if
 
           ! here are the parts for \gamma being integrated
@@ -631,12 +631,12 @@ contains
        ExpRhoCompression=exp(RhoCompression_I(iVertex))
 
        call assign_kolmogorov_spectrum( &
-            iVertex, iVertex, 0, 0, XyzSI_DI(:,iVertex:iVertex),&
-            BSI_I(iVertex:iVertex))
-       ! IPlusSI_IX(    0,iVertex) =
-       !       IPlusSI_IX(  0,iVertex)*ExpRhoCompression
-       ! IMinusSI_IX(   0,iVertex) =
-       !       IMinusSI_IX( 0,iVertex)*ExpRhoCompression
+            iVertex, iVertex, 0, 0, XyzSi_DI(:,iVertex:iVertex),&
+            BSi_I(iVertex:iVertex))
+       ! IPlusSi_IX(    0,iVertex) =
+       !       IPlusSi_IX(  0,iVertex)*ExpRhoCompression
+       ! IMinusSi_IX(   0,iVertex) =
+       !       IMinusSi_IX( 0,iVertex)*ExpRhoCompression
 
        !----------------------------------------------------------------------!
        !          Grid in the momentum space                                  !
@@ -650,15 +650,15 @@ contains
 
        do iK = nK,1,-1
           ! The wave number
-          K=BSI_I(iVertex)*kOverBSI_I(iK)
+          K=BSi_I(iVertex)*kOverBSi_I(iK)
 
           ! The resonant momentum, for a given K
-          PRes = cElectronCharge*BSI_I(iVertex)/K
+          PRes = cElectronCharge*BSi_I(iVertex)/K
 
           iP = iK
 
           ! here is the dynamic \gamma evaluated
-          Gamma=-4.0*2.0*(cPi**2)*vAlfvenSI_I(iVertex)/K*&
+          Gamma=-4.0*2.0*(cPi**2)*vAlfvenSi_I(iVertex)/K*&
                (PRes*A_I(iP)-(PRes**3)*B_I(iP))/    &
                cProtonMass
 
@@ -681,9 +681,9 @@ contains
           ! to account for the contribution from the density derivative.
 
           ! Compression  factor comes twice
-          C1=(IPlusSI_IX(iK,iVertex)*IMinusSI_IX(iK,iVertex)) &
+          C1=(IPlusSi_IX(iK,iVertex)*IMinusSi_IX(iK,iVertex)) &
                *ExpRhoCompression**2
-          C2=(IPlusSI_IX(iK,iVertex)-IMinusSI_IX(iK,iVertex)) &
+          C2=(IPlusSi_IX(iK,iVertex)-IMinusSi_IX(iK,iVertex)) &
                *ExpRhoCompression
 
           ! The solution of the equations
@@ -703,68 +703,68 @@ contains
 
           if(C3>0)then
 
-             IPlusSI_IX(iK,iVertex)=(C3+sqrt(C3**2+4.0*C1))/2.0
+             IPlusSi_IX(iK,iVertex)=(C3+sqrt(C3**2+4.0*C1))/2.0
 
              ! Now we take again into account the conservation of the
              ! product I_+*I_-
              ! which is the consequence of the relationship \gamma_-=-\gamma_+
 
-             IMinusSI_IX(iK,iVertex)=C1/IPlusSI_IX(iK,iVertex)
+             IMinusSi_IX(iK,iVertex)=C1/IPlusSi_IX(iK,iVertex)
           else
 
-             IMinusSI_IX(iK,iVertex)=(-C3+sqrt(C3**2+4.0*C1))/2.0
+             IMinusSi_IX(iK,iVertex)=(-C3+sqrt(C3**2+4.0*C1))/2.0
 
              ! Now we take again into account the conservation of the product
              ! I_+*I_-
              ! which is the consequence of the relationship \gamma_-=-\gamma_+
 
-             IPlusSI_IX(iK,iVertex)=C1/IMinusSI_IX(iK,iVertex)
+             IPlusSi_IX(iK,iVertex)=C1/IMinusSi_IX(iK,iVertex)
           end if
 
-          if(IPlusSI_IX(iK,iVertex)<=0.0)then
+          if(IPlusSi_IX(iK,iVertex)<=0.0)then
              write(*,*)'IPlus(iK,iVertex) < 0, IPlus,iK,iVertex=',&
-                  IPlusSI_IX(iK,iVertex),iK,iVertex,c1,c2,c3,gamma,SP_Dt
+                  IPlusSi_IX(iK,iVertex),iK,iVertex,c1,c2,c3,gamma,SP_Dt
              stop
           end if
 
-          if(IMinusSI_IX(iK,iVertex)<=0.0)then
+          if(IMinusSi_IX(iK,iVertex)<=0.0)then
              write(*,*)'IMinus(iK,iVertex) < 0, IMinus,iK,iVertex=',&
-                  IMinusSI_IX(iK,iVertex),iK,iVertex,c1,c2,c3,gamma,SP_Dt
+                  IMinusSi_IX(iK,iVertex),iK,iVertex,c1,c2,c3,gamma,SP_Dt
              stop
           end if
 
        end do    ! cycling iK
-       IPlusSI_IX( nP+1,iVertex) = IPlusSI_IX( nP,iVertex)
-       IMinusSI_IX(nP+1,iVertex) = IMinusSI_IX(nP,iVertex)
+       IPlusSi_IX( nP+1,iVertex) = IPlusSi_IX( nP,iVertex)
+       IMinusSi_IX(nP+1,iVertex) = IMinusSi_IX(nP,iVertex)
     end do       ! cycling iVertex
 
     if(UseAdvectionWithAlfvenSpeed)then
        do iK=0,nP+1
-          IPlusSI_IX(iK,1:iEnd) = &
-               vAlfvenSI_I(1:iEnd)*IPlusSI_IX(iK,1:iEnd)/BSI_I( 1:iEnd)
+          IPlusSi_IX(iK,1:iEnd) = &
+               vAlfvenSi_I(1:iEnd)*IPlusSi_IX(iK,1:iEnd)/BSi_I( 1:iEnd)
           call advance_lin_advection_plus(CFL_I( 1:iEnd),&
-               iEnd,0,0,IPlusSI_IX(iK,1:iEnd))
+               iEnd,0,0,IPlusSi_IX(iK,1:iEnd))
 
-          IPlusSI_IX(iK,1:iEnd) = &
-               BSI_I( 1:iEnd)*IPlusSI_IX(iK,1:iEnd)/vAlfvenSI_I(1:iEnd)
+          IPlusSi_IX(iK,1:iEnd) = &
+               BSi_I( 1:iEnd)*IPlusSi_IX(iK,1:iEnd)/vAlfvenSi_I(1:iEnd)
 
-          IMinusSI_IX(iK,1:iEnd)= &
-               vAlfvenSI_I(1:iEnd)*IMinusSI_IX(iK,1:iEnd)/BSI_I( 1:iEnd)
+          IMinusSi_IX(iK,1:iEnd)= &
+               vAlfvenSi_I(1:iEnd)*IMinusSi_IX(iK,1:iEnd)/BSi_I( 1:iEnd)
 
           call advance_lin_advection_minus(CFL_I(1:iEnd),&
-               iEnd,0,0,IMinusSI_IX(iK,1:iEnd))
+               iEnd,0,0,IMinusSi_IX(iK,1:iEnd))
 
-          IMinusSI_IX(iK,1:iEnd) = &
-               BSI_I( 1:iEnd)*IMinusSI_IX(iK,1:iEnd)/vAlfvenSI_I(1:iEnd)
+          IMinusSi_IX(iK,1:iEnd) = &
+               BSi_I( 1:iEnd)*IMinusSi_IX(iK,1:iEnd)/vAlfvenSi_I(1:iEnd)
        end do
     end if
   end subroutine update_spectrum
   !============================================================================
-  real function Dxx(iX, iP, MomentumSI, SpeedSI, BSI)
+  real function Dxx(iX, iP, MomentumSi, SpeedSi, BSi)
     integer,intent(in) :: iX, iP
-    real,   intent(in) :: MomentumSI, SpeedSI, BSI
+    real,   intent(in) :: MomentumSi, SpeedSi, BSi
 
-    real    :: kRSI
+    real    :: kRSi
 
     logical :: DoTestMe =.false.
 
@@ -785,17 +785,17 @@ contains
     ! and   BK_I=\int_{k_{res}}^\infty{d(\log k)/(k^4*(I_{+}(k) + I_{-}(k) )) }
 
     ! The resonant wave number, kr = e*B/p in the SI unit
-    kRSI = cElectronCharge*BSI/MomentumSI
+    kRSi = cElectronCharge*BSi/MomentumSi
 
     ! Calculate D_{xx}: KRes-dependent part
-    Dxx = BSI**2*SpeedSI/(cMu*cPi) * (AK_II(iP,iX)-BK_II(iP,iX)*kRSI**2)
+    Dxx = BSi**2*SpeedSi/(cMu*cPi) * (AK_II(iP,iX)-BK_II(iP,iX)*kRSi**2)
 
     if (iX == iParticleTest .and. iP == iPTest .and. DoTestMe) then
        write(*,*) 'AK_II(iP,iX), BK_II(iP,iX) =', &
             AK_II(iP,iX), BK_II(iP,iX)
        write(*,*) 'Dxx =', Dxx
        write(*,*) 'D from Li =', 1./3*Lambda0InAu*9.3286125374064124E+08 &
-            *(MomentumSI*cLightSpeed/cGeV)**(1./3)*SpeedSI
+            *(MomentumSi*cLightSpeed/cGeV)**(1./3)*SpeedSi
     end if
 
   end function Dxx
