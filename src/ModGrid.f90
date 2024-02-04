@@ -38,19 +38,22 @@ module SP_ModGrid
   integer, public :: nLon  = 4
   integer, public :: nLat  = 4
   !
-  ! Total number of magnetic field lines on all PEs (just a product of nLat * nLon)
-  !
+  ! Total number of magnetic field lines on all PEs
+  ! (just a product of nLat * nLon)
   integer, public :: nLineAll = 16
   !
-  ! All nodes are enumerated. The last node number on the previous proc (iProc-1)
+  ! All nodes are enumerated. The last node number on the previous proc
+  ! (iProc-1)
   ! equals (iProc*nLineAll)/nProc. Store this:
   !
   integer, public :: iLineAll0
   !
   ! The nodes on a given PE have node numbers ranging from iLineAll0 +1 to
-  ! iNodeLast =((iProc + 1)*nLineAll)/nProc. The iLine index to enumerate lines on
-  ! a given proc ranges from 1 to iNodeLast. nLine = nNodeLast - iLineAll0 is the number of
-  ! lines (blocks) on this processor. For iLine=1:nLine iLineAll = iLineAll0+1:iNodeLast
+  ! iNodeLast =((iProc + 1)*nLineAll)/nProc. The iLine index to enumerate
+  ! lines on a given proc ranges from 1 to iNodeLast.
+  ! nLine = nNodeLast - iLineAll0 is the number of
+  ! lines (blocks) on this processor. For iLine=1:nLine
+  ! iLineAll = iLineAll0+1:iNodeLast
   !
   integer, public :: nLine
   !
