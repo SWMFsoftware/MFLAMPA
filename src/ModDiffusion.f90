@@ -29,7 +29,7 @@ module SP_ModDiffusion
 
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
-  real :: ScaleTurbulenceSI = 0.03 * cAu
+  real :: ScaleTurbulenceSi = 0.03 * cAu
   integer, parameter :: Const_ = 0, Linear_ = 1
   integer :: iScaleTurbulenceType = Const_
 
@@ -62,8 +62,8 @@ contains
        case default
           call CON_stop(NameSub//": unknown scale turbulence type")
        end select
-       call read_var('ScaleTurbulence [AU] at 1 AU', ScaleTurbulenceSI)
-       ScaleTurbulenceSI = ScaleTurbulenceSI * cAu
+       call read_var('ScaleTurbulence [AU] at 1 AU', ScaleTurbulenceSi)
+       ScaleTurbulenceSi = ScaleTurbulenceSi * cAu
     case('#DIFFUSION')
        call read_var('UseDiffusion', UseDiffusion)
     end select
@@ -78,7 +78,7 @@ contains
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModGrid, ONLY: State_VIB, MHData_VIB, R_, D_, x_, y_, z_
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, MomentumSi_I, DLogP
-    use SP_ModUnit, ONLY: UnitX_, Io2Si_V 
+    use SP_ModUnit, ONLY: UnitX_, Io2Si_V
     ! use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -92,11 +92,11 @@ contains
     integer :: iP, iVertex              ! loop variables
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
-    ! DOuter =BSI in the cell center
-    ! DInner = DiffusionCoefficient/BSI at the face
+    ! DOuter = BSi in the cell center
+    ! DInner = DiffusionCoefficient/BSi at the face
     real, dimension(1:iEnd) :: DOuterSi_I, DInnerSi_I, CoefDInnerSi_I
     ! Full difference between DataInputTime and SPTime
-    real, parameter :: DiffCoeffMinSI = 1.0E+04*Rsun
+    real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
 
     ! diffusion along the field line
 
@@ -129,7 +129,7 @@ contains
             *SpeedSi_I(iP)*(MomentumSi_I(iP))**(1.0/3)
 
        DInnerSi_I(1:iEnd) = max(DInnerSi_I(1:iEnd),    &
-            DiffCoeffMinSI/DOuterSi_I(1:iEnd))
+            DiffCoeffMinSi/DOuterSi_I(1:iEnd))
        ! end if
 
        call advance_diffusion(Dt, iEnd, DsSi_I(1:iEnd),   &
@@ -158,9 +158,9 @@ contains
       ! precompute scale of turbulence along the line
       select case(iScaleTurbulenceType)
       case(Const_)
-         ScaleSi_I(1:iEnd) = ScaleTurbulenceSI
+         ScaleSi_I(1:iEnd) = ScaleTurbulenceSi
       case(Linear_)
-         ScaleSi_I(1:iEnd) = ScaleTurbulenceSI*RadiusSi_I(1:iEnd)/cAU
+         ScaleSi_I(1:iEnd) = ScaleTurbulenceSi*RadiusSi_I(1:iEnd)/cAU
       end select
       ! Compute the diffusion coefficient without the contribution of
       ! v (velocity) and p (momentum), as v and p are different for

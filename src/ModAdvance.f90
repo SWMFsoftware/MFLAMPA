@@ -170,7 +170,7 @@ contains
                (MhData_VIB(Rho_,  1:iEnd,iLine) - &
                State_VIB(RhoOld_,1:iEnd,iLine))
 
-          BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha*&
+          BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha* &
                (State_VIB(B_,  1:iEnd,iLine) - &
                State_VIB(BOld_,1:iEnd,iLine))
 
@@ -198,8 +198,6 @@ contains
           ! XyzSi_DI(x_:z_, 1:iEnd), DsSi_I(1:iEnd), &
           ! DLogP, DtProgress, DtReduction)
 
-          ! Store the value at the end of the previous time step
-
           ! set the left boundary condition (for diffusion)
           Distribution_IIB(1:nP+1, 1, iLine) = &
                Distribution_IIB(0, 1, iLine) * &
@@ -209,14 +207,15 @@ contains
           if(UsePoissonBracket)then
              ! update bc for advection
              call set_advection_bc
-             ! store/update the inverse rho arrays
              call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
                   iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
+             ! store the density and B-field arrays
+             ! at the end of the previous time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
              ! DoInitSpectrum = .true.
           else
-             ! No Poisson bracket, use the default algorithm
+             ! No Poisson bracket scheme, use the default algorithm
              ! 1st order Fermi acceleration is responsible for advection
              ! in momentum space
              ! first order Fermi acceleration for the current line
@@ -232,7 +231,7 @@ contains
              ! Check if the number of time steps is positive:
              if(nStep < 1)then
                 ! if(UseTurbulentSpectrum) &
-                !     write(*,*) ' DtReduction               =', DtReduction
+                !     write(*,*) ' DtReduction =', DtReduction
                 write(*,*) ' maxval(abs(FermiFirst_I)) =', &
                      maxval(abs(FermiFirst_I(2:iEnd)))
                 call CON_stop(NameSub//': nStep <= 0????')
@@ -294,9 +293,9 @@ contains
       integer:: iVertex ! loop variable
       real   :: DLogRhoExcessIntegral, DLogRhoExcess
       real, parameter:: DLogRhoBackground = 0.01
-      !------------------------------------------------------------------------
       ! find the excess of DLogRho within the shock compared to background
       ! averaged over length
+      !------------------------------------------------------------------------
       DLogRhoExcessIntegral = 0.0
       DsSi_I = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
       do iVertex = iShock - nWidth, iShock + nWidth - 1
@@ -338,7 +337,7 @@ contains
          ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
          !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
          ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
-         CoefInjLocal = 2.50E-11
+         CoefInjLocal = 2.5E-11
          MomentumSi   = kinetic_energy_to_momentum(                     &
               MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 

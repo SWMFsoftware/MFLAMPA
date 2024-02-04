@@ -15,7 +15,8 @@ contains
   !============================================================================
   subroutine advect_via_poisson_bracket(nX, tFinal, CflIn,  &
        iLine, iShock, nOldSi_I, nSi_I, BSi_I)
-    ! advect via Possion Bracket + diffusion by encapsulation
+    ! advect via Possion Bracket scheme
+    ! diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
@@ -25,10 +26,10 @@ contains
 
     integer,intent(in):: nX         ! # of meshes along lnp-coordinate
     real,   intent(in):: tFinal     ! time interval to advance through
-    real,   intent(in):: CflIn      !
-    ! Variables for diffusion
-    integer, intent(in) :: iLine, iShock
-    real, intent(in), dimension(1:nX) :: nOldSi_I, nSi_I,  BSi_I
+    real,   intent(in):: CflIn      ! input CFL number
+    ! Input variables for diffusion
+    integer, intent(in):: iLine, iShock ! indices of line and shock
+    real, intent(in), dimension(1:nX):: nOldSi_I, nSi_I, BSi_I
     ! Loop variables
     integer :: iP
     ! Extended arrays for implementation of the Poisson Bracket Alg.
@@ -62,13 +63,13 @@ contains
 
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
-    VolumeXStart_I(1:nX)  = 1/nOldSi_I(1:nX)
-    VolumeXStart_I(0)     = VolumeXStart_I(1)
-    VolumeXStart_I(nX+1)  = VolumeXStart_I(nX)
+    VolumeXStart_I(1:nX) = 1/nOldSi_I(1:nX)
+    VolumeXStart_I(0)    = VolumeXStart_I(1)
+    VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
     ! End volume
-    VolumeXEnd_I(1:nX)    = 1/nSi_I(1:nX)
-    VolumeXEnd_I(0)       = VolumeXEnd_I(1)
-    VolumeXEnd_I(nX+1)    = VolumeXEnd_I(nX)
+    VolumeXEnd_I(1:nX)   = 1/nSi_I(1:nX)
+    VolumeXEnd_I(0)      = VolumeXEnd_I(1)
+    VolumeXEnd_I(nX+1)   = VolumeXEnd_I(nX)
     ! Time derivative
     dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)/tFinal
     ! Phase volume: initial and time derivative
@@ -105,8 +106,8 @@ contains
 
        ! Update velocity distribution function
        VDF_G(1:nP, 1:nX) = VDF_G(1:nP, 1:nX) + Source_C
-       if(UseDiffusion)call diffuse_distribution(iLine, nX, iShock,   &
-            Dt, VDF_G(0:nP+1, 1:nX), nSi_I, BSi_I)
+       if(UseDiffusion) call diffuse_distribution(iLine,    &
+            nX, iShock, Dt, VDF_G(0:nP+1, 1:nX), nSi_I, BSi_I)
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT

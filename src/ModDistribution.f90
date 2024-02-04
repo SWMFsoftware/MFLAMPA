@@ -14,7 +14,7 @@ module SP_ModDistribution
   use ModConst,    ONLY: cLightSpeed, energy_in
   use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
-       IO2SI_V, SI2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
+       IO2Si_V, Si2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid,  ONLY: nLine, nVertex_B
 
@@ -30,8 +30,8 @@ module SP_ModDistribution
   public:: offset            ! Sync. index in State_VIB and Dist_IIB
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
-  public:: MomentumInjSI     ! Mimimum momentum value in SI
-  public:: MomentumMaxSI     ! Maximum momentum value in SI
+  public:: MomentumInjSi     ! Mimimum momentum value in SI
+  public:: MomentumMaxSi     ! Maximum momentum value in SI
   public:: EnergyInjIo       ! Energy in kev (IO unit)
   public:: EnergyMaxIo       ! Energy in keV (IO unit)
   public:: DLogP             ! Mesh size for log(momentum) grid
@@ -41,17 +41,17 @@ module SP_ModDistribution
   real:: EnergyInjIo=10.0, EnergyMaxIo=1.0E+07
 
   ! Injection and max momentum in the simulation
-  real:: MomentumInjSI, MomentumMaxSI
+  real:: MomentumInjSi, MomentumMaxSi
 
   ! Size of a  log-momentum mesh. For momentum we use both the
   ! denotaion, P, and a word, momentum - whichever is more covenient
-  real:: DLogP        ! log(MomentumMaxSI/MomentumInjSI)/nP
+  real:: DLogP        ! log(MomentumMaxSi/MomentumInjSi)/nP
 
   ! speed, momentum, kinetic energy and total energy (including the rest
   ! mass energy) at the momentum grid points
-  real, public, dimension(0:nP+1) :: SpeedSI_I, MomentumSI_I, &
-       KinEnergySI_I, EnergySI_I, VolumeP_I
-  real, public :: Momentum3SI_I(-1:nP+1)
+  real, public, dimension(0:nP+1) :: SpeedSi_I, MomentumSi_I, &
+       KinEnergySi_I, EnergySi_I, VolumeP_I
+  real, public :: Momentum3Si_I(-1:nP+1)
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_ = 0
@@ -101,21 +101,21 @@ contains
     DoInit = .false.
 
     ! convert energies to momenta
-    MomentumInjSI= kinetic_energy_to_momentum(EnergyInjIo*IO2SI_V(UnitEnergy_))
-    MomentumMaxSI= kinetic_energy_to_momentum(EnergyMaxIo*IO2SI_V(UnitEnergy_))
+    MomentumInjSi= kinetic_energy_to_momentum(EnergyInjIo*IO2Si_V(UnitEnergy_))
+    MomentumMaxSi= kinetic_energy_to_momentum(EnergyMaxIo*IO2Si_V(UnitEnergy_))
 
     ! grid size in the log momentum space
-    DLogP = log(MomentumMaxSI/MomentumInjSI)/nP
+    DLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
     ! Functions to convert the grid index to momentum and energy
-    Momentum3SI_I(-1) = (MomentumInjSI*exp(-DLogP))**3/3
+    Momentum3Si_I(-1) = (MomentumInjSi*exp(-DLogP))**3/3
     do iP = 0, nP +1
-       MomentumSI_I(iP)  = MomentumInjSI*exp(iP*DLogP)
-       Momentum3SI_I(iP) = MomentumSI_I(iP)**3/3
-       VolumeP_I(iP)     = Momentum3SI_I(iP) - Momentum3SI_I(iP-1)
-       KinEnergySI_I(iP) = momentum_to_kinetic_energy(MomentumSI_I(iP))
-       EnergySI_I(iP)    = momentum_to_energy(MomentumSI_I(iP))
-       SpeedSI_I(iP)     = MomentumSI_I(iP)*cLightSpeed**2/EnergySI_I(iP)
+       MomentumSi_I(iP)  = MomentumInjSi*exp(iP*DLogP)
+       Momentum3Si_I(iP) = MomentumSi_I(iP)**3/3
+       VolumeP_I(iP)     = Momentum3Si_I(iP) - Momentum3Si_I(iP-1)
+       KinEnergySi_I(iP) = momentum_to_kinetic_energy(MomentumSi_I(iP))
+       EnergySi_I(iP)    = momentum_to_energy(MomentumSi_I(iP))
+       SpeedSi_I(iP)     = MomentumSi_I(iP)*cLightSpeed**2/EnergySi_I(iP)
     end do
 
     ! Distribution function
@@ -132,8 +132,8 @@ contains
           ! (m^2 ster s). Differential background flux is constant.
           do iP = 0, nP +1
              Distribution_IIB(iP,iVertex,iLine) =                         &
-                  FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSI_I(iP)**2   &
-                  *IO2SI_V(UnitFlux_)/IO2SI_V(UnitEnergy_)
+                  FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSi_I(iP)**2   &
+                  *IO2Si_V(UnitFlux_)/IO2Si_V(UnitEnergy_)
           end do
        end do
     end do
@@ -170,9 +170,9 @@ contains
     FluxChannelInit_V(0) = FluxInitIo
     FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
          (EnergyMaxIo-EChannelIO_I(:)) / (EnergyMaxIo-EnergyInjIo)
-    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2SI_V(UnitFlux_) * &
-         0.5 * (EnergyMaxIo + EnergyInjIo) * IO2SI_V(UnitEnergy_) * &
-         SI2IO_V(UnitEFlux_)
+    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2Si_V(UnitFlux_) * &
+         0.5 * (EnergyMaxIo + EnergyInjIo) * IO2Si_V(UnitEnergy_) * &
+         Si2IO_V(UnitEFlux_)
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
@@ -299,14 +299,14 @@ contains
     real   :: EFlux ! the value of energy flux
     real   :: dFlux, dFlux1 ! increments
     real   :: Flux          ! the value of particle flux
-    real, allocatable :: Flux_I(:), EChannelSI_I(:)
+    real, allocatable :: Flux_I(:), EChannelSi_I(:)
     !--------------------------------------------------------------------------
     ! energy limits of GOES channels
 
     if (.not.allocated(Flux_I)) allocate(Flux_I(nFluxChannel))
-    if (.not.allocated(EChannelSI_I)) allocate(EChannelSI_I(nFluxChannel))
+    if (.not.allocated(EChannelSi_I)) allocate(EChannelSi_I(nFluxChannel))
 
-    EChannelSI_I = EChannelIO_I * energy_in('MeV')
+    EChannelSi_I = EChannelIO_I * energy_in('MeV')
 
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
@@ -319,12 +319,12 @@ contains
           do iP = 1, nP - 1
              ! the flux increment from iP
              dFlux = 0.5 * &
-                  (KinEnergySI_I(iP+1) - KinEnergySI_I(iP)) * (&
+                  (KinEnergySi_I(iP+1) - KinEnergySi_I(iP)) * (&
                   Distribution_IIB(iP,  iVertex,iLine)*&
-                  MomentumSI_I(iP)**2 &
+                  MomentumSi_I(iP)**2 &
                   +&
                   Distribution_IIB(iP+1,iVertex,iLine)*&
-                  MomentumSI_I(iP+1)**2)
+                  MomentumSi_I(iP+1)**2)
 
              ! increase the total flux
              Flux = Flux + dFlux
@@ -332,51 +332,51 @@ contains
              ! increase GOES channels' fluxes
              do iFlux = 1, nFluxChannel
                 ! check whether reached the channel's cut-off level
-                if(KinEnergySI_I(iP+1) < EChannelSI_I(iFlux))&
+                if(KinEnergySi_I(iP+1) < EChannelSi_I(iFlux))&
                      CYCLE
 
-                if(KinEnergySI_I(iP) >= EChannelSI_I(iFlux))then
+                if(KinEnergySi_I(iP) >= EChannelSi_I(iFlux))then
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux
                 else
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
                    dFlux1 =&
-                        ((-0.50*(KinEnergySI_I(iP) + EChannelSI_I(iFlux)) + &
-                        KinEnergySI_I(iP+1) )*&
+                        ((-0.50*(KinEnergySi_I(iP) + EChannelSi_I(iFlux)) + &
+                        KinEnergySi_I(iP+1) )*&
                         Distribution_IIB(iP,iVertex,iLine)*&
-                        MomentumSI_I(iP)**2  &
-                        -0.50*(KinEnergySI_I(iP)-EChannelSI_I(iFlux))*&
+                        MomentumSi_I(iP)**2  &
+                        -0.50*(KinEnergySi_I(iP)-EChannelSi_I(iFlux))*&
                         Distribution_IIB(iP+1,iVertex,iLine)*&
-                        MomentumSI_I(iP+1)**2)*&
-                        (KinEnergySI_I(iP)-EChannelSI_I(iFlux))/&
-                        (KinEnergySI_I(iP+1)-KinEnergySI_I(iP))
+                        MomentumSi_I(iP+1)**2)*&
+                        (KinEnergySi_I(iP)-EChannelSi_I(iFlux))/&
+                        (KinEnergySi_I(iP+1)-KinEnergySi_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 end if
              end do
 
              ! increase total energy flux
              EFlux = EFlux + 0.5 * &
-                  (KinEnergySI_I(iP+1) - KinEnergySI_I(iP)) * (&
+                  (KinEnergySi_I(iP+1) - KinEnergySi_I(iP)) * (&
                   Distribution_IIB(iP,  iVertex,iLine)*&
-                  KinEnergySI_I(iP) * &
-                  MomentumSI_I(iP)**2 &
+                  KinEnergySi_I(iP) * &
+                  MomentumSi_I(iP)**2 &
                   +&
                   Distribution_IIB(iP+1,iVertex,iLine)*&
-                  KinEnergySI_I(iP+1) * &
-                  MomentumSI_I(iP+1)**2)
+                  KinEnergySi_I(iP+1) * &
+                  MomentumSi_I(iP+1)**2)
           end do
 
           ! store the results
           Flux_VIB(Flux0_,              iVertex, iLine) = &
-               Flux   * SI2IO_V(UnitFlux_)
+               Flux   * Si2IO_V(UnitFlux_)
           Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
-               Flux_I * SI2IO_V(UnitFlux_)
+               Flux_I * Si2IO_V(UnitFlux_)
           Flux_VIB(EFlux_,              iVertex, iLine) = &
-               EFlux  * SI2IO_V(UnitEFlux_)
+               EFlux  * Si2IO_V(UnitEFlux_)
        end do
     end do
 
-    deallocate(Flux_I, EChannelSI_I)
+    deallocate(Flux_I, EChannelSi_I)
 
   end subroutine get_integral_flux
   !============================================================================

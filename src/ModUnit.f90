@@ -36,7 +36,7 @@ module SP_ModUnit
 
   ! Unit particle flux, 1 particle per cm2 per s per steradian,
   ! corresponds to 10,000 particles per m2 per s per steradian.
-  real,                    parameter  :: UnitParticleFluxSI = 10000.0
+  real,                    parameter  :: UnitParticleFluxSi = 10000.0
   character(len=12),public            :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
   character(len=12),public,allocatable:: NameFluxUnit_I(:)
 
@@ -105,8 +105,8 @@ contains
     ! unit conversion
     Io2Si_V(UnitX_)      = Rsun
     Io2Si_V(UnitEnergy_) = energy_in(NameEnergyUnit)
-    Io2Si_V(UnitFlux_)   = UnitParticleFluxSI
-    Io2Si_V(UnitEFlux_)  = IO2SI_V(UnitEnergy_) * IO2SI_V(UnitFlux_)
+    Io2Si_V(UnitFlux_)   = UnitParticleFluxSi
+    Io2Si_V(UnitEFlux_)  = IO2Si_V(UnitEnergy_) * IO2Si_V(UnitFlux_)
 
     Si2Io_V = 1.0 / Io2Si_V
 
