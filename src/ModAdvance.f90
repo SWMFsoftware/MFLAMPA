@@ -8,7 +8,7 @@ module SP_ModAdvance
   use ModConst,   ONLY: cPi, cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
-       MomentumSi_I, MomentumInjSI, DLogP
+       MomentumSi_I, MomentumInjSi, DLogP
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
        D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
@@ -26,12 +26,12 @@ module SP_ModAdvance
   ! Public members:
   public:: read_param  ! read injection parameters
   public:: advance     ! Advance solution Distribution_IIB
-!!!!!!!!!! Boundary condition at the injection energy!!!!!!
+  ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real:: CoefInj = 0.25, SpectralIndex = 5.0
 
-!!!!!!!!!!!!!!!!!!!!!!!!! Local parameters!!!!!!!!!!!!!!!
+  ! Local parameters
   real:: Cfl=0.9        ! Controls the maximum allowed time step
   integer, public, parameter :: nWidth = 50
   logical :: UsePoissonBracket = .false.
@@ -261,13 +261,13 @@ contains
                      iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),  &
                      nSi_I, BSi_I)
              end do STEP
-             ! if(UseDoInitSpectrum = .true.
+             ! UseDoInitSpectrum = .true.
           end if
        end do PROGRESS
     end do line
   contains
     !==========================================================================
-    ! used only with the turbulence model ON
+    ! used only with the turbulence model ON:
     ! function mach_alfven() result(MachAlfven)
     ! alfvenic mach number for the current line
     !  real:: MachAlfven
@@ -346,13 +346,10 @@ contains
               * nSi_I(iVertex)/MomentumSi**3                            &
               * (MomentumSi/MomentumInjSi)**SpectralIndex
 
-         if (iShock /= NoShock_           .and.                         &
-              iVertex <= iShock + nWidth  .and.                         &
-              iVertex >= iShock - nWidth) then
-            CoefInjLocal = CoefInj
-         endif
+         if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth  .and. &
+              iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
 
-         Distribution_IIB(0,iVertex,iLine) = DistributionBc * CoefInjLocal
+         Distribution_IIB(0,iVertex,iLine) = DistributionBc*CoefInjLocal
 
       end do
 
