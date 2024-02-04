@@ -14,7 +14,7 @@ module SP_ModDistribution
   use ModConst,    ONLY: cLightSpeed, energy_in
   use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
-       IO2Si_V, Si2IO_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
+       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid,  ONLY: nLine, nVertex_B
 
@@ -30,10 +30,10 @@ module SP_ModDistribution
   public:: offset            ! Sync. index in State_VIB and Dist_IIB
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
-  public:: MomentumInjSi     ! Mimimum momentum value in SI
-  public:: MomentumMaxSi     ! Maximum momentum value in SI
-  public:: EnergyInjIo       ! Energy in kev (IO unit)
-  public:: EnergyMaxIo       ! Energy in keV (IO unit)
+  public:: MomentumInjSi     ! Mimimum momentum value in Si
+  public:: MomentumMaxSi     ! Maximum momentum value in Si
+  public:: EnergyInjIo       ! Energy in kev (Io unit)
+  public:: EnergyMaxIo       ! Energy in keV (Io unit)
   public:: DLogP             ! Mesh size for log(momentum) grid
 
   ! Injection and maximal energy in the simulation
@@ -60,7 +60,7 @@ module SP_ModDistribution
   integer, public :: FluxLast_ = 6             ! The last channel
   integer, public :: EFlux_    = 7             ! Total integral energy flux
   integer, public :: FluxMax_  = 7
-  real, allocatable :: EChannelIO_I(:) ! energy limits of the instrument
+  real, allocatable :: EChannelIo_I(:) ! energy limits of the instrument
   real, public, allocatable  :: Flux_VIB( :,:,:)
   character(len=10), public, allocatable  :: NameFluxChannel_I(:)
 
@@ -101,8 +101,8 @@ contains
     DoInit = .false.
 
     ! convert energies to momenta
-    MomentumInjSi= kinetic_energy_to_momentum(EnergyInjIo*IO2Si_V(UnitEnergy_))
-    MomentumMaxSi= kinetic_energy_to_momentum(EnergyMaxIo*IO2Si_V(UnitEnergy_))
+    MomentumInjSi= kinetic_energy_to_momentum(EnergyInjIo*Io2Si_V(UnitEnergy_))
+    MomentumMaxSi= kinetic_energy_to_momentum(EnergyMaxIo*Io2Si_V(UnitEnergy_))
 
     ! grid size in the log momentum space
     DLogP = log(MomentumMaxSi/MomentumInjSi)/nP
@@ -133,7 +133,7 @@ contains
           do iP = 0, nP +1
              Distribution_IIB(iP,iVertex,iLine) =                         &
                   FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSi_I(iP)**2   &
-                  *IO2Si_V(UnitFlux_)/IO2Si_V(UnitEnergy_)
+                  *Io2Si_V(UnitFlux_)/Io2Si_V(UnitEnergy_)
           end do
        end do
     end do
@@ -145,10 +145,10 @@ contains
        NameFluxChannel_I = ['flux_total', 'flux_00005', 'flux_00010', &
             'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100', &
             'eflux     ']
-       if(allocated(EChannelIO_I))&
-            deallocate(EChannelIO_I)
-       allocate (EChannelIO_I(nFluxChannel))
-       EChannelIO_I = [5,10,30,50,60,100]
+       if(allocated(EChannelIo_I))&
+            deallocate(EChannelIo_I)
+       allocate (EChannelIo_I(nFluxChannel))
+       EChannelIo_I = [5,10,30,50,60,100]
        if(allocated(NameFluxUnit_I))&
             deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(0:nFluxChannel+1))
@@ -169,10 +169,10 @@ contains
     ! for the assumed initial distribution (~1/p^2)
     FluxChannelInit_V(0) = FluxInitIo
     FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
-         (EnergyMaxIo-EChannelIO_I(:)) / (EnergyMaxIo-EnergyInjIo)
-    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * IO2Si_V(UnitFlux_) * &
-         0.5 * (EnergyMaxIo + EnergyInjIo) * IO2Si_V(UnitEnergy_) * &
-         Si2IO_V(UnitEFlux_)
+         (EnergyMaxIo-EChannelIo_I(:)) / (EnergyMaxIo-EnergyInjIo)
+    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * Io2Si_V(UnitFlux_) * &
+         0.5 * (EnergyMaxIo + EnergyInjIo) * Io2Si_V(UnitEnergy_) * &
+         Si2Io_V(UnitEFlux_)
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
@@ -207,8 +207,8 @@ contains
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
 
-       if (allocated(EChannelIO_I)) deallocate(EChannelIO_I)
-       allocate(EChannelIO_I(nFluxChannel))
+       if (allocated(EChannelIo_I)) deallocate(EChannelIo_I)
+       allocate(EChannelIo_I(nFluxChannel))
        if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
        allocate(NameFluxChannel_I(0:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
@@ -218,8 +218,8 @@ contains
        NameFluxChannel_I(nFluxChannel+1) = 'eflux'
 
        do iFluxChannel=1,nFluxChannel
-          call read_var('EChannelIO_I', EChannelIO_I(iFluxChannel))
-          write(NameFluxChannel,'(I5.5)') int(EChannelIO_I(iFluxChannel))
+          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel))
+          write(NameFluxChannel,'(I5.5)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
 
@@ -306,7 +306,7 @@ contains
     if (.not.allocated(Flux_I)) allocate(Flux_I(nFluxChannel))
     if (.not.allocated(EChannelSi_I)) allocate(EChannelSi_I(nFluxChannel))
 
-    EChannelSi_I = EChannelIO_I * energy_in('MeV')
+    EChannelSi_I = EChannelIo_I * energy_in('MeV')
 
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
@@ -368,11 +368,11 @@ contains
 
           ! store the results
           Flux_VIB(Flux0_,              iVertex, iLine) = &
-               Flux   * Si2IO_V(UnitFlux_)
+               Flux   * Si2Io_V(UnitFlux_)
           Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
-               Flux_I * Si2IO_V(UnitFlux_)
+               Flux_I * Si2Io_V(UnitFlux_)
           Flux_VIB(EFlux_,              iVertex, iLine) = &
-               EFlux  * Si2IO_V(UnitEFlux_)
+               EFlux  * Si2Io_V(UnitEFlux_)
        end do
     end do
 
