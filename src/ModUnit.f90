@@ -68,7 +68,6 @@ module SP_ModUnit
        'RSun  ', &
        'm/s   ', &
        'T     ', &
-       'none  ', &
        'amu/m3', &
        'T     ']
 

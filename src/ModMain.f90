@@ -208,7 +208,7 @@ contains
     use SP_ModAdvance,       ONLY: DoTraceShock, advance
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
-         Rho_, nLine, nVertex_B,  DLogRho_, RhoOld_, State_VIB, MHData_VIB
+         get_shock_location
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: stand_alone_save_restart
     use SP_ModPlot,          ONLY: save_plot_all
@@ -245,8 +245,7 @@ contains
     call get_other_state_var
     ! if no new background data loaded, don't advance in time
     if(DataInputTime <= SPTime) RETURN
-
-    call lagr_time_derivative
+    if(DoTraceShock)call get_shock_location
     ! run the model
     if(DoRun) call advance(min(DataInputTime,TimeLimit))
 
@@ -258,64 +257,6 @@ contains
 
     ! save restart in the stand alone mod
     if(IsStandAlone)call stand_alone_save_restart(Dt)
-
-  contains
-    !==========================================================================
-    subroutine lagr_time_derivative
-
-      use SP_ModGrid, ONLY: Used_B
-
-      integer:: iLine, iVertex
-      !------------------------------------------------------------------------
-      do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
-         do iVertex = 1, nVertex_B(  iLine)
-            ! divergence of plasma velocity
-            State_VIB(DLogRho_,iVertex,iLine) = log(&
-                 MHData_VIB(Rho_,iVertex,iLine)/&
-                 State_VIB(RhoOld_,iVertex,iLine))
-         end do
-         ! location of shock
-         call get_shock_location(iLine)
-      end do
-
-    end subroutine lagr_time_derivative
-    !==========================================================================
-    subroutine get_shock_location(iLine)
-
-      use SP_ModAdvance, ONLY: nWidth
-      use SP_ModGrid,    ONLY: R_, NoShock_, Shock_, ShockOld_, iShock_IB
-
-      integer, intent(in) :: iLine
-      ! find location of a shock wave on a given line (line)
-      ! Do not search too close to the Sun
-      integer         :: iShockMin
-      real, parameter :: RShockMin = 1.20  ! *RSun
-      ! Threshold for shock tracing
-      real, parameter :: DLogRhoThreshold = 0.01
-      ! Do not search too close to the heliosphere boundary
-      integer:: iShockMax
-      ! Misc
-      integer:: iShockCandidate
-      !------------------------------------------------------------------------
-      if(.not.DoTraceShock)then
-         iShock_IB(Shock_, iLine) = NoShock_
-         RETURN
-      end if
-      ! shock front is assumed to be location of max gradient log(Rho1/Rho2);
-      ! shock never moves back
-      iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
-      iShockMax = nVertex_B(iLine) - nWidth - 1
-      iShockCandidate = iShockMin - 1 + maxloc(&
-           State_VIB(DLogRho_,iShockMin:iShockMax,iLine),&
-           1, MASK = &
-           State_VIB(R_,      iShockMin:iShockMax,iLine) > RShockMin .and. &
-           State_VIB(DLogRho_,iShockMin:iShockMax,iLine) > DLogRhoThreshold)
-      if(iShockCandidate >= iShockMin)&
-           iShock_IB(Shock_, iLine) = iShockCandidate
-
-    end subroutine get_shock_location
-    !==========================================================================
   end subroutine run
   !============================================================================
   subroutine check

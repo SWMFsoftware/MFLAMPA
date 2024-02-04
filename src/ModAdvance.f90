@@ -10,7 +10,7 @@ module SP_ModAdvance
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
        MomentumSi_I, MomentumInjSi, DLogP
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
-       D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B
+       D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
   !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
   use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, Io2Si_V,                       &
@@ -33,7 +33,6 @@ module SP_ModAdvance
 
   ! Local parameters
   real:: Cfl=0.9        ! Controls the maximum allowed time step
-  integer, public, parameter :: nWidth = 50
   logical :: UsePoissonBracket = .false.
   logical, public:: DoTraceShock = .true.
 
@@ -286,13 +285,13 @@ contains
     ! MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
     ! end function mach_alfven
     subroutine steepen_shock(iEnd)
+      use SP_ModGrid, ONLY: dLogRhoThreshold
       integer, intent(in) :: iEnd ! To limit the range of search
       ! change the density profile near the shock front so it becomes steeper
       ! for the current line
       real   :: DsSi_I(1:iEnd)
       integer:: iVertex ! loop variable
       real   :: DLogRhoExcessIntegral, DLogRhoExcess
-      real, parameter:: DLogRhoBackground = 0.01
       ! find the excess of DLogRho within the shock compared to background
       ! averaged over length
       !------------------------------------------------------------------------
@@ -300,7 +299,7 @@ contains
       DsSi_I = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
       do iVertex = iShock - nWidth, iShock + nWidth - 1
          DLogRhoExcess = 0.5*(DLogRho_I(iVertex) + DLogRho_I(iVertex+1)) &
-              - DLogRhoBackground ! D log(rho)/Dt*\Delta t = -\div U*\Delta t
+              - DLogRhoThreshold ! D log(rho)/Dt*\Delta t = -\div U*\Delta t
          if(DLogRhoExcess>0) then
             ! This is a jump in velocity accross the shock wave * \Delta t
             DLogRhoExcessIntegral = DLogRhoExcessIntegral + &
@@ -311,11 +310,11 @@ contains
       ! check for zero excess
       if(DLogRhoExcessIntegral == 0.0) RETURN
       ! nullify excess  within the smoothed shock
-      DLogRho_I(iShock-nWidth:iShock+nWidth) = min(DLogRhoBackground, &
+      DLogRho_I(iShock-nWidth:iShock+nWidth) = min(DLogRhoThreshold, &
            DLogRho_I(iShock-nWidth:iShock+nWidth))
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
-      DLogRho_I(iShock) = DLogRhoBackground + DLogRhoExcessIntegral / &
+      DLogRho_I(iShock) = DLogRhoThreshold + DLogRhoExcessIntegral / &
            DsSi_I(iVertex)
       ! also, sharpen the magnetic field magnitude
       ! post shock part

@@ -19,13 +19,14 @@ module SP_ModGrid
   implicit none
   SAVE
 
-  private ! except
+  PRIVATE ! except
   ! Public members:
   public:: read_param          ! read parameters related to grid
   public:: init                ! Initialize arrays on the grid
   public:: init_stand_alone    ! Initialize arrays on the grid
   public:: copy_old_state      ! save old arrays before getting new ones
   public:: get_other_state_var ! Auxiliary components of state vector
+  public:: get_shock_location  ! finds shock location on all lines
   public:: search_line         ! find particle index corresponding to radius
 
   ! Coordinate system and geometry
@@ -103,7 +104,7 @@ module SP_ModGrid
   !
   ! Number of variables in the state vector and the identifications
   !
-  integer, public, parameter :: nMHData = 13, nVar = 21,          &
+  integer, public, parameter :: nMHData = 13, nVar = 20,          &
        !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
        X_          = 1, & !                         |read in  |in copy_
@@ -125,9 +126,8 @@ module SP_ModGrid
        S_          =16, & ! Distance from the foot point   |get_other_
        U_          =17, & ! Plasma speed                   |state_var
        B_          =18, & ! Magnitude of magnetic field    v
-       DLogRho_    =19, & ! Dln(Rho), i.e. -div(U) * Dt
-       RhoOld_     =20, & ! Background plasma density      ! copy_
-       BOld_       =21    ! Magnitude of magnetic field    ! old_state
+       RhoOld_     =19, & ! Background plasma density      ! copy_
+       BOld_       =20    ! Magnitude of magnetic field    ! old_state
   !
   ! variable names
   !
@@ -151,7 +151,6 @@ module SP_ModGrid
        'S         ', &
        'U         ', &
        'B         ', &
-       'DLogRho   ', &
        'RhoOld    ', &
        'BOld      ' ]
   !
@@ -165,7 +164,9 @@ module SP_ModGrid
 
   ! Test position and momentum
   integer, public :: iPTest =1, iParticleTest = 99, iNodeTest =1
-
+  ! Shock algorithm parameters:
+  real,    public, parameter :: dLogRhoThreshold = 0.01
+  integer, public, parameter :: nWidth = 50
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -373,6 +374,45 @@ contains
     end do
 
   end subroutine get_other_state_var
+  !============================================================================
+  subroutine get_shock_location
+    use SP_ModSize, ONLY: nVertexMax
+    ! find location of a shock wave on a given line (line)
+    ! shock front is assumed to be location of max log(Rho/RhoOld)
+    real :: dLogRho_I(1:nVertexMax)
+    ! Threshold for shock tracing
+    real, parameter :: DLogRhoThreshold = 0.01
+    ! Do not search too close to the Sun
+    real, parameter :: RShockMin = 1.20  ! *RSun
+    integer         :: iShockMin
+    ! Do not search too close to the heliosphere boundary
+    integer:: iShockMax
+    ! Misc
+    integer:: iShockCandidate
+    integer:: iLine, iVertex
+    !--------------------------------------------------------------------------
+    do iLine = 1, nLine
+       if(.not.Used_B(iLine))then
+          iShock_IB(Shock_,iLine) = NoShock_
+          CYCLE
+       end if
+       ! shock front is assumed to be location of max log(Rho/RhoOld);
+       do iVertex = 1, nVertex_B(  iLine)
+          ! divergence of plasma velocity
+          dLogRho_I(iVertex) = log(MHData_VIB(Rho_,iVertex,iLine)/&
+               State_VIB(RhoOld_,iVertex,iLine))
+       end do
+       ! shock never moves back
+       iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
+       iShockMax = nVertex_B(iLine) - nWidth - 1
+       iShockCandidate = iShockMin - 1 + maxloc(&
+            DLogRho_I(   iShockMin:iShockMax),1, MASK = &
+            State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
+            DLogRho_I(   iShockMin:iShockMax)       > DLogRhoThreshold)
+       if(iShockCandidate >= iShockMin)&
+            iShock_IB(Shock_, iLine) = iShockCandidate
+    end do
+  end subroutine get_shock_location
   !============================================================================
   subroutine search_line(iLine, Radius, iParticleOut, IsFound, Weight)
 
