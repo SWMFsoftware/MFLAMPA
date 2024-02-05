@@ -13,6 +13,7 @@ OBJECTS = \
 	ModAdvancePoisson.o \
 	ModAdvection.o \
 	ModAngularSpread.o \
+	ModBc.o \
 	ModDistribution.o \
 	ModDiffusion.o \
 	ModGrid.o \

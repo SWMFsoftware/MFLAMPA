@@ -5,7 +5,7 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-  use ModConst,   ONLY: cPi, cMu
+  use ModConst,   ONLY: cMu
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
        MomentumSi_I, MomentumInjSi, DLogP
@@ -13,8 +13,8 @@ module SP_ModAdvance
        D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
   !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
-  use SP_ModUnit, ONLY: UnitX_, UnitEnergy_, Io2Si_V,                       &
-       kinetic_energy_to_momentum
+  use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+  use SP_ModBc,   ONLY: set_momentum_bc, CoefInj, SpectralIndex
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -26,10 +26,6 @@ module SP_ModAdvance
   ! Public members:
   public:: read_param  ! read injection parameters
   public:: advance     ! Advance solution Distribution_IIB
-  ! Boundary condition at the injection energy
-  ! Injection efficiency and assumed spectral index with the energy
-  ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
-  real:: CoefInj = 0.25, SpectralIndex = 5.0
 
   ! Local parameters
   real:: Cfl=0.9        ! Controls the maximum allowed time step
@@ -70,7 +66,7 @@ contains
     ! and (3) new steepen_shock
     use ModConst,             ONLY: cProtonMass, Rsun
     use SP_ModTime,           ONLY: SPTime
-    use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_, T_
+    use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvection,      ONLY: advance_log_advection
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,      ONLY: UseDiffusion, diffuse_distribution
@@ -133,7 +129,6 @@ contains
        ! amu/m^3, temperature is in the unit of kinetic energy, all others
        ! are in SI units. So to convert the IO units, the three conversion
        ! factors are needed as follows:
-       ! UnitX_, UnitRho_, UnitEnergy_
        uSi_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
        BOldSi_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
        nOldSi_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
@@ -205,7 +200,7 @@ contains
           ! Advection (2 different schemes) and Diffusion
           if(UsePoissonBracket)then
              ! update bc for advection
-             call set_advection_bc
+             call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
              call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
                   iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              ! store the density and B-field arrays
@@ -241,7 +236,7 @@ contains
 
              STEP:do iStep = 1, nStep
                 ! update bc for advection
-                call set_advection_bc
+                call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
                 ! advection in the momentum space
                 do iVertex = 2, iEnd
                    if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
@@ -322,36 +317,6 @@ contains
       ! pre shock part
       BSi_I(iShock+1:iShock+nWidth  )=minval(BSi_I(iShock+1:iShock+nWidth))
     end subroutine steepen_shock
-    !==========================================================================
-    subroutine set_advection_bc
-      ! set boundary conditions on grid point on the current line
-      ! local variables
-
-      integer:: iVertex     ! loop variable
-      real   :: MomentumSi    ! Momentum for the thermal energy k_BTi
-      real   :: CoefInjLocal, DistributionBc
-      !------------------------------------------------------------------------
-      do iVertex = 1, iEnd
-         ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
-         ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
-         !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
-         ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
-         CoefInjLocal = 2.5E-11
-         MomentumSi   = kinetic_energy_to_momentum(                     &
-              MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
-
-         DistributionBc = (SpectralIndex-3)/(4*cPi)                     &
-              * nSi_I(iVertex)/MomentumSi**3                            &
-              * (MomentumSi/MomentumInjSi)**SpectralIndex
-
-         if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth  .and. &
-              iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
-
-         Distribution_IIB(0,iVertex,iLine) = DistributionBc*CoefInjLocal
-
-      end do
-
-    end subroutine set_advection_bc
     !==========================================================================
   end subroutine advance
   !============================================================================
