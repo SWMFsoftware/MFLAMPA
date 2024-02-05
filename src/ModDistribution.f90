@@ -68,10 +68,10 @@ module SP_ModDistribution
   ! iP     0     1                         nP   nP+1
   !        |     |    ....                 |     |
   ! P      P_inj P_inj*exp(\Delta(log P))  P_Max P_Max*exp(DLogP)
-  !----------------------------------------------------------------------------
   !-----------------Control volumes and faces----------------------------------
-  !Vol   | 0  |  1  |.........          |  nP |  nP+1 |
-  !Face -1    0     1 ....            nP-1    nP    nP+1
+  ! Vol  | 0  |  1  |.........          |  nP | nP+1 |
+  ! Fcs -1    0     1 ....            nP-1    nP    nP+1
+  !----------------------------------------------------------------------------
   ! This is because we put two boundary conditions: the background
   ! value at the right one and the physical condition at the left
   ! one, for the velocity distribution function
