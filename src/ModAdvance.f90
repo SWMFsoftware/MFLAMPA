@@ -67,7 +67,7 @@ contains
     use ModConst,             ONLY: cProtonMass, Rsun
     use SP_ModTime,           ONLY: SPTime
     use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_
-    use SP_ModAdvection,      ONLY: advance_log_advection
+    use SP_ModAdvanceAdvection,  ONLY: advance_log_advection
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,      ONLY: UseDiffusion, diffuse_distribution
     real, intent(in):: TimeLimit
