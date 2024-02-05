@@ -69,15 +69,15 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine diffuse_distribution(iLine, iEnd, iShock, Dt,        &
-       Distribution_IIB, nSi_I, BSi_I)
+  subroutine diffuse_distribution(iLine, iEnd, iShock, Dt, nSi_I, BSi_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
 
     use ModConst, ONLY: cProtonMass, cGyroradius
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModGrid, ONLY: State_VIB, MHData_VIB, R_, D_, x_, y_, z_
-    use SP_ModDistribution, ONLY: nP, SpeedSi_I, MomentumSi_I, DLogP
+    use SP_ModDistribution, ONLY: nP, SpeedSi_I, MomentumSi_I, DLogP, &
+         Distribution_IIB
     use SP_ModUnit, ONLY: UnitX_, Io2Si_V
     ! use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
@@ -85,7 +85,6 @@ contains
     ! input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, iEnd, iShock
     real, intent(in) :: Dt              ! Time step for diffusion
-    real, intent(inout) :: Distribution_IIB(0:nP+1, 1:iEnd)
     real, intent(in) :: nSi_I(1:iEnd), BSi_I(1:iEnd)
     ! Variables declared in this subroutine
     real :: XyzSi_DI(3, 1:iEnd), DsSi_I(1:iEnd), RadiusSi_I(1:iEnd)
@@ -132,8 +131,8 @@ contains
             DiffCoeffMinSi/DOuterSi_I(1:iEnd))
        ! end if
 
-       call advance_diffusion(Dt, iEnd, DsSi_I(1:iEnd),   &
-            Distribution_IIB(iP, 1:iEnd),                 &
+       call advance_diffusion(Dt, iEnd, DsSi_I(1:iEnd),     &
+            Distribution_IIB(iP, 1:iEnd, iLine),            &
             DOuterSi_I(1:iEnd), DInnerSi_I(1:iEnd))
     end do MOMENTUM
 

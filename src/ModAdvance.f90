@@ -251,8 +251,7 @@ contains
                 end do
                 ! compute diffusion along the field line
                 if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
-                     iShock, Dt, Distribution_IIB(0:nP+1, 1:iEnd, iLine),  &
-                     nSi_I, BSi_I)
+                     iShock, Dt, nSi_I, BSi_I)
              end do STEP
              ! UseDoInitSpectrum = .true.
           end if

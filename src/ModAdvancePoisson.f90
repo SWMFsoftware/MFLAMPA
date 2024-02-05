@@ -104,7 +104,7 @@ contains
        Distribution_IIB(1:nP, 1:nX, iLine) = &
             Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
        if(UseDiffusion) call diffuse_distribution(iLine,    &
-            nX, iShock, Dt, Distribution_IIB(:, 1:nX, iLine), nSi_I, BSi_I)
+            nX, iShock, Dt, nSi_I, BSi_I)
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
