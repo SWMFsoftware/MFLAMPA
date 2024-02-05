@@ -34,7 +34,7 @@ module SP_ModDiffusion
   integer :: iScaleTurbulenceType = Const_
 
   ! Public members:
-  public :: read_param, diffuse_distribution, advance_diffusion
+  public :: read_param, diffuse_distribution
 
 contains
   !============================================================================
@@ -131,8 +131,8 @@ contains
             DiffCoeffMinSi/DOuterSi_I(1:iEnd))
        ! end if
 
-       call advance_diffusion(Dt, iEnd, DsSi_I(1:iEnd),     &
-            Distribution_IIB(iP, 1:iEnd, iLine),            &
+       call advance_diffusion(Dt, iEnd, DsSi_I(1:iEnd),   &
+            Distribution_IIB(iP, 1:iEnd, iLine),          &
             DOuterSi_I(1:iEnd), DInnerSi_I(1:iEnd))
     end do MOMENTUM
 
@@ -258,7 +258,7 @@ contains
     !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
     !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
     Main_I = 1.0
-
+    R_I = F_I
     ! For i=1:
     Aux1 = Dt*DOuter_I(1)*0.5*(DInner_I(1)+DInner_I(2))/&
          DsMesh_I(2)**2
@@ -277,15 +277,13 @@ contains
     end do
 
     ! For i=n:
-    ! Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
-    !     DsMesh_I(n)**2
-    ! set free escaping at outerboundary for now
-    Aux2=0.
+    Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
+         DsMesh_I(n)**2
+
     Main_I( n) = Main_I(n) + Aux2
     Lower_I(n) = -Aux2
 
     ! Update the solution from f^(n) to f^(n+1):
-    R_I = F_I
     call tridiag(n,Lower_I,Main_I,Upper_I,R_I,F_I)
 
   end subroutine advance_diffusion
