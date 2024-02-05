@@ -11,7 +11,7 @@ include ../Makefile.conf
 OBJECTS = \
 	ModAdvance.o \
 	ModAdvancePoisson.o \
-	ModAdvection.o \
+	ModAdvanceAdvection.o \
 	ModAngularSpread.o \
 	ModBc.o \
 	ModDistribution.o \
