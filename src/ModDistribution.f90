@@ -50,7 +50,7 @@ module SP_ModDistribution
   ! speed, momentum, kinetic energy and total energy (including the rest
   ! mass energy) at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, MomentumSi_I, &
-       KinEnergySi_I, EnergySi_I, VolumeP_I
+       KinEnergySi_I, EnergySi_I, VolumeP_I, Background_I
   real, public :: Momentum3Si_I(-1:nP+1)
 
   ! Total integral (simulated) particle flux
@@ -69,7 +69,9 @@ module SP_ModDistribution
   !        |     |    ....                 |     |
   ! P      P_inj P_inj*exp(\Delta(log P))  P_Max P_Max*exp(DLogP)
   !----------------------------------------------------------------------------
-
+  !-----------------Control volumes and faces----------------------------------
+  !Vol   | 0  |  1  |.........          |  nP |  nP+1 |
+  !Face -1    0     1 ....            nP-1    nP    nP+1
   ! This is because we put two boundary conditions: the background
   ! value at the right one and the physical condition at the left
   ! one, for the velocity distribution function
@@ -108,14 +110,17 @@ contains
     DLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
     ! Functions to convert the grid index to momentum and energy
-    Momentum3Si_I(-1) = (MomentumInjSi*exp(-DLogP))**3/3
+    Momentum3Si_I(-1) = (MomentumInjSi*exp(-0.50*DLogP))**3/3
     do iP = 0, nP +1
        MomentumSi_I(iP)  = MomentumInjSi*exp(iP*DLogP)
-       Momentum3Si_I(iP) = MomentumSi_I(iP)**3/3
+       Momentum3Si_I(iP) = Momentum3Si_I(iP-1)*exp(3*DLogP)
        VolumeP_I(iP)     = Momentum3Si_I(iP) - Momentum3Si_I(iP-1)
        KinEnergySi_I(iP) = momentum_to_kinetic_energy(MomentumSi_I(iP))
        EnergySi_I(iP)    = momentum_to_energy(MomentumSi_I(iP))
        SpeedSi_I(iP)     = MomentumSi_I(iP)*cLightSpeed**2/EnergySi_I(iP)
+       Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
+            ((EnergyMaxIo-EnergyInjIo)*Io2Si_V(UnitEnergy_)) & ! Energy range
+            /MomentumSi_I(iP)**2 ! Convert from diff flux to VDF
     end do
 
     ! Distribution function
@@ -130,11 +135,7 @@ contains
           ! Overall density of the fast particles is of the order
           ! of 10^-6 m^-3. Integral flux is less than 100 per
           ! (m^2 ster s). Differential background flux is constant.
-          do iP = 0, nP +1
-             Distribution_IIB(iP,iVertex,iLine) =                         &
-                  FluxInitIo/(EnergyMaxIo-EnergyInjIo)/MomentumSi_I(iP)**2   &
-                  *Io2Si_V(UnitFlux_)/Io2Si_V(UnitEnergy_)
-          end do
+          Distribution_IIB(:,iVertex,iLine) = Background_I
        end do
     end do
 
@@ -148,7 +149,7 @@ contains
        if(allocated(EChannelIo_I))&
             deallocate(EChannelIo_I)
        allocate (EChannelIo_I(nFluxChannel))
-       EChannelIo_I = [5,10,30,50,60,100]
+       EChannelIo_I = [5,10,30,50,60,100]  ! in MeV!
        if(allocated(NameFluxUnit_I))&
             deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(0:nFluxChannel+1))
