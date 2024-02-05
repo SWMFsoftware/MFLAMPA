@@ -21,15 +21,15 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModDistribution, ONLY: nP, Momentum3Si_I,        &
-         VolumeP_I, DLogP, Distribution_IIB
-    use SP_ModDiffusion, ONLY: UseDiffusion,diffuse_distribution
-
+         VolumeP_I, DLogP, Distribution_IIB, MomentumSi_I, MomentumInjSi
+    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     integer,intent(in):: nX         ! # of meshes along lnp-coordinate
     real,   intent(in):: tFinal     ! time interval to advance through
     real,   intent(in):: CflIn      ! input CFL number
     ! Input variables for diffusion
     integer, intent(in):: iLine, iShock ! indices of line and shock
-    real, intent(in), dimension(1:nX):: nOldSi_I, nSi_I, BSi_I
+    real, intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
     integer :: iP
     ! Extended arrays for implementation of the Poisson Bracket Alg.
@@ -90,6 +90,10 @@ contains
        ! Volume Updates
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
+       ! update bc for advection
+       call set_momentum_bc(iLine, nX, nSi_I, iShock)
+       ! We need the VDF on the extended grid with two layers of ghost cells,
+       ! to solve the second order scheme
        VDF_G(0:nP+1, 1:nX)  = Distribution_IIB(:, 1:nX, iLine)
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX=dHamiltonian01_FX,         &
@@ -103,8 +107,11 @@ contains
        ! Update velocity distribution function
        Distribution_IIB(1:nP, 1:nX, iLine) = &
             Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
+       ! set the left boundary condition (for diffusion)
        if(UseDiffusion) call diffuse_distribution(iLine,    &
-            nX, iShock, Dt, nSi_I, BSi_I)
+            nX, iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
+                     Distribution_IIB(0, 1, iLine) * &
+                     (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT

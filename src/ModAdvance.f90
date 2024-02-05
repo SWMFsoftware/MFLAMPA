@@ -191,16 +191,8 @@ contains
           ! nSi_I(1:iEnd)*cProtonMass,  nOldSi_I(1:iEnd)*cProtonMass, &
           ! XyzSi_DI(x_:z_, 1:iEnd), DsSi_I(1:iEnd), &
           ! DLogP, DtProgress, DtReduction)
-
-          ! set the left boundary condition (for diffusion)
-          Distribution_IIB(1:nP+1, 1, iLine) = &
-               Distribution_IIB(0, 1, iLine) * &
-               (MomentumSi_I(0)/MomentumSi_I(1:nP+1))**SpectralIndex
-
           ! Advection (2 different schemes) and Diffusion
           if(UsePoissonBracket)then
-             ! update bc for advection
-             call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
              call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
                   iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              ! store the density and B-field arrays
@@ -238,7 +230,7 @@ contains
                 ! update bc for advection
                 call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
                 ! advection in the momentum space
-                do iVertex = 2, iEnd
+                do iVertex = 1, iEnd
                    if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
                       write(*,*) NameSub, ': Distribution_IIB < 0'
                       Used_B(iLine) = .false.
@@ -250,8 +242,11 @@ contains
                         1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
                 end do
                 ! compute diffusion along the field line
+                ! set the left boundary condition (for diffusion)
                 if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
-                     iShock, Dt, nSi_I, BSi_I)
+                     iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
+                     Distribution_IIB(0, 1, iLine) * &
+                     (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
              end do STEP
              ! UseDoInitSpectrum = .true.
           end if
