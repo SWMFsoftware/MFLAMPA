@@ -69,7 +69,8 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
+  subroutine diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
+       LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
     use ModNumConst, ONLY: cTiny
@@ -86,6 +87,10 @@ contains
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in) :: Dt              ! Time step for diffusion
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    ! Given spectrum of particles at low end (flare acceleration)
+    real, intent(in), optional :: LowerEndSpectrum_I(nP)
+    ! Given spectrum of particles at upper end (GCRs)
+    real, intent(in), optional :: UpperEndSpectrum_I(nP)
     ! Variables declared in this subroutine
     real :: XyzSi_DI(3, 1:nX), DsSi_I(1:nX)
     integer :: iP, iVertex              ! loop variables
@@ -175,9 +180,13 @@ contains
        ! For i=1:
        Aux1 = Dt*DOuterSi_I(1)*0.5*(DInnerSi_I(1)+DInnerSi_I(2))/&
             DsMesh_I(2)**2
-       Main_I( 1) = Main_I(1)+Aux1
+       Main_I( 1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
-       
+       if(present(LowerEndSpectrum_I))then
+          Aux2 = Dt*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
+          Main_I( 1) = Main_I(1) + Aux2
+          R_I(1) = R_I(1) + Aux2*LowerEndSpectrum_I(iP)
+       end if
        ! For i=2,n-1:
        do iVertex = 2, nX-1
           Aux1 = Dt*DOuterSi_I(iVertex)*0.5*(DInnerSi_I(iVertex) + &
@@ -194,7 +203,11 @@ contains
             DsMesh_I(nX)**2
        Main_I( nX) = Main_I(nX) + Aux2
        Lower_I(nX) = -Aux2
-       
+       if(present(UpperEndSpectrum_I))then
+          Aux1 = Dt*DOuterSi_I(nX)*DInnerSi_I(nX)/DsMesh_I(nX)**2
+          Main_I( nX) = Main_I(nX) + Aux1
+          R_I(nX) = R_I(nX) + Aux1*UpperEndSpectrum_I(iP)
+       end if
        ! Update the solution from f^(n) to f^(n+1):
        call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,             &
             Distribution_IIB(iP, 1:nX, iLine))
