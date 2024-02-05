@@ -56,13 +56,9 @@ contains
     ! Now this is the particle-number-conservative advection scheme
 
     ! Initialize arrays
-    !--------------------------------------------------------------------------
-    Source_C   = 0.0
-    VDF_G      = 1.0e-8
-    VDF_G(0:nP+1, 1:nX)  = Distribution_IIB(:, 1:nX, iLine)
-
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
+    !--------------------------------------------------------------------------
     VolumeXStart_I(1:nX) = 1/nOldSi_I(1:nX)
     VolumeXStart_I(0)    = VolumeXStart_I(1)
     VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
@@ -94,7 +90,7 @@ contains
        ! Volume Updates
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
-
+       VDF_G(0:nP+1, 1:nX)  = Distribution_IIB(:, 1:nX, iLine)
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX=dHamiltonian01_FX,         &
             dVolumeDt_G = dVolumeDt_G,                   &
@@ -105,23 +101,14 @@ contains
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
 
        ! Update velocity distribution function
-       VDF_G(1:nP, 1:nX) = VDF_G(1:nP, 1:nX) + Source_C
+       Distribution_IIB(1:nP, 1:nX, iLine) = &
+            Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
        if(UseDiffusion) call diffuse_distribution(iLine,    &
-            nX, iShock, Dt, VDF_G(0:nP+1, 1:nX), nSi_I, BSi_I)
+            nX, iShock, Dt, Distribution_IIB(:, 1:nX, iLine), nSi_I, BSi_I)
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
-
-       ! BCs
-       VDF_G(-1, 1:nX)        = VDF_G(0, 1:nX)
-       VDF_G(nP+1:nP+2, 1:nX) = 1.0e-8
-       VDF_G(:, 0   )         = VDF_G(:, 1   )
-       VDF_G(:, -1  )         = VDF_G(:, 1   )
-       VDF_G(:, nX+1:nX+2)    = 1.0e-8
     end do
-
-    Distribution_IIB(:, 1:nX, iLine) = VDF_G(0:nP+1, 1:nX)
-
   end subroutine advect_via_poisson_bracket
   !============================================================================
 end module SP_ModAdvancePoisson
