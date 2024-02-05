@@ -109,7 +109,6 @@ contains
     ! diffusion along the field line
 
     !--------------------------------------------------------------------------
- 
     call set_diffusion_coef
 
     ! if using turbulent spectrum:
@@ -117,16 +116,16 @@ contains
     ! if(UseTurbulentSpectrum) then
     !   call set_dxx(nX, nP, BSi_I(1:nX))
     ! end if
-    
+
     DsSi_I(1:nX) = State_VIB(D_,1:nX,iLine)*IO2Si_V(UnitX_)
-    
+
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i   and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
     do iVertex = 2, nX
        DsMesh_I(iVertex) = max(DsSi_I(iVertex-1),cTiny)
     end do
-    
+
     ! Within the framework of finite volume method, the cell
     ! volume is used, which is proportional to  the distance between
     ! the faces bounding the volume with an index, i, which is half of
@@ -171,7 +170,7 @@ contains
        ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
        !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
        !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
-     
+
        ! Set source term in the RHS:
        R_I = Distribution_IIB(iP, 1:nX, iLine)
        ! Set elements of tri-diagonal matrix in the LHS
