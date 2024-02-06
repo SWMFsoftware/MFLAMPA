@@ -477,7 +477,7 @@ contains
     ! dI_+/dt=\gamma_+ I_+
     ! dI_-/dt=\gamma_- I_-
 
-    use SP_ModAdvection, ONLY: advance_log_advection
+    use SP_ModAdvanceAdvection, ONLY: advance_log_advection
     use ModLinearAdvection
 
     ! The number of points and the number of the energy intervals
