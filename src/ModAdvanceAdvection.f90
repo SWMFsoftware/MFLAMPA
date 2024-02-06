@@ -55,7 +55,7 @@ contains
     !--------------------------------------------------------------------------
     STEP:do iStep = 1, nStep
        ! update bc for advection
-       call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
+       call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd), iShock)
        ! advection in the momentum space
        do iVertex = 1, iEnd
           if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then

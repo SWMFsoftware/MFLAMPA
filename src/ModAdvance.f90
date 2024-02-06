@@ -195,6 +195,7 @@ contains
           ! XyzSi_DI(x_:z_, 1:iEnd), DsSi_I(1:iEnd), &
           ! DLogP, DtProgress, DtReduction)
           ! Advection (2 different schemes) and Diffusion
+
           if(UsePoissonBracket)then
              call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
                   iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
@@ -202,7 +203,6 @@ contains
              ! at the end of the previous time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
-             ! DoInitSpectrum = .true.
           else
              ! No Poisson bracket scheme, use the default algorithm
              ! 1st order Fermi acceleration is responsible for advection
@@ -225,14 +225,14 @@ contains
                      maxval(abs(FermiFirst_I(2:iEnd)))
                 call CON_stop(NameSub//': nStep <= 0????')
              end if
-             Dt = DtProgress/nStep
+             Dt = DtProgress / nStep
              FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
              ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
              call advect_via_log(iLine, iEnd, iShock, nStep, Dt,        &
                   FermiFirst_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
              if(IsNeg) CYCLE line
-             ! UseDoInitSpectrum = .true.
           end if
+          ! DoInitSpectrum = .true.
        end do PROGRESS
     end do line
   contains

@@ -12,6 +12,7 @@ module SP_ModDiffusion
 
   use ModNumConst, ONLY: cPi
   use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun
+  use SP_ModSize, ONLY: nVertexMax
   use SP_ModGrid, ONLY: Wave1_, Wave2_
   ! use SP_ModTurbulence, ONLY: update_spectrum
   use ModUtilities, ONLY: CON_stop
@@ -75,7 +76,6 @@ contains
     ! diffuse the distribution function
     use ModNumConst, ONLY: cTiny
     use ModConst, ONLY: cProtonMass, cGyroradius
-    use SP_ModSize, ONLY: nVertexMax
     use SP_ModGrid, ONLY: State_VIB, MHData_VIB, R_, D_, x_, y_, z_
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, MomentumSi_I, DLogP, &
          Distribution_IIB
@@ -122,19 +122,14 @@ contains
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i   and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
-    do iVertex = 2, nX
-       DsMesh_I(iVertex) = max(DsSi_I(iVertex-1),cTiny)
-    end do
+    DsMesh_I(2:nX) = max(DsSi_I(1:nX-1), cTiny)
 
     ! Within the framework of finite volume method, the cell
     ! volume is used, which is proportional to  the distance between
     ! the faces bounding the volume with an index, i, which is half of
     ! sum of distance between meshes i-1 and i (i.e. D_I(i-1) and that
     ! between meshes i and i+1 (which is D_I(i)):
-    do iVertex = 2, nX-1
-       DsFace_I(iVertex) = max(cTiny, 0.5*&
-            (DsSi_I(iVertex) + DsSi_I(iVertex-1)))
-    end do
+    DsFace_I(2:nX-1) = max(0.5*(DsSi_I(2:nX)+DsSi_I(1:nX-1)), cTiny)
     ! In flux coordinates, the control volume associated with the
     ! given cell has a cross-section equal to (Magnetic Flux)/B,
     ! where the flux is a constant along the magnetic field line,
@@ -227,7 +222,7 @@ contains
       real, parameter :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
       !------------------------------------------------------------------------
       DOuterSi_I(1:nX) = BSi_I(1:nX)
-      RadiusSi_I( 1:nX) = State_VIB(R_, 1:nX,iLine)*IO2Si_V(UnitX_)
+      RadiusSi_I(1:nX) = State_VIB(R_, 1:nX,iLine)*IO2Si_V(UnitX_)
       ! if(UseTurbulentSpectrum) RETURN
 
       ! precompute scale of turbulence along the line
