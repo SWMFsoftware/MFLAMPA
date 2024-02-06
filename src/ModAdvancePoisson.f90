@@ -22,7 +22,7 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModDistribution, ONLY: nP, Momentum3Si_I, VolumeP_I,   &
-         DLogP, Distribution_IIB, MomentumSi_I, MomentumInjSi
+         DLogP, Distribution_IIB, MomentumSi_I, MomentumInjSi, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     integer, intent(in):: iLine, iShock ! indices of line and shock
@@ -91,11 +91,21 @@ contains
        ! Volume Updates
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
-       ! update bc for advection
+       ! update bc for at minimal and maximal energy
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        ! We need the VDF on the extended grid with two layers of ghost cells,
-       ! to solve the second order scheme
+       ! to solve the second order scheme. Add solution in physical cells and
+       ! in a single layer of the ghost cells along the momentum coordinate:
        VDF_G(0:nP+1, 1:nX)  = Distribution_IIB(:, 1:nX, iLine)
+       ! Apply bc along the line coordinate:
+       VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine) * &
+            (MomentumSi_I(0)/MomentumSi_I(0:nP+1))**SpectralIndex
+       VDF_G(0:nP+1, nX+1) = Background_I
+       ! Add a second layer of the ghost cells along the line coordinate:
+       VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
+       VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
+       ! Add a second layer of the ghost cells along the momentum coordinate:
+       VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX=dHamiltonian01_FX,         &
             dVolumeDt_G = dVolumeDt_G,                   &
@@ -111,8 +121,7 @@ contains
        ! set the left boundary condition (for diffusion)
        if(UseDiffusion) call diffuse_distribution(iLine,    &
             nX, iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-            Distribution_IIB(0, 1, iLine) * &
-            (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
+            VDF_G(1:nP, 0))
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
