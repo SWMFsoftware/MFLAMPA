@@ -93,19 +93,7 @@ contains
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
        ! update bc for at minimal and maximal energy
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
-       ! We need the VDF on the extended grid with two layers of ghost cells,
-       ! to solve the second order scheme. Add solution in physical cells and
-       ! in a single layer of the ghost cells along the momentum coordinate:
-       VDF_G(0:nP+1, 1:nX)  = Distribution_IIB(:, 1:nX, iLine)
-       ! Apply bc along the line coordinate:
-       VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine) * &
-            (MomentumSi_I(0)/MomentumSi_I(0:nP+1))**SpectralIndex
-       VDF_G(0:nP+1, nX+1) = Background_I
-       ! Add a second layer of the ghost cells along the line coordinate:
-       VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
-       VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
-       ! Add a second layer of the ghost cells along the momentum coordinate:
-       VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
+       call set_VDF_bc()
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX=dHamiltonian01_FX,         &
             dVolumeDt_G = dVolumeDt_G,                   &
@@ -126,6 +114,25 @@ contains
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
     end do
+   contains
+    !==========================================================================
+     subroutine set_VDF_bc()
+       ! We need the VDF on the extended grid with two layers of ghost cells,
+       ! to solve the second order scheme. Add solution in physical cells and
+       ! in a single layer of the ghost cells along the momentum coordinate:
+      !------------------------------------------------------------------------
+       VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
+       ! Apply bc along the line coordinate:
+       VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine) * &
+            (MomentumSi_I(0)/MomentumSi_I(0:nP+1))**SpectralIndex
+       VDF_G(0:nP+1, nX+1) = Background_I
+       ! Add a second layer of the ghost cells along the line coordinate:
+       VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
+       VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
+       ! Add a second layer of the ghost cells along the momentum coordinate:
+       VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
+     end subroutine set_VDF_bc
+    !==========================================================================
   end subroutine advect_via_poisson
   !============================================================================
 end module SP_ModAdvancePoisson
