@@ -6,10 +6,9 @@ module SP_ModBc
 
   ! The module sets up boundary conditions
   use ModNumConst, ONLY: cPi
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB, Background_I,         &
-       MomentumSi_I, MomentumInjSi
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
-       NoShock_, nWidth, T_
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumSi_I,   &
+       MomentumInjSi
+  use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_
   use SP_ModUnit, ONLY: kinetic_energy_to_momentum, UnitEnergy_, Io2Si_V
   implicit none
 
@@ -49,7 +48,7 @@ contains
             * nSi_I(iVertex)/MomentumSi**3                            &
             * (MomentumSi/MomentumInjSi)**SpectralIndex
 
-       if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth  .and. &
+       if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
             iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
 
        Distribution_IIB(0,iVertex,iLine) = DistributionBc*CoefInjLocal

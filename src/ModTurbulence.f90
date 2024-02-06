@@ -224,7 +224,7 @@ contains
           ! In this part of the spectrum another equation governs the diffusion
           ICOldSi    = ICSi_X(iVertex)
 
-          !!!!
+!!!!
           ICSi_X(iVertex) = CoefInj *                                 &
                10.0*BSi_I(iVertex)**2*max(AlfvenMach,2.0)/(cMu*3.0) * &
                min(1.0, rSi/rShockSi/(1.0-Alpha))
@@ -282,7 +282,7 @@ contains
   end subroutine assign_kolmogorov_spectrum
   !============================================================================
   subroutine set_wave_advection_rates(iEnd, BSi_I, BOldSi_I, RhoSi_I, &
-    RhoOldSi_I, XyzSi_DI, DsSi_I, DLogP, Dt, DtReduction)
+       RhoOldSi_I, XyzSi_DI, DsSi_I, DLogP, Dt, DtReduction)
     !=======================Set advection rate in k-space======================
     integer, intent(in) :: iEnd
     real, intent(in)    :: BSi_I(1:iEnd), BOldSi_I(1:iEnd)

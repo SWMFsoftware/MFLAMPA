@@ -113,10 +113,10 @@ contains
     real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
 
     ! the full time interval
-    character(len=*), parameter:: NameSub = 'advance'
 
     ! Check if any Distribution_IIB < 0 in advect_via_log
     logical   :: IsNeg
+    character(len=*), parameter:: NameSub = 'advance'
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution

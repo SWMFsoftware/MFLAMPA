@@ -33,49 +33,50 @@ module SP_ModAdvanceAdvection
 contains
   !============================================================================
   !===========advect_via_log=======================================
-  subroutine advect_via_log(iLine, iEnd, iShock, nStep, Dt,    & 
-         FermiFirst_I, nSi_I, BSi_I, IsNeg)
-  ! The subroutine encapsulates the logarithmic advection scheme,
-  ! which is non-conservative, and the diffusion
+  subroutine advect_via_log(iLine, iEnd, iShock, nStep, Dt,    &
+       FermiFirst_I, nSi_I, BSi_I, IsNeg)
+    ! The subroutine encapsulates the logarithmic advection scheme,
+    ! which is non-conservative, and the diffusion
 
-  use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-  use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
-  use SP_ModGrid, ONLY: Used_B, nVertex_B
-  integer, intent(in):: iLine, iEnd, iShock ! id of line, particle #, and Shock
-  integer, intent(in):: nStep               ! total steps in this iProgress
-  real,    intent(in):: Dt                  ! input time step
-  ! information at upper step
-  real,    intent(in):: FermiFirst_I(1:iEnd), nSI_I(1:iEnd), BSI_I(1:iEnd) 
-  logical, intent(inout):: IsNeg            ! check if any Distribution_IIB < 0
-  ! local variables, declared in this subroutine
-  integer            :: iStep, iVertex      ! loop variables
-  ! characters in case of any Distribution_IIB < 0
-  character(len=*), parameter:: NameSub = 'advect_via_log'
-  
-  STEP:do iStep = 1, nStep
-      ! update bc for advection
-      call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
-      ! advection in the momentum space
-      do iVertex = 1, iEnd
-         if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
-            write(*,*) NameSub, ': Distribution_IIB < 0'
-            Used_B(iLine) = .false.
-            nVertex_B(iLine) = 0
-            ! CYCLE line
-            IsNeg = .true.
-            EXIT STEP
-         end if
+    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
+    use SP_ModGrid, ONLY: Used_B, nVertex_B
+    integer, intent(in):: iLine, iEnd, iShock ! id of line, particle #, and Shock
+    integer, intent(in):: nStep               ! total steps in this iProgress
+    real,    intent(in):: Dt                  ! input time step
+    ! information at upper step
+    real,    intent(in):: FermiFirst_I(1:iEnd), nSI_I(1:iEnd), BSI_I(1:iEnd)
+    logical, intent(inout):: IsNeg            ! check if any Distribution_IIB < 0
+    ! local variables, declared in this subroutine
+    integer            :: iStep, iVertex      ! loop variables
+    ! characters in case of any Distribution_IIB < 0
 
-         call advance_log_advection(FermiFirst_I(iVertex), &
-            1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
-      end do
-      ! compute diffusion along the field line
-      ! set the left boundary condition (for diffusion)
-      if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
-         iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-         Distribution_IIB(0, 1, iLine) * &
-         (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
-   end do STEP
+    character(len=*), parameter:: NameSub = 'advect_via_log'
+    !--------------------------------------------------------------------------
+    STEP:do iStep = 1, nStep
+       ! update bc for advection
+       call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
+       ! advection in the momentum space
+       do iVertex = 1, iEnd
+          if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
+             write(*,*) NameSub, ': Distribution_IIB < 0'
+             Used_B(iLine) = .false.
+             nVertex_B(iLine) = 0
+             ! CYCLE line
+             IsNeg = .true.
+             EXIT STEP
+          end if
+
+          call advance_log_advection(FermiFirst_I(iVertex), &
+               1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
+       end do
+       ! compute diffusion along the field line
+       ! set the left boundary condition (for diffusion)
+       if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
+            iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
+            Distribution_IIB(0, 1, iLine) * &
+            (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
+    end do STEP
   end subroutine advect_via_log
   !============================================================================
 
