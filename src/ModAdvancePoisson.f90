@@ -2,45 +2,46 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvancePoisson
-  !   High resolution finite volume method for kinetic equations
-  !   with Poisson brackets (Sokolov et al., 2023)
-  !   https://doi.org/10.1016/j.jcp.2023.111923
+
+  ! High resolution finite volume method for kinetic equations
+  ! with Poisson brackets (Sokolov et al., 2023)
+  ! See https://doi.org/10.1016/j.jcp.2023.111923
   implicit none
 
   PRIVATE ! Except
 
   SAVE
-  public :: advect_via_poisson_bracket
+  public :: advect_via_poisson
 contains
   !============================================================================
-  subroutine advect_via_poisson_bracket(nX, tFinal, CflIn,  &
-       iLine, iShock, nOldSi_I, nSi_I, BSi_I)
+  subroutine advect_via_poisson(iLine, nX, iShock,                &
+       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
-    use SP_ModDistribution, ONLY: nP, Momentum3Si_I,        &
-         VolumeP_I, DLogP, Distribution_IIB, MomentumSi_I, MomentumInjSi
+    use SP_ModDistribution, ONLY: nP, Momentum3Si_I, VolumeP_I,   &
+         DLogP, Distribution_IIB, MomentumSi_I, MomentumInjSi
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
-    integer,intent(in):: nX         ! # of meshes along lnp-coordinate
-    real,   intent(in):: tFinal     ! time interval to advance through
-    real,   intent(in):: CflIn      ! input CFL number
-    ! Input variables for diffusion
     integer, intent(in):: iLine, iShock ! indices of line and shock
-    real, intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    integer, intent(in):: nX        ! # of meshes along lnp-coordinate
+    real,    intent(in):: tFinal    ! time interval to advance through
+    real,    intent(in):: CflIn     ! input CFL number
+    ! Input variables for diffusion
+    real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
     integer :: iP
     ! Extended arrays for implementation of the Poisson Bracket Alg.
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
     ! dVolumeXDt_I: time derivative of geometric volume
-    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
+    real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
     ! Volume_G: phase space volume at the end of each iteration
     ! VolumeOld_G : phase space volume at the end of each iteration
     ! dVolumeDt_G : phase space time derivative
-    real, dimension(0:nP+1, 0:nX+1) :: VolumeOld_G, Volume_G, dVolumeDt_G
+    real, dimension(0:nP+1, 0:nX+1):: VolumeOld_G, Volume_G, dVolumeDt_G
     ! DeltaHamiltonian
     real    :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
     ! Extended array for distribution function
@@ -110,13 +111,13 @@ contains
        ! set the left boundary condition (for diffusion)
        if(UseDiffusion) call diffuse_distribution(iLine,    &
             nX, iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-                     Distribution_IIB(0, 1, iLine) * &
-                     (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
+            Distribution_IIB(0, 1, iLine) * &
+            (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
     end do
-  end subroutine advect_via_poisson_bracket
+  end subroutine advect_via_poisson
   !============================================================================
 end module SP_ModAdvancePoisson
 !==============================================================================

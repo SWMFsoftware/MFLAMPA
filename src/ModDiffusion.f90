@@ -74,12 +74,13 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-       LowerEndSpectrum_I, UpperEndSpectrum_I)
+  subroutine diffuse_distribution(iLine, nX, iShock, Dt, &
+       nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
-    use SP_ModDistribution, ONLY: nP, SpeedSi_I, MomentumSi_I, DLogP, &
-         Distribution_IIB
+    !  use ModDiffusion, ONLY: tridiag
+    use SP_ModDistribution, ONLY: nP, SpeedSi_I, DLogP,  &
+         MomentumSi_I, Distribution_IIB
     ! use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -98,7 +99,7 @@ contains
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
-    real  :: DInnerSi_I(1:nX)! DOuterSi_I(1:nX), DInnerSi_I(1:nX), CoefDInnerSi_I(1:nX)
+    real  :: DInnerSi_I(1:nX)
     ! Full difference between DataInputTime and SPTime
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
@@ -179,7 +180,7 @@ contains
        end if
        ! For i=2,n-1:
        do iVertex = 2, nX-1
-          Aux1 = Dt*DOuterSi_I(iVertex)*0.5*(DInnerSi_I(iVertex) + &
+          Aux1 = Dt*DOuterSi_I(iVertex)*0.5*(DInnerSi_I(iVertex  ) + &
                DInnerSi_I(iVertex+1))/(DsMesh_I(iVertex+1)*DsFace_I(iVertex))
           Aux2 = Dt*DOuterSi_I(iVertex)*0.5*(DInnerSi_I(iVertex-1) + &
                DInnerSi_I(iVertex  ))/(DsMesh_I(iVertex)*DsFace_I(iVertex))
@@ -199,7 +200,7 @@ contains
           R_I(nX) = R_I(nX) + Aux1*UpperEndSpectrum_I(iP)
        end if
        ! Update the solution from f^(n) to f^(n+1):
-       call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,             &
+       call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,   &
             Distribution_IIB(iP, 1:nX, iLine))
     end do MOMENTUM
 

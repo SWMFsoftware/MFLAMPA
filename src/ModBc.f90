@@ -1,7 +1,6 @@
 !  Copyright (C) 2002 Regents of the University of Michigan,
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-
 module SP_ModBc
 
   ! The module sets up boundary conditions
@@ -18,7 +17,7 @@ module SP_ModBc
 
   ! Public members:
   public:: set_momentum_bc  ! Sets the boundary condition at min/max energy
-    ! Boundary condition at the injection energy
+  ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real, public :: CoefInj = 0.25, SpectralIndex = 5.0

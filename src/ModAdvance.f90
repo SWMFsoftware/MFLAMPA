@@ -1,7 +1,6 @@
 !  Copyright (C) 2002 Regents of the University of Michigan,
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
-
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
@@ -9,7 +8,7 @@ module SP_ModAdvance
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY:  &
        MomentumSi_I, MomentumInjSi, DLogP
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,  &
        D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
   !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
   !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
@@ -64,12 +63,12 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
-        use ModConst,              ONLY: cProtonMass, Rsun
-    use SP_ModTime,            ONLY: SPTime
-    use SP_ModGrid,            ONLY: Rho_, RhoOld_, B_, BOld_, U_
+    use ModConst,               ONLY: cProtonMass, Rsun
+    use SP_ModTime,             ONLY: SPTime
+    use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
-    use SP_ModAdvancePoisson,  ONLY: advect_via_poisson_bracket
-    use SP_ModDiffusion,       ONLY: UseDiffusion, set_diffusion_coef
+    use SP_ModAdvancePoisson,   ONLY: advect_via_poisson
+    use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
     real, intent(in):: TimeLimit
     ! Loop variables
     integer  :: iP, iVertex, iLine
@@ -98,9 +97,9 @@ contains
     real      :: DtProgress
     ! used only with the turbulence model ON
     ! real      :: MachAlfven
-    real      :: DtReduction
+    ! real      :: DtReduction
 
-    ! Local arrays to store the  state vectors in SI units
+    ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
 
     ! Lagrangian derivatives
@@ -193,8 +192,8 @@ contains
           if(UseDiffusion) call set_diffusion_coef(iLine,   &
                iEnd, iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket)then
-             call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
-                  iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
+             call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
+                  Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              ! store the density and B-field arrays
              ! at the end of the previous time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)

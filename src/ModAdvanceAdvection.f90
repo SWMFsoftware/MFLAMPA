@@ -2,6 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvanceAdvection
+
   use ModUtilities, ONLY: CON_stop
   ! Solves advection in the momentum space (=first order Fermi acceleration)
   ! First way - solve advection over log P coordinate.
@@ -54,22 +55,22 @@ contains
     real,    intent(in):: DtProgress
     ! CFL number
     real,    intent(in):: Cfl
-    ! Ratio of densities at upper and lower level  
-    real,    intent(in) :: dLogRho_I(1:nX)
+    ! Ratio of densities at upper and lower level
+    real,    intent(in):: dLogRho_I(1:nX)
     ! Density and magnetic field at the upper level
-    real,    intent(in) :: nSI_I(1:nX), BSI_I(1:nX)
+    real,    intent(in):: nSI_I(1:nX), BSI_I(1:nX)
     ! OUTPUT:
     ! Check if any distrubution function value is negative
-    logical, intent(out):: IsNeg           
+    logical, intent(out):: IsNeg
     ! local variables, declared in this subroutine
     integer  :: iStep, iVertex      ! loop variables
     ! time step is split for nStep intervals,  so short that the CFL for
     ! (explicit) advection operator is less that CFL declared abobe.
     integer  :: nStep
     ! Time step in the STEP Loop, DtProgress/nStep
-    real      :: Dt
+    real     :: Dt
     ! Lagrangian derivatives
-    real      :: FermiFirst_I(1:nX)
+    real     :: FermiFirst_I(1:nX)
 
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
@@ -85,7 +86,7 @@ contains
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1+int(maxval(abs(FermiFirst_I(2:nX)))/CFL)
     ! end if
-    
+
     ! Check if the number of time steps is positive:
     if(nStep < 1)then
        ! if(UseTurbulentSpectrum) &
@@ -136,10 +137,10 @@ contains
     ! sol. index 0 is to set boundary condition at the injection energy
     logical,intent(in):: IsConservative  ! Solve (C) if .true. (NC) otherwise
     real,optional,intent(in)::DeltaLnP   ! Used only for NonConservative=.true.!
-    ! Loop variables
-    integer :: iP, iStep
     ! Subcycling to achieve the condition CFL<1, if nStep>1
     integer :: nStep
+    ! Loop variables
+    integer :: iStep
     ! Extended version of the sulution array to implement BCc
     real    :: F_I(1 - max(nGCLeft,2):nP+max(nGCRight,2))
     real    :: FSemiintUp_I(0:nP+1), FSemiintDown_I(0:nP+1)
@@ -238,9 +239,8 @@ contains
     !==========================================================================
     function df_lim_array(iLeft, iRight) result(df_lim_arr)
       integer, intent(in):: iLeft, iRight ! start/left and end/right indices
-      real :: df_lim_arr(iLeft:iRight)        ! output results
+      real :: df_lim_arr(iLeft:iRight)    ! output results
       real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
-
 
       !------------------------------------------------------------------------
       dF1 = F_I(iLeft+1:iRight+1)-F_I(iLeft:iRight)
