@@ -170,11 +170,11 @@ contains
        ! For i=1:
        Aux1 = Dt*DOuterSi_I(1)*0.5*(DInnerSi_I(1)+DInnerSi_I(2))/&
             DsMesh_I(2)**2
-       Main_I(1) = Main_I(1) + Aux1
+       Main_I( 1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
        if(present(LowerEndSpectrum_I))then
           Aux2 = Dt*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
-          Main_I( 1) = Main_I(1) + Aux2
+          Main_I(1) = Main_I(1) + Aux2
           R_I(1) = R_I(1) + Aux2*LowerEndSpectrum_I(iP)
        end if
        ! For i=2,n-1:
@@ -189,7 +189,7 @@ contains
        end do
 
        ! For i=n:
-       Aux2 = Dt*DOuterSi_I(nX)*0.50*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/&
+       Aux2 = Dt*DOuterSi_I(nX)*0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/&
             DsMesh_I(nX)**2
        Main_I( nX) = Main_I(nX) + Aux2
        Lower_I(nX) = -Aux2
@@ -216,10 +216,10 @@ contains
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
     ! set diffusion coefficient for the current line
 
-    integer, intent(in):: iLine, nX, iShock
-    real, intent(in):: BSI_I(1:nX)
-    real            :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
-    real, parameter :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
+    integer, intent(in) :: iLine, nX, iShock
+    real, intent(in)    :: BSI_I(1:nX)
+    real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
+    real, parameter     :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
     RadiusSi_I(1:nX) = State_VIB(R_, 1:nX,iLine)*Io2Si_V(UnitX_)
@@ -245,15 +245,14 @@ contains
           ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
           ! 1/AU cancels with unit of Lambda0,no special attention needed;
           ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
-          CoefDInnerSi_I(1:nX) =                     &
-               (1.0/3)*MeanFreePath0InAu * RadiusSi_I(1:nX)&
-               *(cLightSpeed/cGEV)**(1.0/3)
+          CoefDInnerSi_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
+               RadiusSi_I(1:nX) * (cLightSpeed/cGEV)**(1.0/3)
        elsewhere
-          CoefDInnerSi_I(1:nX) =  (cCoef/3)*BSi_I(1:nX)**2 /       &
-               (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
+          CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /       &
+               (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
                (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
        end where
-    else    ! .not.UseFixedMFPUpstream
+    else  ! .not.UseFixedMFPUpstream
        ! Sokolov et al., 2004: eq (4),
        ! note: Momentum = TotalEnergy * Vel / C**2
        ! Gyroradius = cGyroRadius * momentum / |B|
@@ -261,7 +260,7 @@ contains
        ! ------------------------------------------------------
        ! effective level of turbulence is different for different momenta:
        ! (\delta B)**2 \propto Gyroradius^(1/3)
-       CoefDInnerSi_I(1:nX) =  (cCoef/3)*BSi_I(1:nX)**2 /       &
+       CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /          &
             (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
             (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
     end if

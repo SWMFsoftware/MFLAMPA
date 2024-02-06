@@ -161,12 +161,9 @@ contains
           ! Boundary condition at the right boundary
           if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
-          do iP=0,nP
-
-             ! f_(i+1/2):
-             FSemiintUp_I(iP) = F_I(iP)*(1.00 + HalfADtIfNeeded)+&
-                  0.50*(1.00 - CFL)*df_lim(iP)
-          end do
+          ! f_(i+1/2):
+          FSemiintUp_I(0:nP) = F_I(0:nP)*(1.0 + HalfADtIfNeeded)&
+               + 0.5*(1.0 - CFL)*df_lim_array(0, nP)
           ! f_(i-1/2):
           FSemiintDown_I(1:nP) = FSemiintUp_I(0:nP-1)
 
@@ -181,11 +178,10 @@ contains
           if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft)
           ! Boundary condition at the right boundary
           if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
-          do iP=1,nP+1
-             ! f_(i-1/2):
-             FSemiintDown_I(iP) = F_I(iP)*(1.00 + HalfADtIfNeeded)&
-                  -0.50 * (1.00 + CFL)*df_lim(iP)
-          end do
+
+          ! f_(i-1/2):
+          FSemiintDown_I(1:nP+1) = F_I(1:nP+1)*(1.0 + HalfADtIfNeeded)&
+               - 0.5* (1.0 + CFL)*df_lim_array(1, nP+1)
           ! f_(i+1/2):
           FSemiintUp_I(1:nP) = FSemiintDown_I(2:nP+1)
 
@@ -204,10 +200,11 @@ contains
     !------------------------------------ DONE -------------------------------!
   contains
     !==========================================================================
+    !  ==========================================================================
     real function df_lim(i)
       integer, intent(in):: i
 
-      real:: dF1,dF2
+      real:: dF1, dF2
 
       !------------------------------------------------------------------------
       dF1 = F_I(i+1)-F_I(i)
@@ -221,6 +218,23 @@ contains
       df_lim = df_lim*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
       !---------------------------------- DONE -------------------------------!
     end function df_lim
+    !==========================================================================
+    function df_lim_array(iLeft, iRight) result(df_lim_arr)
+      integer, intent(in):: iLeft, iRight ! start/left and end/right indices
+      real :: df_lim_arr(iLeft:iRight)        ! output results
+      real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
+
+      !------------------------------------------------------------------------
+      dF1 = F_I(iLeft+1:iRight+1)-F_I(iLeft:iRight)
+      dF2 = F_I(iLeft:iRight)-F_I(iLeft-1:iRight-1)
+
+      ! df_lim=0 if dF1*dF2<0, sign(dF1) otherwise:
+      df_lim_arr = sign(0.50,dF1)+sign(0.50,dF2)
+      dF1 = abs(dF1)
+      dF2 = abs(dF2)
+      df_lim_arr = df_lim_arr*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
+      !---------------------------------- DONE -------------------------------!
+    end function df_lim_array
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================

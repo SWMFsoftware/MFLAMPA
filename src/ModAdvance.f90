@@ -64,12 +64,12 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
-    use ModConst,             ONLY: cProtonMass, Rsun
-    use SP_ModTime,           ONLY: SPTime
-    use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_
-    use SP_ModAdvanceAdvection,  ONLY: advect_via_log
-    use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
-    use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
+    use ModConst,              ONLY: cProtonMass, Rsun
+    use SP_ModTime,            ONLY: SPTime
+    use SP_ModGrid,            ONLY: Rho_, RhoOld_, B_, BOld_, U_
+    use SP_ModAdvanceAdvection, ONLY: advect_via_log
+    use SP_ModAdvancePoisson,  ONLY: advect_via_poisson_bracket
+    use SP_ModDiffusion,       ONLY: UseDiffusion, set_diffusion_coef
     real, intent(in):: TimeLimit
     ! Loop variables
     integer  :: iP, iVertex, iLine
@@ -185,7 +185,7 @@ contains
           ! else
           !    MachAlfven = 1.0
           ! end if
-          !
+
           ! if (DoInitSpectrum) call init_spectrum(iEnd,              &
           !     XyzSi_DI(x_:z_, 1:iEnd),BSi_I(1:iEnd), MomentumSi_I, &
           !     dLogP, iShock, CoefInj, MachAlfven)
@@ -234,6 +234,7 @@ contains
                   FermiFirst_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
              if(IsNeg) CYCLE line
           end if
+
           ! DoInitSpectrum = .true.
        end do PROGRESS
     end do line
