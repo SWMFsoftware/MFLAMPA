@@ -78,10 +78,10 @@ contains
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
-    !  use ModDiffusion, ONLY: tridiag
+    !  use ModLinearSolver, ONLY: tridiag
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, DLogP,  &
          MomentumSi_I, Distribution_IIB
-    ! use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+    !  use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -126,7 +126,7 @@ contains
     ! the faces bounding the volume with an index, i, which is half of
     ! sum of distance between meshes i-1 and i (i.e. D_I(i-1) and that
     ! between meshes i and i+1 (which is D_I(i)):
-    DsFace_I(2:nX-1) = max(0.5*(DsSi_I(2:nX)+DsSi_I(1:nX-1)), cTiny)
+    DsFace_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1)+DsSi_I(1:nX-2)), cTiny)
     ! In flux coordinates, the control volume associated with the
     ! given cell has a cross-section equal to (Magnetic Flux)/B,
     ! where the flux is a constant along the magnetic field line,
@@ -273,7 +273,7 @@ contains
   !============================================================================
   subroutine tridiag(n, L_I, M_I, U_I, R_I, W_I)
 
-    ! This routine solves three-diagonal system of equations:
+    ! Solve tri-diagonal system of equations:
     !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
     !  ||l_2 m_2 u_2...        || ||w_2|| ||r_2||
     !  || 0  l_3 m_3 u_3       ||.||w_3||=||r_3||
@@ -284,16 +284,16 @@ contains
     ! input parameters
     integer,            intent(in):: n
     real, dimension(n), intent(in):: L_I, M_I ,U_I ,R_I
-
     ! Output parameters
     real, intent(out):: W_I(n)
-
     ! Misc
     integer:: j
     real:: Aux,Aux_I(2:n)
     !--------------------------------------------------------------------------
-    if (M_I(1)==0.0)&
-         call CON_stop(' Error in tridiag: M_I(1)=0')
+    if (M_I(1)==0.0) then
+       write(*,*)' Error in tridiag: M_I(1)=0'
+       stop
+    end if
     Aux = M_I(1)
     W_I(1) = R_I(1)/Aux
     do j=2,n
@@ -303,7 +303,8 @@ contains
           write(*,*)'M_I(j), L_I(j), Aux_I(j) = ',&
                M_I(j),L_I(j),Aux_I(j)
           write(*,*)'  For j=',j
-          call CON_stop('Tridiag failed')
+          write(*,*)'Tridiag failed'
+          stop
        end if
        W_I(j) = (R_I(j)-L_I(j)*W_I(j-1))/Aux
     end do
