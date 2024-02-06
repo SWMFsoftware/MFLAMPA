@@ -207,8 +207,8 @@ contains
       df_lim_arr = sign(0.50,dF1)+sign(0.50,dF2)
       dF1 = abs(dF1)
       dF2 = abs(dF2)
-      df_lim = df_lim*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
-    end function df_lim
+      df_lim_arr = df_lim_arr*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
+    end function df_lim_array
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================
