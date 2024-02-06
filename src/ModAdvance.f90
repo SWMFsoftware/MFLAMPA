@@ -7,7 +7,7 @@ module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
   use ModConst,   ONLY: cMu
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB,                       &
+  use SP_ModDistribution, ONLY:  &
        MomentumSi_I, MomentumInjSi, DLogP
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,   &
        D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
@@ -64,7 +64,7 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
-    use ModConst,              ONLY: cProtonMass, Rsun
+        use ModConst,              ONLY: cProtonMass, Rsun
     use SP_ModTime,            ONLY: SPTime
     use SP_ModGrid,            ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
@@ -79,10 +79,6 @@ contains
     ! a time step so short that the shock wave passes
     ! a single grid interval per a progress step:
     integer  :: iProgress, nProgress
-    ! Upper limit and variable for the loop which makes a
-    ! time step so short that the CFL for the (explicit)
-    ! advection is less that CFL declared abobe.
-    integer  :: iStep, nStep
     ! coefficient to interpolate "old" and "new"
     real     :: Alpha
     ! Lower limit to floor the spatial diffusion coefficient For a
@@ -100,8 +96,6 @@ contains
     real      :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real      :: DtProgress
-    ! Time step in the STEP Loop, DtProgress/nStep
-    real      :: Dt
     ! used only with the turbulence model ON
     ! real      :: MachAlfven
     real      :: DtReduction
@@ -110,7 +104,7 @@ contains
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
 
     ! Lagrangian derivatives
-    real, dimension(1:nVertexMax):: DLogRho_I, FermiFirst_I
+    real, dimension(1:nVertexMax):: DLogRho_I
 
     ! the full time interval
 
@@ -185,7 +179,7 @@ contains
           ! else
           !    MachAlfven = 1.0
           ! end if
-
+          !
           ! if (DoInitSpectrum) call init_spectrum(iEnd,              &
           !     XyzSi_DI(x_:z_, 1:iEnd),BSi_I(1:iEnd), MomentumSi_I, &
           !     dLogP, iShock, CoefInj, MachAlfven)
@@ -207,34 +201,11 @@ contains
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
           else
              ! No Poisson bracket scheme, use the default algorithm
-             ! 1st order Fermi acceleration is responsible for advection
-             ! in momentum space
-             ! first order Fermi acceleration for the current line
-             FermiFirst_I(1:iEnd) = DLogRho_I(1:iEnd) / (3*DLogP)
-             ! if(UseTurbulentSpectrum)then
-             ! nStep = 1+int(max(DtReduction,                &
-             !      maxval(abs(FermiFirst_I(1:iEnd))))/CFL)
-             ! else
-             ! How many steps should be done to the CFL criterion is fulfilled
-             nStep = 1+int(maxval(abs(FermiFirst_I(2:iEnd)))/CFL)
-             ! end if
-
-             ! Check if the number of time steps is positive:
-             if(nStep < 1)then
-                ! if(UseTurbulentSpectrum) &
-                !     write(*,*) ' DtReduction =', DtReduction
-                write(*,*) ' maxval(abs(FermiFirst_I)) =', &
-                     maxval(abs(FermiFirst_I(2:iEnd)))
-                call CON_stop(NameSub//': nStep <= 0????')
-             end if
-             Dt = DtProgress / nStep
-             FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
-             ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
-             call advect_via_log(iLine, iEnd, iShock, nStep, Dt,        &
-                  FermiFirst_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
+             ! Upper limit and loop variable for the loop which makes a
+             call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,   &
+                  DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
              if(IsNeg) CYCLE line
           end if
-
           ! DoInitSpectrum = .true.
        end do PROGRESS
     end do line

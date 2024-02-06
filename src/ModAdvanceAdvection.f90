@@ -2,7 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvanceAdvection
-
+  use ModUtilities, ONLY: CON_stop
   ! Solves advection in the momentum space (=first order Fermi acceleration)
   ! First way - solve advection over log P coordinate.
   ! In space physics applications one often needs to solve the
@@ -24,37 +24,79 @@ module SP_ModAdvanceAdvection
   !           Conservative formulation: Kolmogorov-type cascade,
   !           wave-particle interactions
   !
-  ! In all these applications, A does not depend on the phase coordinate, p
-  use SP_ModDistribution, ONLY: nP, MomentumSi_I, Distribution_IIB
+  ! In all these applications, an acceleration rate, A, does not depend on the
+  ! phase coordinate, p
+  use SP_ModDistribution, ONLY: nP, MomentumSi_I, Distribution_IIB, dLogP
   implicit none
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
   ! Version: Sokolov& Roussev, Jan,2008, SP/FLAMPA/src/ModLogAdvection.f90
+
+  SAVE
+
+  PRIVATE ! Except
+
   public :: advect_via_log, advance_log_advection
 contains
   !============================================================================
-  subroutine advect_via_log(iLine, nX, iShock, nStep, Dt,    &
-       FermiFirst_I, nSi_I, BSi_I, IsNeg)
+  subroutine advect_via_log(iLine, nX, iShock, DtProgress, Cfl, &
+       dLogRho_I, nSi_I, BSi_I, IsNeg)
     ! The subroutine encapsulates the logarithmic advection scheme,
     ! which is non-conservative, and the diffusion
 
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     use SP_ModGrid, ONLY: Used_B, nVertex_B
-    integer, intent(in):: iLine, nX, iShock ! id of line, particle #, and Shock
-    integer, intent(in):: nStep               ! total steps in this iProgress
-    real,    intent(in):: Dt                  ! input time step
-    ! information at upper step
-    real,    intent(in):: FermiFirst_I(1:nX), nSI_I(1:nX), BSI_I(1:nX)
-    logical, intent(inout):: IsNeg            ! check if any Distribution_IIB < 0
+    ! INPUTS:
+    ! id of line, particle #, and Shock location
+    integer, intent(in):: iLine, nX, iShock
+    ! input time step
+    real,    intent(in):: DtProgress
+    ! CFL number
+    real,    intent(in):: Cfl
+    ! Ratio of densities at upper and lower level  
+    real,    intent(in) :: dLogRho_I(1:nX)
+    ! Density and magnetic field at the upper level
+    real,    intent(in) :: nSI_I(1:nX), BSI_I(1:nX)
+    ! OUTPUT:
+    ! Check if any distrubution function value is negative
+    logical, intent(out):: IsNeg           
     ! local variables, declared in this subroutine
-    integer  :: iStep, iVertex         ! loop variables
-    ! characters in case of any Distribution_IIB < 0
+    integer  :: iStep, iVertex      ! loop variables
+    ! time step is split for nStep intervals,  so short that the CFL for
+    ! (explicit) advection operator is less that CFL declared abobe.
+    integer  :: nStep
+    ! Time step in the STEP Loop, DtProgress/nStep
+    real      :: Dt
+    ! Lagrangian derivatives
+    real      :: FermiFirst_I(1:nX)
 
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
-    IsNeg = .false.                    ! initial value
-
+    ! 1st order Fermi acceleration is responsible for advection
+    ! in momentum space
+    IsNeg = .false.
+    ! first order Fermi acceleration for the current line
+    FermiFirst_I = DLogRho_I / (3*DLogP)
+    ! if(UseTurbulentSpectrum)then
+    ! nStep = 1+int(max(DtReduction,                &
+    !      maxval(abs(FermiFirst_I(1:nX))))/CFL)
+    ! else
+    ! How many steps should be done to the CFL criterion is fulfilled
+    nStep = 1+int(maxval(abs(FermiFirst_I(2:nX)))/CFL)
+    ! end if
+    
+    ! Check if the number of time steps is positive:
+    if(nStep < 1)then
+       ! if(UseTurbulentSpectrum) &
+       !     write(*,*) ' DtReduction =', DtReduction
+       write(*,*) ' maxval(abs(FermiFirst_I)) =', &
+            maxval(abs(FermiFirst_I(2:nX)))
+       call CON_stop(NameSub//': nStep <= 0????')
+    end if
+    Dt = DtProgress / nStep
+    FermiFirst_I = FermiFirst_I / nStep
+    ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
     STEP:do iStep = 1, nStep
        ! update bc for advection
        call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
@@ -136,7 +178,7 @@ contains
        HalfADtIfNeeded = 0.0; CFL = CFLIn
     end if
 
-    nStep = 1 + int(CFL); CFL = CFL/real(nStep)
+    nStep = 1 + int(abs(CFL)); CFL = CFL/real(nStep)
     HalfADtIfNeeded=HalfADtIfNeeded/real(nStep)
     F_I(1-nGCLeft:nP+nGCRight) = FInOut_I(1 - nGCLeft:nP+nGCRight)
 
@@ -151,7 +193,7 @@ contains
     ! One stage second order upwind scheme
 
     if (CFL>0.0) then
-       do iStep=1, nStep
+       do iStep = 1, nStep
           ! Boundary condition at the left boundary
           if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft )
           ! Boundary condition at the right boundary
@@ -168,7 +210,7 @@ contains
                HalfADtIfNeeded*(FSemiintDown_I(1:nP)+FSemiintUp_I(1:nP))
        end do
     else
-       do iStep=1, nStep
+       do iStep = 1, nStep
           ! Boundary condition at the left boundary
           if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft)
           ! Boundary condition at the right boundary
@@ -190,7 +232,7 @@ contains
     if(any(FInOut_I(1-nGCLeft:nP+nGCRight)<=0.0))then
        write(*,*)'After advection F_I <=0, for CFLFermi= ',CFL
        write(*,*)F_I
-       stop
+       call CON_stop('Negative distribution function')
     end if
   contains
     !==========================================================================
@@ -198,6 +240,7 @@ contains
       integer, intent(in):: iLeft, iRight ! start/left and end/right indices
       real :: df_lim_arr(iLeft:iRight)        ! output results
       real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
+
 
       !------------------------------------------------------------------------
       dF1 = F_I(iLeft+1:iRight+1)-F_I(iLeft:iRight)
