@@ -33,8 +33,7 @@ module SP_ModAdvanceAdvection
   public :: advect_via_log, advance_log_advection
 contains
   !============================================================================
-  !===========advect_via_log=======================================
-  subroutine advect_via_log(iLine, iEnd, iShock, nStep, Dt,    &
+  subroutine advect_via_log(iLine, nX, iShock, nStep, Dt,    &
        FermiFirst_I, nSi_I, BSi_I, IsNeg)
     ! The subroutine encapsulates the logarithmic advection scheme,
     ! which is non-conservative, and the diffusion
@@ -42,12 +41,12 @@ contains
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     use SP_ModGrid, ONLY: Used_B, nVertex_B
-    integer, intent(in):: iLine, iEnd, iShock ! indices
-    integer, intent(in):: nStep        ! total steps in this iProgress
-    real,    intent(in):: Dt           ! input time step
+    integer, intent(in):: iLine, nX, iShock ! id of line, particle #, and Shock
+    integer, intent(in):: nStep               ! total steps in this iProgress
+    real,    intent(in):: Dt                  ! input time step
     ! information at upper step
-    real,    intent(in):: FermiFirst_I(1:iEnd), nSI_I(1:iEnd), BSI_I(1:iEnd)
-    logical,intent(inout):: IsNeg      ! check if any Distribution_IIB<0
+    real,    intent(in):: FermiFirst_I(1:nX), nSI_I(1:nX), BSI_I(1:nX)
+    logical, intent(inout):: IsNeg            ! check if any Distribution_IIB < 0
     ! local variables, declared in this subroutine
     integer  :: iStep, iVertex         ! loop variables
     ! characters in case of any Distribution_IIB < 0
@@ -58,9 +57,9 @@ contains
 
     STEP:do iStep = 1, nStep
        ! update bc for advection
-       call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd), iShock)
+       call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! advection in the momentum space
-       do iVertex = 1, iEnd
+       do iVertex = 1, nX
           if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
              write(*,*) NameSub, ': Distribution_IIB < 0'
              Used_B(iLine) = .false.
@@ -75,15 +74,13 @@ contains
        end do
        ! compute diffusion along the field line
        ! set the left boundary condition (for diffusion)
-       if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
+       if(UseDiffusion) call diffuse_distribution(iLine, nX,    &
             iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
             Distribution_IIB(0, 1, iLine) * &
             (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
     end do STEP
   end subroutine advect_via_log
   !============================================================================
-
-  !===========advance_log_advection=======================================
   ! The procedure integrates the log-advection equation, in
   ! the conservative or non-conservative formulation, at a logarithmic grid,
   ! using a single-stage second order scheme
@@ -98,8 +95,8 @@ contains
     logical,intent(in):: IsConservative  ! Solve (C) if .true. (NC) otherwise
     real,optional,intent(in)::DeltaLnP   ! Used only for NonConservative=.true.!
     ! Loop variables
-    integer :: iStep
-    ! Subcycling to achive the condition CFL<1, if nStep>1
+    integer :: iP, iStep
+    ! Subcycling to achieve the condition CFL<1, if nStep>1
     integer :: nStep
     ! Extended version of the sulution array to implement BCc
     real    :: F_I(1 - max(nGCLeft,2):nP+max(nGCRight,2))
@@ -195,7 +192,6 @@ contains
        write(*,*)F_I
        stop
     end if
-    !------------------------------------ DONE -------------------------------!
   contains
     !==========================================================================
     function df_lim_array(iLeft, iRight) result(df_lim_arr)
@@ -211,9 +207,8 @@ contains
       df_lim_arr = sign(0.50,dF1)+sign(0.50,dF2)
       dF1 = abs(dF1)
       dF2 = abs(dF2)
-      df_lim_arr = df_lim_arr*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
-      !---------------------------------- DONE -------------------------------!
-    end function df_lim_array
+      df_lim = df_lim*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
+    end function df_lim
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================
