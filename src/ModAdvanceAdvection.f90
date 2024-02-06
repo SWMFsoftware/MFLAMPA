@@ -2,6 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvanceAdvection
+
   ! Solves advection in the momentum space (=first order Fermi acceleration)
   ! First way - solve advection over log P coordinate.
   ! In space physics applications one often needs to solve the
@@ -41,18 +42,20 @@ contains
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     use SP_ModGrid, ONLY: Used_B, nVertex_B
-    integer, intent(in):: iLine, iEnd, iShock ! id of line, particle #, and Shock
-    integer, intent(in):: nStep               ! total steps in this iProgress
-    real,    intent(in):: Dt                  ! input time step
+    integer, intent(in):: iLine, iEnd, iShock ! indices
+    integer, intent(in):: nStep        ! total steps in this iProgress
+    real,    intent(in):: Dt           ! input time step
     ! information at upper step
     real,    intent(in):: FermiFirst_I(1:iEnd), nSI_I(1:iEnd), BSI_I(1:iEnd)
-    logical, intent(inout):: IsNeg            ! check if any Distribution_IIB < 0
+    logical,intent(inout):: IsNeg      ! check if any Distribution_IIB<0
     ! local variables, declared in this subroutine
-    integer            :: iStep, iVertex      ! loop variables
+    integer  :: iStep, iVertex         ! loop variables
     ! characters in case of any Distribution_IIB < 0
 
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
+    IsNeg = .false.                    ! initial value
+
     STEP:do iStep = 1, nStep
        ! update bc for advection
        call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd), iShock)
