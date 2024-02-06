@@ -98,7 +98,7 @@ contains
     logical,intent(in):: IsConservative  ! Solve (C) if .true. (NC) otherwise
     real,optional,intent(in)::DeltaLnP   ! Used only for NonConservative=.true.!
     ! Loop variables
-    integer :: iP, iStep
+    integer :: iStep
     ! Subcycling to achive the condition CFL<1, if nStep>1
     integer :: nStep
     ! Extended version of the sulution array to implement BCc
@@ -179,7 +179,7 @@ contains
 
           ! f_(i-1/2):
           FSemiintDown_I(1:nP+1) = F_I(1:nP+1)*(1.0 + HalfADtIfNeeded)&
-               - 0.5* (1.0 + CFL)*df_lim_array(1, nP+1)
+               - 0.5*(1.0 + CFL)*df_lim_array(1, nP+1)
           ! f_(i+1/2):
           FSemiintUp_I(1:nP) = FSemiintDown_I(2:nP+1)
 
