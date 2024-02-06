@@ -69,7 +69,7 @@ contains
     use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection,  ONLY: advect_via_log
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
-    use SP_ModDiffusion,      ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
     real, intent(in):: TimeLimit
     ! Loop variables
     integer  :: iP, iVertex, iLine
@@ -196,6 +196,8 @@ contains
           ! DLogP, DtProgress, DtReduction)
           ! Advection (2 different schemes) and Diffusion
 
+          if(UseDiffusion) call set_diffusion_coef(iLine,   &
+               iEnd, iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket)then
              call advect_via_poisson_bracket(iEnd, DtProgress, Cfl, iLine, &
                   iShock, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))

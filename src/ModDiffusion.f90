@@ -10,10 +10,13 @@ module SP_ModDiffusion
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
 
-  use ModNumConst, ONLY: cPi
-  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun
+  use ModNumConst, ONLY: cPi, cTiny
+  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu,     &
+       Rsun, cProtonMass, cGyroradius
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModGrid, ONLY: Wave1_, Wave2_
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, D_,       &
+       R_, x_, y_, z_, Wave1_, Wave2_
+  use SP_ModUnit, ONLY: UnitX_, Io2Si_V
   ! use SP_ModTurbulence, ONLY: update_spectrum
   use ModUtilities, ONLY: CON_stop
 
@@ -23,6 +26,7 @@ module SP_ModDiffusion
 
   PRIVATE
   logical, public :: UseDiffusion = .true.
+  real, public :: DOuterSi_I(1:nVertexMax), CoefDInnerSi_I(1:nVertexMax)
   ! Local parameters!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMFPUpstream = .false.
@@ -35,7 +39,7 @@ module SP_ModDiffusion
   integer :: iScaleTurbulenceType = Const_
 
   ! Public members:
-  public :: read_param, diffuse_distribution
+  public :: read_param, diffuse_distribution, set_diffusion_coef
 
 contains
   !============================================================================
@@ -74,12 +78,8 @@ contains
        LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
-    use ModNumConst, ONLY: cTiny
-    use ModConst, ONLY: cProtonMass, cGyroradius
-    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, R_, D_, x_, y_, z_
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, MomentumSi_I, DLogP, &
          Distribution_IIB
-    use SP_ModUnit, ONLY: UnitX_, Io2Si_V
     ! use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -98,7 +98,7 @@ contains
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
-    real  :: DOuterSi_I(1:nX), DInnerSi_I(1:nX), CoefDInnerSi_I(1:nX)
+    real  :: DInnerSi_I(1:nX)! DOuterSi_I(1:nX), DInnerSi_I(1:nX), CoefDInnerSi_I(1:nX)
     ! Full difference between DataInputTime and SPTime
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
@@ -109,21 +109,17 @@ contains
     ! diffusion along the field line
 
     !--------------------------------------------------------------------------
-    call set_diffusion_coef
-
     ! if using turbulent spectrum:
     ! set_dxx for diffusion along the field line
     ! if(UseTurbulentSpectrum) then
     !   call set_dxx(nX, nP, BSi_I(1:nX))
     ! end if
 
-    DsSi_I(1:nX) = State_VIB(D_,1:nX,iLine)*IO2Si_V(UnitX_)
-
-    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i   and i+1
+    DsSi_I(1:nX) = State_VIB(D_,1:nX,iLine)*Io2Si_V(UnitX_)
+    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
     DsMesh_I(2:nX) = max(DsSi_I(1:nX-1), cTiny)
-
     ! Within the framework of finite volume method, the cell
     ! volume is used, which is proportional to  the distance between
     ! the faces bounding the volume with an index, i, which is half of
@@ -174,7 +170,7 @@ contains
        ! For i=1:
        Aux1 = Dt*DOuterSi_I(1)*0.5*(DInnerSi_I(1)+DInnerSi_I(2))/&
             DsMesh_I(2)**2
-       Main_I( 1) = Main_I(1) + Aux1
+       Main_I(1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
        if(present(LowerEndSpectrum_I))then
           Aux2 = Dt*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
@@ -214,64 +210,66 @@ contains
     !       Distribution_IIB(:,1:nX), BSi_I(1:nX),      &
     !       nSi_I(1:nX)*cProtonMass, Dt)
     ! end if
-  contains
-    !==========================================================================
-    subroutine set_diffusion_coef
-      ! set diffusion coefficient for the current line
-      real            :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
-      real, parameter :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
-      !------------------------------------------------------------------------
-      DOuterSi_I(1:nX) = BSi_I(1:nX)
-      RadiusSi_I(1:nX) = State_VIB(R_, 1:nX,iLine)*IO2Si_V(UnitX_)
-      ! if(UseTurbulentSpectrum) RETURN
 
-      ! precompute scale of turbulence along the line
-      select case(iScaleTurbulenceType)
-      case(Const_)
-         ScaleSi_I(1:nX) = ScaleTurbulenceSi
-      case(Linear_)
-         ScaleSi_I(1:nX) = ScaleTurbulenceSi*RadiusSi_I(1:nX)/cAU
-      end select
-      ! Compute the diffusion coefficient without the contribution of
-      ! v (velocity) and p (momentum), as v and p are different for
-      ! different iP
-      if(UseFixedMFPUpstream) then
-         ! diffusion is different up- and down-stream
-         ! Sokolov et al. 2004, paragraphs before and after eq (4)
-         where(RadiusSi_I(1:nX) > 0.9 * RadiusSi_I(iShock))
-            ! upstream: reset the diffusion coefficient to
-            ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3)
-            ! see Li et al. (2003), doi:10.1029/2002JA009666
-            ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-            ! 1/AU cancels with unit of Lambda0,no special attention needed;
-            ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
-            CoefDInnerSi_I(1:nX) =                     &
-                 (1.0/3)*MeanFreePath0InAU * RadiusSi_I(1:nX)&
-                 *(cLightSpeed/cGEV)**(1.0/3)
-         elsewhere
-            CoefDInnerSi_I(1:nX) =  (cCoef/3)*BSi_I(1:nX)**2 /       &
-                 (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
-                 (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
-         end where
-      else    ! .not.UseFixedMFPUpstream
-         ! Sokolov et al., 2004: eq (4),
-         ! note: Momentum = TotalEnergy * Vel / C**2
-         ! Gyroradius = cGyroRadius * momentum / |B|
-         ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B|
-         ! ------------------------------------------------------
-         ! effective level of turbulence is different for different momenta:
-         ! (\delta B)**2 \propto Gyroradius^(1/3)
-         CoefDInnerSi_I(1:nX) =  (cCoef/3)*BSi_I(1:nX)**2 /       &
-              (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
-              (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
-      end if
-
-      ! Add 1/B as the actual diffusion is D/B
-      CoefDInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX) / BSi_I(1:nX)
-
-    end subroutine set_diffusion_coef
-    !==========================================================================
   end subroutine diffuse_distribution
+  !============================================================================
+  subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
+    ! set diffusion coefficient for the current line
+
+    integer, intent(in):: iLine, nX, iShock
+    real, intent(in):: BSI_I(1:nX)
+    real            :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
+    real, parameter :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
+    !--------------------------------------------------------------------------
+    DOuterSi_I(1:nX) = BSi_I(1:nX)
+    RadiusSi_I(1:nX) = State_VIB(R_, 1:nX,iLine)*Io2Si_V(UnitX_)
+    ! if(UseTurbulentSpectrum) RETURN
+
+    ! precompute scale of turbulence along the line
+    select case(iScaleTurbulenceType)
+    case(Const_)
+       ScaleSi_I(1:nX) = ScaleTurbulenceSi
+    case(Linear_)
+       ScaleSi_I(1:nX) = ScaleTurbulenceSi*RadiusSi_I(1:nX)/cAu
+    end select
+    ! Compute the diffusion coefficient without the contribution of
+    ! v (velocity) and p (momentum), as v and p are different for
+    ! different iP
+    if(UseFixedMFPUpstream) then
+       ! diffusion is different up- and down-stream
+       ! Sokolov et al. 2004, paragraphs before and after eq (4)
+       where(RadiusSi_I(1:nX) > 0.9 * RadiusSi_I(iShock))
+          ! upstream: reset the diffusion coefficient to
+          ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3)
+          ! see Li et al. (2003), doi:10.1029/2002JA009666
+          ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+          ! 1/AU cancels with unit of Lambda0,no special attention needed;
+          ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
+          CoefDInnerSi_I(1:nX) =                     &
+               (1.0/3)*MeanFreePath0InAu * RadiusSi_I(1:nX)&
+               *(cLightSpeed/cGEV)**(1.0/3)
+       elsewhere
+          CoefDInnerSi_I(1:nX) =  (cCoef/3)*BSi_I(1:nX)**2 /       &
+               (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
+               (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
+       end where
+    else    ! .not.UseFixedMFPUpstream
+       ! Sokolov et al., 2004: eq (4),
+       ! note: Momentum = TotalEnergy * Vel / C**2
+       ! Gyroradius = cGyroRadius * momentum / |B|
+       ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B|
+       ! ------------------------------------------------------
+       ! effective level of turbulence is different for different momenta:
+       ! (\delta B)**2 \propto Gyroradius^(1/3)
+       CoefDInnerSi_I(1:nX) =  (cCoef/3)*BSi_I(1:nX)**2 /       &
+            (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
+            (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
+    end if
+
+    ! Add 1/B as the actual diffusion is D/B
+    CoefDInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX) / BSi_I(1:nX)
+
+  end subroutine set_diffusion_coef
   !============================================================================
   subroutine tridiag(n, L_I, M_I, U_I, R_I, W_I)
 
