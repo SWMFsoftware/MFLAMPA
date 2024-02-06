@@ -67,7 +67,7 @@ contains
     use ModConst,             ONLY: cProtonMass, Rsun
     use SP_ModTime,           ONLY: SPTime
     use SP_ModGrid,           ONLY: Rho_, RhoOld_, B_, BOld_, U_
-    use SP_ModAdvanceAdvection,  ONLY: advance_log_advection
+    use SP_ModAdvanceAdvection,  ONLY: advect_via_log
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_bracket
     use SP_ModDiffusion,      ONLY: UseDiffusion, diffuse_distribution
     real, intent(in):: TimeLimit
@@ -114,6 +114,9 @@ contains
 
     ! the full time interval
     character(len=*), parameter:: NameSub = 'advance'
+
+    ! Check if any Distribution_IIB < 0 in advect_via_log
+    logical   :: IsNeg
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
@@ -225,29 +228,9 @@ contains
              Dt = DtProgress/nStep
              FermiFirst_I(1:iEnd) = FermiFirst_I(1:iEnd) / nStep
              ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
-
-             STEP:do iStep = 1, nStep
-                ! update bc for advection
-                call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
-                ! advection in the momentum space
-                do iVertex = 1, iEnd
-                   if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
-                      write(*,*) NameSub, ': Distribution_IIB < 0'
-                      Used_B(iLine) = .false.
-                      nVertex_B(iLine) = 0
-                      CYCLE line
-                   end if
-
-                   call advance_log_advection(FermiFirst_I(iVertex), nP,   &
-                        1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
-                end do
-                ! compute diffusion along the field line
-                ! set the left boundary condition (for diffusion)
-                if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
-                     iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-                     Distribution_IIB(0, 1, iLine) * &
-                     (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
-             end do STEP
+             call advect_via_log(iLine, iEnd, iShock, nStep, Dt,        &
+                  FermiFirst_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
+             if(IsNeg) CYCLE line
              ! UseDoInitSpectrum = .true.
           end if
        end do PROGRESS

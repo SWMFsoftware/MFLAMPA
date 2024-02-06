@@ -24,22 +24,69 @@ module SP_ModAdvanceAdvection
   !           wave-particle interactions
   !
   ! In all these applications, A does not depend on the phase coordinate, p
+  use SP_ModDistribution, ONLY: nP, MomentumSi_I, Distribution_IIB
   implicit none
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
   ! Version: Sokolov& Roussev, Jan,2008, SP/FLAMPA/src/ModLogAdvection.f90
-  public :: advance_log_advection
+  public :: advect_via_log, advance_log_advection
 contains
   !============================================================================
+  !===========advect_via_log=======================================
+  subroutine advect_via_log(iLine, iEnd, iShock, nStep, Dt,    & 
+         FermiFirst_I, nSi_I, BSi_I, IsNeg)
+  ! The subroutine encapsulates the logarithmic advection scheme,
+  ! which is non-conservative, and the diffusion
+
+  use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+  use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
+  use SP_ModGrid, ONLY: Used_B, nVertex_B
+  integer, intent(in):: iLine, iEnd, iShock ! id of line, particle #, and Shock
+  integer, intent(in):: nStep               ! total steps in this iProgress
+  real,    intent(in):: Dt                  ! input time step
+  ! information at upper step
+  real,    intent(in):: FermiFirst_I(1:iEnd), nSI_I(1:iEnd), BSI_I(1:iEnd) 
+  logical, intent(inout):: IsNeg            ! check if any Distribution_IIB < 0
+  ! local variables, declared in this subroutine
+  integer            :: iStep, iVertex      ! loop variables
+  ! characters in case of any Distribution_IIB < 0
+  character(len=*), parameter:: NameSub = 'advect_via_log'
+  
+  STEP:do iStep = 1, nStep
+      ! update bc for advection
+      call set_momentum_bc(iLine, iEnd, nSi_I(1:iEnd),iShock)
+      ! advection in the momentum space
+      do iVertex = 1, iEnd
+         if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
+            write(*,*) NameSub, ': Distribution_IIB < 0'
+            Used_B(iLine) = .false.
+            nVertex_B(iLine) = 0
+            ! CYCLE line
+            IsNeg = .true.
+            EXIT STEP
+         end if
+
+         call advance_log_advection(FermiFirst_I(iVertex), &
+            1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
+      end do
+      ! compute diffusion along the field line
+      ! set the left boundary condition (for diffusion)
+      if(UseDiffusion) call diffuse_distribution(iLine, iEnd,    &
+         iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
+         Distribution_IIB(0, 1, iLine) * &
+         (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
+   end do STEP
+  end subroutine advect_via_log
+  !============================================================================
+
   !===========advance_log_advection=======================================
   ! The procedure integrates the log-advection equation, in
   ! the conservative or non-conservative formulation, at a logarithmic grid,
   ! using a single-stage second order scheme
-  subroutine advance_log_advection(CFLIn, nP, nGCLeft, nGCRight,        &
+  subroutine advance_log_advection(CFLIn, nGCLeft, nGCRight,        &
        FInOut_I, IsConservative, DeltaLnP)
 
     real,   intent(in):: CFLIn        ! Time step * acceleration rate/(Dlnp)
-    integer,intent(in):: nP           ! Number of meshes along lnp-coordinate
     integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
     integer,intent(in):: nGCRight     ! advanced in time but used as the BCs
     real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight)  ! Solution

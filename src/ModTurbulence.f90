@@ -526,17 +526,17 @@ contains
     do iVertex=1,iEnd
        ! Advection in k space:
        if(UseAdvectionWithAlfvenSpeed)then
-          call advance_log_advection(DispersionPlus_I(iVertex),  nP, 1, 1, &
+          call advance_log_advection(DispersionPlus_I(iVertex), 1, 1, &
                IPlusSi_IX( :,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
-          call advance_log_advection(DispersionMinus_I(iVertex), nP, 1, 1, &
+          call advance_log_advection(DispersionMinus_I(iVertex), 1, 1, &
                IMinusSi_IX(:,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
        else
-          call advance_log_advection(DispersionA_I(iVertex), nP, 0, 0, &
+          call advance_log_advection(DispersionA_I(iVertex), 0, 0, &
                IPlusSi_IX( 1:nP,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
-          call advance_log_advection(DispersionA_I(iVertex), nP, 0, 0, &
+          call advance_log_advection(DispersionA_I(iVertex), 0, 0, &
                IMinusSi_IX(1:nP,iVertex),IsConservative=.true., &
                DeltaLnP=DLogP)
        end if
