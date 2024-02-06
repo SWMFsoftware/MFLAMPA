@@ -154,8 +154,7 @@ contains
     ! One stage second order upwind scheme
 
     if (CFL>0.0) then
-       do iStep=1,nStep
-
+       do iStep=1, nStep
           ! Boundary condition at the left boundary
           if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft )
           ! Boundary condition at the right boundary
@@ -168,12 +167,11 @@ contains
           FSemiintDown_I(1:nP) = FSemiintUp_I(0:nP-1)
 
           ! Update the solution from f^(n) to f^(n+1):
-
           F_I(1:nP) = F_I(1:nP)+CFL*(FSemiintDown_I(1:nP)-FSemiintUp_I(1:nP))+&
                HalfADtIfNeeded*(FSemiintDown_I(1:nP)+FSemiintUp_I(1:nP))
        end do
     else
-       do iStep=1,nStep
+       do iStep=1, nStep
           ! Boundary condition at the left boundary
           if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft)
           ! Boundary condition at the right boundary
@@ -191,7 +189,7 @@ contains
        end do
     end if
 
-    FInOut_I(1:nP)=F_I(1:nP)
+    FInOut_I(1:nP) = F_I(1:nP)
     if(any(FInOut_I(1-nGCLeft:nP+nGCRight)<=0.0))then
        write(*,*)'After advection F_I <=0, for CFLFermi= ',CFL
        write(*,*)F_I
@@ -199,25 +197,6 @@ contains
     end if
     !------------------------------------ DONE -------------------------------!
   contains
-    !==========================================================================
-    !  ==========================================================================
-    real function df_lim(i)
-      integer, intent(in):: i
-
-      real:: dF1, dF2
-
-      !------------------------------------------------------------------------
-      dF1 = F_I(i+1)-F_I(i)
-      dF2 = F_I(i)-F_I(i-1)
-
-      ! df_lim=0 if dF1*dF2<0, sign(dF1) otherwise:
-
-      df_lim = sign(0.50,dF1)+sign(0.50,dF2)
-      dF1 = abs(dF1)
-      dF2 = abs(dF2)
-      df_lim = df_lim*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
-      !---------------------------------- DONE -------------------------------!
-    end function df_lim
     !==========================================================================
     function df_lim_array(iLeft, iRight) result(df_lim_arr)
       integer, intent(in):: iLeft, iRight ! start/left and end/right indices
