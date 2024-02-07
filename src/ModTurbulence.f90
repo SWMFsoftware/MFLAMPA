@@ -15,7 +15,7 @@ module SP_ModTurbulence
   public :: init, finalize, DoInitSpectrum, UseTurbulentSpectrum, set_dxx, &
        read_param, set_wave_advection_rates, reduce_advection_rates, dxx,  &
        init_spectrum, update_spectrum, set_init_tspectrum, DoTraceShock,   &
-       advance_log_advection
+       advance_log_advection, DtReduced
 
   ! Logicals, all .false. by default
   logical:: DoInitSpectrum              = .false.
@@ -25,6 +25,7 @@ module SP_ModTurbulence
 
   integer, parameter :: nK = nP
   real    :: dLogK
+  real    :: DtReduced
 
   real, allocatable :: Gamma_I(:,:)
   real, allocatable :: IPlusSi_IX(:,:),IMinusSi_IX(:,:),ICSi_X(:)
@@ -60,7 +61,7 @@ module SP_ModTurbulence
 
   ! the intensity of the back travelling wave in the initial condition
   real :: Alpha       = 1.0/10
-  real :: Lambda0InAu = 4.0/10  ![AU]
+  real :: Lambda0InAu = 4.0/10  ! [AU]
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -946,7 +947,6 @@ contains
     real     :: uSi_I(1:iEnd), DsSi_I(1:iEnd)
     real     :: XyzSi_DI(3, 1:iEnd)
     real     :: MachAlfven   ! Alfvenic Mach number
-    real     :: DtReduction  ! Time step may be reduced
     !--------------------------------------------------------------------------
     uSi_I(1:iEnd)      = State_VIB(U_,1:iEnd,iLine)
     DsSi_I(1:iEnd)     = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
@@ -969,7 +969,7 @@ contains
     call set_wave_advection_rates(iEnd, BSi_I(1:iEnd),      &
          BOldSi_I(1:iEnd), nSi_I(1:iEnd)*cProtonMass,       &
          nOldSi_I(1:iEnd)*cProtonMass, XyzSi_DI(:,1:iEnd),  &
-         DsSi_I(1:iEnd), DLogP, DtProgress, DtReduction)
+         DsSi_I(1:iEnd), DLogP, DtProgress, DtReduced)
 
   contains
     !==========================================================================

@@ -64,11 +64,11 @@ rundir:
 		cp ${DIR}/share/JobScripts/job.*${MACHINE}* ${RUNDIR}/; \
 		cp ${DIR}/share/JobScripts/*.${MACHINE}.pl ${RUNDIR}/; \
 		rm -f ${RUNDIR}/*_TMP_* ${DIR}/share/JobScripts/*_TMP_*; \
-		cp -f Param/PARAM.test ${RUNDIR}/PARAM.in; \
 		touch ${RUNDIR}/core; chmod 444 ${RUNDIR}/core; \
 		cd ${RUNDIR}; ln -s ${BINDIR}/${DEFAULT_EXE} .; \
 		ln -s SP/* .; \
 	fi);
+#		cp -f Param/PARAM.test ${RUNDIR}/PARAM.in; \
 
 clean:  install
 	@(if [ -r "Makefile.conf" ]; then \

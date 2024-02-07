@@ -16,7 +16,6 @@ module SP_ModDiffusion
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, D_, R_,      &
        x_, z_, Wave1_, Wave2_
-  !   use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, update_spectrum
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 

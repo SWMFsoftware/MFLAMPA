@@ -4,6 +4,7 @@
 module SP_ModAdvanceAdvection
 
   use ModUtilities, ONLY: CON_stop
+  use SP_ModDistribution, ONLY: nP, MomentumSi_I, Distribution_IIB, dLogP
   ! Solves advection in the momentum space (=first order Fermi acceleration)
   ! First way - solve advection over log P coordinate.
   ! In space physics applications one often needs to solve the
@@ -27,7 +28,6 @@ module SP_ModAdvanceAdvection
   !
   ! In all these applications, an acceleration rate, A, does not depend on the
   ! phase coordinate, p
-  use SP_ModDistribution, ONLY: nP, MomentumSi_I, Distribution_IIB, dLogP
   implicit none
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
@@ -48,7 +48,8 @@ contains
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     use SP_ModGrid, ONLY: Used_B, nVertex_B
-    use SP_ModTurbulence, ONLY: advance_log_advection
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum,          &
+         advance_log_advection, reduce_advection_rates, DtReduced
     ! INPUTS:
     ! id of line, particle #, and Shock location
     integer, intent(in):: iLine, nX, iShock
@@ -72,33 +73,32 @@ contains
     real     :: Dt
     ! Lagrangian derivatives
     real     :: FermiFirst_I(1:nX)
-
-    character(len=*), parameter:: NameSub = 'advect_via_log'
-    !--------------------------------------------------------------------------
     ! 1st order Fermi acceleration is responsible for advection
     ! in momentum space
+    character(len=*), parameter:: NameSub = 'advect_via_log'
+    !--------------------------------------------------------------------------
     IsNeg = .false.
     ! first order Fermi acceleration for the current line
     FermiFirst_I = DLogRho_I / (3*DLogP)
-    ! if(UseTurbulentSpectrum)then
-    ! nStep = 1+int(max(DtReduction,                &
-    !      maxval(abs(FermiFirst_I(1:nX))))/CFL)
-    ! else
     ! How many steps should be done to the CFL criterion is fulfilled
-    nStep = 1+int(maxval(abs(FermiFirst_I(2:nX)))/CFL)
-    ! end if
+    if(UseTurbulentSpectrum) then
+       nStep = 1+int(max(DtReduced,maxval(abs(FermiFirst_I(1:nX))))/Cfl)
+    else
+       nStep = 1+int(maxval(abs(FermiFirst_I(2:nX)))/Cfl)
+    end if
 
     ! Check if the number of time steps is positive:
     if(nStep < 1)then
-       ! if(UseTurbulentSpectrum) &
-       !     write(*,*) ' DtReduction =', DtReduction
-       write(*,*) ' maxval(abs(FermiFirst_I)) =', &
+       if(UseTurbulentSpectrum) &
+            write(*,*) 'DtReduction =', DtReduced
+       write(*,*) 'maxval(abs(FermiFirst_I)) =', &
             maxval(abs(FermiFirst_I(2:nX)))
        call CON_stop(NameSub//': nStep <= 0????')
     end if
     Dt = DtProgress / nStep
     FermiFirst_I = FermiFirst_I / nStep
-    ! if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
+    if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
+
     STEP:do iStep = 1, nStep
        ! update bc for advection
        call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
@@ -108,7 +108,6 @@ contains
              write(*,*) NameSub, ': Distribution_IIB < 0'
              Used_B(iLine) = .false.
              nVertex_B(iLine) = 0
-             ! CYCLE line
              IsNeg = .true.
              EXIT STEP
           end if
