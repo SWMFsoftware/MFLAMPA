@@ -59,16 +59,14 @@ module SP_ModTurbulence
 
   ! the intensity of the back travelling wave in the initial condition
   real :: Alpha       = 1.0/10
-  real :: Lambda0InAu = 4.0/10.0  ![AU]
+  real :: Lambda0InAu = 4.0/10  ![AU]
 contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand
-
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
-
     select case(NameCommand)
     case('#INITSPECTRUM')
        call read_var('DoInitSpectrum', DoInitSpectrum)
@@ -148,8 +146,8 @@ contains
 
   end subroutine finalize
   !============================================================================
-  subroutine init_spectrum(iEnd, XyzSi_DI, BSi_I, MomentumSi_I, dLogP, iShock,&
-       CoefInj, AlfvenMach)
+  subroutine init_spectrum(iEnd, XyzSi_DI, BSi_I, MomentumSi_I, dLogP, &
+       iShock, CoefInj, AlfvenMach)
     !==============Initial spectrum of turbulence=============================!
     ! We recover the initial spectrum of turbulence from the spatial
     ! distribution of the diffusion coefficient and its dependence on the
@@ -801,58 +799,65 @@ contains
 
   end function Dxx
   !============================================================================
-  subroutine set_turbulence_spectrum(iLine, iEnd, iShock, nSi_I, BSi_I)
+  subroutine set_turbulence_spectrum(iLine, iEnd, iShock,   &
+       DtProgress, nOldSi_I, nSi_I, BOldSi_I, BSi_I)
 
     use ModConst,   ONLY: cMu, cProtonMass
     use SP_ModGrid, ONLY: State_VIB, MhData_VIB, nWidth, D_, U_, x_, z_
     use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+    use SP_ModBc,   ONLY: CoefInj
+    use SP_ModDistribution, ONLY: MomentumSi_I, DLogP
+
     integer, intent(in):: iLine, iEnd, iShock
-    real, intent(in)   :: nSi_I(1:iEnd), BSi_I(1:iEnd)
+    real, intent(in)   :: DtProgress
+    real, intent(in)   :: nSi_I(1:iEnd), nOldSi_I(1:iEnd)
+    real, intent(in)   :: BSi_I(1:iEnd), BOldSi_I(1:iEnd)
     real     :: uSi_I(1:iEnd), DsSi_I(1:iEnd)
-    real     :: XyzSi_I(3, 1:iEnd)
+    real     :: XyzSi_DI(3, 1:iEnd)
     real     :: MachAlfven   ! Alfvenic Mach number
     real     :: DtReduction  ! Time step may be reduced
     !--------------------------------------------------------------------------
-    uSi_I(1:iEnd)         = State_VIB(U_,1:iEnd,iLine)
-    DsSi_I(1:iEnd)        = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
-    XyzSi_I(x_:z_,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2SI_V(UnitX_)
+    uSi_I(1:iEnd)      = State_VIB(U_,1:iEnd,iLine)
+    DsSi_I(1:iEnd)     = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
+    XyzSi_DI(:,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2SI_V(UnitX_)
 
-    if(UseTurbulentSpectrum) then
-       ! Calculate the Alfven speed
-       if(iShock < iEnd-nWidth .and. iShock > nWidth  &
-            .and. DoTraceShock) then
-          MachAlfven = mach_alfven()
-       else
-          MachAlfven = 1.0
-       end if
-
-       ! if (DoInitSpectrum) call init_spectrum(iEnd,               &
-       !    XyzSi_DI(x_:z_, 1:iEnd), BSi_I(1:iEnd),                &
-       !    MomentumSi_I, dLogP, iShock, CoefInj, MachAlfven)
-       ! call set_wave_advection_rates(iEnd, BSi_I(1:iEnd),         &
-       !    BOldSi_I(1:iEnd), nSi_I(1:iEnd)*cProtonMass,           &
-       !    nOldSi_I(1:iEnd)*cProtonMass, XyzSi_DI(x_:z_, 1:iEnd), &
-       !    DsSi_I(1:iEnd), DLogP, DtProgress, DtReduction)
+    ! Calculate the Alfven speed
+    if(iShock < iEnd-nWidth .and. iShock > nWidth &
+         .and. DoTraceShock) then
+       MachAlfven = mach_alfven()
+    else
+       MachAlfven = 1.0
     end if
+
+    ! initial the spectrum
+    if(DoInitSpectrum) call init_spectrum(iEnd,          &
+         XyzSi_DI(:,1:iEnd), BSi_I(1:iEnd),              &
+         MomentumSi_I, dLogP, iShock, CoefInj, MachAlfven)
+
+    ! set wave advection and obtain DtReduction
+    call set_wave_advection_rates(iEnd, BSi_I(1:iEnd),      &
+         BOldSi_I(1:iEnd), nSi_I(1:iEnd)*cProtonMass,       &
+         nOldSi_I(1:iEnd)*cProtonMass, XyzSi_DI(:,1:iEnd),  &
+         DsSi_I(1:iEnd), DLogP, DtProgress, DtReduction)
 
   contains
     !==========================================================================
     function mach_alfven() result(MachAlfven)
       ! used only with the turbulence model ON:
       ! alfvenic mach number for the current line
-      real:: MachAlfven
-      real:: SpeedAlfvenUpstream, SpeedUpstream
+      real :: MachAlfven
+      real :: SpeedAlfvenUpstream, SpeedUpstream
 
       ! speed upstream is relative to the shock:
       ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
-      !=> V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
-      !=> V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
+      ! => V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
+      ! => V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
       ! Hence, below there should be norm2(\vect{U}_d - \vect{U}_u)
       !------------------------------------------------------------------------
       SpeedUpstream = nSi_I(iShock+1-nWidth) * &
            (uSi_I(iShock+1-nWidth) - uSi_I(iShock+nWidth)) / &
            (nSi_I(iShock+1-nWidth) - nSi_I(iShock+nWidth))
-      SpeedAlfvenUpstream = BSi_I(iShock + nWidth)/ &
+      SpeedAlfvenUpstream = BSi_I(iShock + nWidth) / &
            sqrt(cMu*nSi_I(iShock + nWidth)*cProtonMass)
       MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
     end function mach_alfven

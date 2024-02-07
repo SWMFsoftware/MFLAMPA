@@ -29,7 +29,6 @@ contains
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-    character(len=8) :: StringScaleTurbulenceType
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)

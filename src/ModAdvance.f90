@@ -4,16 +4,12 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-  use ModConst,   ONLY: cMu
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModDistribution, ONLY:  &
-       MomentumSi_I, MomentumInjSi, DLogP
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, D_, &
-       Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
-  use SP_ModTurbulence, ONLY: DoTraceShock, set_turbulence_spectrum,  &
-       set_wave_advection_rates, reduce_advection_rates, init_spectrum
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, D_,  &
+       Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
+  use SP_ModTurbulence, ONLY: set_turbulence_spectrum,         &
+       DoTraceShock, UseTurbulentSpectrum
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
-  use SP_ModBc,   ONLY: set_momentum_bc, CoefInj, SpectralIndex
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -34,7 +30,6 @@ contains
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-    character(len=8) :: StringScaleTurbulenceType
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
@@ -99,9 +94,9 @@ contains
        ! amu/m^3, temperature is in the unit of kinetic energy, all others
        ! are in SI units. So to convert the IO units, the three conversion
        ! factors are needed as follows:
-       uSi_I(      1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
-       BOldSi_I(   1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
-       nOldSi_I(   1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
+       uSi_I(   1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
+       BOldSi_I(1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
+       nOldSi_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iLine)
@@ -135,14 +130,17 @@ contains
           BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha* &
                (State_VIB(B_,  1:iEnd,iLine) - &
                State_VIB(BOld_,1:iEnd,iLine))
+          DLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
 
+          ! trace shock position and steepen the shock
           iShock = iShockOld + iProgress
-          DLogRho_I(1:iEnd)=log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
-          ! steepen the shock
-          if(iShock < iEnd - nWidth .and. iShock > nWidth   &
+          if(iShock < iEnd-nWidth .and. iShock > nWidth     &
                .and. DoTraceShock) call steepen_shock(iEnd)
-          call set_turbulence_spectrum(iLine, iEnd, iShock, &
-               nSi_I(1:iEnd), BSi_I(1:iEnd))
+
+          ! set turbulence spectrum: depend on UseTurbulentSpectrum
+          if(UseTurbulentSpectrum) call set_turbulence_spectrum(iLine,  &
+               iEnd, iShock, DtProgress, nOldSi_I(1:iEnd),              &
+               nSi_I(1:iEnd), BOldSi_I(1:iEnd), BSi_I(1:iEnd))
 
           ! Advection (2 different schemes) and Diffusion
           if(UseDiffusion) call set_diffusion_coef(iLine,   &
@@ -156,7 +154,7 @@ contains
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
           else
              ! No Poisson bracket scheme, use the default algorithm
-             call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,   &
+             call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
                   DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
              if(IsNeg) CYCLE line
           end if
