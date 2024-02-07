@@ -14,15 +14,15 @@ module SP_ModAdvancePoisson
   public :: advect_via_poisson
 contains
   !============================================================================
-  subroutine advect_via_poisson(iLine, nX, iShock,                &
+  subroutine advect_via_poisson(iLine, nX, iShock, &
        tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
-    use SP_ModDistribution, ONLY: nP, Momentum3Si_I, VolumeP_I,   &
-         DLogP, Distribution_IIB, MomentumSi_I, MomentumInjSi, Background_I
+    use SP_ModDistribution, ONLY: nP, Momentum3Si_I, VolumeP_I, DLogP, &
+         Distribution_IIB, MomentumSi_I, MomentumInjSi, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     integer, intent(in):: iLine, iShock ! indices of line and shock
@@ -55,11 +55,10 @@ contains
     ! Prediction for the next time step:
     real    :: DtNext
     ! Now this is the particle-number-conservative advection scheme
-
+    !--------------------------------------------------------------------------
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
-    !--------------------------------------------------------------------------
     VolumeXStart_I(1:nX) = 1/nOldSi_I(1:nX)
     VolumeXStart_I(0)    = VolumeXStart_I(1)
     VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
@@ -107,9 +106,8 @@ contains
        Distribution_IIB(1:nP, 1:nX, iLine) = &
             Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
        ! set the left boundary condition (for diffusion)
-       if(UseDiffusion) call diffuse_distribution(iLine,    &
-            nX, iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-            VDF_G(1:nP, 0))
+       if(UseDiffusion) call diffuse_distribution(iLine, nX, iShock, &
+            Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT

@@ -9,6 +9,7 @@ module SP_ModBc
        MomentumInjSi
   use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_
   use SP_ModUnit, ONLY: kinetic_energy_to_momentum, UnitEnergy_, Io2Si_V
+  use ModUtilities, ONLY: CON_stop
   implicit none
 
   SAVE
@@ -16,6 +17,7 @@ module SP_ModBc
   PRIVATE ! except
 
   ! Public members:
+  public:: read_param
   public:: set_momentum_bc  ! Sets the boundary condition at min/max energy
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
@@ -23,6 +25,21 @@ module SP_ModBc
   real, public :: CoefInj = 0.25, SpectralIndex = 5.0
   real, parameter :: CoefInjTiny = 2.5E-11
 contains
+  !============================================================================
+  subroutine read_param(NameCommand)
+    use ModReadParam, ONLY: read_var
+    character(len=*), intent(in):: NameCommand ! From PARAM.in
+    character(len=8) :: StringScaleTurbulenceType
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
+    select case(NameCommand)
+    case('#INJECTION')
+       call read_var('Efficiency',   CoefInj)
+       call read_var('SpectralIndex',SpectralIndex)
+    case default
+       call CON_stop(NameSub//': Unknown command '//NameCommand)
+    end select
+  end subroutine read_param
   !============================================================================
   subroutine set_momentum_bc(iLine, iEnd, nSi_I, iShock)
     ! set boundary conditions on grid point on the current line
@@ -51,7 +68,6 @@ contains
             iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
 
        Distribution_IIB(0,iVertex,iLine) = DistributionBc*CoefInjLocal
-
     end do
 
   end subroutine set_momentum_bc

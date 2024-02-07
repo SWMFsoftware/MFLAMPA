@@ -236,7 +236,7 @@ contains
     real, parameter     :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
-    RadiusSi_I(1:nX) = State_VIB(R_, 1:nX,iLine)*Io2Si_V(UnitX_)
+    RadiusSi_I(1:nX) = State_VIB(R_,1:nX,iLine)*Io2Si_V(UnitX_)
     ! if(UseTurbulentSpectrum) RETURN
 
     ! precompute scale of turbulence along the line

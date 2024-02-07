@@ -14,12 +14,13 @@ module SP_ModTurbulence
 
   public :: init, finalize, DoInitSpectrum, UseTurbulentSpectrum, set_dxx, &
        read_param, set_wave_advection_rates, reduce_advection_rates, dxx,  &
-       init_spectrum, update_spectrum
+       init_spectrum, update_spectrum, set_turbulence_spectrum, DoTraceShock
 
   ! Logicals, all .false. by default
   logical:: DoInitSpectrum              = .false.
   logical:: UseTurbulentSpectrum        = .false.
   logical:: UseAdvectionWithAlfvenSpeed = .false.
+  logical:: DoTraceShock                = .true.
 
   integer, parameter :: nK = nP
   real    :: dLogK
@@ -43,19 +44,17 @@ module SP_ModTurbulence
 
   !------------------------------------------------------------------------!
   !          Grid in the momentum space                                    !
-  ! iP     0     1                         nP   nP+1                        !
+  ! iP     0     1                         nP   nP+1                       !
   !       |     |    ....                 |     |                          !
-  ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))   !
+  ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))  !
   !             |    Grid in k-space      |     |                          !
-  ! K/B         KMax                      KMin                              !
-  ! ik     0     1                         nP   nP+1                         !
+  ! K/B         KMax                      KMin                             !
+  ! ik     0     1                         nP   nP+1                       !
   !------------------------------------------------------------------------!
 
   real,allocatable,private:: AK_II(:,:)
   real,allocatable,private:: BK_II(:,:)
-
   real,allocatable,private:: CFL_I(:)
-
   integer,allocatable::      CorrectionMode_X(:)
 
   ! the intensity of the back travelling wave in the initial condition
@@ -83,6 +82,8 @@ contains
     case('#ADVECTIONWITHALFVENSPEED')
        call read_var('UseAdvectionWithAlfvenSpeed', &
             UseAdvectionWithAlfvenSpeed)
+    case('#TRACESHOCK')
+       call read_var('DoTraceShock', DoTraceShock)
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -799,6 +800,64 @@ contains
     end if
 
   end function Dxx
+  !============================================================================
+  subroutine set_turbulence_spectrum(iLine, iEnd, iShock, nSi_I, BSi_I)
+
+    use ModConst,   ONLY: cMu, cProtonMass
+    use SP_ModGrid, ONLY: State_VIB, MhData_VIB, nWidth, D_, U_, x_, z_
+    use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+    integer, intent(in):: iLine, iEnd, iShock
+    real, intent(in)   :: nSi_I(1:iEnd), BSi_I(1:iEnd)
+    real     :: uSi_I(1:iEnd), DsSi_I(1:iEnd)
+    real     :: XyzSi_I(3, 1:iEnd)
+    real     :: MachAlfven   ! Alfvenic Mach number
+    real     :: DtReduction  ! Time step may be reduced
+    !--------------------------------------------------------------------------
+    uSi_I(1:iEnd)         = State_VIB(U_,1:iEnd,iLine)
+    DsSi_I(1:iEnd)        = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
+    XyzSi_I(x_:z_,1:iEnd) = MhData_VIB(x_:z_,1:iEnd,iLine)*IO2SI_V(UnitX_)
+
+    if(UseTurbulentSpectrum) then
+       ! Calculate the Alfven speed
+       if(iShock < iEnd-nWidth .and. iShock > nWidth  &
+            .and. DoTraceShock) then
+          MachAlfven = mach_alfven()
+       else
+          MachAlfven = 1.0
+       end if
+
+       ! if (DoInitSpectrum) call init_spectrum(iEnd,               &
+       !    XyzSi_DI(x_:z_, 1:iEnd), BSi_I(1:iEnd),                &
+       !    MomentumSi_I, dLogP, iShock, CoefInj, MachAlfven)
+       ! call set_wave_advection_rates(iEnd, BSi_I(1:iEnd),         &
+       !    BOldSi_I(1:iEnd), nSi_I(1:iEnd)*cProtonMass,           &
+       !    nOldSi_I(1:iEnd)*cProtonMass, XyzSi_DI(x_:z_, 1:iEnd), &
+       !    DsSi_I(1:iEnd), DLogP, DtProgress, DtReduction)
+    end if
+
+  contains
+    !==========================================================================
+    function mach_alfven() result(MachAlfven)
+      ! used only with the turbulence model ON:
+      ! alfvenic mach number for the current line
+      real:: MachAlfven
+      real:: SpeedAlfvenUpstream, SpeedUpstream
+
+      ! speed upstream is relative to the shock:
+      ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
+      !=> V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
+      !=> V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
+      ! Hence, below there should be norm2(\vect{U}_d - \vect{U}_u)
+      !------------------------------------------------------------------------
+      SpeedUpstream = nSi_I(iShock+1-nWidth) * &
+           (uSi_I(iShock+1-nWidth) - uSi_I(iShock+nWidth)) / &
+           (nSi_I(iShock+1-nWidth) - nSi_I(iShock+nWidth))
+      SpeedAlfvenUpstream = BSi_I(iShock + nWidth)/ &
+           sqrt(cMu*nSi_I(iShock + nWidth)*cProtonMass)
+      MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
+    end function mach_alfven
+    !==========================================================================
+  end subroutine set_turbulence_spectrum
   !============================================================================
 end module SP_ModTurbulence
 !==============================================================================

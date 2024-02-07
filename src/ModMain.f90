@@ -37,9 +37,10 @@ contains
   !============================================================================
   subroutine read_param
 
-    use SP_ModAdvance,       ONLY: DoTraceShock
+    use SP_ModTurbulence,    ONLY: DoTraceShock
     use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
+    use SP_ModBc,            ONLY: read_param_bc         =>read_param
     use SP_ModDiffusion,     ONLY: read_param_diffuse    =>read_param
     use SP_ModDistribution,  ONLY: read_param_dist       =>read_param
     use SP_ModGrid,          ONLY: read_param_grid       =>read_param
@@ -49,7 +50,7 @@ contains
     use SP_ModRestart,       ONLY: read_param_restart    =>read_param
     use SP_ModTime,          ONLY: read_param_time       =>read_param
     use SP_ModTiming,        ONLY: read_param_timing     =>read_param
-    ! use SP_ModTurbulence,    ONLY: read_param_turbulence =>read_param
+    use SP_ModTurbulence,    ONLY: read_param_turbulence =>read_param
     use SP_ModUnit,          ONLY: read_param_unit       =>read_param
 
     ! Read input parameters for SP component
@@ -82,31 +83,32 @@ contains
             '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
           if(i_session_read() /= 1)CYCLE
           call read_param_grid(NameCommand)
-       case('#MOMENTUMGRID','#FLUXINITIAL', '#FLUXCHANNEL')
+       case('#MOMENTUMGRID', '#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#INJECTION','#CFL', '#TRACESHOCK', &
-            '#POISSONBRACKET')
+       case('#CFL', '#POISSONBRACKET')
           call read_param_adv(NameCommand)
+       case('#INJECTION')
+          call read_param_bc(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
           call read_param_diffuse(NameCommand)
-       case('#SAVEPLOT','#USEDATETIME','#SAVEINITIAL','#NTAG')
+       case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG')
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
-          ! case('#TURBULENTSPECTRUM', '#INITSPECTRUM', &
-          ! '#ADVECTIONWITHALFVENSPEED')
-          ! call read_param_turbulence(NameCommand)
+       case('#TURBULENTSPECTRUM', '#INITSPECTRUM', &
+            '#ADVECTIONWITHALFVENSPEED', '#TRACESHOCK')
+          call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')
           call read_param_unit(NameCommand)
        case('#SPREADGRID', '#SPREADSOLIDANGLE', '#SPREADSIGMA')
           call read_param_spread(NameCommand)
        case('#DORUN')
-          call read_var('DoRun',DoRun)
+          call read_var('DoRun', DoRun)
        case('#TIMING')
           call read_param_timing
        case('#TEST')
-          call read_param_adv('#TRACESHOCK')
+          call read_param_turbulence('#TRACESHOCK')
           call read_param_diffuse('#DIFFUSION')
        case('#END')
           call check_stand_alone
@@ -118,11 +120,11 @@ contains
           EXIT
        case('#STOP')
           call check_stand_alone
-          call read_var('nIterMax',nIterMax)
-          call read_var('TimeMax' ,TimeMax)
+          call read_var('nIterMax', nIterMax)
+          call read_var('TimeMax' , TimeMax)
        case('#CPUTIMEMAX')
           call check_stand_alone
-          call read_var('CpuTimeMax',CpuTimeMax)
+          call read_var('CpuTimeMax', CpuTimeMax)
        case('#CHECKSTOPFILE')
           call check_stand_alone
           call read_var('UseStopFile',UseStopFile)
@@ -205,7 +207,7 @@ contains
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: DoTraceShock, advance
+    use SP_ModAdvance,       ONLY: advance
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
          get_shock_location
@@ -213,6 +215,7 @@ contains
     use SP_ModRestart,       ONLY: stand_alone_save_restart
     use SP_ModPlot,          ONLY: save_plot_all
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter
+    use SP_ModTurbulence,    ONLY: DoTraceShock
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
     logical, save:: IsFirstCall = .true.

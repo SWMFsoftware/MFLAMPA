@@ -8,10 +8,10 @@ module SP_ModAdvance
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY:  &
        MomentumSi_I, MomentumInjSi, DLogP
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, x_, y_, z_,  &
-       D_, Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
-  !  use SP_ModTurbulence, ONLY: DoInitSpectrum, UseTurbulentSpectrum,  &
-  !   set_wave_advection_rates, reduce_advection_rates, init_spectrum
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, R_, D_, &
+       Used_B, Shock_, NoShock_, ShockOld_, nLine, nVertex_B, nWidth
+  use SP_ModTurbulence, ONLY: DoTraceShock, set_turbulence_spectrum,  &
+       set_wave_advection_rates, reduce_advection_rates, init_spectrum
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
   use SP_ModBc,   ONLY: set_momentum_bc, CoefInj, SpectralIndex
   use ModUtilities, ONLY: CON_stop
@@ -29,8 +29,6 @@ module SP_ModAdvance
   ! Local parameters
   real:: Cfl=0.9        ! Controls the maximum allowed time step
   logical :: UsePoissonBracket = .false.
-  logical, public:: DoTraceShock = .true.
-
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -40,15 +38,10 @@ contains
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-    case('#INJECTION')
-       call read_var('Efficiency',   CoefInj)
-       call read_var('SpectralIndex',SpectralIndex)
     case('#CFL')
        call read_var('Cfl',Cfl)
     case('#POISSONBRACKET')
        call read_var('UsePoissonBracket',UsePoissonBracket)
-    case('#TRACESHOCK')
-       call read_var('DoTraceShock', DoTraceShock)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -63,7 +56,6 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
-    use ModConst,               ONLY: cProtonMass, Rsun
     use SP_ModTime,             ONLY: SPTime
     use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
@@ -81,23 +73,16 @@ contains
     ! coefficient to interpolate "old" and "new"
     real     :: Alpha
     ! Full difference between DataInputTime and SPTime
-    real      :: DtFull
+    real     :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
-    real      :: DtProgress
-    ! used only with the turbulence model ON
-    ! real      :: MachAlfven
-    ! real      :: DtReduction
-
+    real     :: DtProgress
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
-
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I
 
-    ! the full time interval
-
     ! Check if any Distribution_IIB < 0 in advect_via_log
-    logical   :: IsNeg
+    logical  :: IsNeg
     character(len=*), parameter:: NameSub = 'advance'
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
@@ -142,13 +127,11 @@ contains
 
           ! Recall that MhData_VIB(Rho_) and State_VIB(RhoOld_) are in
           ! the unit of amu/m^3.
-          !
           ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
           nSI_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine) + Alpha* &
                (MhData_VIB(Rho_,  1:iEnd,iLine) - &
                State_VIB(RhoOld_,1:iEnd,iLine))
-
           BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha* &
                (State_VIB(B_,  1:iEnd,iLine) - &
                State_VIB(BOld_,1:iEnd,iLine))
@@ -156,25 +139,10 @@ contains
           iShock = iShockOld + iProgress
           DLogRho_I(1:iEnd)=log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
           ! steepen the shock
-          if(iShock < iEnd - nWidth .and. iShock > nWidth      &
+          if(iShock < iEnd - nWidth .and. iShock > nWidth   &
                .and. DoTraceShock) call steepen_shock(iEnd)
-
-          ! if(UseTurbulentSpectrum)then
-          ! Calculate the Alfven speed
-          ! if(iShock < iEnd - nWidth.and.iShock > nWidth  &
-          ! .and.DoTraceShock)then
-          !    MachAlfven = mach_alfven()
-          ! else
-          !    MachAlfven = 1.0
-          ! end if
-          !
-          ! if (DoInitSpectrum) call init_spectrum(iEnd,               &
-          !     XyzSi_DI(x_:z_, 1:iEnd), BSi_I(1:iEnd),                &
-          !     MomentumSi_I, dLogP, iShock, CoefInj, MachAlfven)
-          ! call set_wave_advection_rates(iEnd, BSi_I(1:iEnd),         &
-          !     BOldSi_I(1:iEnd), nSi_I(1:iEnd)*cProtonMass,           &
-          !     nOldSi_I(1:iEnd)*cProtonMass, XyzSi_DI(x_:z_, 1:iEnd), &
-          !     DsSi_I(1:iEnd), DLogP, DtProgress, DtReduction)
+          call set_turbulence_spectrum(iLine, iEnd, iShock, &
+               nSi_I(1:iEnd), BSi_I(1:iEnd))
 
           ! Advection (2 different schemes) and Diffusion
           if(UseDiffusion) call set_diffusion_coef(iLine,   &
@@ -197,25 +165,6 @@ contains
     end do line
   contains
     !==========================================================================
-    ! used only with the turbulence model ON:
-    ! function mach_alfven() result(MachAlfven)
-    ! alfvenic mach number for the current line
-    !  real:: MachAlfven
-    !  real:: SpeedAlfvenUpstream, SpeedUpstream
-
-    ! speed upstream is relative to the shock:
-    ! \rho_u * (U_u - V_{shock}) = \rho_d * (U_d - V_{shock})
-    !=> V_{shock}(\rho_d - \rho_u) = \rho_d*U_d -\rho_u*U_u
-    !=> V_{shock} - U_u=\rho_d*(U_d - U_u)/(\rho_d - \rho_u)
-    ! Hence, below there should be norm2(\vect{U}_d - \vect{U}_u)
-    !------------------------------------------------------------------------
-    ! SpeedUpstream = nSi_I(iShock+1-nWidth)*&
-    !     (uSi_I(  iShock + 1 - nWidth) - uSi_I(  iShock + nWidth)) /  &
-    !     (nSi_I(iShock + 1 - nWidth) - nSi_I(iShock + nWidth))
-    ! SpeedAlfvenUpstream = BSi_I(iShock + nWidth)/ &
-    !     sqrt(cMu*nSi_I(iShock + nWidth)*cProtonMass)
-    ! MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
-    ! end function mach_alfven
     subroutine steepen_shock(iEnd)
       use SP_ModGrid, ONLY: dLogRhoThreshold
       integer, intent(in) :: iEnd ! To limit the range of search
