@@ -80,7 +80,8 @@ contains
     ! diffuse the distribution function
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, DLogP,  &
          MomentumSi_I, Distribution_IIB
-    !  use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum,    &
+         set_dxx, Dxx, update_spectrum
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -117,13 +118,11 @@ contains
     real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), R_I(nX)
     real   :: Aux1, Aux2
     ! diffusion along the field line
-
     !--------------------------------------------------------------------------
+
     ! if using turbulent spectrum:
     ! set_dxx for diffusion along the field line
-    ! if(UseTurbulentSpectrum) then
-    !   call set_dxx(nX, nP, BSi_I(1:nX))
-    ! end if
+    if(UseTurbulentSpectrum) call set_dxx(nX, nP, BSi_I(1:nX))
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
@@ -155,21 +154,21 @@ contains
        ! For each momentum account for dependence
        ! of the diffusion coefficient on momentum
        ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-       ! if (UseTurbulentSpectrum) then
-       !   do iVertex=1, nX
-       !      DInnerSi_I(iVertex) = Dxx(iVertex, iP,       &
-       !           MomentumSi_I(iP), SpeedSi_I(iP),        &
-       !           BSi_I(iVertex)) / BSi_I(iVertex)
-       !   end do
-       ! else
-       ! Add v (= p*c^2/E_total in the relativistic case)
-       ! and (p)^(1/3)
-       DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)     &
-            *SpeedSi_I(iP)*(MomentumSi_I(iP))**(1.0/3)
+       if (UseTurbulentSpectrum) then
+          do iVertex=1, nX
+             DInnerSi_I(iVertex) = Dxx(iVertex, iP,   &
+                  MomentumSi_I(iP), SpeedSi_I(iP),    &
+                  BSi_I(iVertex)) / BSi_I(iVertex)
+          end do
+       else
+          ! Add v (= p*c^2/E_total in the relativistic case)
+          ! and (p)^(1/3)
+          DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)     &
+               *SpeedSi_I(iP)*(MomentumSi_I(iP))**(1.0/3)
 
-       DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX),    &
-            DiffCoeffMinSi/DOuterSi_I(1:nX))
-       ! end if
+          DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX),    &
+               DiffCoeffMinSi/DOuterSi_I(1:nX))
+       end if
        ! Now, we solve the matrix equation
        ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
        !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
@@ -212,17 +211,17 @@ contains
           R_I(nX) = R_I(nX) + Aux1*UpperEndSpectrum_I(iP)
        end if
        ! Update the solution from f^(n) to f^(n+1):
-       call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,   &
+       call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,    &
             Distribution_IIB(iP, 1:nX, iLine))
     end do MOMENTUM
 
-    !  if(UseTurbulentSpectrum) then
-    !     XyzSi_DI(:,1:nX) = MhData_VIB(x_:z_,1:nX,iLine)*IO2Si_V(UnitX_)
-    !     call update_spectrum(nX, nP, MomentumSi_I, DLogP, &
-    !        XyzSi_DI(:,1:nX), DsSi_I(1:nX),                &
-    !        Distribution_IIB(:,1:nX,iLine), BSi_I(1:nX),   &
-    !        nSi_I(1:nX)*cProtonMass, Dt)
-    !  end if
+    if(UseTurbulentSpectrum) then
+       XyzSi_DI(:,1:nX) = MhData_VIB(x_:z_,1:nX,iLine)*IO2Si_V(UnitX_)
+       call update_spectrum(nX, nP, MomentumSi_I, DLogP, &
+            XyzSi_DI(:,1:nX), DsSi_I(1:nX),                &
+            Distribution_IIB(:,1:nX,iLine), BSi_I(1:nX),   &
+            nSi_I(1:nX)*cProtonMass, Dt)
+    end if
 
   end subroutine diffuse_distribution
   !============================================================================
