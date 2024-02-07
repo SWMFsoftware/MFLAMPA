@@ -100,7 +100,17 @@ contains
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
     real  :: DInnerSi_I(1:nX)
-    ! Full difference between DataInputTime and SPTime
+    ! Lower limit to floor the spatial diffusion coefficient For a
+    ! given spatial and temporal resolution, the value of the
+    ! diffusion coefficient should be artificially increased to get
+    ! the diffusion length to be larger than the shock front width,
+    ! which even for the steepened shock is as wide as a mesh size
+    ! of the Largangian grid, State_VIB(D_,:,:)*RSun. In this way,
+    ! the Lagrangian grid resolution is sufficient to resolve a
+    ! precursor in the upstream distribution of DiffCoeffMin=0
+    ! (default value), we do NOT enhance the diffusion coefficient!
+    ! Physically, DiffCoeffMin should be given by the product of
+    ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
     real   :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
@@ -116,17 +126,18 @@ contains
     !   call set_dxx(nX, nP, BSi_I(1:nX))
     ! end if
 
-    DsSi_I(1:nX) = State_VIB(D_,1:nX,iLine)*Io2Si_V(UnitX_)
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
-    DsMesh_I(2:nX) = max(DsSi_I(1:nX-1), cTiny)
+    DsSi_I(1:nX) = State_VIB(D_,1:nX,iLine)*Io2Si_V(UnitX_)
+
     ! Within the framework of finite volume method, the cell
     ! volume is used, which is proportional to  the distance between
     ! the faces bounding the volume with an index, i, which is half of
     ! sum of distance between meshes i-1 and i (i.e. D_I(i-1) and that
     ! between meshes i and i+1 (which is D_I(i)):
-    DsFace_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1)+DsSi_I(1:nX-2)), cTiny)
+    DsMesh_I(2:nX) = max(DsSi_I(1:nX-1), cTiny)
+
     ! In flux coordinates, the control volume associated with the
     ! given cell has a cross-section equal to (Magnetic Flux)/B,
     ! where the flux is a constant along the magnetic field line,
@@ -139,6 +150,8 @@ contains
     !                 (f^(n+1)_(i-1) - f^(n+1)_i),
     !  The multiplier, DsFace_i/B_i, is denoted as DsFace_i/DOuter_i
     !  The face-centered combination,
+    DsFace_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1)+DsSi_I(1:nX-2)), cTiny)
+
     MOMENTUM:do iP = 1, nP
        ! For each momentum account for dependence
        ! of the diffusion coefficient on momentum

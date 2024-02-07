@@ -80,18 +80,7 @@ contains
     integer  :: iProgress, nProgress
     ! coefficient to interpolate "old" and "new"
     real     :: Alpha
-    ! Lower limit to floor the spatial diffusion coefficient For a
-    ! given spatial and temporal resolution, the value of the
-    ! diffusion coefficient should be artificially increased to get
-    ! the diffusion length to be larger than the shock front width,
-    ! which even for the steepened shock is as wide as a mesh size
-    ! of the Largangian grid, State_VIB(D_,:,:)*RSun. In this way,
-    ! the Lagrangian grid resolution is sufficient to resolve a
-    ! precursor in the upstream distribution of
-    ! DiffCoeffMin=0 (default value), we do NOT enhance
-    ! the diffusion coefficient! Physically, DiffCoeffMin
-    ! should be given by the product of shock wave speed
-    ! and local grid spacing.
+    ! Full difference between DataInputTime and SPTime
     real      :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real      :: DtProgress
@@ -167,8 +156,8 @@ contains
           iShock = iShockOld + iProgress
           DLogRho_I(1:iEnd)=log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
           ! steepen the shock
-          if(iShock < iEnd - nWidth.and.iShock > nWidth.and.DoTraceShock)&
-               call steepen_shock(iEnd)
+          if(iShock < iEnd - nWidth .and. iShock > nWidth      &
+               .and. DoTraceShock) call steepen_shock(iEnd)
 
           ! if(UseTurbulentSpectrum)then
           ! Calculate the Alfven speed
@@ -179,28 +168,26 @@ contains
           !    MachAlfven = 1.0
           ! end if
           !
-          ! if (DoInitSpectrum) call init_spectrum(iEnd,              &
-          !     XyzSi_DI(x_:z_, 1:iEnd),BSi_I(1:iEnd), MomentumSi_I, &
-          !     dLogP, iShock, CoefInj, MachAlfven)
-          ! call set_wave_advection_rates(iEnd,     &
-          ! BSi_I(1:iEnd),    BOldSi_I(1:iEnd),      &
-          ! nSi_I(1:iEnd)*cProtonMass,  nOldSi_I(1:iEnd)*cProtonMass, &
-          ! XyzSi_DI(x_:z_, 1:iEnd), DsSi_I(1:iEnd), &
-          ! DLogP, DtProgress, DtReduction)
-          ! Advection (2 different schemes) and Diffusion
+          ! if (DoInitSpectrum) call init_spectrum(iEnd,               &
+          !     XyzSi_DI(x_:z_, 1:iEnd), BSi_I(1:iEnd),                &
+          !     MomentumSi_I, dLogP, iShock, CoefInj, MachAlfven)
+          ! call set_wave_advection_rates(iEnd, BSi_I(1:iEnd),         &
+          !     BOldSi_I(1:iEnd), nSi_I(1:iEnd)*cProtonMass,           &
+          !     nOldSi_I(1:iEnd)*cProtonMass, XyzSi_DI(x_:z_, 1:iEnd), &
+          !     DsSi_I(1:iEnd), DLogP, DtProgress, DtReduction)
 
+          ! Advection (2 different schemes) and Diffusion
           if(UseDiffusion) call set_diffusion_coef(iLine,   &
                iEnd, iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket)then
+             ! Poisson bracket scheme: particle-number-conservative
              call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
                   Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
-             ! store the density and B-field arrays
-             ! at the end of the previous time step
+             ! store density and B-field arrays at the end of this time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
           else
              ! No Poisson bracket scheme, use the default algorithm
-             ! Upper limit and loop variable for the loop which makes a
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,   &
                   DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
              if(IsNeg) CYCLE line

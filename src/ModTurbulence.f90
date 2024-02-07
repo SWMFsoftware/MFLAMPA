@@ -3,6 +3,7 @@
 !  with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTurbulence
+
   use ModConst
   use SP_ModDistribution, ONLY: nP
   use SP_ModGrid,         ONLY: iPTest, iParticleTest
@@ -224,7 +225,6 @@ contains
           ! In this part of the spectrum another equation governs the diffusion
           ICOldSi    = ICSi_X(iVertex)
 
-!!!!
           ICSi_X(iVertex) = CoefInj *                                 &
                10.0*BSi_I(iVertex)**2*max(AlfvenMach,2.0)/(cMu*3.0) * &
                min(1.0, rSi/rShockSi/(1.0-Alpha))

@@ -124,11 +124,11 @@ contains
     end do STEP
   end subroutine advect_via_log
   !============================================================================
-  ! The procedure integrates the log-advection equation, in
-  ! the conservative or non-conservative formulation, at a logarithmic grid,
-  ! using a single-stage second order scheme
   subroutine advance_log_advection(CFLIn, nGCLeft, nGCRight,        &
        FInOut_I, IsConservative, DeltaLnP)
+    ! The procedure integrates the log-advection equation, in
+    ! the conservative or non-conservative formulation, at a logarithmic grid,
+    ! using a single-stage second order scheme
 
     real,   intent(in):: CFLIn        ! Time step * acceleration rate/(Dlnp)
     integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
