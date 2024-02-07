@@ -7,7 +7,7 @@ module SP_ModAdvance
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, D_,  &
        Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
-  use SP_ModTurbulence, ONLY: set_turbulence_spectrum,         &
+  use SP_ModTurbulence, ONLY: set_init_tspectrum,    &
        DoTraceShock, UseTurbulentSpectrum
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
@@ -137,14 +137,14 @@ contains
           if(iShock < iEnd-nWidth .and. iShock > nWidth     &
                .and. DoTraceShock) call steepen_shock(iEnd)
 
-          ! set turbulence spectrum: depend on UseTurbulentSpectrum
-          if(UseTurbulentSpectrum) call set_turbulence_spectrum(iLine,  &
-               iEnd, iShock, DtProgress, nOldSi_I(1:iEnd),              &
+          ! set initial turbulence spectrum: depend on UseTurbulentSpectrum
+          if(UseTurbulentSpectrum) call set_init_tspectrum(iLine, &
+               iEnd, iShock, DtProgress, nOldSi_I(1:iEnd),        &
                nSi_I(1:iEnd), BOldSi_I(1:iEnd), BSi_I(1:iEnd))
 
           ! Advection (2 different schemes) and Diffusion
-          if(UseDiffusion) call set_diffusion_coef(iLine,   &
-               iEnd, iShock, BSi_I(1:iEnd))
+          if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
+               iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket)then
              ! Poisson bracket scheme: particle-number-conservative
              call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &

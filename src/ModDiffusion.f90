@@ -11,13 +11,13 @@ module SP_ModDiffusion
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
 
   use ModNumConst, ONLY: cPi, cTiny
-  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu,     &
-       Rsun, cProtonMass, cGyroradius
+  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun,  &
+       cProtonMass, cGyroRadius
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, D_,       &
-       R_, x_, y_, z_, Wave1_, Wave2_
+  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, D_, R_,      &
+       x_, z_, Wave1_, Wave2_
+  !   use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, update_spectrum
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
-  ! use SP_ModTurbulence, ONLY: update_spectrum
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -78,7 +78,6 @@ contains
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
-    !  use ModLinearSolver, ONLY: tridiag
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, DLogP,  &
          MomentumSi_I, Distribution_IIB
     !  use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
@@ -217,13 +216,13 @@ contains
             Distribution_IIB(iP, 1:nX, iLine))
     end do MOMENTUM
 
-    ! if (UseTurbulentSpectrum) then
-    !    XyzSi_DI(x_:z_,1:nX) = MhData_VIB(x_:z_,1:nX,iLine)*IO2Si_V(UnitX_)
-    !    call update_spectrum(nX,nP,MomentumSi_I,DLogP, &
-    !       XyzSi_DI(:,1:nX), DsSi_I(1:nX),             &
-    !       Distribution_IIB(:,1:nX), BSi_I(1:nX),      &
-    !       nSi_I(1:nX)*cProtonMass, Dt)
-    ! end if
+    !  if(UseTurbulentSpectrum) then
+    !     XyzSi_DI(:,1:nX) = MhData_VIB(x_:z_,1:nX,iLine)*IO2Si_V(UnitX_)
+    !     call update_spectrum(nX, nP, MomentumSi_I, DLogP, &
+    !        XyzSi_DI(:,1:nX), DsSi_I(1:nX),                &
+    !        Distribution_IIB(:,1:nX,iLine), BSi_I(1:nX),   &
+    !        nSi_I(1:nX)*cProtonMass, Dt)
+    !  end if
 
   end subroutine diffuse_distribution
   !============================================================================

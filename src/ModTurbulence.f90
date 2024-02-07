@@ -14,7 +14,7 @@ module SP_ModTurbulence
 
   public :: init, finalize, DoInitSpectrum, UseTurbulentSpectrum, set_dxx, &
        read_param, set_wave_advection_rates, reduce_advection_rates, dxx,  &
-       init_spectrum, update_spectrum, set_turbulence_spectrum, DoTraceShock
+       init_spectrum, update_spectrum, set_init_tspectrum, DoTraceShock
 
   ! Logicals, all .false. by default
   logical:: DoInitSpectrum              = .false.
@@ -799,7 +799,7 @@ contains
 
   end function Dxx
   !============================================================================
-  subroutine set_turbulence_spectrum(iLine, iEnd, iShock,   &
+  subroutine set_init_tspectrum(iLine, iEnd, iShock,        &
        DtProgress, nOldSi_I, nSi_I, BOldSi_I, BSi_I)
 
     use ModConst,   ONLY: cMu, cProtonMass
@@ -862,7 +862,7 @@ contains
       MachAlfven = SpeedUpstream / SpeedAlfvenUpstream
     end function mach_alfven
     !==========================================================================
-  end subroutine set_turbulence_spectrum
+  end subroutine set_init_tspectrum
   !============================================================================
 end module SP_ModTurbulence
 !==============================================================================
