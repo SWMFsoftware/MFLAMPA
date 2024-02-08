@@ -28,7 +28,7 @@ module SP_ModDiffusion
   real, public :: DOuterSi_I(1:nVertexMax), CoefDInnerSi_I(1:nVertexMax)
   ! Local parameters!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
-  logical, public :: UseFixedMFPUpstream = .false.
+  logical, public :: UseFixedMeanFreePathUpstream = .false.
   real    :: MeanFreePath0InAu = 1.0
 
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
@@ -50,8 +50,9 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#USEFIXEDMFPUPSTREAM')
-       call read_var('UseFixedMFPUpstream',UseFixedMFPUpstream)
-       if(UseFixedMFPUpstream)then
+       call read_var('UseFixedMeanFreePathUpstream',&
+            UseFixedMeanFreePathUpstream)
+       if(UseFixedMeanFreePathUpstream)then
           ! see Li et al. (2003), doi:10.1029/2002JA009666
           call read_var('MeanFreePath0 [AU]', MeanFreePath0InAu)
        end if
@@ -113,7 +114,7 @@ contains
     ! Mesh spacing and face spacing.
     real   :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
-    real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), R_I(nX)
+    real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     real   :: Aux1, Aux2
     ! diffusion along the field line
     !--------------------------------------------------------------------------
@@ -153,8 +154,8 @@ contains
        ! D\propto r_L*v\propto Momentum**2/TotalEnergy
        if (UseTurbulentSpectrum) then
           do iVertex=1, nX
-             DInnerSi_I(iVertex) = Dxx(iVertex, iP,   &
-                  Momentum_I(iP)*MomentumInjSi, SpeedSi_I(iP),    &
+             DInnerSi_I(iVertex) = Dxx(iVertex, iP,            &
+                  Momentum_I(iP)*MomentumInjSi, SpeedSi_I(iP), &
                   BSi_I(iVertex)) / BSi_I(iVertex)
           end do
        else
@@ -172,7 +173,7 @@ contains
        !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
 
        ! Set source term in the RHS:
-       R_I = Distribution_IIB(iP, 1:nX, iLine)
+       Res_I = Distribution_IIB(iP, 1:nX, iLine)
        ! Set elements of tri-diagonal matrix in the LHS
        Main_I = 1.0
 
@@ -184,7 +185,7 @@ contains
        if(present(LowerEndSpectrum_I))then
           Aux2 = Dt*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
           Main_I(1) = Main_I(1) + Aux2
-          R_I(1) = R_I(1) + Aux2*LowerEndSpectrum_I(iP)
+          Res_I(1) = Res_I(1) + Aux2*LowerEndSpectrum_I(iP)
        end if
        ! For i=2,n-1:
        do iVertex = 2, nX-1
@@ -205,10 +206,10 @@ contains
        if(present(UpperEndSpectrum_I))then
           Aux1 = Dt*DOuterSi_I(nX)*DInnerSi_I(nX)/DsMesh_I(nX)**2
           Main_I( nX) = Main_I(nX) + Aux1
-          R_I(nX) = R_I(nX) + Aux1*UpperEndSpectrum_I(iP)
+          Res_I(nX) = Res_I(nX) + Aux1*UpperEndSpectrum_I(iP)
        end if
        ! Update the solution from f^(n) to f^(n+1):
-       call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,    &
+       call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I,   &
             Distribution_IIB(iP, 1:nX, iLine))
     end do MOMENTUM
   end subroutine diffuse_distribution
@@ -235,7 +236,7 @@ contains
     ! Compute the diffusion coefficient without the contribution of
     ! v (velocity) and p (momentum), as v and p are different for
     ! different iP
-    if(UseFixedMFPUpstream) then
+    if(UseFixedMeanFreePathUpstream) then
        ! diffusion is different up- and down-stream
        ! Sokolov et al. 2004, paragraphs before and after eq (4)
        where(RadiusSi_I(1:nX) > 0.9 * RadiusSi_I(iShock))
@@ -252,9 +253,8 @@ contains
                (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
                (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
        end where
-    else  ! .not.UseFixedMFPUpstream
+    else
        ! Sokolov et al., 2004: eq (4),
-       ! note: Momentum = TotalEnergy * Vel / C**2
        ! Gyroradius = cGyroRadius * momentum / |B|
        ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B|
        ! ------------------------------------------------------
@@ -270,7 +270,7 @@ contains
 
   end subroutine set_diffusion_coef
   !============================================================================
-  subroutine tridiag(n, L_I, M_I, U_I, R_I, W_I)
+  subroutine tridiag(n, Lower_I, Mean_I, Upper_I, Res_I, W_I)
 
     ! Solve tri-diagonal system of equations:
     !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
@@ -281,34 +281,30 @@ contains
     ! From: Numerical Recipes, Chapter 2.6, p.40.
 
     ! input parameters
-    integer,            intent(in):: n
-    real, dimension(n), intent(in):: L_I, M_I ,U_I ,R_I
+    integer, intent(in) :: n
+    real,    intent(in) :: Lower_I(n), Mean_I(n) ,Upper_I(n) ,Res_I(n)
     ! Output parameters
-    real, intent(out):: W_I(n)
+    real,    intent(out):: W_I(n)
     ! Misc
     integer:: j
     real:: Aux,Aux_I(2:n)
     !--------------------------------------------------------------------------
-    if (M_I(1)==0.0) then
-       write(*,*)' Error in tridiag: M_I(1)=0'
-       stop
-    end if
-    Aux = M_I(1)
-    W_I(1) = R_I(1)/Aux
-    do j=2,n
-       Aux_I(j) = U_I(j-1)/Aux
-       Aux = M_I(j)-L_I(j)*Aux_I(j)
+    if(Mean_I(1) == 0.0) call CON_stop('Error in tridiag: Mean_I(1)=0')
+    Aux = Mean_I(1)
+    W_I(1) = Res_I(1)/Aux
+    do j = 2, n
+       Aux_I(j) = Upper_I(j-1)/Aux
+       Aux = Mean_I(j) - Lower_I(j)*Aux_I(j)
        if (Aux == 0.0) then
           write(*,*)'M_I(j), L_I(j), Aux_I(j) = ',&
-               M_I(j),L_I(j),Aux_I(j)
+               Mean_I(j),Lower_I(j),Aux_I(j)
           write(*,*)'  For j=',j
-          write(*,*)'Tridiag failed'
-          stop
+          call CON_stop('Tridiag failed')
        end if
-       W_I(j) = (R_I(j)-L_I(j)*W_I(j-1))/Aux
+       W_I(j) = (Res_I(j) - Lower_I(j)*W_I(j-1))/Aux
     end do
-    do j=n-1,1,-1
-       W_I(j) = W_I(j)-Aux_I(j+1)*W_I(j+1)
+    do j = n-1, 1, -1
+       W_I(j) = W_I(j) - Aux_I(j+1)*W_I(j+1)
     end do
   end subroutine tridiag
   !============================================================================
