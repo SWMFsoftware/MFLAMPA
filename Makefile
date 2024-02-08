@@ -15,13 +15,13 @@ help:
 	@echo ' '
 	@echo '  You can "make" the following:'
 	@echo ' '
-	@echo '    <default> ${DEFAULT_TARGET} in stand alone mode, help in SWMF'
+	@echo '    <default> ${DEFAULT_TARGET} in stand alone mode'
 	@echo ' '
 	@echo '    help          (makefile option list)'
 	@echo '    install       (install ${DEFAULT_TARGET})'
 	@echo ' '
 	@echo '    LIB           (Component library libSP for SWMF)'
-	@echo '    ${DEFAULT_TARGET}       (Multiple-Field-Line Advection Model for Particle Acceleration)'
+	@echo '    ${DEFAULT_TARGET}       (FLAMPA)'
 	@echo '    NOMPI         (NOMPI library for compilation without MPI)'
 	@echo ' '
 	@echo '    rundir        (create run directory for standalone or SWMF)'
@@ -29,7 +29,7 @@ help:
 	@echo ' '
 	@echo '    test          (run all ${DEFAULT_TARGET} tests)'
 	@echo ' '
-	@echo '    clean         (remove temp files like: *~ *.o *.kmo *.mod *.T *.lst core)'
+	@echo '    clean         (remove temp files like: *~ *.o etc)'
 	@echo '    distclean     (equivalent to ./Config.pl -uninstall)'
 
 
@@ -64,6 +64,7 @@ rundir:
 		cp ${DIR}/share/JobScripts/job.*${MACHINE}* ${RUNDIR}/; \
 		cp ${DIR}/share/JobScripts/*.${MACHINE}.pl ${RUNDIR}/; \
 		rm -f ${RUNDIR}/*_TMP_* ${DIR}/share/JobScripts/*_TMP_*; \
+		cp -f Param/PARAM.in.test ${RUNDIR}/PARAM.in; \
 		touch ${RUNDIR}/core; chmod 444 ${RUNDIR}/core; \
 		cd ${RUNDIR}; ln -s ${BINDIR}/${DEFAULT_EXE} .; \
 		ln -s SP/* .; \
