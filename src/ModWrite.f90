@@ -9,16 +9,16 @@ module SP_ModPlot
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModDistribution, ONLY: nP, KinEnergySi_I, MomentumSi_I, &
-       Distribution_IIB, FluxChannelInit_V,                      &
+       Distribution_IIB, FluxChannelInit_V, MomentumInjSi,            &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
-       MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_, &
+       MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
        X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
   use SP_ModGrid, ONLY: iblock_to_lon_lat, Used_B
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, Io2Si_V, UnitEnergy_
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cPi,cTwoPi, cDegToRad,cRadToDeg, cTolerance
@@ -172,8 +172,7 @@ module SP_ModPlot
 contains
   !============================================================================
   subroutine init
-    use ModConst,           ONLY: cLightSpeed
-    use SP_ModDistribution, ONLY: EnergySi_I
+    use SP_ModDistribution, ONLY: SpeedSi_I
     ! storage for existing tags (possible during restart
     character(len=50),allocatable:: StringTag_I(:)
     ! full tag file name
@@ -188,7 +187,7 @@ contains
     ! Array for plotting distribution function
     Log10MomentumSi_I      = log10(MomentumSi_I)
     Log10KinEnergySi_I     = log10(KinEnergySi_I)
-    DMomentumOverDEnergy_I = EnergySi_I/(MomentumSi_I*cLightSpeed**2)
+    DMomentumOverDEnergy_I = 1/SpeedSi_I
 
     !
     ! Finalize setting output files:
@@ -1178,7 +1177,8 @@ contains
             end if
             ! the actual distribution
             File_I(iFile) % Buffer_II(:,iVertex) = &
-                 log10(Distribution_IIB(1:nP,iVertex,iLine)*Factor_I(1:nP))
+                 log10(Distribution_IIB(1:nP,iVertex,iLine)*Factor_I(1:nP))-&
+                 log10(MomentumInjSi**2*Io2Si_V(UnitEnergy_))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)

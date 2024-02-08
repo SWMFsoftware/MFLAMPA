@@ -31,7 +31,6 @@ module SP_ModDistribution
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
   public:: MomentumInjSi     ! Mimimum momentum value in Si
-  public:: MomentumMaxSi     ! Maximum momentum value in Si
   public:: EnergyInjIo       ! Energy in kev (Io unit)
   public:: EnergyMaxIo       ! Energy in keV (Io unit)
   public:: DLogP             ! Mesh size for log(momentum) grid
@@ -50,7 +49,7 @@ module SP_ModDistribution
   ! speed, momentum, kinetic energy and total energy (including the rest
   ! mass energy) at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, MomentumSi_I, &
-       KinEnergySi_I, EnergySi_I, VolumeP_I, Background_I
+       KinEnergySi_I, VolumeP_I, Background_I
   real, public :: Momentum3Si_I(-1:nP+1)
 
   ! Total integral (simulated) particle flux
@@ -97,6 +96,8 @@ contains
     use ModUtilities, ONLY: check_allocate
     ! set the initial distribution on all lines
     integer:: iLine, iVertex, iP, iError
+    ! maximal and current momenta
+    real :: MomentumMaxSi, MomentumSi
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
@@ -116,11 +117,11 @@ contains
        Momentum3Si_I(iP) = Momentum3Si_I(iP-1)*exp(3*DLogP)
        VolumeP_I(iP)     = Momentum3Si_I(iP) - Momentum3Si_I(iP-1)
        KinEnergySi_I(iP) = momentum_to_kinetic_energy(MomentumSi_I(iP))
-       EnergySi_I(iP)    = momentum_to_energy(MomentumSi_I(iP))
-       SpeedSi_I(iP)     = MomentumSi_I(iP)*cLightSpeed**2/EnergySi_I(iP)
+       SpeedSi_I(iP)     = MomentumSi_I(iP)*cLightSpeed**2/ &
+            momentum_to_energy(MomentumSi_I(iP))
        Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
-            ((EnergyMaxIo-EnergyInjIo)*Io2Si_V(UnitEnergy_)) & ! Energy range
-            /MomentumSi_I(iP)**2 ! Convert from diff flux to VDF
+            (EnergyMaxIo-EnergyInjIo)       &  ! Energy range
+            *(MomentumInjSi/MomentumSi_I(iP))**2 ! Convert from diff flux to VDF
     end do
 
     ! Distribution function
@@ -374,6 +375,9 @@ contains
                Flux_I * Si2Io_V(UnitFlux_)
           Flux_VIB(EFlux_,              iVertex, iLine) = &
                EFlux  * Si2Io_V(UnitEFlux_)
+          ! Normalization coeff:
+          Flux_VIB(:, iVertex, iLine) = Flux_VIB(:, iVertex, iLine)/&
+               (MomentumInjSi**2*Io2Si_V(UnitEnergy_))
        end do
     end do
 
