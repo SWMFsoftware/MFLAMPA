@@ -7,8 +7,7 @@ module SP_ModAdvance
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, D_,  &
        Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
-  use SP_ModTurbulence, ONLY: &
-       DoTraceShock, UseTurbulentSpectrum
+  use SP_ModTurbulence, ONLY: DoTraceShock
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 
@@ -138,6 +137,8 @@ contains
                .and. DoTraceShock) call steepen_shock(iEnd)
 
           ! Advection (2 different schemes) and Diffusion
+          ! First, set the diffusion coefficient, from the
+          ! given formulae or from the turbulent specrtum, if known
           if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
                iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket)then
@@ -153,7 +154,6 @@ contains
                   DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
              if(IsNeg) CYCLE line
           end if
-          ! DoInitSpectrum = .true.
        end do PROGRESS
     end do line
   contains
