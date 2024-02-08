@@ -4,7 +4,7 @@
 module SP_ModAdvanceAdvection
 
   use ModUtilities, ONLY: CON_stop
-  use SP_ModDistribution, ONLY: nP, MomentumSi_I, Distribution_IIB, dLogP
+  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_IIB, dLogP
   ! Solves advection in the momentum space (=first order Fermi acceleration)
   ! First way - solve advection over log P coordinate.
   ! In space physics applications one often needs to solve the
@@ -48,8 +48,7 @@ contains
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     use SP_ModGrid, ONLY: Used_B, nVertex_B
-    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum,          &
-         advance_log_advection, reduce_advection_rates, DtReduced
+    use SP_ModTurbulence, ONLY: advance_log_advection
     ! INPUTS:
     ! id of line, particle #, and Shock location
     integer, intent(in):: iLine, nX, iShock
@@ -81,23 +80,11 @@ contains
     ! first order Fermi acceleration for the current line
     FermiFirst_I = DLogRho_I / (3*DLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
-    if(UseTurbulentSpectrum) then
-       nStep = 1+int(max(DtReduced,maxval(abs(FermiFirst_I(1:nX))))/Cfl)
-    else
-       nStep = 1+int(maxval(abs(FermiFirst_I(2:nX)))/Cfl)
-    end if
-
+    nStep = 1+int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:
-    if(nStep < 1)then
-       if(UseTurbulentSpectrum) &
-            write(*,*) 'DtReduction =', DtReduced
-       write(*,*) 'maxval(abs(FermiFirst_I)) =', &
-            maxval(abs(FermiFirst_I(2:nX)))
-       call CON_stop(NameSub//': nStep <= 0????')
-    end if
+    if(nStep < 1)call CON_stop(NameSub//': nStep <= 0????')
     Dt = DtProgress / nStep
     FermiFirst_I = FermiFirst_I / nStep
-    if(UseTurbulentSpectrum) call reduce_advection_rates(nStep)
 
     STEP:do iStep = 1, nStep
        ! update bc for advection
@@ -109,9 +96,8 @@ contains
              Used_B(iLine) = .false.
              nVertex_B(iLine) = 0
              IsNeg = .true.
-             EXIT STEP
+             RETURN
           end if
-
           call advance_log_advection(FermiFirst_I(iVertex), &
                1, 1, Distribution_IIB(0:nP+1,iVertex,iLine), .false.)
        end do
@@ -120,7 +106,7 @@ contains
        if(UseDiffusion) call diffuse_distribution(iLine, nX,    &
             iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
             Distribution_IIB(0, 1, iLine) * &
-            (MomentumSi_I(0)/MomentumSi_I(1:nP))**SpectralIndex)
+            (Momentum_I(0)/Momentum_I(1:nP))**SpectralIndex)
     end do STEP
   end subroutine advect_via_log
   !============================================================================

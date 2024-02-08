@@ -30,25 +30,20 @@ module SP_ModDistribution
   public:: offset            ! Sync. index in State_VIB and Dist_IIB
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
-  public:: MomentumInjSi     ! Mimimum momentum value in Si
-  public:: EnergyInjIo       ! Energy in kev (Io unit)
-  public:: EnergyMaxIo       ! Energy in keV (Io unit)
-  public:: DLogP             ! Mesh size for log(momentum) grid
 
-  ! Injection and maximal energy in the simulation
-  ! To be read from the PARAM.in file: KINETIC energies
-  real:: EnergyInjIo=10.0, EnergyMaxIo=1.0E+07
+  ! Injection and maximal energy, in kev (or, in Io energy unit)
+  ! To be read from the PARAM.in file
+  real, public :: EnergyInjIo = 10.0, EnergyMaxIo = 1.0E+07
 
-  ! Injection and max momentum in the simulation
-  real:: MomentumInjSi, MomentumMaxSi
+  ! Injection momentum, mimimum momentum value in Si
+  real, public :: MomentumInjSi
 
   ! Size of a  log-momentum mesh. For momentum we use both the
   ! denotaion, P, and a word, momentum - whichever is more covenient
-  real:: DLogP        ! log(MomentumMaxSi/MomentumInjSi)/nP
+  real, public :: DLogP      ! log(MomentumMaxSi/MomentumInjSi)/nP
 
-  ! speed, momentum, kinetic energy and total energy (including the rest
-  ! mass energy) at the momentum grid points
-  real, public, dimension(0:nP+1) :: SpeedSi_I, MomentumSi_I, &
+  ! speed, momentum, kinetic energy at the momentum grid points
+  real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
        KinEnergySi_I, VolumeP_I, Background_I
   real, public :: Momentum3Si_I(-1:nP+1)
 
@@ -85,7 +80,7 @@ module SP_ModDistribution
   ! distribution is initialized to have integral flux:
   real:: FluxInitIo = 0.01 ! [PFU]
   ! initial values of fluxes in energy channels
-  real,public,allocatable:: FluxChannelInit_V(:)
+  real, public, allocatable:: FluxChannelInit_V(:)
 
   logical :: DoInit = .true.
 contains
@@ -113,15 +108,17 @@ contains
     ! Functions to convert the grid index to momentum and energy
     Momentum3Si_I(-1) = (MomentumInjSi*exp(-0.50*DLogP))**3/3
     do iP = 0, nP +1
-       MomentumSi_I(iP)  = MomentumInjSi*exp(iP*DLogP)
+       Momentum_I(iP)    = MomentumInjSi*exp(iP*DLogP)
        Momentum3Si_I(iP) = Momentum3Si_I(iP-1)*exp(3*DLogP)
+       SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
+            momentum_to_energy(Momentum_I(iP))
        VolumeP_I(iP)     = Momentum3Si_I(iP) - Momentum3Si_I(iP-1)
-       KinEnergySi_I(iP) = momentum_to_kinetic_energy(MomentumSi_I(iP))
-       SpeedSi_I(iP)     = MomentumSi_I(iP)*cLightSpeed**2/ &
-            momentum_to_energy(MomentumSi_I(iP))
+       KinEnergySi_I(iP) = momentum_to_kinetic_energy(Momentum_I(iP))
+       ! Normalize momentum per MomentumInjSi
+       Momentum_I(iP) = Momentum_I(iP)/MomentumInjSi
        Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
             (EnergyMaxIo-EnergyInjIo)       &  ! Energy range
-            *(MomentumInjSi/MomentumSi_I(iP))**2 ! Convert from diff flux to VDF
+            /Momentum_I(iP)**2           ! Convert from diff flux to VDF
     end do
 
     ! Distribution function
@@ -220,7 +217,7 @@ contains
        NameFluxChannel_I(nFluxChannel+1) = 'eflux'
 
        do iFluxChannel=1,nFluxChannel
-          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel))
+          call read_var('EChannelIo_I [MeV]', EChannelIo_I(iFluxChannel))
           write(NameFluxChannel,'(I5.5)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
@@ -323,10 +320,10 @@ contains
              dFlux = 0.5 * &
                   (KinEnergySi_I(iP+1) - KinEnergySi_I(iP)) * (&
                   Distribution_IIB(iP,  iVertex,iLine)*&
-                  MomentumSi_I(iP)**2 &
+                  Momentum_I(iP)**2 &
                   +&
                   Distribution_IIB(iP+1,iVertex,iLine)*&
-                  MomentumSi_I(iP+1)**2)
+                  Momentum_I(iP+1)**2)
 
              ! increase the total flux
              Flux = Flux + dFlux
@@ -346,10 +343,10 @@ contains
                         ((-0.50*(KinEnergySi_I(iP) + EChannelSi_I(iFlux)) + &
                         KinEnergySi_I(iP+1) )*&
                         Distribution_IIB(iP,iVertex,iLine)*&
-                        MomentumSi_I(iP)**2  &
+                        Momentum_I(iP)**2  &
                         -0.50*(KinEnergySi_I(iP)-EChannelSi_I(iFlux))*&
                         Distribution_IIB(iP+1,iVertex,iLine)*&
-                        MomentumSi_I(iP+1)**2)*&
+                        Momentum_I(iP+1)**2)*&
                         (KinEnergySi_I(iP)-EChannelSi_I(iFlux))/&
                         (KinEnergySi_I(iP+1)-KinEnergySi_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
@@ -361,11 +358,11 @@ contains
                   (KinEnergySi_I(iP+1) - KinEnergySi_I(iP)) * (&
                   Distribution_IIB(iP,  iVertex,iLine)*&
                   KinEnergySi_I(iP) * &
-                  MomentumSi_I(iP)**2 &
+                  Momentum_I(iP)**2 &
                   +&
                   Distribution_IIB(iP+1,iVertex,iLine)*&
                   KinEnergySi_I(iP+1) * &
-                  MomentumSi_I(iP+1)**2)
+                  Momentum_I(iP+1)**2)
           end do
 
           ! store the results
@@ -377,7 +374,7 @@ contains
                EFlux  * Si2Io_V(UnitEFlux_)
           ! Normalization coeff:
           Flux_VIB(:, iVertex, iLine) = Flux_VIB(:, iVertex, iLine)/&
-               (MomentumInjSi**2*Io2Si_V(UnitEnergy_))
+               Io2Si_V(UnitEnergy_)
        end do
     end do
 

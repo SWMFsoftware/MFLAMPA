@@ -22,7 +22,7 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModDistribution, ONLY: nP, Momentum3Si_I, VolumeP_I, DLogP, &
-         Distribution_IIB, MomentumSi_I, MomentumInjSi, Background_I
+         Distribution_IIB, Momentum_I, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
     integer, intent(in):: iLine, iShock ! indices of line and shock
@@ -122,7 +122,7 @@ contains
       VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
       ! Apply bc along the line coordinate:
       VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine) * &
-           (MomentumSi_I(0)/MomentumSi_I(0:nP+1))**SpectralIndex
+           (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
       VDF_G(0:nP+1, nX+1) = Background_I
       ! Add a second layer of the ghost cells along the line coordinate:
       VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)

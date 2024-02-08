@@ -78,9 +78,8 @@ contains
     ! set up the diffusion coefficients
     ! diffuse the distribution function
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, DLogP,  &
-         MomentumSi_I, Distribution_IIB
-    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum,    &
-         set_dxx, Dxx, update_spectrum
+         Momentum_I, MomentumInjSi, Distribution_IIB
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -118,7 +117,6 @@ contains
     real   :: Aux1, Aux2
     ! diffusion along the field line
     !--------------------------------------------------------------------------
-
     ! if using turbulent spectrum:
     ! set_dxx for diffusion along the field line
     if(UseTurbulentSpectrum) call set_dxx(nX, nP, BSi_I(1:nX))
@@ -156,14 +154,14 @@ contains
        if (UseTurbulentSpectrum) then
           do iVertex=1, nX
              DInnerSi_I(iVertex) = Dxx(iVertex, iP,   &
-                  MomentumSi_I(iP), SpeedSi_I(iP),    &
+                  Momentum_I(iP)*MomentumInjSi, SpeedSi_I(iP),    &
                   BSi_I(iVertex)) / BSi_I(iVertex)
           end do
        else
           ! Add v (= p*c^2/E_total in the relativistic case)
           ! and (p)^(1/3)
           DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)     &
-               *SpeedSi_I(iP)*(MomentumSi_I(iP))**(1.0/3)
+               *SpeedSi_I(iP)*(Momentum_I(iP)*MomentumInjSi)**(1.0/3)
 
           DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX),    &
                DiffCoeffMinSi/DOuterSi_I(1:nX))
@@ -213,15 +211,6 @@ contains
        call tridiag(nX, Lower_I, Main_I, Upper_I, R_I,    &
             Distribution_IIB(iP, 1:nX, iLine))
     end do MOMENTUM
-
-    if(UseTurbulentSpectrum) then
-       XyzSi_DI(:,1:nX) = MhData_VIB(x_:z_,1:nX,iLine)*IO2Si_V(UnitX_)
-       call update_spectrum(nX, nP, MomentumSi_I, DLogP, &
-            XyzSi_DI(:,1:nX), DsSi_I(1:nX),                &
-            Distribution_IIB(:,1:nX,iLine), BSi_I(1:nX),   &
-            nSi_I(1:nX)*cProtonMass, Dt)
-    end if
-
   end subroutine diffuse_distribution
   !============================================================================
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)

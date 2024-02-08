@@ -8,7 +8,7 @@ module SP_ModPlot
   use SP_ModAngularSpread, ONLY: get_normalized_spread, &
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModDistribution, ONLY: nP, KinEnergySi_I, MomentumSi_I, &
+  use SP_ModDistribution, ONLY: nP, KinEnergySi_I, Momentum_I, &
        Distribution_IIB, FluxChannelInit_V, MomentumInjSi,            &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
@@ -185,7 +185,7 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
     ! Array for plotting distribution function
-    Log10MomentumSi_I      = log10(MomentumSi_I)
+    Log10MomentumSi_I      = log10(Momentum_I*MomentumInjSi)
     Log10KinEnergySi_I     = log10(KinEnergySi_I)
     DMomentumOverDEnergy_I = 1/SpeedSi_I
 
