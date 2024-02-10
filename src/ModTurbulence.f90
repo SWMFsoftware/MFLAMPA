@@ -13,14 +13,13 @@ module SP_ModTurbulence
   private
 
   public :: init, finalize, UseTurbulentSpectrum, set_dxx, &
-       read_param, dxx, DoTraceShock, advance_log_advection
+       read_param, dxx, DoTraceShock
 
   logical:: UseTurbulentSpectrum        = .false.
   logical:: DoTraceShock                = .true.
 
   integer, parameter :: nK = nP
   real    :: dLogK
-  real    :: DtReduced
 
   real, allocatable :: Gamma_I(:,:)
   real, allocatable :: IPlusSi_IX(:,:),IMinusSi_IX(:,:),ICSi_X(:)
@@ -53,10 +52,6 @@ module SP_ModTurbulence
   real,allocatable,private:: BK_II(:,:)
   real,allocatable,private:: CFL_I(:)
   integer,allocatable::      CorrectionMode_X(:)
-
-  ! the intensity of the back travelling wave in the initial condition
-  real :: Alpha       = 1.0/10
-  real :: Lambda0InAu = 4.0/10  ! [AU]
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -90,9 +85,6 @@ contains
 
     allocate(RhoCompression_I(1:nVertexMax))
 
-    ! if(DoOutputGamma) &
-    !     allocate(Gamma_I(nP,(iXOutputLast-iXOutputStart)/iXOutputStride+1))
-
     allocate(DispersionPlus_I(1:nVertexMax))
     allocate(DispersionMinus_I(1:nVertexMax))
     allocate(CFL_I(1:nVertexMax))
@@ -112,9 +104,6 @@ contains
 
     deallocate(RhoCompression_I)
 
-    ! if(DoOutputGamma) &
-    !     allocate(Gamma_I(nP,(iXOutputLast-iXOutputStart)/iXOutputStride+1))
-
     deallocate(DispersionPlus_I)
     deallocate(DispersionMinus_I)
     deallocate(CFL_I)
@@ -122,6 +111,68 @@ contains
     deallocate(AK_II,BK_II)
 
   end subroutine finalize
+  !============================================================================
+  subroutine init_spectrum(iEnd, XyzSi_DI, BSi_I, MomentumSi_I, dLogP, &
+       iShock, CoefInj, AlfvenMach)
+    !==============Initial spectrum of turbulence=============================!
+    ! We recover the initial spectrum of turbulence from the spatial
+    ! distribution of the diffusion coefficient and its dependence on the
+    ! particle energy.
+
+    ! the number of active particles on the line
+    integer, intent(in)::  iEnd
+
+    ! Coordinates of Lagrangian Meshes in SI unit [m]
+    real,dimension(1:3,1:iEnd),intent(in) :: XyzSi_DI
+
+    ! Magnetic field intensity in SI unit [T]
+    real,dimension(1:iEnd),intent(in) :: BSi_I
+
+    ! momentum in SI unit
+    real,intent(in)     :: MomentumSi_I(0:nP+1)
+
+    ! delta log p in SI unit
+    real,intent(in)     :: dLogP
+
+    ! coef of injection
+    real,intent(in)     :: CoefInj
+
+    ! Alfven March number
+    real,intent(in)     :: AlfvenMach
+
+    ! shock index
+    integer, intent(in) :: iShock
+
+    integer :: iVertex,iK
+    real    :: ICOldSi, kSi
+    real    :: rSi , rShockSi
+
+    !--------------------------------------------------------------------------
+
+
+    !-------------------------------------------------------------------------!
+    !          Grid in the momentum space                                     !
+    ! iP     0     1                         nP   nP+1                         !
+    !       |     |    ....                 |     |                           !
+    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
+    !             |    Grid in k-space      |     |                           !
+    ! K/B         KMax                      KMin                               !
+    ! ik     0     1                         nP   nP+1                         !
+    !-------------------------------------------------------------------------!
+
+    ! k = e*B/p => dlog(k) = - dlog(p)
+    dLogK = dLogP
+
+    kOverBSi_I = cElectronCharge/MomentumSi_I
+
+    rShockSi = sqrt(sum(XyzSi_DI(:,iShock)**2))
+
+    do iVertex=1,iEnd
+       rSi   = sqrt(sum(XyzSi_DI(:,iVertex)**2))
+       kSi_I = kOverBSi_I*BSi_I(iVertex)
+    end do
+
+  end subroutine init_spectrum
   !============================================================================
   subroutine set_dxx(iEnd, nP, BSi_I)
     integer,intent(in) :: iEnd,nP
@@ -232,148 +283,9 @@ contains
     kRSi = cElectronCharge*BSi/MomentumSi
 
     ! Calculate D_{xx}: KRes-dependent part
-    Dxx = BSi**2*SpeedSi/(cMu*cPi) * (AK_II(iP,iX)-BK_II(iP,iX)*kRSi**2)
-
-    if (iX == iParticleTest .and. iP == iPTest .and. DoTestMe) then
-       write(*,*) 'AK_II(iP,iX), BK_II(iP,iX) =', &
-            AK_II(iP,iX), BK_II(iP,iX)
-       write(*,*) 'Dxx =', Dxx
-       write(*,*) 'D from Li =', 1./3*Lambda0InAu*9.3286125374064124E+08 &
-            *(MomentumSi*cLightSpeed/cGeV)**(1./3)*SpeedSi
-    end if
+    Dxx = BSi**2*SpeedSi/(cMu*cPi) * (AK_II(iP,iX) - BK_II(iP,iX)*kRSi**2)
 
   end function Dxx
-  !============================================================================
-  subroutine advance_log_advection(CFLIn, nGCLeft, nGCRight,        &
-       FInOut_I, IsConservative, DeltaLnP)
-    ! The procedure integrates the log-advection equation, in
-    ! the conservative or non-conservative formulation, at a logarithmic grid,
-    ! using a single-stage second order scheme
-
-    real,   intent(in):: CFLIn        ! Time step * acceleration rate/(Dlnp)
-    integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
-    integer,intent(in):: nGCRight     ! advanced in time but used as the BCs
-    real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight)  ! Solution
-    ! sol. index 0 is to set boundary condition at the injection energy
-    logical,intent(in):: IsConservative  ! Solve (C) if .true. (NC) otherwise
-    real,optional,intent(in)::DeltaLnP   ! Used only for NonConservative=.true.!
-    ! Subcycling to achieve the condition CFL<1, if nStep>1
-    integer :: nStep
-    ! Loop variables
-    integer :: iStep
-    ! Extended version of the sulution array to implement BCc
-    real    :: F_I(1 - max(nGCLeft,2):nP+max(nGCRight,2))
-    real    :: FSemiintUp_I(0:nP+1), FSemiintDown_I(0:nP+1)
-    real    :: CFL, HalfADtIfNeeded
-    !-------------------------NonConservative---------------------------
-    ! This is a one-stage second-order scheme for the advection equation:
-    !             f_t+A f_{ln p}=0,
-    !
-    ! Herewith CFL = A*Delta t/Delta(ln p):
-    ! f^(n+1)_i-CFL*(f^n_(i-1/2)-f^n_(i+1/2)=f^n_i, where
-    ! For CFL>0:
-    ! f^n_(i-1/2)=f^n_(i-1)+cHalf*(cOne-CFL)*df_lim^n_(i-1)
-    ! For CFL<0:
-    ! f^n_(i-1/2)=f^n_(i  )-cHalf*(cOne+CFL)*df_lim^n_(i  )
-    !-------------------------   Conservative---------------------------
-    ! This is a one-stage second-order scheme for the advection equation:
-    !             f_t+A (f p}_p=0,
-    ! We now need to use both
-    ! A*Delta t = CFLIn*Delta (LnP)
-    ! and
-    ! CFL = A*Delta t/(2 tanh(Delta (ln p)/2)
-    ! f^(n+1)_i = CFL*(f^n_(i-1/2)-f^n_(i+1/2))-
-    !        (1/2)(f^n_(i-1/2)+f^n_(i+1/2))A*Delta t + f^n_i,
-    ! where
-    ! For CFL>0:
-    ! f^n_(i-1/2)=f^n_(i-1)*(1-(1/2)*A*Delta t)+cHalf*(cOne-CFL)*df_lim^n_(i-1)
-    ! For CFL<0:
-    ! f^n_(i-1/2)=f^n_(i  )*(1-(1/2)*A*Delta t)-cHalf*(cOne+CFL)*df_lim^n_(i  )
-
-    !--------------------------------------------------------------------------
-    if(IsConservative)then
-       HalfADtIfNeeded = 0.50*CFLIn*DeltaLnP
-       CFL = HalfADtIfneeded/tanh(0.50 * DeltaLnP)
-       HalfADtIfNeeded = -HalfADtIfNeeded
-    else
-       HalfADtIfNeeded = 0.0; CFL = CFLIn
-    end if
-
-    nStep = 1 + int(abs(CFL)); CFL = CFL/real(nStep)
-    HalfADtIfNeeded=HalfADtIfNeeded/real(nStep)
-    F_I(1-nGCLeft:nP+nGCRight) = FInOut_I(1 - nGCLeft:nP+nGCRight)
-
-    ! Check for positivity
-    if(any(F_I(1-nGCLeft:nP+nGCRight)<=0.0))then
-       write(*,*)'Before advection F_I <=0'
-       write(*,*)IsConservative
-       write(*,*)F_I
-       stop
-    end if
-
-    ! One stage second order upwind scheme
-
-    if (CFL>0.0) then
-       do iStep = 1, nStep
-          ! Boundary condition at the left boundary
-          if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft )
-          ! Boundary condition at the right boundary
-          if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
-
-          ! f_(i+1/2):
-          FSemiintUp_I(0:nP) = F_I(0:nP)*(1.0 + HalfADtIfNeeded)&
-               + 0.5*(1.0 - CFL)*df_lim_array(0, nP)
-          ! f_(i-1/2):
-          FSemiintDown_I(1:nP) = FSemiintUp_I(0:nP-1)
-
-          ! Update the solution from f^(n) to f^(n+1):
-          F_I(1:nP) = F_I(1:nP)+CFL*(FSemiintDown_I(1:nP)-FSemiintUp_I(1:nP))+&
-               HalfADtIfNeeded*(FSemiintDown_I(1:nP)+FSemiintUp_I(1:nP))
-       end do
-    else
-       do iStep = 1, nStep
-          ! Boundary condition at the left boundary
-          if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft)
-          ! Boundary condition at the right boundary
-          if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
-
-          ! f_(i-1/2):
-          FSemiintDown_I(1:nP+1) = F_I(1:nP+1)*(1.0 + HalfADtIfNeeded)&
-               - 0.5*(1.0 + CFL)*df_lim_array(1, nP+1)
-          ! f_(i+1/2):
-          FSemiintUp_I(1:nP) = FSemiintDown_I(2:nP+1)
-
-          ! Update the solution from f^(n) to f^(n+1):
-          F_I(1:nP) = F_I(1:nP)+CFL*(FSemiintDown_I(1:nP)-FSemiintUp_I(1:nP))+&
-               HalfADtIfNeeded*(FSemiintDown_I(1:nP)+FSemiintUp_I(1:nP))
-       end do
-    end if
-
-    FInOut_I(1:nP) = F_I(1:nP)
-    if(any(FInOut_I(1-nGCLeft:nP+nGCRight)<=0.0))then
-       write(*,*)'After advection F_I <=0, for CFLFermi= ',CFL
-       write(*,*)F_I
-       call CON_stop('Negative distribution function')
-    end if
-  contains
-    !==========================================================================
-    function df_lim_array(iLeft, iRight) result(df_lim_arr)
-      integer, intent(in):: iLeft, iRight ! start/left and end/right indices
-      real :: df_lim_arr(iLeft:iRight)    ! output results
-      real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
-
-      !------------------------------------------------------------------------
-      dF1 = F_I(iLeft+1:iRight+1)-F_I(iLeft:iRight)
-      dF2 = F_I(iLeft:iRight)-F_I(iLeft-1:iRight-1)
-
-      ! df_lim=0 if dF1*dF2<0, sign(dF1) otherwise:
-      df_lim_arr = sign(0.50,dF1)+sign(0.50,dF2)
-      dF1 = abs(dF1)
-      dF2 = abs(dF2)
-      df_lim_arr = df_lim_arr*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
-    end function df_lim_array
-    !==========================================================================
-  end subroutine advance_log_advection
   !============================================================================
 end module SP_ModTurbulence
 !==============================================================================
