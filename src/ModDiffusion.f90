@@ -10,13 +10,13 @@ module SP_ModDiffusion
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
 
-  use ModNumConst, ONLY: cPi, cTiny
-  use ModConst,   ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun,  &
+  use ModNumConst,  ONLY: cPi, cTiny
+  use ModConst,     ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun,  &
        cProtonMass, cGyroRadius
-  use SP_ModSize, ONLY: nVertexMax
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, D_, R_,      &
-       x_, z_, Wave1_, Wave2_
-  use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+  use SP_ModSize,   ONLY: nVertexMax
+  use SP_ModDistribution, ONLY: MomentumInjSi
+  use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, D_, R_, Wave1_, Wave2_
+  use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -78,8 +78,7 @@ contains
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
-    use SP_ModDistribution, ONLY: nP, SpeedSi_I, DLogP,  &
-         Momentum_I, MomentumInjSi, Distribution_IIB
+    use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, Distribution_IIB
     use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -162,7 +161,7 @@ contains
           ! Add v (= p*c^2/E_total in the relativistic case)
           ! and (p)^(1/3)
           DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)     &
-               *SpeedSi_I(iP)*(Momentum_I(iP)*MomentumInjSi)**(1.0/3)
+               *SpeedSi_I(iP)*Momentum_I(iP)**(1.0/3)
 
           DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX),    &
                DiffCoeffMinSi/DOuterSi_I(1:nX))
@@ -247,11 +246,12 @@ contains
           ! 1/AU cancels with unit of Lambda0,no special attention needed;
           ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
           CoefDInnerSi_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
-               RadiusSi_I(1:nX) * (cLightSpeed/cGEV)**(1.0/3)
+               RadiusSi_I(1:nX) * (cLightSpeed*MomentumInjSi/cGEV)**(1.0/3)
        elsewhere
           CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /       &
                (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
-               (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
+               (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
+               **(1.0/3)
        end where
     else
        ! Sokolov et al., 2004: eq (4),
@@ -262,7 +262,8 @@ contains
        ! (\delta B)**2 \propto Gyroradius^(1/3)
        CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /          &
             (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
-            (ScaleSi_I(1:nX)**2*cGyroRadius/BSi_I(1:nX))**(1.0/3)
+            (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
+            **(1.0/3)
     end if
 
     ! Add 1/B as the actual diffusion is D/B
