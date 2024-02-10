@@ -8,7 +8,7 @@ module SP_ModPlot
   use SP_ModAngularSpread, ONLY: get_normalized_spread, &
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModDistribution, ONLY: nP, KinEnergySi_I, Momentum_I, &
+  use SP_ModDistribution, ONLY: nP, KinEnergy_I, Momentum_I, &
        Distribution_IIB, FluxChannelInit_V, MomentumInjSi,            &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
@@ -185,8 +185,8 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
     ! Array for plotting distribution function
-    Log10MomentumSi_I      = log10(Momentum_I*MomentumInjSi)
-    Log10KinEnergySi_I     = log10(KinEnergySi_I)
+    Log10MomentumSi_I      = log10(Momentum_I)
+    Log10KinEnergySi_I     = log10(KinEnergy_I)
     DMomentumOverDEnergy_I = 1/SpeedSi_I
 
     !
@@ -1177,8 +1177,7 @@ contains
             end if
             ! the actual distribution
             File_I(iFile) % Buffer_II(:,iVertex) = &
-                 log10(Distribution_IIB(1:nP,iVertex,iLine)*Factor_I(1:nP))-&
-                 log10(MomentumInjSi**2*Io2Si_V(UnitEnergy_))
+                 log10(Distribution_IIB(1:nP,iVertex,iLine)*Factor_I(1:nP))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)

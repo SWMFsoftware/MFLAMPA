@@ -21,7 +21,7 @@ contains
 
     use ModPoissonBracket, ONLY: explicit
     use SP_ModSize, ONLY: nVertexMax
-    use SP_ModDistribution, ONLY: nP, Momentum3Si_I, VolumeP_I, DLogP, &
+    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
          Distribution_IIB, Momentum_I, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
@@ -75,7 +75,7 @@ contains
     end do
     ! calculate: dHamiltonian/dVolumeSubX
     do iP = -1, nP+1
-       dHamiltonian01_FX(iP,:) = - Momentum3Si_I(iP)*dVolumeXDt_I
+       dHamiltonian01_FX(iP,:) = - Momentum3_I(iP)*dVolumeXDt_I
     end do
     ! Time initialization
     Time   = 0.0
