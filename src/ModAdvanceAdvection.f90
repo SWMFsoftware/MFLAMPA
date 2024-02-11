@@ -113,8 +113,8 @@ contains
     ! f^n_(i-1/2)=f^n_(i-1)+cHalf*(cOne-CFL)*df_lim^n_(i-1)
     ! For CFL<0:
     ! f^n_(i-1/2)=f^n_(i  )-cHalf*(cOne+CFL)*df_lim^n_(i  )
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     nStep = 1 + int(abs(CflIn)); Cfl = CflIn/real(nStep)
     F_I(1-nGCLeft:nP+nGCRight) = FInOut_I(1-nGCLeft:nP+nGCRight)
 
