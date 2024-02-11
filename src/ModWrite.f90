@@ -9,7 +9,7 @@ module SP_ModPlot
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModDistribution, ONLY: nP, KinEnergy_I, Momentum_I, &
-       Distribution_IIB, FluxChannelInit_V, MomentumInjSi,            &
+       Distribution_IIB, FluxChannelInit_V,                  &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
@@ -887,8 +887,8 @@ contains
                  State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile)%Buffer_II(1 + iVarLat:nFluxVar + iVarLat,iLineAll)=&
-              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
+              File_I(iFile)%Buffer_II(1 + iVarLat:nFluxVar + iVarLat,iLineAll)&
+              = Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) +     &
               Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
       end do !  iLine
 
