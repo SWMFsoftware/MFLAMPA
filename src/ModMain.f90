@@ -36,8 +36,6 @@ module SP_ModMain
 contains
   !============================================================================
   subroutine read_param
-
-    use SP_ModTurbulence,    ONLY: DoTraceShock
     use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
     use SP_ModBc,            ONLY: read_param_bc         =>read_param
@@ -86,7 +84,7 @@ contains
        case('#MOMENTUMGRID', '#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1)CYCLE
           call read_param_dist(NameCommand)
-       case('#CFL', '#POISSONBRACKET')
+       case('#CFL', '#POISSONBRACKET','#TRACESHOCK')
           call read_param_adv(NameCommand)
        case('#INJECTION')
           call read_param_bc(NameCommand)
@@ -96,8 +94,7 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
-       case('#TURBULENTSPECTRUM', '#INITSPECTRUM', &
-            '#ADVECTIONWITHALFVENSPEED', '#TRACESHOCK')
+       case('#TURBULENTSPECTRUM')
           call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')
           call read_param_unit(NameCommand)
@@ -108,7 +105,7 @@ contains
        case('#TIMING')
           call read_param_timing
        case('#TEST')
-          call read_param_turbulence('#TRACESHOCK')
+          call read_param_adv('#TRACESHOCK')
           call read_param_diffuse('#DIFFUSION')
        case('#END')
           call check_stand_alone
@@ -170,7 +167,8 @@ contains
     use SP_ModRestart,       ONLY: &
          read_restart
     use SP_ModTime,          ONLY: init_time       => init
-    ! use SP_ModTurbulence,    ONLY: init_turbulence => init
+    use SP_ModTurbulence,    ONLY: init_turbulence => init, &
+         UseTurbulentSpectrum
     use SP_ModUnit,          ONLY: init_unit       => init
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
@@ -184,7 +182,7 @@ contains
     call init_dist
     call init_plot
     call init_mhdata
-    ! call init_turbulence
+    if(UseTurbulentSpectrum)call init_turbulence
     call init_spread
     if(DoRestart) call read_restart
     if(IsStandAlone) call init_time
@@ -207,7 +205,7 @@ contains
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: advance
+    use SP_ModAdvance,       ONLY: advance, DoTraceShock
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
          get_shock_location
@@ -215,7 +213,6 @@ contains
     use SP_ModRestart,       ONLY: stand_alone_save_restart
     use SP_ModPlot,          ONLY: save_plot_all
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter
-    use SP_ModTurbulence,    ONLY: DoTraceShock
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
     logical, save:: IsFirstCall = .true.

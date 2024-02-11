@@ -13,10 +13,9 @@ module SP_ModTurbulence
   private
 
   public :: init, finalize, UseTurbulentSpectrum, set_dxx, &
-       read_param, dxx, DoTraceShock
+       read_param, dxx
 
   logical:: UseTurbulentSpectrum        = .false.
-  logical:: DoTraceShock                = .true.
 
   integer, parameter :: nK = nP
   real    :: dLogK
@@ -62,8 +61,6 @@ contains
     select case(NameCommand)
     case('#TURBULENTSPECTRUM')
        call read_var('UseTurbulentSpectrum', UseTurbulentSpectrum)
-    case('#TRACESHOCK')
-       call read_var('DoTraceShock', DoTraceShock)
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -147,10 +144,6 @@ contains
     real    :: ICOldSi, kSi
     real    :: rSi , rShockSi
 
-    !--------------------------------------------------------------------------
-
-
-    !-------------------------------------------------------------------------!
     !          Grid in the momentum space                                     !
     ! iP     0     1                         nP   nP+1                         !
     !       |     |    ....                 |     |                           !
@@ -158,7 +151,7 @@ contains
     !             |    Grid in k-space      |     |                           !
     ! K/B         KMax                      KMin                               !
     ! ik     0     1                         nP   nP+1                         !
-    !-------------------------------------------------------------------------!
+    !--------------------------------------------------------------------------
 
     ! k = e*B/p => dlog(k) = - dlog(p)
     dLogK = dLogP

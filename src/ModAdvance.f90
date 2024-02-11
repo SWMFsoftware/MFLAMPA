@@ -7,7 +7,6 @@ module SP_ModAdvance
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, D_,  &
        Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
-  use SP_ModTurbulence, ONLY: DoTraceShock
   use SP_ModUnit, ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 
@@ -20,6 +19,9 @@ module SP_ModAdvance
   ! Public members:
   public:: read_param  ! read injection parameters
   public:: advance     ! Advance solution Distribution_IIB
+
+  ! If the shock wave is traced, the advance algorithms are modified
+  logical, public :: DoTraceShock = .true.
 
   ! Local parameters
   real:: Cfl=0.9        ! Controls the maximum allowed time step
@@ -36,6 +38,8 @@ contains
        call read_var('Cfl',Cfl)
     case('#POISSONBRACKET')
        call read_var('UsePoissonBracket',UsePoissonBracket)
+    case('#TRACESHOCK')
+       call read_var('DoTraceShock', DoTraceShock)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
