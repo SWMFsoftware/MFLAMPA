@@ -14,7 +14,7 @@ module SP_ModDistribution
   use ModConst,    ONLY: cLightSpeed, energy_in, cMeV
   use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
-       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, UnitEFlux_, &
+       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
   use SP_ModGrid,  ONLY: nLine, nVertex_B
 
@@ -45,7 +45,7 @@ module SP_ModDistribution
   ! speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
        KinEnergy_I, VolumeP_I, Background_I
-  real, public :: Momentum3_I(-1:nP+1) ! P**3/3, normalized per MomentumIngSi
+  real, public :: Momentum3_I(-1:nP+1) ! P**3/3, normalized per MomentumInjSi
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_ = 0
@@ -109,11 +109,12 @@ contains
     Momentum3_I(-1) = exp(-1.50*DLogP)/3
     do iP = 0, nP +1
        Momentum_I(iP)    = MomentumInjSi*exp(iP*DLogP)
-       Momentum3_I(iP) = Momentum3_I(iP-1)*exp(3*DLogP)
        SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
             momentum_to_energy(Momentum_I(iP))
+       Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*DLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
-       KinEnergy_I(iP) = momentum_to_kinetic_energy(Momentum_I(iP))&
+       ! Normalize kinetic energy per Unit of energy:
+       KinEnergy_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP))&
             *Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
        Momentum_I(iP) = Momentum_I(iP)/MomentumInjSi
@@ -148,7 +149,9 @@ contains
        if(allocated(EChannelIo_I))&
             deallocate(EChannelIo_I)
        allocate (EChannelIo_I(nFluxChannel))
-       EChannelIo_I = [5,10,30,50,60,100]*cMeV*Si2Io_V(UnitEnergy_)
+       EChannelIo_I = [5,10,30,50,60,100] & ! in MeV!
+            *cMeV                         & ! in SI
+            *Si2Io_V(UnitEnergy_)
        if(allocated(NameFluxUnit_I))&
             deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(0:nFluxChannel+1))
@@ -171,8 +174,7 @@ contains
     FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
          (EnergyMaxIo-EChannelIo_I(:)) / (EnergyMaxIo-EnergyInjIo)
     FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * Io2Si_V(UnitFlux_) * &
-         0.5 * (EnergyMaxIo + EnergyInjIo) * Io2Si_V(UnitEnergy_) * &
-         Si2Io_V(UnitEFlux_)
+         0.5 * (EnergyMaxIo + EnergyInjIo) * Si2Io_V(UnitFlux_)
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
@@ -222,8 +224,9 @@ contains
           write(NameFluxChannel,'(I5.5)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
-       EChannelIo_I(1:nFluxChannel) = EChannelIo_I(1:nFluxChannel)&
-            *cMeV*Si2Io_V(UnitEnergy_)
+       EChannelIo_I = EChannelIo_I & ! in MeV
+            *cMeV                  & ! in SI
+            *Si2Io_V(UnitEnergy_)
        NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
        NameFluxUnit_I(EFlux_)         = NameEnergyFluxUnit
 
@@ -368,9 +371,7 @@ contains
           Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
                Flux_I * Si2Io_V(UnitFlux_)
           Flux_VIB(EFlux_,              iVertex, iLine) = &
-               EFlux  * Si2Io_V(UnitEFlux_)*Io2Si_V(UnitEnergy_)
-          ! Normalization coeff:
-          Flux_VIB(:, iVertex, iLine) = Flux_VIB(:, iVertex, iLine)
+               EFlux  * Si2Io_V(UnitFlux_)
        end do
     end do
   end subroutine get_integral_flux

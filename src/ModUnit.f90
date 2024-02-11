@@ -42,8 +42,8 @@ module SP_ModUnit
 
   ! Unit conversions
   integer, public, parameter:: &
-       UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3, UnitEFlux_ = 4
-  real, public, dimension(UnitX_:UnitEFlux_) :: Io2Si_V, Si2Io_V
+       UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3!, UnitEFlux_ = 4
+  real, public, dimension(UnitX_:UnitFlux_) :: Io2Si_V, Si2Io_V
 
   ! Unit for all the state variables:
   ! Length is in the unit of Rs, Rho is in the unit of amu/m^3,
@@ -105,7 +105,7 @@ contains
     Io2Si_V(UnitX_)      = Rsun
     Io2Si_V(UnitEnergy_) = energy_in(NameEnergyUnit)
     Io2Si_V(UnitFlux_)   = UnitParticleFluxSi
-    Io2Si_V(UnitEFlux_)  = IO2Si_V(UnitEnergy_) * IO2Si_V(UnitFlux_)
+    ! Io2Si_V(UnitEFlux_)  = IO2Si_V(UnitEnergy_) * IO2Si_V(UnitFlux_)
 
     Si2Io_V = 1.0 / Io2Si_V
 
