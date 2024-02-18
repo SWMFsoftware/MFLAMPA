@@ -34,13 +34,14 @@ OBJECTS_EXE = SP_stand_alone.o
 
 EXE = ${BINDIR}/MFLAMPA.exe
 
-SEARCH_EXTRA = -I${LIBRARYDIR} -I${COUPLERDIR}
+SEARCH_EXTRA = -I${LIBRARYDIR} -I${COUPLERDIR} -I${EMPIRICALCRDIR}
 
 MY_LIB = libMFLAMPA.a
 
 # Other required libraries
 LIBSHARE  = ${LIBDIR}/libSHARE.a
 LIBTIMING = ${LIBDIR}/libTIMING.a
+
 
 DEPEND:
 	@perl ${SCRIPTDIR}/depend.pl ${SEARCH} \
@@ -72,6 +73,7 @@ ${EXE}: ${OBJECTS_EXE}
 	cd Tmp_; \
 		ar -x ../${MY_LIB}; \
 		ar -x ${LIBTIMING}; \
+		ar -x ${LIBDIR}/libEMPIRICALCR.a; \
 		ar -x ${LIBSHARE}
 	${LINK.f90} -o ${EXE} ${OBJECTS_EXE} Tmp_/*.o \
 		${Lflag1}
