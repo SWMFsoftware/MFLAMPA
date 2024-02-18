@@ -17,12 +17,18 @@ module SP_ModBc
 
   ! Public members:
   public:: read_param
-  public:: set_momentum_bc  ! Sets the boundary condition at min/max energy
+  public:: set_momentum_bc  ! Set the boundary condition at min/max energy
+  public:: set_upper_end_bc ! Ste the boundary condition and the far end point
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real, public :: CoefInj = 0.25, SpectralIndex = 5.0
   real, parameter :: CoefInjTiny = 2.5E-11
+  ! Upper end BC, set at the last point along the field line
+  logical, public :: UseUpperEndBc = .false.
+  ! Type of upper end BC: float, lism, escape
+  character(LEN=6) :: TypeUpperEndBc = 'none'
+  real, public     :: UpperEndBc_I(1:nP)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -34,6 +40,23 @@ contains
     case('#INJECTION')
        call read_var('Efficiency',   CoefInj)
        call read_var('SpectralIndex',SpectralIndex)
+    case('#UPPERENDBC')
+       call read_var('UseUpperEndBc', UseUpperEndBc)
+       if(UseUpperEndBc)then
+          call read_var('TypeUpperEndBc',TypeUpperEndBc)
+          select case(trim(TypeUpperEndBc))
+          case('none')
+             ! Reset UseUpperEndBc
+             UseUpperEndBc = .false.
+          case('float','escape')
+             ! Do nothing
+          case('lism')
+             ! We may want to read something else here
+          case default
+             call CON_stop(&
+                  NameSub//': Unknown type of upper end BC '//TypeUpperEndBc)
+          end select
+       end if
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -70,6 +93,21 @@ contains
     end do
 
   end subroutine set_momentum_bc
+  !============================================================================
+  subroutine set_upper_end_bc(iLine, iEnd)
+    use SP_ModDistribution, ONLY: Background_I
+    use ModCosmicRay, ONLY: local_interstellar_spectrum
+    ! set boundary condition at the last grid point on the given line
+    ! assign the calculated BC to UpperEndBc_I
+    integer, intent(in) :: iLine, iEnd
+    !--------------------------------------------------------------------------
+    select case(trim(TypeUpperEndBc))
+    case('float')
+       UpperEndBc_I = Distribution_IIB(1:nP,iEnd,iLine)
+    case('escape')
+       UpperEndBc_I = Background_I(1:nP)
+    end select
+  end subroutine set_upper_end_bc
   !============================================================================
 end module SP_ModBc
 !==============================================================================
