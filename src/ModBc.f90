@@ -117,7 +117,7 @@ contains
     case('lism')
        XyzSi_D = MhData_VIB(x_:z_,iEnd,iLine)*IO2SI_V(UnitX_)
        call local_interstellar_spectrum(nP, Momentum_I(1:nP), XyzSi_D, &
-            UpperEndBc_I, TypeLisBc=TypeLisBc, A=1.0, Z=1.0)
+            UpperEndBc_I, TypeLisBcIn=TypeLisBc, A=1.0, Z=1.0)
     end select
   end subroutine set_upper_end_bc
   !============================================================================

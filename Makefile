@@ -69,7 +69,6 @@ rundir:
 		cd ${RUNDIR}; ln -s ${BINDIR}/${DEFAULT_EXE} .; \
 		ln -s SP/* .; \
 	fi);
-#		cp -f Param/PARAM.test ${RUNDIR}/PARAM.in; \
 
 clean:  install
 	@(if [ -r "Makefile.conf" ]; then \
