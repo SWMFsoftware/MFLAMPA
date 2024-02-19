@@ -3,7 +3,7 @@
 # For more information, see http://csem.engin.umich.edu/tools/swmf
 
 DEFAULT_TARGET = MFLAMPA
-DEFAULT_EXE    = ${DEFAULT_TARGET}.exe
+DEFAULT_EXE    = MFLAMPA.exe
 
 default : ${DEFAULT_TARGET}
 
@@ -17,17 +17,17 @@ help:
 	@echo ' '
 	@echo '    <default> ${DEFAULT_TARGET} in stand alone mode'
 	@echo ' '
-	@echo '    help          (makefile option list)'
-	@echo '    install       (install ${DEFAULT_TARGET})'
+	@echo '    help          (show makefile option list)'
+	@echo '    install       (install MFLAMPA)'
 	@echo ' '
 	@echo '    LIB           (Component library libSP for SWMF)'
-	@echo '    ${DEFAULT_TARGET}       (FLAMPA)'
+	@echo '    MFLAMPA       (make MFLAMPA.exe)'
 	@echo '    NOMPI         (NOMPI library for compilation without MPI)'
 	@echo ' '
 	@echo '    rundir        (create run directory for standalone or SWMF)'
 	@echo '    rundir RUNDIR=run_test (create run directory run_test)'
 	@echo ' '
-	@echo '    test          (run all ${DEFAULT_TARGET} tests)'
+	@echo '    test          (run all tests)'
 	@echo ' '
 	@echo '    clean         (remove temp files like: *~ *.o etc)'
 	@echo '    distclean     (equivalent to ./Config.pl -uninstall)'
@@ -42,11 +42,12 @@ LIB:    install
 	cd src;          make LIB
 	cd srcInterface; make LIB
 
-${DEFAULT_TARGET}:
+MFLAMPA:
 	cd ${SHAREDIR}; ${MAKE} LIB
+	cd ${EMPIRICALCRDIR}; ${MAKE} LIB
 	cd ${TIMINGDIR}; ${MAKE} LIB
 	cd src; ${MAKE} LIB
-	cd src; ${MAKE} ${DEFAULT_TARGET}
+	cd src; ${MAKE} MFLAMPA
 
 NOMPI:
 	cd util/NOMPI/src; make LIB
