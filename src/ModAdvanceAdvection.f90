@@ -54,13 +54,13 @@ contains
     !--------------------------------------------------------------------------
     IsNeg = .false.
     ! first order Fermi acceleration for the current line
-    FermiFirst_I = DLogRho_I / (3*DLogP)
+    FermiFirst_I = DLogRho_I/(3*DLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1 + int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:
     if(nStep < 1)call CON_stop(NameSub//': nStep <= 0????')
-    Dt = DtProgress / nStep
-    FermiFirst_I = FermiFirst_I / nStep
+    Dt = DtProgress/nStep
+    FermiFirst_I = FermiFirst_I/nStep
 
     STEP:do iStep = 1, nStep
        ! update bc for advection
@@ -131,8 +131,8 @@ contains
           if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
           ! f_(i+1/2):
-          FSemiintUp_I(0:nP) = F_I(0:nP)&
-               + 0.5*(1.0 - CFL)*df_lim_array(0, nP)
+          FSemiintUp_I(0:nP) = F_I(0:nP) &
+               + 0.5*(1.0-CFL)*df_lim_array(0, nP)
           ! f_(i-1/2):
           FSemiintDown_I(1:nP) = FSemiintUp_I(0:nP-1)
 
@@ -147,8 +147,8 @@ contains
           if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
           ! f_(i-1/2):
-          FSemiintDown_I(1:nP+1) = F_I(1:nP+1)&
-               - 0.5*(1.0 + CFL)*df_lim_array(1, nP+1)
+          FSemiintDown_I(1:nP+1) = F_I(1:nP+1) &
+               - 0.5*(1.0+CFL)*df_lim_array(1, nP+1)
           ! f_(i+1/2):
           FSemiintUp_I(1:nP) = FSemiintDown_I(2:nP+1)
 
@@ -168,14 +168,14 @@ contains
       real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
 
       !------------------------------------------------------------------------
-      dF1 = F_I(iLeft+1:iRight+1)-F_I(iLeft:iRight)
-      dF2 = F_I(iLeft:iRight)-F_I(iLeft-1:iRight-1)
+      dF1 = F_I(iLeft+1:iRight+1) - F_I(iLeft:iRight)
+      dF2 = F_I(iLeft:iRight) - F_I(iLeft-1:iRight-1)
 
       ! df_lim=0 if dF1*dF2<0, sign(dF1) otherwise:
-      df_lim_arr = sign(0.50,dF1)+sign(0.50,dF2)
+      df_lim_arr = sign(0.50,dF1) + sign(0.50,dF2)
       dF1 = abs(dF1)
       dF2 = abs(dF2)
-      df_lim_arr = df_lim_arr*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
+      df_lim_arr = df_lim_arr*min(max(dF1,dF2), 2.0*dF1,2.0*dF2)
     end function df_lim_array
     !==========================================================================
   end subroutine advance_log_advection

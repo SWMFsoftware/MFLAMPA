@@ -114,7 +114,7 @@ contains
        Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*DLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
        ! Normalize kinetic energy per Unit of energy:
-       KinEnergy_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP))&
+       KinEnergy_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP)) &
             *Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
        Momentum_I(iP) = Momentum_I(iP)/MomentumInjSi

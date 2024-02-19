@@ -24,7 +24,7 @@ module SP_ModAdvance
   logical, public :: DoTraceShock = .true.
 
   ! Local parameters
-  real:: Cfl=0.9        ! Controls the maximum allowed time step
+  real:: Cfl = 0.9     ! Controls the maximum allowed time step
   logical :: UsePoissonBracket = .false.
 contains
   !============================================================================
@@ -116,12 +116,12 @@ contains
 
        ! each particles shock has crossed should be
        ! processed separately => reduce the time step
-       DtProgress = DtFull / nProgress
+       DtProgress = DtFull/nProgress
 
        ! go over each crossed particle
        PROGRESS:do iProgress = 1, nProgress
           ! account for change in the background up to the current moment
-          Alpha = real(iProgress) / real(nProgress)
+          Alpha = real(iProgress)/real(nProgress)
 
           ! Recall that MhData_VIB(Rho_) and State_VIB(RhoOld_) are in
           ! the unit of amu/m^3.
@@ -192,7 +192,7 @@ contains
            DLogRho_I(iShock-nWidth:iShock+nWidth))
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
-      DLogRho_I(iShock) = DLogRhoThreshold + DLogRhoExcessIntegral / &
+      DLogRho_I(iShock) = DLogRhoThreshold + DLogRhoExcessIntegral/  &
            DsSi_I(iVertex)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
