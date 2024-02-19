@@ -5,9 +5,11 @@ module SP_ModBc
 
   ! The module sets up boundary conditions
   use ModNumConst, ONLY: cPi
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB, MomentumInjSi
-  use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_
-  use SP_ModUnit, ONLY: kinetic_energy_to_momentum, UnitEnergy_, Io2Si_V
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB,             &           
+       MomentumInjSi, Momentum_I
+  use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
+  use SP_ModUnit, ONLY: kinetic_energy_to_momentum, UnitEnergy_,  &
+       UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
   implicit none
 
@@ -28,11 +30,13 @@ module SP_ModBc
   logical, public :: UseUpperEndBc = .false.
   ! Type of upper end BC: float, lism, escape
   character(LEN=6) :: TypeUpperEndBc = 'none'
+  character(LEN=18) :: TypeLisBc = 'default'
   real, public     :: UpperEndBc_I(1:nP)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
+    use ModUtilities, ONLY: lower_case
     character(len=*), intent(in):: NameCommand ! From PARAM.in
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
@@ -52,6 +56,9 @@ contains
              ! Do nothing
           case('lism')
              ! We may want to read something else here
+             call read_var('TypeLisBc',TypeLisBc)
+             call lower_case(TypeLisBc)
+             TypeLisBc = trim(TypeLisBc)
           case default
              call CON_stop(&
                   NameSub//': Unknown type of upper end BC '//TypeUpperEndBc)
@@ -100,12 +107,17 @@ contains
     ! set boundary condition at the last grid point on the given line
     ! assign the calculated BC to UpperEndBc_I
     integer, intent(in) :: iLine, iEnd
+    real :: XyzSi_D(3)    ! Where to set BC
     !--------------------------------------------------------------------------
     select case(trim(TypeUpperEndBc))
     case('float')
        UpperEndBc_I = Distribution_IIB(1:nP,iEnd,iLine)
     case('escape')
        UpperEndBc_I = Background_I(1:nP)
+    case('lism')
+       XyzSi_D = MhData_VIB(x_:z_,iEnd,iLine)*IO2SI_V(UnitX_)
+       call local_interstellar_spectrum(nP, Momentum_I(1:nP), XyzSi_D, &
+            UpperEndBc_I, TypeLisBc=TypeLisBc, A=1.0, Z=1.0)
     end select
   end subroutine set_upper_end_bc
   !============================================================================

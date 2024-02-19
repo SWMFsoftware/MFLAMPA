@@ -91,7 +91,6 @@ contains
     ! Given spectrum of particles at upper end (GCRs)
     real, intent(in), optional :: UpperEndSpectrum_I(nP)
     ! Variables declared in this subroutine
-    real :: XyzSi_DI(3, 1:nX), DsSi_I(1:nX)
     integer :: iP, iVertex              ! loop variables
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
@@ -111,7 +110,7 @@ contains
     ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
-    real   :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
+    real   :: DsSi_I(1:nX), DsMesh_I(2:nX), DsFace_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
     real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     real   :: Aux1, Aux2
