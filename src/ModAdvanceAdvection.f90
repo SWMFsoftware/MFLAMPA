@@ -23,7 +23,8 @@ contains
     ! which is non-conservative, and the diffusion
 
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
+    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex, &
+         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     use SP_ModGrid, ONLY: Used_B, nVertex_B
     ! INPUTS:
     ! id of line, particle #, and Shock location
@@ -79,10 +80,23 @@ contains
        end do
        ! compute diffusion along the field line
        ! set the left boundary condition (for diffusion)
-       if(UseDiffusion) call diffuse_distribution(iLine, nX,    &
-            iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-            Distribution_IIB(0, 1, iLine)  &
-            /Momentum_I(1:nP)**SpectralIndex)
+       if(UseDiffusion) then
+          if(UseUpperEndBc)then
+             ! Set and use BC at the upper end
+             call set_upper_end_bc(iLine, nX)
+             call diffuse_distribution(iLine, nX,               &
+                  iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
+                  Distribution_IIB(0, 1, iLine)                 &
+                  /Momentum_I(1:nP)**SpectralIndex,             &
+                  UpperEndSpectrum_I=UpperEndBc_I)
+          else
+             ! No upper end BC
+             call diffuse_distribution(iLine, nX,               &
+                  iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
+                  Distribution_IIB(0, 1, iLine)                 &
+                  /Momentum_I(1:nP)**SpectralIndex)
+          end if
+       end if
     end do STEP
   end subroutine advect_via_log
   !============================================================================

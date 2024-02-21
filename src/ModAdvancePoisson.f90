@@ -24,7 +24,8 @@ contains
     use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
          Distribution_IIB, Momentum_I, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex
+    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex, &
+         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     integer, intent(in):: iLine, iShock ! indices of line and shock
     integer, intent(in):: nX        ! # of meshes along lnp-coordinate
     real,    intent(in):: tFinal    ! time interval to advance through
@@ -106,8 +107,16 @@ contains
        Distribution_IIB(1:nP, 1:nX, iLine) = &
             Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
        ! set the left boundary condition (for diffusion)
-       if(UseDiffusion) call diffuse_distribution(iLine, nX, iShock, &
-            Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+       if(UseDiffusion)then
+          if(UseUpperEndBc)then
+             call diffuse_distribution(iLine, nX, iShock,             &
+                  Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),&
+                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))  
+          else
+             call diffuse_distribution(iLine, nX, iShock, &
+                  Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+          end if
+       end if
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
@@ -123,7 +132,13 @@ contains
       ! Apply bc along the line coordinate:
       VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine) * &
            (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
-      VDF_G(0:nP+1, nX+1) = Background_I
+      if(UseUpperEndBc)then
+         call set_upper_end_bc(iLine, nX)
+         VDF_G(1:nP, nX+1) = UpperEndBc_I
+         VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
+      else
+         VDF_G(0:nP+1, nX+1) = Background_I
+      end if
       ! Add a second layer of the ghost cells along the line coordinate:
       VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
       VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)

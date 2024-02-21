@@ -115,9 +115,19 @@ contains
     case('escape')
        UpperEndBc_I = Background_I(1:nP)
     case('lism')
-       XyzSi_D = MhData_VIB(x_:z_,iEnd,iLine)*IO2SI_V(UnitX_)
-       call local_interstellar_spectrum(nP, Momentum_I(1:nP), XyzSi_D, &
-            UpperEndBc_I, TypeLisBcIn=TypeLisBc, A=1.0, Z=1.0)
+       XyzSi_D = MhData_VIB(x_:z_,iEnd,iLine)*Io2Si_V(UnitX_)
+       call local_interstellar_spectrum(&
+            nP = nP,                         &  ! # of grid points
+            MomentumSi_I = Momentum_I(1:nP)* &
+            MomentumInjSi,                   &  ! momentum (SI) in grid points
+            XyzSi_D = XyzSi_D,               &  ! Coords
+            DistTimesP2Si_I = UpperEndBc_I)
+       ! Now, in UpperEndBc_I there is Distribution[Si]*Momentum[Si]**2
+       ! Our Momentum_I is MomentumSi_I/MomentumInjSi
+       ! So, UpperEndDc_I is Distribution[Si]*MomentumInjSi**2*Momentum_I**2
+       ! The distribution used in our code is
+       ! Distribution[Si]*MomentumInjSi**2*Io2Si_V(UnitEhergy_)
+       UpperEndBc_I = (UpperEndBc_I/Momentum_I(1:nP)**2)*Io2Si_V(UnitEnergy_)
     end select
   end subroutine set_upper_end_bc
   !============================================================================
