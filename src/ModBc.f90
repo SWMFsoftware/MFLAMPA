@@ -5,7 +5,8 @@ module SP_ModBc
 
   ! The module sets up boundary conditions
   use ModNumConst, ONLY: cPi
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB,             &           
+  use ModCosmicRay, ONLY: TypeLisBc, local_interstellar_spectrum
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB,             &
        MomentumInjSi, Momentum_I
   use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
   use SP_ModUnit, ONLY: kinetic_energy_to_momentum, UnitEnergy_,  &
@@ -30,7 +31,6 @@ module SP_ModBc
   logical, public :: UseUpperEndBc = .false.
   ! Type of upper end BC: float, lism, escape
   character(LEN=6) :: TypeUpperEndBc = 'none'
-  character(LEN=18) :: TypeLisBc = 'default'
   real, public     :: UpperEndBc_I(1:nP)
 contains
   !============================================================================
@@ -71,10 +71,10 @@ contains
   !============================================================================
   subroutine set_momentum_bc(iLine, iEnd, nSi_I, iShock)
     ! set boundary conditions on grid point on the current line
+
     integer, intent(in) :: iLine, iEnd, iShock
     real,    intent(in) :: nSi_I(1:iEnd)
     ! local variables
-
     integer:: iVertex     ! loop variable
     real   :: MomentumSi    ! Momentum for the thermal energy k_BTi
     real   :: CoefInjLocal, DistributionBc
@@ -102,10 +102,10 @@ contains
   end subroutine set_momentum_bc
   !============================================================================
   subroutine set_upper_end_bc(iLine, iEnd)
-    use SP_ModDistribution, ONLY: Background_I
-    use ModCosmicRay, ONLY: local_interstellar_spectrum
     ! set boundary condition at the last grid point on the given line
     ! assign the calculated BC to UpperEndBc_I
+
+    use SP_ModDistribution, ONLY: Background_I
     integer, intent(in) :: iLine, iEnd
     real :: XyzSi_D(3)    ! Where to set BC
     !--------------------------------------------------------------------------

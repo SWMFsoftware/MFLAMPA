@@ -111,7 +111,7 @@ contains
           if(UseUpperEndBc)then
              call diffuse_distribution(iLine, nX, iShock,             &
                   Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),&
-                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))  
+                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
           else
              call diffuse_distribution(iLine, nX, iShock, &
                   Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
