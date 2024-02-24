@@ -132,7 +132,7 @@ module SP_ModGrid
   ! variable names
   !
   character(len=10), public, parameter:: NameVar_V(LagrID_:nVar)&
-        = ['LagrID    ', &
+    = ['LagrID    ', &
        'X         ', &
        'Y         ', &
        'Z         ', &
@@ -185,25 +185,25 @@ contains
             [nLon,     nLat] /= &
             [nLonCheck,nLatCheck])&
             )write(*,'(a,2I5)') 'nLon,nLat are reset to ',&
-               nLonCheck, nLatCheck
+            nLonCheck, nLatCheck
        nLon = nLonCheck
        nLat = nLatCheck
        nLineAll = nLon*nLat
        if(nParticleCheck > nVertexMax)then
           if(iProc==0)write(*,*)&
-              'nVertexMax is too small, use ./Config.pl -g=',nParticleCheck
+               'nVertexMax is too small, use ./Config.pl -g=',nParticleCheck
           call CON_stop('Code stopped')
        end if
     case('#COORDSYSTEM','#COORDINATESYSTEM')
        call read_var('TypeCoordSystem', TypeCoordSystem, &
             IsUpperCase=.true.)
-    ! case('#DOSMOOTH')
-    !   call read_var('DoSmooth', DoSmooth)
-    !   if(DoSmooth)then
-    !      call read_var('nSmooth', nSmooth)
-    !      if(nSmooth < 1)&
-    !           call CON_stop(NameSub//': Invalid setting for line smoothing')
-    !   end if
+       ! case('#DOSMOOTH')
+       !   call read_var('DoSmooth', DoSmooth)
+       !   if(DoSmooth)then
+       !      call read_var('nSmooth', nSmooth)
+       !      if(nSmooth < 1)&
+       !           call CON_stop(NameSub//': Invalid setting for line smoothing')
+       !   end if
     case('#GRIDNODE')
        call read_var('nLat',  nLat)
        call read_var('nLon',  nLon)
@@ -236,8 +236,8 @@ contains
     !
     if(nLineAll < nProc)call CON_stop(NameSub//&
          ': There are more processors than field lines')
-    iLineAll0 = (iProc*nLineAll) / nProc
-    iNodeLast =  ((iProc+1)*nLineAll) / nProc
+    iLineAll0 = (iProc*nLineAll)/nProc
+    iNodeLast = ((iProc+1)*nLineAll)/nProc
     nLine = iNodeLast - iLineAll0
     !
     ! check consistency

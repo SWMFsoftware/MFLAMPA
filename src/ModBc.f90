@@ -5,7 +5,8 @@ module SP_ModBc
 
   ! The module sets up boundary conditions
   use ModNumConst, ONLY: cPi
-  use ModCosmicRay, ONLY: TypeLisBc, local_interstellar_spectrum
+  use ModCosmicRay, ONLY: local_interstellar_spectrum, TypeLisBc, &
+       UseModulationPotential, ModulationPotential
   use SP_ModDistribution, ONLY: nP, Distribution_IIB,             &
        MomentumInjSi, Momentum_I
   use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
@@ -42,12 +43,14 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#INJECTION')
-       call read_var('Efficiency',   CoefInj)
-       call read_var('SpectralIndex',SpectralIndex)
+       call read_var('Efficiency',    CoefInj)
+       call read_var('SpectralIndex', SpectralIndex)
     case('#UPPERENDBC')
+       ! Read whether to use UpperEndBc
        call read_var('UseUpperEndBc', UseUpperEndBc)
        if(UseUpperEndBc)then
-          call read_var('TypeUpperEndBc',TypeUpperEndBc)
+          ! Read type of UppenEndBc and Select
+          call read_var('TypeUpperEndBc', TypeUpperEndBc)
           select case(trim(TypeUpperEndBc))
           case('none')
              ! Reset UseUpperEndBc
@@ -55,8 +58,8 @@ contains
           case('float','escape')
              ! Do nothing
           case('lism')
-             ! We may want to read something else here
-             call read_var('TypeLisBc',TypeLisBc)
+             ! We want to read the type of LIS here
+             call read_var('TypeLisBc', TypeLisBc)
              call lower_case(TypeLisBc)
              TypeLisBc = trim(TypeLisBc)
           case default
@@ -64,6 +67,10 @@ contains
                   NameSub//': Unknown type of upper end BC '//TypeUpperEndBc)
           end select
        end if
+       ! Read whether to use ModulationPotential to get GCR spectrum at ~1 AU
+       call read_var('UseModulationPotential', UseModulationPotential)
+       if(UseModulationPotential) call read_var(&
+            'ModulationPotential', ModulationPotential)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -107,7 +114,7 @@ contains
 
     use SP_ModDistribution, ONLY: Background_I
     integer, intent(in) :: iLine, iEnd
-    real :: XyzSi_D(3)    ! Where to set BC
+    real :: XyzSi_D(3)                          ! Where to set BC
     !--------------------------------------------------------------------------
     select case(trim(TypeUpperEndBc))
     case('float')
@@ -126,7 +133,7 @@ contains
        ! Our Momentum_I is MomentumSi_I/MomentumInjSi
        ! So, UpperEndDc_I is Distribution[Si]*MomentumInjSi**2*Momentum_I**2
        ! The distribution used in our code is
-       ! Distribution[Si]*MomentumInjSi**2*Io2Si_V(UnitEhergy_)
+       ! Distribution[Si]*MomentumInjSi**2*Io2Si_V(UnitEnergy_)
        UpperEndBc_I = (UpperEndBc_I/Momentum_I(1:nP)**2)*Io2Si_V(UnitEnergy_)
     end select
   end subroutine set_upper_end_bc

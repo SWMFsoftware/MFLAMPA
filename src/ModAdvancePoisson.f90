@@ -109,12 +109,12 @@ contains
        ! set the left boundary condition (for diffusion)
        if(UseDiffusion)then
           if(UseUpperEndBc)then
-             call diffuse_distribution(iLine, nX, iShock,             &
-                  Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),&
+             call diffuse_distribution(iLine, nX, iShock, Dt,         &
+                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
                   UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
           else
-             call diffuse_distribution(iLine, nX, iShock, &
-                  Dt, nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+             call diffuse_distribution(iLine, nX, iShock, Dt,         &
+                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
           end if
        end if
        ! Update time
@@ -130,7 +130,7 @@ contains
       !------------------------------------------------------------------------
       VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
       ! Apply bc along the line coordinate:
-      VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine) * &
+      VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*  &
            (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
       if(UseUpperEndBc)then
          call set_upper_end_bc(iLine, nX)

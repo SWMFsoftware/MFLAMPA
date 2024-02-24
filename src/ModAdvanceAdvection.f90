@@ -3,7 +3,7 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvanceAdvection
 
-  use ModUtilities, ONLY: CON_stop
+  use ModUtilities,       ONLY: CON_stop
   use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_IIB, dLogP
   implicit none
   ! Revision history
@@ -18,14 +18,14 @@ module SP_ModAdvanceAdvection
 contains
   !============================================================================
   subroutine advect_via_log(iLine, nX, iShock, DtProgress, Cfl, &
-       dLogRho_I, nSi_I, BSi_I, IsNeg)
+       dLogRho_I, nSi_I, BSi_I, IsDistNeg)
     ! The subroutine encapsulates the logarithmic advection scheme,
     ! which is non-conservative, and the diffusion
 
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex, &
+    use SP_ModBc,        ONLY: set_momentum_bc, SpectralIndex, &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
-    use SP_ModGrid, ONLY: Used_B, nVertex_B
+    use SP_ModGrid,      ONLY: Used_B, nVertex_B
     ! INPUTS:
     ! id of line, particle #, and Shock location
     integer, intent(in):: iLine, nX, iShock
@@ -39,7 +39,7 @@ contains
     real,    intent(in):: nSI_I(1:nX), BSI_I(1:nX)
     ! OUTPUT:
     ! Check if any distrubution function value is negative
-    logical, intent(out):: IsNeg
+    logical, intent(out):: IsDistNeg
     ! local variables, declared in this subroutine
     integer  :: iStep, iVertex      ! loop variables
     ! time step is split for nStep intervals,  so short that the CFL for
@@ -53,7 +53,7 @@ contains
     ! in momentum space
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
-    IsNeg = .false.
+    IsDistNeg = .false.
     ! first order Fermi acceleration for the current line
     FermiFirst_I = DLogRho_I/(3*DLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
@@ -72,7 +72,7 @@ contains
              write(*,*) NameSub, ': Distribution_IIB < 0'
              Used_B(iLine) = .false.
              nVertex_B(iLine) = 0
-             IsNeg = .true.
+             IsDistNeg = .true.
              RETURN
           end if
           call advance_log_advection(FermiFirst_I(iVertex), &
@@ -81,7 +81,7 @@ contains
        ! compute diffusion along the field line
        ! set the left boundary condition (for diffusion)
        if(UseDiffusion) then
-          if(UseUpperEndBc)then
+          if(UseUpperEndBc) then
              ! Set and use BC at the upper end
              call set_upper_end_bc(iLine, nX)
              call diffuse_distribution(iLine, nX,               &
@@ -133,7 +133,7 @@ contains
     F_I(1-nGCLeft:nP+nGCRight) = FInOut_I(1-nGCLeft:nP+nGCRight)
 
     ! Check for positivity
-    if(any(F_I(1-nGCLeft:nP+nGCRight)<=0.0))call CON_stop(&
+    if(any(F_I(1-nGCLeft:nP+nGCRight)<=0.0)) call CON_stop(&
          'Negative distribution function before log advection')
     ! Single stage second order upwind scheme
 
@@ -172,13 +172,13 @@ contains
     end if
 
     FInOut_I(1:nP) = F_I(1:nP)
-    if(any(FInOut_I(1-nGCLeft:nP+nGCRight)<=0.0))call CON_stop(&
+    if(any(FInOut_I(1-nGCLeft:nP+nGCRight)<=0.0)) call CON_stop(&
          'Negative distribution function after log advection')
   contains
     !==========================================================================
-    function df_lim_array(iLeft, iRight) result(df_lim_arr)
+    function df_lim_array(iLeft, iRight)
       integer, intent(in):: iLeft, iRight ! start/left and end/right indices
-      real :: df_lim_arr(iLeft:iRight)    ! output results
+      real :: df_lim_array(iLeft:iRight)  ! output results
       real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
 
       !------------------------------------------------------------------------
@@ -186,10 +186,10 @@ contains
       dF2 = F_I(iLeft:iRight) - F_I(iLeft-1:iRight-1)
 
       ! df_lim=0 if dF1*dF2<0, sign(dF1) otherwise:
-      df_lim_arr = sign(0.50,dF1) + sign(0.50,dF2)
+      df_lim_array = sign(0.50,dF1) + sign(0.50,dF2)
       dF1 = abs(dF1)
       dF2 = abs(dF2)
-      df_lim_arr = df_lim_arr*min(max(dF1,dF2), 2.0*dF1,2.0*dF2)
+      df_lim_array = df_lim_array*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
     end function df_lim_array
     !==========================================================================
   end subroutine advance_log_advection

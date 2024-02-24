@@ -11,8 +11,7 @@ module SP_ModDiffusion
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
 
   use ModNumConst,  ONLY: cPi, cTiny
-  use ModConst,     ONLY: cAu, cLightSpeed, cGEV, cMu, Rsun,  &
-       cProtonMass, cGyroRadius
+  use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModDistribution, ONLY: MomentumInjSi
   use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, D_, R_, Wave1_, Wave2_
@@ -33,7 +32,7 @@ module SP_ModDiffusion
 
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
-  real :: ScaleTurbulenceSi = 0.03 * cAu
+  real :: ScaleTurbulenceSi = 0.03*cAu
   integer, parameter :: Const_ = 0, Linear_ = 1
   integer :: iScaleTurbulenceType = Const_
 
@@ -178,9 +177,9 @@ contains
        ! For i=1:
        Aux1 = Dt*DOuterSi_I(1)*0.5*(DInnerSi_I(1)+DInnerSi_I(2))/&
             DsMesh_I(2)**2
-       Main_I( 1) = Main_I(1) + Aux1
+       Main_I(1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
-       if(present(LowerEndSpectrum_I))then
+       if(present(LowerEndSpectrum_I)) then
           Aux2 = Dt*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
           Main_I(1) = Main_I(1) + Aux2
           Res_I(1) = Res_I(1) + Aux2*LowerEndSpectrum_I(iP)
@@ -201,9 +200,9 @@ contains
             DsMesh_I(nX)**2
        Main_I( nX) = Main_I(nX) + Aux2
        Lower_I(nX) = -Aux2
-       if(present(UpperEndSpectrum_I))then
+       if(present(UpperEndSpectrum_I)) then
           Aux1 = Dt*DOuterSi_I(nX)*DInnerSi_I(nX)/DsMesh_I(nX)**2
-          Main_I( nX) = Main_I(nX) + Aux1
+          Main_I(nX) = Main_I(nX) + Aux1
           Res_I(nX) = Res_I(nX) + Aux1*UpperEndSpectrum_I(iP)
        end if
        ! Update the solution from f^(n) to f^(n+1):
@@ -237,7 +236,7 @@ contains
     if(UseFixedMeanFreePathUpstream) then
        ! diffusion is different up- and down-stream
        ! Sokolov et al. 2004, paragraphs before and after eq (4)
-       where(RadiusSi_I(1:nX) > 0.9 * RadiusSi_I(iShock))
+       where(RadiusSi_I(1:nX) > 0.9*RadiusSi_I(iShock))
           ! upstream: reset the diffusion coefficient to
           ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3)
           ! see Li et al. (2003), doi:10.1029/2002JA009666
@@ -245,7 +244,7 @@ contains
           ! 1/AU cancels with unit of Lambda0,no special attention needed;
           ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
           CoefDInnerSi_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
-               RadiusSi_I(1:nX) * (cLightSpeed*MomentumInjSi/cGEV)**(1.0/3)
+               RadiusSi_I(1:nX)*(cLightSpeed*MomentumInjSi/cGeV)**(1.0/3)
        elsewhere
           CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /       &
                (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
@@ -266,7 +265,7 @@ contains
     end if
 
     ! Add 1/B as the actual diffusion is D/B
-    CoefDInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX) / BSi_I(1:nX)
+    CoefDInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)/BSi_I(1:nX)
 
   end subroutine set_diffusion_coef
   !============================================================================
@@ -282,7 +281,7 @@ contains
 
     ! input parameters
     integer, intent(in) :: n
-    real,    intent(in) :: Lower_I(n), Mean_I(n) ,Upper_I(n) ,Res_I(n)
+    real,    intent(in) :: Lower_I(n), Mean_I(n), Upper_I(n), Res_I(n)
     ! Output parameters
     real,    intent(out):: W_I(n)
     ! Misc

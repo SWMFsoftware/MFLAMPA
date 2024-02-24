@@ -35,9 +35,9 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#CFL')
-       call read_var('Cfl',Cfl)
+       call read_var('Cfl', Cfl)
     case('#POISSONBRACKET')
-       call read_var('UsePoissonBracket',UsePoissonBracket)
+       call read_var('UsePoissonBracket', UsePoissonBracket)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)
     case default
@@ -80,7 +80,7 @@ contains
     real, dimension(1:nVertexMax):: DLogRho_I
 
     ! Check if any Distribution_IIB < 0 in advect_via_log
-    logical  :: IsNeg
+    logical  :: IsDistNeg
     character(len=*), parameter:: NameSub = 'advance'
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
@@ -145,7 +145,7 @@ contains
           ! given formulae or from the turbulent specrtum, if known
           if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
                iShock, BSi_I(1:iEnd))
-          if(UsePoissonBracket)then
+          if(UsePoissonBracket) then
              ! Poisson bracket scheme: particle-number-conservative
              call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
                   Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
@@ -155,8 +155,8 @@ contains
           else
              ! No Poisson bracket scheme, use the default algorithm
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
-                  DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsNeg)
-             if(IsNeg) CYCLE line
+                  DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsDistNeg)
+             if(IsDistNeg) CYCLE line
           end if
        end do PROGRESS
     end do line
@@ -175,7 +175,7 @@ contains
       !------------------------------------------------------------------------
       DLogRhoExcessIntegral = 0.0
       DsSi_I = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
-      do iVertex = iShock - nWidth, iShock + nWidth - 1
+      do iVertex = iShock-nWidth, iShock+nWidth-1
          DLogRhoExcess = 0.5*(DLogRho_I(iVertex) + DLogRho_I(iVertex+1)) &
               - DLogRhoThreshold ! D log(rho)/Dt*\Delta t = -\div U*\Delta t
          if(DLogRhoExcess>0) then
