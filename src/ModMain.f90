@@ -79,14 +79,14 @@ contains
           call read_param_origin
        case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
             '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
-          if(i_session_read() /= 1)CYCLE
+          if(i_session_read() /= 1) CYCLE
           call read_param_grid(NameCommand)
        case('#MOMENTUMGRID', '#FLUXINITIAL', '#FLUXCHANNEL')
-          if(i_session_read() /= 1)CYCLE
+          if(i_session_read() /= 1) CYCLE
           call read_param_dist(NameCommand)
-       case('#CFL', '#POISSONBRACKET','#TRACESHOCK')
+       case('#CFL', '#POISSONBRACKET', '#TRACESHOCK')
           call read_param_adv(NameCommand)
-       case('#INJECTION')
+       case('#INJECTION', '#UPPERENDBC')
           call read_param_bc(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
           call read_param_diffuse(NameCommand)

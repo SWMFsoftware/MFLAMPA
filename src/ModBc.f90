@@ -4,14 +4,14 @@
 module SP_ModBc
 
   ! The module sets up boundary conditions
-  use ModNumConst, ONLY: cPi
-  use ModCosmicRay, ONLY: local_interstellar_spectrum, TypeLisBc, &
-       UseModulationPotential, ModulationPotential
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB,             &
-       MomentumInjSi, Momentum_I
-  use SP_ModGrid, ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
-  use SP_ModUnit, ONLY: kinetic_energy_to_momentum, UnitEnergy_,  &
-       UnitX_, Io2Si_V
+  use ModNumConst,        ONLY: cPi
+  use ModCosmicRay,       ONLY: local_interstellar_spectrum,          &
+       TypeLisBc, UseModulationPhi, ModulationPhi
+  use SP_ModDistribution, ONLY: nP, Distribution_IIB, Momentum_I,     &
+       MomentumInjSi
+  use SP_ModGrid,         ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
+  use SP_ModUnit,         ONLY: kinetic_energy_to_momentum,           &
+       UnitEnergy_, UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
   implicit none
 
@@ -26,10 +26,10 @@ module SP_ModBc
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
-  real, public :: CoefInj = 0.25, SpectralIndex = 5.0
-  real, parameter :: CoefInjTiny = 2.5E-11
+  real, public     :: CoefInj = 0.25, SpectralIndex = 5.0
+  real, parameter  :: CoefInjTiny = 2.5E-11
   ! Upper end BC, set at the last point along the field line
-  logical, public :: UseUpperEndBc = .false.
+  logical, public  :: UseUpperEndBc = .false.
   ! Type of upper end BC: float, lism, escape
   character(LEN=6) :: TypeUpperEndBc = 'none'
   real, public     :: UpperEndBc_I(1:nP)
@@ -48,29 +48,27 @@ contains
     case('#UPPERENDBC')
        ! Read whether to use UpperEndBc
        call read_var('UseUpperEndBc', UseUpperEndBc)
-       if(UseUpperEndBc)then
+       if(UseUpperEndBc) then
           ! Read type of UppenEndBc and Select
           call read_var('TypeUpperEndBc', TypeUpperEndBc)
           select case(trim(TypeUpperEndBc))
           case('none')
              ! Reset UseUpperEndBc
              UseUpperEndBc = .false.
-          case('float','escape')
+          case('float', 'escape')
              ! Do nothing
           case('lism')
              ! We want to read the type of LIS here
              call read_var('TypeLisBc', TypeLisBc)
              call lower_case(TypeLisBc)
-             TypeLisBc = trim(TypeLisBc)
           case default
-             call CON_stop(&
-                  NameSub//': Unknown type of upper end BC '//TypeUpperEndBc)
+             call CON_stop(NameSub//&
+                  ': Unknown type of upper end BC '//TypeUpperEndBc)
           end select
        end if
-       ! Read whether to use ModulationPotential to get GCR spectrum at ~1 AU
-       call read_var('UseModulationPotential', UseModulationPotential)
-       if(UseModulationPotential) call read_var(&
-            'ModulationPotential', ModulationPotential)
+       ! Read whether using ModulationPhi to get GCR spectrum at ~1 AU
+       call read_var('UseModulationPhi', UseModulationPhi)
+       if (UseModulationPhi) call read_var('ModulationPhi', ModulationPhi)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
