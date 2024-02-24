@@ -1,0 +1,71 @@
+Input for testing MFLAMPA model for SEPs, uses input files with background data
+
+Begin session: 1
+
+#ECHO
+T			DoEcho
+
+#STARTTIME
+2012
+01
+23
+04
+00
+0
+0.0
+
+#USEDATETIME
+T
+
+#DORUN
+T
+
+#TEST
+F			DoTraceShock
+T			UseDiffusion
+
+#INCLUDE
+MH_data_e20120123/MH_data.H
+
+#READMHDATA
+T
+MH_data_e20120123
+real8
+
+#UPPERENDBC
+F           UseUpperEndBc
+lism        TypeUpperEndBc
+default     TypeLisBc
+F           UseModulationPhi
+677.8       ModulationPhi
+
+#SAVEPLOT
+3
+mh1d flux ascii
+mh2d flux ascii
+215.0
+mhtime flux ascii
+215.0
+
+#SCALETURBULENCE
+constant		ScaleTurbulenceType
+0.2402397832		ScaleTurbulence [AU] at 1AU
+
+#STOP
+-1			nIterMax
+300			TimeMax
+
+#RUN
+
+==============================================================================
+
+#USEFIXEDMFPUPSTREAM
+T			UseFixedMFPUpstream
+0.3			MeanFreePath0 [AU]
+
+#STOP
+-1			nIterMax
+600			TimeMax
+
+End session: 1
+#END ##########################################################################

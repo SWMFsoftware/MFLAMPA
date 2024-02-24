@@ -61,14 +61,14 @@ contains
              ! We want to read the type of LIS here
              call read_var('TypeLisBc', TypeLisBc)
              call lower_case(TypeLisBc)
+             ! Read whether using ModulationPhi to get GCR spectrum at ~1 AU
+             call read_var('UseModulationPhi', UseModulationPhi)
+             if (UseModulationPhi) call read_var('ModulationPhi',ModulationPhi)
           case default
              call CON_stop(NameSub//&
                   ': Unknown type of upper end BC '//TypeUpperEndBc)
           end select
        end if
-       ! Read whether using ModulationPhi to get GCR spectrum at ~1 AU
-       call read_var('UseModulationPhi', UseModulationPhi)
-       if (UseModulationPhi) call read_var('ModulationPhi', ModulationPhi)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
