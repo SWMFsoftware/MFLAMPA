@@ -84,16 +84,14 @@ contains
           if(UseUpperEndBc) then
              ! Set and use BC at the upper end
              call set_upper_end_bc(iLine, nX)
-             call diffuse_distribution(iLine, nX,               &
-                  iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-                  Distribution_IIB(0, 1, iLine)                 &
-                  /Momentum_I(1:nP)**SpectralIndex,             &
-                  UpperEndSpectrum_I=UpperEndBc_I)
+             call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
+                  LowerEndSpectrum_I = Distribution_IIB(0, 1, iLine)        &
+                  /Momentum_I(1:nP)**SpectralIndex,                         &
+                  UpperEndSpectrum_I = UpperEndBc_I)
           else
              ! No upper end BC
-             call diffuse_distribution(iLine, nX,               &
-                  iShock, Dt, nSi_I, BSi_I, LowerEndSpectrum_I= &
-                  Distribution_IIB(0, 1, iLine)                 &
+             call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
+                  LowerEndSpectrum_I = Distribution_IIB(0, 1, iLine)        &
                   /Momentum_I(1:nP)**SpectralIndex)
           end if
        end if
@@ -115,7 +113,7 @@ contains
     ! Loop variables
     integer :: iStep
     ! Extended version of the sulution array to implement BCc
-    real    :: F_I(1 - max(nGCLeft,2):nP+max(nGCRight,2))
+    real    :: F_I(1-max(nGCLeft,2):nP+max(nGCRight,2))
     real    :: FSemiintUp_I(0:nP+1), FSemiintDown_I(0:nP+1), Cfl
     !-------------------------NonConservative---------------------------
     ! This is a single-stage second-order scheme for the advection equation:

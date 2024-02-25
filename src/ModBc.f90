@@ -6,7 +6,7 @@ module SP_ModBc
   ! The module sets up boundary conditions
   use ModNumConst,        ONLY: cPi
   use ModCosmicRay,       ONLY: local_interstellar_spectrum,          &
-       TypeLisBc, UseModulationPhi, ModulationPhi
+       TypeLisBc, UseModulationPot, ModulationPot
   use SP_ModDistribution, ONLY: nP, Distribution_IIB, Momentum_I,     &
        MomentumInjSi
   use SP_ModGrid,         ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
@@ -61,9 +61,9 @@ contains
              ! We want to read the type of LIS here
              call read_var('TypeLisBc', TypeLisBc)
              call lower_case(TypeLisBc)
-             ! Read whether using ModulationPhi to get GCR spectrum at ~1 AU
-             call read_var('UseModulationPhi', UseModulationPhi)
-             if (UseModulationPhi) call read_var('ModulationPhi',ModulationPhi)
+             ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
+             call read_var('UseModulationPot', UseModulationPot)
+             if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
           case default
              call CON_stop(NameSub//&
                   ': Unknown type of upper end BC '//TypeUpperEndBc)

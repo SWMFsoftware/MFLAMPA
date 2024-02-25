@@ -28,7 +28,7 @@ Origin points on the surface R=ROrigin in the intervals of longitude,
 (LonMin,LonMax) and latitude, (LatMin,LatMax). Originating from these
 points are the magnetic field lines traced down from ROrigin to RScMin
 and up from ROrigin to RIhMax. 
- 
+
 </command>
 </commandgroup>
 
@@ -263,6 +263,41 @@ Usually read from the restart.H file.
 
 </commandgroup>
 
+
+<commandgroup name="ENDBC">
+
+<command name="UPPERENDBC">
+  <parameter name="UseUpperEndBc" type="logical" default="F"/>
+  <parameter name="TypeUpperEndBc" type="string" default="lism"/>
+  <parameter name="TypeLisBc" type="string" default="default"/>
+  <parameter name="UseModulationPot" type="logical" default="F"/>
+  <parameter name="ModulationPot" type="real" default="600"/>
+
+#UPPERENDBC
+F           UseUpperEndBc
+lism        TypeUpperEndBc
+default     TypeLisBc
+F           UseModulationPot
+600.0       ModulationPot
+
+To determine whether we set the upper boundary condition. If so, 
+we turn UseUpperEndBc and have UpperEndSpectrum_I in diffusion.
+At this time, we need to determine the type of UpperEndBc, LISM
+is the nominal one for use. For LISM, there are various models
+fitting or simulating the spectrum, read as TypeLisBc. Here we
+set Eq.(2) in Usoskin et al. 2005 as default. Then, we also need
+to determine whether we use LISM or the GCR spectrum at ~1 AU.
+For the latter, we also need the modulation potential (denoted
+as "phi" in Usoskin et al. 2005), which is temporal and spatial
+(and even energy) dependent. We stick to the one derived by Oulu
+neutron monitor and published in the dataset 1 of
+https://cosmicrays.oulu.fi/phi/phi.html.
+
+</command>
+
+</commandgroup>
+
+
 <commandgroup name="ADVANCE">
 
 <command name="INJECTION">
@@ -291,7 +326,19 @@ however, somewhat higher than one values may be of use.
 
 Please send an email to Igor Sokolov for more information.
 </command>
-	
+
+<command name="POISSONBRACKET">
+  <parameter name="UsePoissonBracket" type="logical" default="T" />
+
+#POISSONBRACKET
+F           UsePoissonBracket
+
+If UsePoissonBracket is True, the advection scheme is conservative
+Poisson bracket scheme; otherwise, it is non-conservative.
+
+The default value is false.
+</command>
+
 </commandgroup>
 
 <commandgroup name="ACTION">

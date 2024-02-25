@@ -104,7 +104,7 @@ contains
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,   iLine)
        iShockOld = iShock_IB(ShockOld_,iLine)
-       if(DoTraceShock)then
+       if(DoTraceShock) then
           ! This is how many steps should be done to allow the shock to
           ! the move not more than one mesh size
           nProgress = MAX(1, iShock - iShockOld)

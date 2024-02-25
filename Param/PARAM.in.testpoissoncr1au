@@ -24,6 +24,9 @@ T
 F			DoTraceShock
 T			UseDiffusion
 
+#POISSONBRACKET
+T           UsePoissonBracket
+
 #INCLUDE
 MH_data_e20120123/MH_data.H
 
@@ -33,11 +36,11 @@ MH_data_e20120123
 real8
 
 #UPPERENDBC
-F           UseUpperEndBc
+T           UseUpperEndBc
 lism        TypeUpperEndBc
 default     TypeLisBc
-F           UseModulationPhi
-677.8       ModulationPhi
+T           UseModulationPot
+534.7       ModulationPot
 
 #SAVEPLOT
 3

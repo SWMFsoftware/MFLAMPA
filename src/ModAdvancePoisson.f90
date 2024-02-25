@@ -107,8 +107,8 @@ contains
        Distribution_IIB(1:nP, 1:nX, iLine) = &
             Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
        ! set the left boundary condition (for diffusion)
-       if(UseDiffusion)then
-          if(UseUpperEndBc)then
+       if(UseDiffusion) then
+          if(UseUpperEndBc) then
              call diffuse_distribution(iLine, nX, iShock, Dt,         &
                   nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
                   UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
@@ -132,7 +132,7 @@ contains
       ! Apply bc along the line coordinate:
       VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*  &
            (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
-      if(UseUpperEndBc)then
+      if(UseUpperEndBc) then
          call set_upper_end_bc(iLine, nX)
          VDF_G(1:nP, nX+1) = UpperEndBc_I
          VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
