@@ -124,7 +124,7 @@ module SP_ModGrid
        R_          =14, & ! Heliocentric distance          ^derived from
        D_          =15, & ! Distance to the next particle  |MHdata in
        S_          =16, & ! Distance from the foot point   |get_other_
-       U_          =17, & ! Plasma speed                   |state_var
+       U_          =17, & ! Plasma speed along field line  |state_var
        B_          =18, & ! Magnitude of magnetic field    v
        RhoOld_     =19, & ! Background plasma density      ! copy_
        BOld_       =20    ! Magnitude of magnetic field    ! old_state
@@ -198,12 +198,12 @@ contains
        call read_var('TypeCoordSystem', TypeCoordSystem, &
             IsUpperCase=.true.)
        ! case('#DOSMOOTH')
-       !   call read_var('DoSmooth', DoSmooth)
-       !   if(DoSmooth)then
-       !      call read_var('nSmooth', nSmooth)
-       !      if(nSmooth < 1)&
-       !           call CON_stop(NameSub//': Invalid setting for line smoothing')
-       !   end if
+       ! call read_var('DoSmooth', DoSmooth)
+       ! if(DoSmooth)then
+       ! call read_var('nSmooth', nSmooth)
+       ! if(nSmooth < 1)&
+       ! call CON_stop(NameSub//': Invalid setting for line smoothing')
+       ! end if
     case('#GRIDNODE')
        call read_var('nLat',  nLat)
        call read_var('nLon',  nLon)
@@ -332,12 +332,15 @@ contains
        if(.not.Used_B(iLine))CYCLE
        iEnd   = nVertex_B(  iLine)
        do iVertex = 1, iEnd
-          ! plasma speed
-          State_VIB(U_,iVertex, iLine) = &
-               norm2(MHData_VIB(Ux_:Uz_,iVertex,iLine))
           ! magnetic field
           State_VIB(B_,iVertex, iLine) = &
                norm2(MHData_VIB(Bx_:Bz_,iVertex,iLine))
+          ! plasma speed (negative if velocity is antiparallel to
+          ! magnetic field)
+          State_VIB(U_,iVertex, iLine) = &
+               sum(MHData_VIB(Ux_:Uz_,iVertex,iLine)*&
+               MHData_VIB(Bx_:Bz_,iVertex,iLine))/   &
+               State_VIB(B_,iVertex, iLine)
           ! distances between particles
           ! if(.not.DoSmooth)then
           if(iVertex /=nVertex_B(iLine))&

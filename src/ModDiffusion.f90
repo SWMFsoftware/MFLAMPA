@@ -38,6 +38,10 @@ module SP_ModDiffusion
 
   ! Public members:
   public :: read_param, diffuse_distribution, set_diffusion_coef
+  interface diffuse_distribution
+     module procedure diffuse_distribution_s    ! Dt time step
+     module procedure diffuse_distribution_arr  ! LocalTimeStep_I array
+  end interface diffuse_distribution
 
 contains
   !============================================================================
@@ -73,7 +77,7 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine diffuse_distribution(iLine, nX, iShock, Dt, &
+  subroutine diffuse_distribution_s(iLine, nX, iShock, Dt, &
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! set up the diffusion coefficients
     ! diffuse the distribution function
@@ -114,9 +118,9 @@ contains
     real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     real   :: Aux1, Aux2
     ! diffusion along the field line
-    !--------------------------------------------------------------------------
     ! if using turbulent spectrum:
     ! set_dxx for diffusion along the field line
+    !--------------------------------------------------------------------------
     if(UseTurbulentSpectrum) call set_dxx(nX, nP, BSi_I(1:nX))
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
@@ -209,7 +213,26 @@ contains
        call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I,   &
             Distribution_IIB(iP, 1:nX, iLine))
     end do MOMENTUM
-  end subroutine diffuse_distribution
+  end subroutine diffuse_distribution_s
+  !============================================================================
+  subroutine diffuse_distribution_arr(iLine, nX, iShock, LocalTimeStep_I, &
+       nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
+  ! set up the diffusion coefficients
+    ! diffuse the distribution function
+    use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, Distribution_IIB
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+
+    ! Variables as inputs
+    ! input Line, End (for how many particles), and Shock indices
+    integer, intent(in) :: iLine, nX, iShock
+    real, intent(in) :: LocalTimeStep_I(1:nX)  ! Local time step for diffusion
+    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    ! Given spectrum of particles at low end (flare acceleration)
+    real, intent(in), optional :: LowerEndSpectrum_I(nP)
+    ! Given spectrum of particles at upper end (GCRs)
+    real, intent(in), optional :: UpperEndSpectrum_I(nP)
+    !--------------------------------------------------------------------------
+  end subroutine diffuse_distribution_arr
   !============================================================================
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
     ! set diffusion coefficient for the current line
