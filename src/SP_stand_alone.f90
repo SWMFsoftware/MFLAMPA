@@ -5,7 +5,7 @@ program MFLAMPA
   use ModKind
   use SP_ModProc,   ONLY: iProc, nProc, iComm
   use ModUtilities, ONLY: remove_file, touch_file
-  use SP_ModTime,   ONLY: iIter
+  use SP_ModTime,   ONLY: iIter, init_time  => init
   use SP_ModTiming, ONLY: nTiming
   use SP_ModMain,   ONLY: &
        IsLastRead, IsStandAlone,          &
@@ -67,6 +67,7 @@ program MFLAMPA
         call init_grid
         call init_stand_alone
         call SP_initialize
+        call init_time
      end if
      if(IsFirstSession)then
         call timing_stop('setup')

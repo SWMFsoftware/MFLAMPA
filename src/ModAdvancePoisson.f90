@@ -11,7 +11,8 @@ module SP_ModAdvancePoisson
   PRIVATE ! Except
 
   SAVE
-  public :: advect_via_poisson
+  public :: advect_via_poisson ! Time-accurate advance through given Dt
+  public :: iterate_poisson    ! Local time-stepping
 contains
   !============================================================================
   subroutine advect_via_poisson(iLine, nX, iShock, &
@@ -20,7 +21,7 @@ contains
     ! diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
-    use SP_ModSize, ONLY: nVertexMax
+    ! use SP_ModSize, ONLY: nVertexMax
     use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
          Distribution_IIB, Momentum_I, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
@@ -147,6 +148,24 @@ contains
     end subroutine set_VDF
     !==========================================================================
   end subroutine advect_via_poisson
+  !============================================================================
+  subroutine iterate_poisson(iLine, nX, iShock, CflIn, uSi_I, nSi_I, BSi_I)
+    ! advect via Possion Bracket scheme
+    ! diffuse the distribution function at each time step
+
+    use ModPoissonBracket, ONLY: explicit
+    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
+         Distribution_IIB, Momentum_I, Background_I
+    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex, &
+         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    integer, intent(in):: iLine, iShock ! indices of line and shock
+    integer, intent(in):: nX        ! # of meshes along lnp-coordinate
+    real,    intent(in):: CflIn     ! input CFL number
+    ! Input variables for diffusion
+    real,    intent(in):: uSi_I(nX), nSi_I(nX), BSi_I(nX)
+    !--------------------------------------------------------------------------
+  end subroutine iterate_poisson
   !============================================================================
 end module SP_ModAdvancePoisson
 !==============================================================================

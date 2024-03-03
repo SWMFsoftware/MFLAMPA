@@ -164,9 +164,7 @@ contains
     use SP_ModDistribution,  ONLY: init_dist       => init
     use SP_ModPlot,          ONLY: init_plot       => init
     use SP_ModReadMhData,    ONLY: init_mhdata     => init
-    use SP_ModRestart,       ONLY: &
-         read_restart
-    use SP_ModTime,          ONLY: init_time       => init
+    use SP_ModRestart,       ONLY: read_restart
     use SP_ModTurbulence,    ONLY: init_turbulence => init, &
          UseTurbulentSpectrum
     use SP_ModUnit,          ONLY: init_unit       => init
@@ -185,8 +183,6 @@ contains
     if(UseTurbulentSpectrum)call init_turbulence
     call init_spread
     if(DoRestart) call read_restart
-    if(IsStandAlone) call init_time
-
   end subroutine initialize
   !============================================================================
   subroutine finalize
