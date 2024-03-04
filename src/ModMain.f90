@@ -176,9 +176,12 @@ contains
        write(*,'(a)')'SP: initialize'
        write(*,'(a)')'SP: '
     end if
+    ! Inialize unit for energy ('keV', 'MeV', 'GeV') and convert energies
     call init_unit
+    ! Allocate the didtribution function arrays and set 'uniform' background
     call init_dist
     call init_plot
+    ! if(DoReadMhData), inialize MH data reader and reads the first data file
     call init_mhdata
     if(UseTurbulentSpectrum)call init_turbulence
     call init_spread
@@ -188,27 +191,27 @@ contains
   subroutine finalize
 
     use SP_ModPlot,       ONLY: finalize_plot       =>finalize
-    use SP_ModReadMhData, ONLY: finalize_read       =>finalize
+    use SP_ModReadMhData, ONLY: finalize_mhdata     =>finalize
     ! use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
     ! finalize the model
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
     call finalize_plot
-    call finalize_read
+    call finalize_mhdata
     ! call finalize_turbulence
 
   end subroutine finalize
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: advance, DoTraceShock
+    use SP_ModAdvance,       ONLY: advance, DoTraceShock, iterate_steady_state
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
          get_shock_location
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: stand_alone_save_restart
     use SP_ModPlot,          ONLY: save_plot_all
-    use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter
+    use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
     logical, save:: IsFirstCall = .true.
@@ -227,24 +230,27 @@ contains
 
        IsFirstCall = .false.
     end if
-    ! May need to read background data from files
-    if(DoReadMhData)then
-       ! copy some variables from the previous time step
-       call copy_old_state
-       ! Read the background data from file
-       call read_mh_data()
-       ! Read from file: MHData_VIB(0:nMHData,::) for the time moment
-       ! DataInputTime
+    if(IsSTeadyState)then
+       call iterate_steady_state
+    else
+       ! May need to read background data from files
+       if(DoReadMhData)then
+          ! copy some variables from the previous time step
+          call copy_old_state
+          ! Read the background data from file
+          call read_mh_data()
+          ! Read from file: MHData_VIB(0:nMHData,::) for the time moment
+          ! DataInputTime
+       end if
+       ! recompute the derived components of state vector, e.g.
+       ! magnitude of magnetic field and velocity etc. Smooth if needed.
+       call get_other_state_var
+       ! if no new background data loaded, don't advance in time
+       if(DataInputTime <= SPTime) RETURN
+       if(DoTraceShock)call get_shock_location
+       ! run the model
+       if(DoRun) call advance(min(DataInputTime,TimeLimit))
     end if
-    ! recompute the derived components of state vector, e.g.
-    ! magnitude of magnetic field and velocity etc. Smooth if needed.
-    call get_other_state_var
-    ! if no new background data loaded, don't advance in time
-    if(DataInputTime <= SPTime) RETURN
-    if(DoTraceShock)call get_shock_location
-    ! run the model
-    if(DoRun) call advance(min(DataInputTime,TimeLimit))
-
     ! update time & iteration counters
     iIter = iIter + 1
     Dt = min(DataInputTime,TimeLimit) - SPTime

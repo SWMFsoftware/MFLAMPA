@@ -18,7 +18,8 @@ module SP_ModAdvance
 
   ! Public members:
   public:: read_param  ! read injection parameters
-  public:: advance     ! Advance solution Distribution_IIB
+  public:: advance     ! Advance Distribution_IIB through the time interval
+  public:: iterate_steady_state
 
   ! If the shock wave is traced, the advance algorithms are modified
   logical, public :: DoTraceShock = .true.

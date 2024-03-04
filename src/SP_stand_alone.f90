@@ -55,19 +55,20 @@ program MFLAMPA
          write(*,*)'----- Starting Session ',iSession,' ------'
 
      ! Set and check input parameters for this session
-     call SP_read_param
-     call SP_check
+     call SP_read_param  ! Identical to SP_set_param('READ')
+     call SP_check       ! Similar to SP_set_param('CHECK'), but see init_time
 
-     ! Time execution (timing parameters set by SP_read_param)
      if(IsFirstSession)then
+        ! Time execution (timing parameters set by SP_read_param)
         call timing_start('MFLAMPA')
         call timing_start('setup')
-     end if
-     if(IsFirstSession)then
-        call init_grid
-        call init_stand_alone
-        call SP_initialize
-        call init_time
+        call init_grid        ! Similar to SP_set_param('GRID')
+        call init_stand_alone ! Distinctions from SWMF (CON_bline) version
+        call SP_initialize    ! Similar to SP_init_session, NO origin points
+        call init_time        ! StartTime, StartTimeJulian from  StartTime_I
+        ! DataInputTime=0, SPTime=0 unless set in PARAM.in or restart.H
+        ! In SWMF, SPTime is set in SP_set_param('CHECK'), DataInput time is
+        ! set either in coupling or in reading the MHD data from file.
      end if
      if(IsFirstSession)then
         call timing_stop('setup')
