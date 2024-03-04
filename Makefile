@@ -93,6 +93,7 @@ BLESS=NO
 test:
 	${MAKE} test_mflampa
 	${MAKE} test_poisson TESTDIR=run_poisson
+	${MAKE} test_steady TESTDIR=run_steady
 
 test_mflampa:
 	@echo "test_mflampa_compile..." > test_mflampa.diff
@@ -100,7 +101,7 @@ test_mflampa:
 	@echo "test_mflampa_rundir..." >> test_mflampa.diff
 	${MAKE} test_mflampa_rundir
 	@echo "test_mflampa_run..." >> test_mflampa.diff
-	${MAKE} test_mflampa_run
+	${MAKE} test_run
 	@echo "test_mflampa_check..." >> test_mflampa.diff
 	${MAKE} test_mflampa_check
 
@@ -108,9 +109,17 @@ test_poisson:
 	@echo "test_poisson_rundir..." > test_poisson.diff
 	${MAKE} test_poisson_rundir
 	@echo "test_poisson_run..." >> test_poisson.diff
-	${MAKE} test_poisson_run
+	${MAKE} test_run
 	@echo "test_poisson_check..." >> test_poisson.diff
 	${MAKE} test_poisson_check
+
+test_steady:
+	@echo "test_steady_rundir..." > test_steady.diff
+	${MAKE} test_steady_rundir
+	@echo "test_steady_run..." >> test_steady.diff
+	${MAKE} test_run
+# @echo "test_poisson_check..." >> test_poisson.diff
+# ${MAKE} test_poisson_check
 
 test_mflampa_compile:
 	./Config.pl -g=20000
@@ -122,7 +131,7 @@ test_mflampa_rundir:
 	cd ${TESTDIR}; cp -f Param/PARAM.in.test PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
-test_mflampa_run:
+test_run:
 	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
 
 test_mflampa_check:
@@ -140,9 +149,6 @@ test_poisson_rundir:
 	cd ${TESTDIR}; cp -f Param/PARAM.in.testpoisson PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
-test_poisson_run:
-	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
-
 test_poisson_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
 		> ${TESTDIR}/SP/IO2/MH_data.outs
@@ -151,3 +157,9 @@ test_poisson_check:
 		data/output/test_mflampa/MH_poisson_data.ref.gz \
 		> test_poisson.diff
 	ls -l test_*.diff
+
+test_steady_rundir:
+	rm -rf ${TESTDIR}
+	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
+	cd ${TESTDIR}; cp -f Param/PARAM.in.test.steady_state PARAM.in
+	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz

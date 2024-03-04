@@ -155,6 +155,7 @@ module SP_ModPlot
   character(len=*), parameter :: NameTagFile  = NameMHData//'.lst'
   ! number of different output file tags
   integer,  public :: nTag = 0
+  integer          :: nOutput = 1
   !
   !
   character(len=20) :: TypeMHDataFile
@@ -286,6 +287,7 @@ contains
   subroutine read_param(NameCommand)
     use ModUtilities, ONLY: split_string, lower_case
     use ModReadParam, ONLY: read_var
+    use SP_ModTime,   ONLY: IsSteadyState
     character(len=*), intent(in):: NameCommand
     ! set parameters of output files: file format, kind of output etc.
     character(len=300):: StringPlot
@@ -338,12 +340,16 @@ contains
           case('mh2d')
              File_I(iFile) % iKindData = MH2D_
           case('mhtime')
+             if(IsSteadySTate)call CON_stop(NameSub//&
+                  ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = MHTime_
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
           case('flux2d')
              File_I(iFile) % iKindData = Flux2D_
           case('fluxtime')
+             if(IsSteadySTate)call CON_stop(NameSub//&
+                  ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
           case default
              call CON_stop(NameSub//&
@@ -476,6 +482,7 @@ contains
        if(count(File_I(1:nFileOut)%iKindData == MH1D_,1) > 1)&
             call CON_stop(NameSub//&
             ": only one MH1D output file can be requested")
+       if(IsSteadyState)call read_var('nOutput',nOutput)
     case("#USEDATETIME")
        call read_var('UseDateTime',UseDateTime)
     case('#SAVEINITIAL')
@@ -616,6 +623,7 @@ contains
   !============================================================================
   subroutine save_plot_all(IsInitialOutputIn)
     use SP_ModDistribution, ONLY: get_integral_flux
+    use SP_ModTime,         ONLY: IsSteadyState, iIter
     ! write the output data
     logical, intent(in), optional:: IsInitialOutputIn
 
@@ -639,6 +647,7 @@ contains
     else
        call get_integral_flux
     end if
+    if(IsSteadyState.and.mod(iIter,nOutput)/=0)RETURN
     do iFile = 1, nFileOut
        iKindData = File_I(iFile) % iKindData
 
