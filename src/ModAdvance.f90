@@ -226,8 +226,8 @@ contains
        iEnd   = nVertex_B( iLine)
        ! Various data along the line in SI units. Temperature is in the unit
        ! of kinetic energy, all others are in SI units.
-       uSi_I(1:iEnd) = State_VIB(  U_, 1:iEnd,iLine)
-       BSi_I(1:iEnd) = State_VIB(  B_, 1:iEnd, iLine)
+       uSi_I(1:iEnd) = State_VIB(   U_, 1:iEnd, iLine)
+       BSi_I(1:iEnd) = State_VIB(   B_, 1:iEnd, iLine)
        ! nSi is needed to set up the distribution at the injection.
        nSI_I(1:iEnd) = MhData_VIB(Rho_, 1:iEnd, iLine)
        ! find how far shock has travelled on this line

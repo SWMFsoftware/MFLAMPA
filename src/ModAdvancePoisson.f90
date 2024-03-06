@@ -102,11 +102,11 @@ contains
             DtOut=DtNext)
        ! May need to correct the volume if the time step has been reduced
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
-
        ! Update velocity distribution function
        Distribution_IIB(1:nP, 1:nX, iLine) = &
             Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
-       ! set the left boundary condition (for diffusion)
+
+       ! Diffuse the distribution function
        if(UseDiffusion) then
           if(UseUpperEndBc) then
              call diffuse_distribution(iLine, nX, iShock, Dt,         &
@@ -149,8 +149,8 @@ contains
   end subroutine advect_via_poisson
   !============================================================================
   subroutine iterate_poisson(iLine, nX, iShock, CflIn, uSi_I, nSi_I, BSi_I)
-    ! advect via Possion Bracket scheme
-    ! diffuse the distribution function at each time step
+    ! Advect via Possion Bracket scheme to the steady state
+    ! Diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
@@ -163,7 +163,101 @@ contains
     real,    intent(in):: CflIn     ! input CFL number
     ! Input variables for diffusion
     real,    intent(in):: uSi_I(nX), nSi_I(nX), BSi_I(nX)
+    ! Maximal steps
+    integer, parameter :: nStep = 1000
+    ! Loop variables
+    integer :: iStep, iP, iX
+    ! Volume_G: phase space volume at the end of each iteration
+    real, dimension(0:nP+1, 0:nX+1):: Volume_G
+    ! VolumeXStart_I: geometric volume
+    real, dimension(0:nX+1):: VolumeX_I
+    ! Hamiltonian
+    real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
+    ! Extended array for distribution function
+    real    :: VDF_G(-1:nP+2, -1:nX+2)
+    ! Advection term
+    real    :: Source_C(nP, nX)
+    ! Time step
+    real    :: Dt_C(nP, nX), DtLocal_I(nX)
+    ! Distribution function at the last loop
+    real    :: DistributionOld_IIB(nP, nX)
+    ! Declare the residual (difference) norm and threshold of two
+    ! distribution functions at previous and current time steps
+    real    :: DiffDistNorm
+    real, parameter :: DiffThreshold = 1.0E-3
+    ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
+    ! Initialize arrays
+    VolumeX_I(1:nX) = 1/nSi_I(1:nX)
+    VolumeX_I(0)    = VolumeX_I(1)
+    VolumeX_I(nX+1) = VolumeX_I(nX)
+    ! Phase volume: initial values
+    do iP = 0, nP+1
+       Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I
+    end do
+
+    do iStep = 1, nStep
+       ! Record the distribution function at previous time step
+       DistributionOld_IIB(1:nP, 1:nX) = Distribution_IIB(1:nP, 1:nX, iLine)
+
+       ! Update bc for at minimal and maximal energy (left BC)
+       call set_momentum_bc(iLine, nX, nSi_I, iShock)
+       call set_VDF
+       call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
+            Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,  &
+            IsSteadyState=.true., DtOut_C=Dt_C)
+
+       !!! Do we need to update the Volume_G here? !!!
+
+       ! Update velocity distribution function
+       Distribution_IIB(1:nP, 1:nX, iLine) = &
+            Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
+
+       ! Diffuse the distribution function
+       if(UseDiffusion) then
+          ! Convert 2D Dt_C(1:nP, 1:nX) into DtLocal_I(1:nX)
+          do iX = 1, nX
+             DtLocal_I(nX) = minval(Dt_C(:, iX))
+          end do
+          if(UseUpperEndBc) then
+             call diffuse_distribution(iLine, nX, iShock, DtLocal_I,  &
+                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
+                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+          else
+             call diffuse_distribution(iLine, nX, iShock, DtLocal_I,  &
+                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+          end if
+       end if
+
+       DiffDistNorm = sqrt(sum((DistributionOld_IIB(1:nP, 1:nX) -     &
+            Distribution_IIB(1:nP, 1:nX, iLine))**2))
+       if(DiffDistNorm <= DiffThreshold) EXIT
+    end do
+  contains
+    !==========================================================================
+    subroutine set_VDF
+      ! We need the VDF on the extended grid with two layers of ghost cells,
+      ! to solve the second order scheme. Add solution in physical cells and
+      ! in a single layer of the ghost cells along the momentum coordinate:
+      !------------------------------------------------------------------------
+      VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
+      ! Apply bc along the line coordinate:
+      VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*  &
+           (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
+      if(UseUpperEndBc) then
+         call set_upper_end_bc(iLine, nX)
+         VDF_G(1:nP, nX+1) = UpperEndBc_I
+         VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
+      else
+         VDF_G(0:nP+1, nX+1) = Background_I
+      end if
+      ! Add a second layer of the ghost cells along the line coordinate:
+      VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
+      VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
+      ! Add a second layer of the ghost cells along the momentum coordinate:
+      VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
+    end subroutine set_VDF
+    !==========================================================================
   end subroutine iterate_poisson
   !============================================================================
 end module SP_ModAdvancePoisson
