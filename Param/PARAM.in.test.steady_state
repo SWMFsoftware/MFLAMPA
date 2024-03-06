@@ -46,11 +46,11 @@ mh2d flux ascii
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType
-0.2402397832		ScaleTurbulence [AU] at 1 AU
+0.2402397832	ScaleTurbulence [AU] at 1 AU
 
 #STOP
 10			nIterMax
--1.0			TimeMax
+-1.0		TimeMax
 
 #RUN
 
@@ -62,7 +62,7 @@ T			UseFixedMeanFreePathUpstream
 
 #STOP
 20			nIterMax
--1.0			TimeMax
+-1.0		TimeMax
 
 End session: 1
 #END ##########################################################################

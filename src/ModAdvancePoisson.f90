@@ -21,7 +21,6 @@ contains
     ! diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
-    ! use SP_ModSize, ONLY: nVertexMax
     use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
          Distribution_IIB, Momentum_I, Background_I
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
