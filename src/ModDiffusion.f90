@@ -100,7 +100,7 @@ contains
          nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
   end subroutine diffuse_distribution_s
   !============================================================================
-  subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocal_I, &
+  subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocal_II, &
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! diffuse the distribution function with vector/local Dt
     use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, Distribution_IIB
@@ -109,7 +109,7 @@ contains
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
-    real, intent(in) :: DtLocal_I(1:nX)  ! Local time step for diffusion
+    real, intent(in) :: DtLocal_II(nP,nX)  ! Local time step for diffusion
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
     ! Given spectrum of particles at low end (flare acceleration)
     real, intent(in), optional :: LowerEndSpectrum_I(nP)
@@ -201,21 +201,21 @@ contains
        ! Set elements of tri-diagonal matrix in the LHS
        Main_I = 1.0
        ! For i=1:
-       Aux1 = DtLocal_I(1)*DOuterSi_I(1)*                            &
+       Aux1 = DtLocal_II(iP,1)*DOuterSi_I(1)*                            &
             0.5*(DInnerSi_I(1) + DInnerSi_I(2))/DsMesh_I(2)**2
        Main_I(1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
        if(present(LowerEndSpectrum_I)) then
-          Aux2 = DtLocal_I(1)*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
+          Aux2 = DtLocal_II(iP,1)*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
           Main_I(1) = Main_I(1) + Aux2
           Res_I(1) = Res_I(1) + Aux2*LowerEndSpectrum_I(iP)
        end if
        ! For i=2, n-1:
        do iVertex = 2, nX-1
-          Aux1 = DtLocal_I(iVertex)*DOuterSi_I(iVertex)*             &
+          Aux1 = DtLocal_II(iP,iVertex)*DOuterSi_I(iVertex)*             &
                0.5*(DInnerSi_I(iVertex  ) + DInnerSi_I(iVertex+1))/  &
                (DsMesh_I(iVertex+1)*DsFace_I(iVertex))
-          Aux2 = DtLocal_I(iVertex)*DOuterSi_I(iVertex)*             &
+          Aux2 = DtLocal_II(iP,iVertex)*DOuterSi_I(iVertex)*             &
                0.5*(DInnerSi_I(iVertex-1) + DInnerSi_I(iVertex  ))/  &
                (DsMesh_I(iVertex)*DsFace_I(iVertex))
           Main_I(iVertex)  = Main_I(iVertex) + Aux1 + Aux2
@@ -224,12 +224,13 @@ contains
        end do
 
        ! For i=n:
-       Aux2 = DtLocal_I(nX)*DOuterSi_I(nX)*                          &
+       Aux2 = DtLocal_II(iP,nX)*DOuterSi_I(nX)*                          &
             0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/DsMesh_I(nX)**2
        Main_I( nX) = Main_I(nX) + Aux2
        Lower_I(nX) = -Aux2
        if(present(UpperEndSpectrum_I)) then
-          Aux1 = DtLocal_I(nX)*DOuterSi_I(nX)*DInnerSi_I(nX)/DsMesh_I(nX)**2
+          Aux1 = DtLocal_II(iP,nX)*DOuterSi_I(nX)*DInnerSi_I(nX)/&
+               DsMesh_I(nX)**2
           Main_I(nX) = Main_I(nX) + Aux1
           Res_I(nX) = Res_I(nX) + Aux1*UpperEndSpectrum_I(iP)
        end if

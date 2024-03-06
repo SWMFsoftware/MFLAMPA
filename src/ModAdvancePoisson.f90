@@ -178,13 +178,7 @@ contains
     ! Advection term
     real    :: Source_C(nP, nX)
     ! Time step
-    real    :: Dt_C(nP, nX), DtLocal_I(nX)
-    ! Distribution function at the last loop
-    real    :: DistributionOld_IIB(nP, nX)
-    ! Declare the residual (difference) norm and threshold of two
-    ! distribution functions at previous and current time steps
-    real    :: DiffDistNorm
-    real, parameter :: DiffThreshold = 1.0E-3
+    real    :: Dt_C(nP, nX)!  , DtLocal_I(nX)
     ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
     ! Initialize arrays
@@ -196,43 +190,28 @@ contains
        Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I
     end do
 
-    do iStep = 1, nStep
-       ! Record the distribution function at previous time step
-       DistributionOld_IIB(1:nP, 1:nX) = Distribution_IIB(1:nP, 1:nX, iLine)
+    ! Update bc for at minimal and maximal energy (left BC)
+    call set_momentum_bc(iLine, nX, nSi_I, iShock)
+    call set_VDF
+    call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
+         Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,  &
+         IsSteadyState=.true., DtOut_C=Dt_C)
 
-       ! Update bc for at minimal and maximal energy (left BC)
-       call set_momentum_bc(iLine, nX, nSi_I, iShock)
-       call set_VDF
-       call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
-            Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,  &
-            IsSteadyState=.true., DtOut_C=Dt_C)
+    ! Update velocity distribution function
+    Distribution_IIB(1:nP, 1:nX, iLine) = &
+         Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
 
-       !!! Do we need to update the Volume_G here? !!!
-
-       ! Update velocity distribution function
-       Distribution_IIB(1:nP, 1:nX, iLine) = &
-            Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
-
-       ! Diffuse the distribution function
-       if(UseDiffusion) then
-          ! Convert 2D Dt_C(1:nP, 1:nX) into DtLocal_I(1:nX)
-          do iX = 1, nX
-             DtLocal_I(nX) = minval(Dt_C(:, iX))
-          end do
-          if(UseUpperEndBc) then
-             call diffuse_distribution(iLine, nX, iShock, DtLocal_I,  &
-                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
-                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
-          else
-             call diffuse_distribution(iLine, nX, iShock, DtLocal_I,  &
-                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
-          end if
+    ! Diffuse the distribution function
+    if(UseDiffusion) then
+       if(UseUpperEndBc) then
+          call diffuse_distribution(iLine, nX, iShock, Dt_C,  &
+               nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
+               UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+       else
+          call diffuse_distribution(iLine, nX, iShock, Dt_C,  &
+               nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
        end if
-
-       DiffDistNorm = sqrt(sum((DistributionOld_IIB(1:nP, 1:nX) -     &
-            Distribution_IIB(1:nP, 1:nX, iLine))**2))
-       if(DiffDistNorm <= DiffThreshold) EXIT
-    end do
+    end if
   contains
     !==========================================================================
     subroutine set_VDF
