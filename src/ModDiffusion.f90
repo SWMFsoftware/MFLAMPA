@@ -93,10 +93,10 @@ contains
     ! Given spectrum of particles at upper end (GCRs)
     real, intent(in), optional :: UpperEndSpectrum_I(nP)
     ! LOCAL VARS
-    real :: DtFake_I(1:nX)
+    real :: DtFake_C(nP,nX)
     !--------------------------------------------------------------------------
-    DtFake_I = Dt
-    call diffuse_distribution_arr(iLine, nX, iShock, DtFake_I, &
+    DtFake_C = Dt
+    call diffuse_distribution_arr(iLine, nX, iShock, DtFake_C, &
          nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
   end subroutine diffuse_distribution_s
   !============================================================================
