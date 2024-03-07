@@ -155,13 +155,13 @@ contains
 
     use ModNumConst,        ONLY: cTiny
     use ModPoissonBracket,  ONLY: explicit
-    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
+    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I,         &
          Distribution_IIB, Momentum_I, Background_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, SpectralIndex,    &
+    use SP_ModBc,           ONLY: set_momentum_bc, SpectralIndex,     &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     integer, intent(in):: iLine, iShock ! indices of line and shock
-    integer, intent(in):: nX        ! # of meshes along lnp-coordinate
+    integer, intent(in):: nX        ! # of meshes along lnP-coordinate
     real,    intent(in):: CflIn     ! input CFL number
     ! Input variables for diffusion
     real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX), DsSi_I(nX)
@@ -170,7 +170,7 @@ contains
     ! Volume_G: phase space volume
     real    :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume
-    real    :: VolumeX_I(-1:nX+2)
+    real    :: VolumeX_I(0:nX+1)
     ! Hamiltonian
     real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
@@ -184,8 +184,8 @@ contains
     ! Initialize arrays
     VolumeX_I( 2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +     &
          DsSi_I(1:nX-2)), cTiny)/BSi_I(1:nX-1)
-    VolumeX_I(-1:   1) = DsSi_I(1)/BSi_I(1)
-    VolumeX_I(nX:nX+2) = VolumeX_I(nX-1)
+    VolumeX_I( 0:   1) = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(nX:nX+1) = VolumeX_I(nX-1)
     ! Phase volume: initial values
     do iP = 0, nP+1
        Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I(0:nX+1)

@@ -37,6 +37,13 @@ T
 MH_data_e20120123
 real8
 
+#UPPERENDBC
+T           UseUpperEndBc
+lism        TypeUpperEndBc
+default     TypeLisBc
+T           UseModulationPot
+534.7       ModulationPot
+
 #SAVEPLOT
 2
 mh1d flux ascii
