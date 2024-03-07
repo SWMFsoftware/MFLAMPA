@@ -208,7 +208,7 @@ contains
     ! advance the solution of the diffusive kinetic equation:
     !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and Fermi acceleration
-    use SP_ModGrid,             ONLY: Rho_, B_, Ux_, Uz_, Bx_, Bz_, D_
+    use SP_ModGrid,             ONLY: Rho_, U_, B_, D_
     use SP_ModAdvancePoisson,   ONLY: iterate_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
     ! Loop variable
@@ -216,8 +216,7 @@ contains
     ! For a given line: nVertex_B, iShock_IB:
     integer  :: iEnd, iShock
     ! Local arrays to store the state vectors in SI units
-    real, dimension(1:nVertexMax):: nSi_I, BSi_I, DsSi_I
-    real, dimension(3, 1:nVertexMax):: UxyzSi_II, BxyzSi_II
+    real, dimension(1:nVertexMax):: nSi_I, uSi_I, BSi_I, DsSi_I
     ! go line by line and iterate the solution
     character(len=*), parameter:: NameSub = 'iterate_steady_state'
     !--------------------------------------------------------------------------
@@ -228,8 +227,7 @@ contains
        ! Various data along the line in SI units. Temperature is in the unit
        ! of kinetic energy, all others are in SI units.
        ! Vector U and B are needed for Hamiltonian
-       UxyzSi_II(1:3, 1:iEnd) = State_VIB(Ux_:Uz_, 1:iEnd, iLine)
-       BxyzSi_II(1:3, 1:iEnd) = State_VIB(Bx_:Bz_, 1:iEnd, iLine)
+       uSi_I(1:iEnd)  = State_VIB(   U_, 1:iEnd, iLine)
        BSi_I(1:iEnd)  = State_VIB(   B_, 1:iEnd, iLine)
        ! nSi is needed to set up the distribution at the injection.
        nSI_I(1:iEnd)  = MhData_VIB(Rho_, 1:iEnd, iLine)
@@ -243,9 +241,8 @@ contains
        if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
             iShock, BSi_I(1:iEnd))
        ! Poisson bracket scheme: particle-number-conservative
-       call iterate_poisson(iLine, iEnd, iShock, Cfl,    &
-            UxyzSi_II(3, 1:iEnd), BxyzSi_II(3, 1:iEnd),  &
-            BSi_I(1:iEnd), nSi_I(1:iEnd), DsSi_I(1:iEnd))
+       call iterate_poisson(iLine, iEnd, iShock, Cfl, uSi_I(1:iEnd), &
+           BSi_I(1:iEnd), nSi_I(1:iEnd), DsSi_I(1:iEnd))
     end do
   end subroutine iterate_steady_state
   !============================================================================

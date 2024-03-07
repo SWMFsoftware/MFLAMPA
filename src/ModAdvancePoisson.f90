@@ -149,7 +149,7 @@ contains
   end subroutine advect_via_poisson
   !============================================================================
   subroutine iterate_poisson(iLine, nX, iShock, CflIn, &
-       UxyzSi_II, BxyzSi_II, BSi_I, nSi_I, DsSi_I)
+       uSi_I, BSi_I, nSi_I, DsSi_I)
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
@@ -164,9 +164,7 @@ contains
     integer, intent(in):: nX        ! # of meshes along lnp-coordinate
     real,    intent(in):: CflIn     ! input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: BSi_I(nX), nSi_I(nX), DsSi_I(nX)
-    ! Input variables for Hamitonian
-    real,    intent(in):: UxyzSi_II(3, nX), BxyzSi_II(3, nX)
+    real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX), DsSi_I(nX)
     ! Loop variable
     integer :: iP
     ! Volume_G: phase space volume
@@ -187,17 +185,17 @@ contains
     VolumeX_I( 2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +     &
          DsSi_I(1:nX-2)), cTiny)/BSi_I(1:nX-1)
     VolumeX_I(-1:   1) = DsSi_I(1)/BSi_I(1)
-    VolumeX_I(nX:nX+2) = DsSi_I(nX)/BSi_I(nX)
+    VolumeX_I(nX:nX+2) = VolumeX_I(nX-1)
     ! Phase volume: initial values
     do iP = 0, nP+1
        Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
     end do
-    ! do iP = -1, nP+1
-    !    Hamiltonian_N(iP, 1:nX) = sum(UxyzSi_II(:,1:nX)*BxyzSi_II(:,1:nX), &
-    !       dim=1)/(BSi_I(1:nX)**2)*Momentum3_I(iP)
-    !    Hamiltonian_N(iP, -1:0) = Hamiltonian_N(iP, 1)
-    !    Hamiltonian_N(iP, nX+1) = Hamiltonian_N(iP, nX)
-    ! end do
+    ! Calculate Hamiltonian = (u/B)*(p**3/3)
+    do iP = -1, nP+1
+       Hamiltonian_N(iP, 1:nX) = uSi_I/BSi_I*Momentum3_I(iP)
+       Hamiltonian_N(iP, -1:0) = Hamiltonian_N(iP, 1)
+       Hamiltonian_N(iP, nX+1) = Hamiltonian_N(iP, nX)
+    end do
 
     ! Update bc for at minimal and maximal energy (left BC)
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
