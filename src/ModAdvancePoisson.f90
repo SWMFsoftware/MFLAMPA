@@ -148,29 +148,31 @@ contains
     !==========================================================================
   end subroutine advect_via_poisson
   !============================================================================
-  subroutine iterate_poisson(iLine, nX, iShock, CflIn, uSi_I, nSi_I, BSi_I)
+  subroutine iterate_poisson(iLine, nX, iShock, CflIn, &
+       UxyzSi_II, BxyzSi_II, BSi_I, nSi_I, DsSi_I)
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
-    use ModPoissonBracket, ONLY: explicit
+    use ModNumConst,        ONLY: cTiny
+    use ModPoissonBracket,  ONLY: explicit
     use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
          Distribution_IIB, Momentum_I, Background_I
-    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex, &
+    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,           ONLY: set_momentum_bc, SpectralIndex,    &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     integer, intent(in):: iLine, iShock ! indices of line and shock
     integer, intent(in):: nX        ! # of meshes along lnp-coordinate
     real,    intent(in):: CflIn     ! input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: uSi_I(nX), nSi_I(nX), BSi_I(nX)
-    ! Maximal steps
-    integer, parameter :: nStep = 1000
-    ! Loop variables
-    integer :: iStep, iP, iX
-    ! Volume_G: phase space volume at the end of each iteration
-    real, dimension(0:nP+1, 0:nX+1):: Volume_G
-    ! VolumeXStart_I: geometric volume
-    real, dimension(0:nX+1):: VolumeX_I
+    real,    intent(in):: BSi_I(nX), nSi_I(nX), DsSi_I(nX)
+    ! Input variables for Hamitonian
+    real,    intent(in):: UxyzSi_II(3, nX), BxyzSi_II(3, nX)
+    ! Loop variable
+    integer :: iP
+    ! Volume_G: phase space volume
+    real    :: Volume_G(0:nP+1, 0:nX+1)
+    ! VolumeX_I: geometric volume
+    real    :: VolumeX_I(-1:nX+2)
     ! Hamiltonian
     real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
@@ -178,17 +180,24 @@ contains
     ! Advection term
     real    :: Source_C(nP, nX)
     ! Time step
-    real    :: Dt_C(nP, nX)!  , DtLocal_I(nX)
+    real    :: Dt_C(nP, nX)
     ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
     ! Initialize arrays
-    VolumeX_I(1:nX) = 1/nSi_I(1:nX)
-    VolumeX_I(0)    = VolumeX_I(1)
-    VolumeX_I(nX+1) = VolumeX_I(nX)
+    VolumeX_I( 2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +     &
+         DsSi_I(1:nX-2)), cTiny)/BSi_I(1:nX-1)
+    VolumeX_I(-1:   1) = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(nX:nX+2) = DsSi_I(nX)/BSi_I(nX)
     ! Phase volume: initial values
     do iP = 0, nP+1
-       Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I
+       Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
     end do
+    ! do iP = -1, nP+1
+    !    Hamiltonian_N(iP, 1:nX) = sum(UxyzSi_II(:,1:nX)*BxyzSi_II(:,1:nX), &
+    !       dim=1)/(BSi_I(1:nX)**2)*Momentum3_I(iP)
+    !    Hamiltonian_N(iP, -1:0) = Hamiltonian_N(iP, 1)
+    !    Hamiltonian_N(iP, nX+1) = Hamiltonian_N(iP, nX)
+    ! end do
 
     ! Update bc for at minimal and maximal energy (left BC)
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -204,11 +213,11 @@ contains
     ! Diffuse the distribution function
     if(UseDiffusion) then
        if(UseUpperEndBc) then
-          call diffuse_distribution(iLine, nX, iShock, Dt_C,  &
-               nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
+          call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
+               nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),  &
                UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
        else
-          call diffuse_distribution(iLine, nX, iShock, Dt_C,  &
+          call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
                nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
        end if
     end if
