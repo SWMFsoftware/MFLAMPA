@@ -208,7 +208,7 @@ contains
     BNodeSi_I(nX+1)   = BNodeSi_I(nX)
     ! Calculate Hamiltonian = (u/B)*(p**3/3), node-centered
     do iP = -1, nP+1
-       Hamiltonian_N(iP, :) = uNodeSi_I/BNodeSi_I*Momentum3_I(iP)
+       Hamiltonian_N(iP, :) = -uNodeSi_I/BNodeSi_I*Momentum3_I(iP)
     end do
 
     ! Update bc for at minimal and maximal energy (left BC)
