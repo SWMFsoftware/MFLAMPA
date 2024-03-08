@@ -197,13 +197,13 @@ contains
     ! Calculate node-centered u=|vector{u}*vector{B}|/|vector{B}|
     uNodeSi_I(2:nX-1) = 0.5*(uSi_I(2:nX-1)+uSi_I(1:nX-2))
     uNodeSi_I(1)      = uSi_I(1)
-    uNodeSi_I(0)      = uNodeSi_I(1)
+    uNodeSi_I(-1:0)   = uNodeSi_I(1)
     uNodeSi_I(nX)     = uSi_I(nX)
     uNodeSi_I(nX+1)   = uNodeSi_I(nX)
     ! Calculate node-centered B=|vector{B}|
     BNodeSi_I(2:nX-1) = 0.5*(BSi_I(2:nX-1)+BSi_I(1:nX-2))
     BNodeSi_I(1)      = BSi_I(1)
-    BNodeSi_I(0)      = BNodeSi_I(1)
+    BNodeSi_I(-1:0)   = BNodeSi_I(1)
     BNodeSi_I(nX)     = BSi_I(nX)
     BNodeSi_I(nX+1)   = BNodeSi_I(nX)
     ! Calculate Hamiltonian = (u/B)*(p**3/3), node-centered
