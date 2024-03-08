@@ -183,9 +183,11 @@ contains
     !--------------------------------------------------------------------------
     ! Initialize arrays
     VolumeX_I( 2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +     &
-         DsSi_I(1:nX-2)), cTiny)/BSi_I(1:nX-1)
-    VolumeX_I( 0:   1) = DsSi_I(1)/BSi_I(1)
-    VolumeX_I(nX:nX+1) = VolumeX_I(nX-1)
+         DsSi_I(1:nX-2)), cTiny)/BSi_I(2:nX-1)
+    VolumeX_I(1)    = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(0)    = VolumeX_I(1)
+    VolumeX_I(nX)   = DsSi_I(nX-1)/BSi_I(nX)
+    VolumeX_I(nX+1) = VolumeX_I(nX)
     ! Phase volume: initial values
     do iP = 0, nP+1
        Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
