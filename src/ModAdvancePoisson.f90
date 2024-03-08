@@ -171,6 +171,8 @@ contains
     real    :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume
     real    :: VolumeX_I(0:nX+1)
+    ! Node-centered u and B variables
+    real    :: uNodeSi_I(-1:nX+1), BNodeSi_I(-1:nX+1)
     ! Hamiltonian
     real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
@@ -182,21 +184,31 @@ contains
     ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
     ! Initialize arrays
-    VolumeX_I( 2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +     &
+    VolumeX_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +      &
          DsSi_I(1:nX-2)), cTiny)/BSi_I(2:nX-1)
-    VolumeX_I(1)    = DsSi_I(1)/BSi_I(1)
-    VolumeX_I(0)    = VolumeX_I(1)
-    VolumeX_I(nX)   = DsSi_I(nX-1)/BSi_I(nX)
-    VolumeX_I(nX+1) = VolumeX_I(nX)
+    VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(0)      = VolumeX_I(1)
+    VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
+    VolumeX_I(nX+1)   = VolumeX_I(nX)
     ! Phase volume: initial values
     do iP = 0, nP+1
        Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
     end do
-    ! Calculate Hamiltonian = (u/B)*(p**3/3)
+    ! Calculate node-centered u=|vector{u}*vector{B}|/|vector{B}|
+    uNodeSi_I(2:nX-1) = 0.5*(uSi_I(2:nX-1)+uSi_I(1:nX-2))
+    uNodeSi_I(1)      = uSi_I(1)
+    uNodeSi_I(0)      = uNodeSi_I(1)
+    uNodeSi_I(nX)     = uSi_I(nX)
+    uNodeSi_I(nX+1)   = uNodeSi_I(nX)
+    ! Calculate node-centered B=|vector{B}|
+    BNodeSi_I(2:nX-1) = 0.5*(BSi_I(2:nX-1)+BSi_I(1:nX-2))
+    BNodeSi_I(1)      = BSi_I(1)
+    BNodeSi_I(0)      = BNodeSi_I(1)
+    BNodeSi_I(nX)     = BSi_I(nX)
+    BNodeSi_I(nX+1)   = BNodeSi_I(nX)
+    ! Calculate Hamiltonian = (u/B)*(p**3/3), node-centered
     do iP = -1, nP+1
-       Hamiltonian_N(iP, 1:nX) = uSi_I/BSi_I*Momentum3_I(iP)
-       Hamiltonian_N(iP, -1:0) = Hamiltonian_N(iP, 1)
-       Hamiltonian_N(iP, nX+1) = Hamiltonian_N(iP, nX)
+       Hamiltonian_N(iP, :) = uNodeSi_I*BNodeSi_I*Momentum3_I(iP)
     end do
 
     ! Update bc for at minimal and maximal energy (left BC)
