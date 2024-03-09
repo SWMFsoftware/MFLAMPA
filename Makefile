@@ -118,8 +118,8 @@ test_steady:
 	${MAKE} test_steady_rundir
 	@echo "test_steady_run..." >> test_steady.diff
 	${MAKE} test_run
-# @echo "test_poisson_check..." >> test_poisson.diff
-# ${MAKE} test_poisson_check
+	@echo "test_steady_check..." >> test_steady.diff
+	${MAKE} test_steady_check
 
 test_mflampa_compile:
 	./Config.pl -g=20000
@@ -156,10 +156,19 @@ test_poisson_check:
 		${TESTDIR}/SP/IO2/MH_data.outs \
 		data/output/test_mflampa/MH_poisson_data.ref.gz \
 		> test_poisson.diff
-	ls -l test_*.diff
+	ls -l test_poisson.diff
 
 test_steady_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cd ${TESTDIR}; cp -f Param/PARAM.in.test.steady_state PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
+
+test_steady_check:
+	cat ${TESTDIR}/SP/IO2/MH_data_*n000020.out \
+		> ${TESTDIR}/SP/IO2/MH_data.outs
+	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/MH_data.outs \
+		data/output/test_mflampa/MH_steady_data.ref.gz \
+		> test_steady.diff
+	ls -l test_*.diff
