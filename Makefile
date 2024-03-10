@@ -91,39 +91,33 @@ TESTDIR = run_test
 BLESS=NO
 
 test:
+	rm -f test*.diff
 	${MAKE} test_mflampa
 	${MAKE} test_poisson TESTDIR=run_poisson
 	${MAKE} test_steady TESTDIR=run_steady
+	ls -l test*.diff
 
+# Same for all tests
+test_compile:
+	./Config.pl -g=20000
+	${MAKE} 
+
+# Same for all tests
+test_run:
+	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
+
+#### MFLAMPA test
 test_mflampa:
 	@echo "test_mflampa_compile..." > test_mflampa.diff
 	${MAKE} test_mflampa_compile
 	@echo "test_mflampa_rundir..." >> test_mflampa.diff
 	${MAKE} test_mflampa_rundir
 	@echo "test_mflampa_run..." >> test_mflampa.diff
-	${MAKE} test_run
+	${MAKE} test_mflampa_run
 	@echo "test_mflampa_check..." >> test_mflampa.diff
 	${MAKE} test_mflampa_check
 
-test_poisson:
-	@echo "test_poisson_rundir..." > test_poisson.diff
-	${MAKE} test_poisson_rundir
-	@echo "test_poisson_run..." >> test_poisson.diff
-	${MAKE} test_run
-	@echo "test_poisson_check..." >> test_poisson.diff
-	${MAKE} test_poisson_check
-
-test_steady:
-	@echo "test_steady_rundir..." > test_steady.diff
-	${MAKE} test_steady_rundir
-	@echo "test_steady_run..." >> test_steady.diff
-	${MAKE} test_run
-	@echo "test_steady_check..." >> test_steady.diff
-	${MAKE} test_steady_check
-
-test_mflampa_compile:
-	./Config.pl -g=20000
-	${MAKE} 
+test_mflampa_compile: test_compile
 
 test_mflampa_rundir: 
 	rm -rf ${TESTDIR}
@@ -131,8 +125,7 @@ test_mflampa_rundir:
 	cd ${TESTDIR}; cp -f Param/PARAM.in.test PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
-test_run:
-	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
+test_mflampa_run: test_run
 
 test_mflampa_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
@@ -143,11 +136,27 @@ test_mflampa_check:
 		> test_mflampa.diff
 	ls -l test_mflampa.diff
 
+#### Poisson test
+
+test_poisson:
+	@echo "test_poisson_compile..." > test_poisson.diff
+	${MAKE} test_poisson_compile
+	@echo "test_poisson_rundir..." >> test_poisson.diff
+	${MAKE} test_poisson_rundir
+	@echo "test_poisson_run..." >> test_poisson.diff
+	${MAKE} test_poisson_run
+	@echo "test_poisson_check..." >> test_poisson.diff
+	${MAKE} test_poisson_check
+
+test_poisson_compile: test_compile
+
 test_poisson_rundir: 
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cd ${TESTDIR}; cp -f Param/PARAM.in.testpoisson PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
+
+test_poisson_run: test_run
 
 test_poisson_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
@@ -158,11 +167,27 @@ test_poisson_check:
 		> test_poisson.diff
 	ls -l test_poisson.diff
 
+#### Steady state test
+
+test_steady:
+	@echo "test_steady_compile..." > test_steady.diff
+	${MAKE} test_steady_compile
+	@echo "test_steady_rundir..." >> test_steady.diff
+	${MAKE} test_steady_rundir
+	@echo "test_steady_run..." >> test_steady.diff
+	${MAKE} test_steady_run
+	@echo "test_steady_check..." >> test_steady.diff
+	${MAKE} test_steady_check
+
+test_steady_compile: test_compile
+
 test_steady_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cd ${TESTDIR}; cp -f Param/PARAM.in.test.steady_state PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
+
+test_steady_run: test_run
 
 test_steady_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_*n000020.out \
@@ -171,4 +196,4 @@ test_steady_check:
 		${TESTDIR}/SP/IO2/MH_data.outs \
 		data/output/test_mflampa/MH_steady_data.ref.gz \
 		> test_steady.diff
-	ls -l test_*.diff
+	ls -l test_steady.diff
