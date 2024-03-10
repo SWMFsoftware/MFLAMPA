@@ -13,7 +13,7 @@ module SP_ModMain
   private ! except
 
   ! Indicator of stand alone mode
-  logical:: IsStandAlone=.false.
+  logical:: IsStandAlone = .false.
 
   ! Stopping conditions. These variables are only used in stand alone mode.
   real    :: TimeMax     = -1.0, CpuTimeMax = -1.0
@@ -24,11 +24,11 @@ module SP_ModMain
   ! Logicals for actions
   !----------------------
   ! run the component
-  logical:: DoRun = .true.
+  logical :: DoRun       = .true.
   ! restart the run
-  logical:: DoRestart = .false.
+  logical :: DoRestart   = .false.
   ! Methods and variables from ModReadMhData
-  public :: DoReadMhData
+  public  :: DoReadMhData
 
   ! Methods and variables from this module
   public:: read_param, initialize, finalize, run, check, DoRestart,        &
@@ -75,7 +75,7 @@ contains
           call read_var('DoRestart',DoRestart)
           ! read parameters for each module
        case('#ORIGIN')
-          if(IsStandAlone)CYCLE
+          if(IsStandAlone) CYCLE
           call read_param_origin
        case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
             '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
@@ -183,7 +183,7 @@ contains
     call init_plot
     ! if(DoReadMhData), inialize MH data reader and reads the first data file
     call init_mhdata
-    if(UseTurbulentSpectrum)call init_turbulence
+    if(UseTurbulentSpectrum) call init_turbulence
     call init_spread
     if(DoRestart) call read_restart
   end subroutine initialize
@@ -214,15 +214,15 @@ contains
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
-    logical, save:: IsFirstCall = .true.
-    real:: Dt ! time increment in the current call
+    logical, save :: IsFirstCall = .true.
+    real :: Dt ! time increment in the current call
 
     ! write the initial background state to the output file
     !--------------------------------------------------------------------------
     if(IsFirstCall)then
        ! recompute the derived components of state vector, e.g.
        ! magnitude of magnetic field and velocity etc. Smooth if needed.
-       if(.not.DoReadMhData)call get_other_state_var
+       if(.not.DoReadMhData) call get_other_state_var
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
        ! compute magnetic fluxes associated with lines if needed
@@ -230,7 +230,7 @@ contains
 
        IsFirstCall = .false.
     end if
-    if(IsSTeadyState)then
+    if(IsSteadyState)then
        call iterate_steady_state
     else
        ! May need to read background data from files
@@ -247,18 +247,18 @@ contains
        call get_other_state_var
        ! if no new background data loaded, don't advance in time
        if(DataInputTime <= SPTime) RETURN
-       if(DoTraceShock)call get_shock_location
+       if(DoTraceShock) call get_shock_location
        ! run the model
-       if(DoRun) call advance(min(DataInputTime,TimeLimit))
+       if(DoRun) call advance(min(DataInputTime, TimeLimit))
     end if
     ! update time & iteration counters
     iIter = iIter + 1
-    Dt = min(DataInputTime,TimeLimit) - SPTime
+    Dt = min(DataInputTime, TimeLimit) - SPTime
     SPTime = SPTime + Dt
     call save_plot_all
 
     ! save restart in the stand alone mod
-    if(IsStandAlone)call stand_alone_save_restart(Dt)
+    if(IsStandAlone) call stand_alone_save_restart(Dt)
   end subroutine run
   !============================================================================
   subroutine check

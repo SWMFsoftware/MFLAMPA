@@ -65,7 +65,7 @@ program MFLAMPA
         call init_grid        ! Similar to SP_set_param('GRID')
         call init_stand_alone ! Distinctions from SWMF (CON_bline) version
         call SP_initialize    ! Similar to SP_init_session, NO origin points
-        call init_time        ! StartTime, StartTimeJulian from  StartTime_I
+        call init_time        ! StartTime, StartTimeJulian from StartTime_I
         ! DataInputTime=0, SPTime=0 unless set in PARAM.in or restart.H
         ! In SWMF, SPTime is set in SP_set_param('CHECK'), DataInput time is
         ! set either in coupling or in reading the MHD data from file.
@@ -75,12 +75,12 @@ program MFLAMPA
         if(nTiming > -3) call timing_report_total
         if(iProc==0)&
              write(*,*)'Resetting timing counters after setup.'
-        call timing_reset('#all',3)
+        call timing_reset('#all', 3)
      end if
 
      TIMELOOP: do
-        if(stop_condition_true())EXIT TIMELOOP
-        if(is_time_to_stop())EXIT SESSIONLOOP
+        if(stop_condition_true()) EXIT TIMELOOP
+        if(is_time_to_stop()) EXIT SESSIONLOOP
         call timing_step(iIter + 1)
 
         if(TimeMax > 0.0)then
