@@ -68,7 +68,6 @@ rundir:
 		cp -f Param/PARAM.in.test ${RUNDIR}/PARAM.in; \
 		touch ${RUNDIR}/core; chmod 444 ${RUNDIR}/core; \
 		cd ${RUNDIR}; ln -s ${BINDIR}/${DEFAULT_EXE} .; \
-		ln -s SP/* .; \
 	fi);
 
 clean:  install
@@ -122,7 +121,7 @@ test_mflampa_compile: test_compile
 test_mflampa_rundir: 
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cd ${TESTDIR}; cp -f Param/PARAM.in.test PARAM.in
+	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
 test_mflampa_run: test_run
@@ -153,7 +152,7 @@ test_poisson_compile: test_compile
 test_poisson_rundir: 
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cd ${TESTDIR}; cp -f Param/PARAM.in.testpoisson PARAM.in
+	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.testpoisson PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
 test_poisson_run: test_run
@@ -176,6 +175,8 @@ test_steady:
 	${MAKE} test_steady_rundir
 	@echo "test_steady_run..." >> test_steady.diff
 	${MAKE} test_steady_run
+	@echo "test_steady_restart..." >> test_steady.diff
+	${MAKE} test_steady_restart
 	@echo "test_steady_check..." >> test_steady.diff
 	${MAKE} test_steady_check
 
@@ -184,10 +185,15 @@ test_steady_compile: test_compile
 test_steady_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cd ${TESTDIR}; cp -f Param/PARAM.in.test.steady_state PARAM.in
+	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test.steady.start PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
 test_steady_run: test_run
+
+test_steady_restart::
+	cd ${TESTDIR}; ${SCRIPTDIR}/Restart.pl; rm -f PARAM.in; \
+	cp -f SP/Param/PARAM.in.test.steady.restart PARAM.in
+	${MAKE} test_run
 
 test_steady_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_*n000020.out \
