@@ -78,7 +78,8 @@ contains
           if(IsStandAlone) CYCLE
           call read_param_origin
        case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
-            '#CHECKGRIDSIZE','#DOSMOOTH', '#GRIDNODE')
+            '#CHECKGRIDSIZE', '#GRIDNODE') 
+            ! Currently we do not need '#DOSMOOTH'
           if(i_session_read() /= 1) CYCLE
           call read_param_grid(NameCommand)
        case('#MOMENTUMGRID', '#FLUXINITIAL', '#FLUXCHANNEL')
