@@ -28,7 +28,19 @@ Origin points on the surface R=ROrigin in the intervals of longitude,
 (LonMin,LonMax) and latitude, (LatMin,LatMax). Originating from these
 points are the magnetic field lines traced down from ROrigin to RScMin
 and up from ROrigin to RIhMax. 
+</command>
+</commandgroup>
 
+<commandgroup name="UNIT">
+
+<command name="PARTICLEENERGYUNIT">
+  <parameter name="ParticleEnergyUnit" type="string" default="keV"/>
+
+#PARTICLEENERGYUNIT
+keV             ParticleEnergyUnit
+
+The particle energy unit: for example, keV, MeV, GeV, etc.
+We use keV as the default value.
 </command>
 </commandgroup>
 
@@ -116,6 +128,20 @@ This command is allowed in stand alone mode only for the sake of the
 test suite, which contains these commands when the framework is tested.
 </command>
 
+<command name="SAVERESTART" if="$_IsStandAlone">
+	<parameter name="DoSaveRestart" type="logical" default="F" />
+	<parameter name="DnSaveRestart" type="integer" default="-1" />
+	<parameter name="DtSaveRestart" type="real" default="-1.0" />
+
+#SAVERESTART
+F			DoSaveRestart
+-1			DnSaveRestart
+-1.0		DtSaveRestart
+
+Determine whether and when to save the restart file (STAND ALONE ONLY)
+Set default value as: False, -1, and -1.0
+</command>
+
 <command name="RUN" if="$_IsStandAlone">
 
 #RUN
@@ -128,6 +154,14 @@ the current set of parameters. The parameters for the next session
 start after the #RUN command. For the last session there is no
 need to use the #RUN command, since the #END command or simply
 the end of the PARAM.in file makes MFLAMPA execute the last session.
+</command>
+
+<command name="TEST">
+
+#TEST
+
+The #TEST command signals the test of the included file or the
+end of the PARAM.in file. 
 </command>
 
 <command name="END">
@@ -173,7 +207,6 @@ corresponding condition is  not checked.
 The #STOP command must be used in every session.
 </command>
 
-
 <command name="CHECKSTOPFILE" if="$_IsStandAlone">
 	<parameter name="DoCheckStopFile" type="logical" default="T" />
 
@@ -193,6 +226,20 @@ appropriate parameters.
 
 The default is DoCheckStopFile=.true.
 </command>
+
+<command name="ECHO" if="$_IsStandAlone">
+	<parameter name="DoEcho" type="logical" default="T" />
+
+#ECHO
+T			DoEcho
+
+This command is only used in stand alone mode.
+
+If DoEcho is true then the code set the parameters to be echoed
+
+The default is DoEcho=.false.
+</command>
+
 
 <command name="CPUTIMEMAX" if="$_IsStandAlone">
 	<parameter name="CpuTimeMax" type="real" min="-1" default="-1" />
@@ -232,6 +279,68 @@ Check if the configured parameters of the Lagrangian grid match those
 assumed in the input files
 </command>
 
+<command name="GRIDNODE">
+	<parameter name="nLon"  type="integer" default="20" />
+	<parameter name="nLat"  type="integer" default="20" />
+
+#GRIDNODE
+    4     nLon
+    4     nLat
+
+Set the configured parameters of the Lagrangian grid
+</command>
+
+<command name="TESTPOS">
+	<parameter name="iNodeTest"  type="integer" default="1" />
+	<parameter name="iParticleTest"  type="integer" default="99" />
+	<parameter name="iPTest"  type="integer" default="1" />
+
+#TESTPOS
+    1     iNodeTest
+    99    iParticleTest
+    1     iPTest
+
+Set the test position and momentum
+</command>
+
+<command name="SPREADGRID">
+	<parameter name="nSpreadLon"  type="integer" min="1" />
+	<parameter name="nSpreadLat"  type="integer" min="1" />
+
+#PREADGRID
+    6  	  nSpreadLon
+    6  	  nSpreadLat
+
+Set the size of angular grid in longitude and latitude
+</command>
+
+<command name="SPREADSIGMA">
+	<parameter name="SigmaMode"  type="string" />
+	<parameter name="Sigma [deg]"  type="real" />
+
+#SPREADGRID
+    const  	  SigmaMode
+	5.0	      Sigma [deg]
+
+Set the sigma changes to the lines:
+SigmaMode is const: all line have the same characteristic spread
+SigmaMode is linear-lon: sigma changes linear by lines' longitude index
+SigmaMode is linear-lat: sigma changes linear by lines' latitude index
+SigmaMode is bilinear: sigma changes bilinear by lon and lat indexes
+Then we set the "Sigma" of the lines, namely the changes in degrees.
+</command>
+
+<command name="SPREADSOLIDANGLE">
+	<parameter name="RadiusRef [Rs]"  type="real" />
+	<parameter name="SolidAngleRef"  type="real" />
+
+#SPREADGRID
+    -1.0  	  RadiusRef [Rs]
+	-1.0	  Sigma [deg]
+
+Set reference radius and value of solid angle associated with lines.
+</command>
+
 <command name="COORDSYSTEM" alias="COORDINATESYSTEM" if="$_IsFirstSession">
 	<parameter name="TypeCoordSystem" type="string" input="select">
 		<option name="HGR" default="T"/>
@@ -243,8 +352,8 @@ assumed in the input files
 HGI       TypeCoordSystem
 
 Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
-
 </command>
+
 <command name="MOMENTUMGRID" if="$_IsFirstSession">
   <parameter name="EnergyMin" type="real" />
   <parameter name="EnergyMax" type="real" />
@@ -256,9 +365,28 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 1000.0                EnergyMax
 100                   nP
 kev                   NameEnergyUnit
-       
+
 Read energy range, the number of energy bins and the energy unit.
 Usually read from the restart.H file. 
+</command>
+
+<command name="FLUXINITIAL">
+  <parameter name="FluxInitIo" type="real" default="0.01" />
+
+#FLUXINITIAL
+0.01                   FluxInitIo
+
+Distribution is initialized to have integral flux: 
+default value is set as 0.01 [pfu].
+</command>
+
+<command name="FLUXCHANNEL">
+  <parameter name="nFluxChannel" type="integer" default="6" />
+
+#FLUXCHANNEL
+6                   	nFluxChannel
+
+Flux channel numbers: use the one on GOES by default, 6 channels.
 </command>
 
 </commandgroup>
@@ -292,7 +420,6 @@ as "phi" in Usoskin et al. 2005), which is temporal and spatial
 (and even energy) dependent. We stick to the one derived by Oulu
 neutron monitor and published in the dataset 1 of
 https://cosmicrays.oulu.fi/phi/phi.html.
-
 </command>
 
 </commandgroup>
@@ -341,20 +468,20 @@ The default value is false.
 
 </commandgroup>
 
+
 <commandgroup name="ACTION">
 
 <command name="RESTART">
-	<parameter name="DoRestart" type="logical" default="F" />
+	<parameter name="DoRestart" type="logical" default="T" />
 
 #RESTART
 T	DoRestart
-
 
 The default value is true.
 </command>
 
 <command name="DORUN">
-	<parameter name="DoRun" type="logical" default="F" />
+	<parameter name="DoRun" type="logical" default="T" />
 
 #DORUN
 T	DoRun
@@ -377,6 +504,21 @@ profile is not sharpened around it.
 The default value is true.
 </command>
 
+<command name="#USEFIXEDMFPUPSTREAM">
+  <parameter name="UseFixedMeanFreePathUpstream" type="logical" default="F" />
+  <parameter name="MeanFreePath0InAu" type="real" default="1.0" />
+
+#USEFIXEDMFPUPSTREAM
+F			UseFixedMeanFreePathUpstream
+1.0         MeanFreePath0InAu
+
+Determine whether we set the mean free path, 
+see Li et al. (2003), doi:10.1029/2002JA009666.
+The default value for UseFixedMeanFreePathUpstream
+is set as false, and that for MeanFreePath0InAu is 1.0
+</command>
+
+
 <command name="DIFFUSION">
   <parameter name="UseDiffusion" type="logical" default="T" />
 
@@ -384,12 +526,36 @@ The default value is true.
 T           UseDiffusion
 
 Used for testing, to disable diffusion, if UseDiffusion is false.
-
 The default value is true.
+</command>
+
+</commandgroup>
+
+<commandgroup name="TURBULENCE">
+
+<command name="#SCALETURBULENCE">
+  <parameter name="ScaleTurbulenceType" type="string" default="const" />
+
+#SCALETURBULENCE
+const		ScaleTurbulenceType
+
+cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
+The default value is set as const (or constant).
+</command>
+
+<command name="TURBULENTSPECTRUM">
+	 <parameter name="UseTurbulentSpectrum" type="logical" default="F" />
+
+#TURBULENTSPECTRUM
+F          UseTurbulentSpectrum
+
+Determine whether we use the turbulence spectrum
+Set the default value is false.
 </command>
 
 
 </commandgroup>
+
 
 <commandgroup name="INPUT/OUTPUT">
 <command name="USEDATETIME">
@@ -402,7 +568,23 @@ Set the format for the output file names like _eYYYYMMDD_HHMMSS tagging
 the file with real date and UT tume instant. When unset (default) the
 time tag looks like _tHHMMSS, where HHMMSS is the simulation time in hours-
 minutes-seconds passed after the initial time (set by the command #STARTTIME)
+</command>
 
+<command name="TIMING">
+	 <parameter name="UseTiming" type="logical" default="F" />
+	 <parameter name="nTiming" type="integer" />
+	 <parameter name="nDepthTiming" type="integer" />
+	 <parameter name="TypeTimingReport" type="string" />
+
+#TIMING
+T          UseTiming
+-2		   nTiming
+-1		   nDepthTiming
+cumm	   TypeTimingReport
+
+Set the timing format in SP component, but as default, we set
+UseTiming as False; if UseTiming is True, one should specify
+nTiming, nDepthTiming, and TypeTimingReport.
 </command>
 
 <command name="SAVEINITIAL">
@@ -417,7 +599,6 @@ once MFLAMPA restarts, it is useful to set DoSaveInitial to F, in order
 to avoid rewriting the output files and eliminate duplicate tags in the file
 tag list, becuase the same output files and tags were saved at the end of 
 previous run.
- 
 </command>
 
 <command name="READMHDATA" if="$_IsFirstSession">
@@ -429,7 +610,6 @@ T              DoReadMhData
 MH_data        NameInputDir
 
 Sets the name of input directory with MHD data.
-
 </command>
 
 <command name="MHDATA" if="$_IsFirstSession">
@@ -451,7 +631,6 @@ MH_data.lst    NameTagFile
 Sets type, number and names of the MHD input files. While running MFLAMPA
 in cinjunction with the MHD code, these parameters are usually saved into
 the header file, which is then included into the MFLAMPA parameter file
-
 </command>
 
 <command name="NTAG">
