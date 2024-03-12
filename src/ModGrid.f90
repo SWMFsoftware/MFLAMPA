@@ -6,7 +6,7 @@ module SP_ModGrid
   ! Multi-line grid, D.Borovikov & I.Sokolov, Dec,17, 2017.
   ! Dec.23 2017: exclude fluxes from the state vector.
   ! Dec.25 2017: standard init and read_param
-  ! Dec.25 2017: rename nVarRead=>nMHData, add NoShock_ param.
+  ! Dec.25 2017: rename nVarRead=>nMhData, add NoShock_ param.
 
 #ifdef OPENACC
   use ModUtilities, ONLY: norm2
@@ -93,7 +93,7 @@ module SP_ModGrid
   ! 2nd index - particle index along the field line
   ! 3rd index - local line number
   !
-  real, public, pointer     :: MHData_VIB(:,:,:)
+  real, public, pointer     :: MhData_VIB(:,:,:)
   !
   ! Aux state vector;
   ! 1st index - identification of variable (D_:BOld_)
@@ -265,7 +265,7 @@ contains
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
     ! Allocate here if stand alone
-    allocate(MHData_VIB(LagrID_:nMhData, 1:nVertexMax, nLine))
+    allocate(MhData_VIB(LagrID_:nMhData, 1:nVertexMax, nLine))
     !
     MhData_VIB(1:nMhData,:,:) = 0.0
     !
@@ -313,11 +313,11 @@ contains
        iEnd   = nVertex_B(  iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = &
-            MHData_VIB(Rho_,  1:iEnd, iLine)
+            MhData_VIB(Rho_,  1:iEnd, iLine)
        State_VIB(BOld_, 1:iEnd, iLine) = &
             State_VIB(B_,  1:iEnd, iLine)
        ! reset variables read from file or received via coupler
-       MHData_VIB(1:nMHData, 1:iEnd, iLine) = 0.0
+       MhData_VIB(1:nMhData, 1:iEnd, iLine) = 0.0
     end do
 
   end subroutine copy_old_state
@@ -334,19 +334,19 @@ contains
        do iVertex = 1, iEnd
           ! magnetic field
           State_VIB(B_,iVertex, iLine) = &
-               norm2(MHData_VIB(Bx_:Bz_,iVertex,iLine))
+               norm2(MhData_VIB(Bx_:Bz_,iVertex,iLine))
           ! plasma speed (negative if velocity is antiparallel to
           ! magnetic field)
           State_VIB(U_,iVertex, iLine) = &
-               sum(MHData_VIB(Ux_:Uz_,iVertex,iLine)*&
-               MHData_VIB(Bx_:Bz_,iVertex,iLine))/   &
+               sum(MhData_VIB(Ux_:Uz_,iVertex,iLine)*&
+               MhData_VIB(Bx_:Bz_,iVertex,iLine))/   &
                State_VIB(B_,iVertex, iLine)
           ! distances between particles
           ! if(.not.DoSmooth)then
           if(iVertex /=nVertex_B(iLine))&
                State_VIB(D_, iVertex, iLine) = norm2(&
-               MHData_VIB(X_:Z_, iVertex    , iLine) - &
-               MHData_VIB(X_:Z_, iVertex + 1, iLine))
+               MhData_VIB(X_:Z_, iVertex    , iLine) - &
+               MhData_VIB(X_:Z_, iVertex + 1, iLine))
           ! else
           ! smoothing is done by groups:
           ! nSmooth particles are aggeregated into single effective one,
@@ -355,9 +355,9 @@ contains
           ! iAux1 = nSmooth * max(1, min(&
           !     iVertex/nSmooth,nVertex_B(iLine)/nSmooth-1))
           ! iAux2 = iAux1 + nSmooth
-          ! XyzAux1_D = sum(MHData_VIB(&
+          ! XyzAux1_D = sum(MhData_VIB(&
           !     X_:Z_,iAux1-nSmooth+1:iAux1,iLine),DIM=2)/nSmooth
-          ! XyzAux2_D = sum(MHData_VIB(&
+          ! XyzAux2_D = sum(MhData_VIB(&
           !     X_:Z_,iAux2-nSmooth+1:iAux2,iLine),DIM=2)/nSmooth
           ! State_VIB(D_, iVertex, iLine) = &
           !     sqrt(sum((XyzAux2_D - XyzAux1_D)**2)) / nSmooth
@@ -372,7 +372,7 @@ contains
           end if
           ! Heliocentric Distance
           State_VIB(R_, iVertex, iLine) = &
-               norm2(MHData_VIB(X_:Z_, iVertex, iLine))
+               norm2(MhData_VIB(X_:Z_, iVertex, iLine))
        end do
     end do
 
@@ -402,7 +402,7 @@ contains
        ! shock front is assumed to be location of max log(Rho/RhoOld);
        do iVertex = 1, nVertex_B(  iLine)
           ! divergence of plasma velocity
-          dLogRho_I(iVertex) = log(MHData_VIB(Rho_,iVertex,iLine)/&
+          dLogRho_I(iVertex) = log(MhData_VIB(Rho_,iVertex,iLine)/&
                State_VIB(RhoOld_,iVertex,iLine))
        end do
        ! shock never moves back
