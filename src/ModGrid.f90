@@ -104,7 +104,7 @@ module SP_ModGrid
   !
   ! Number of variables in the state vector and the identifications
   !
-  integer, public, parameter :: nMHData = 13, nVar = 20,          &
+  integer, public, parameter :: nMhData = 13, nVar = 20,          &
        !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
        X_          = 1, & !                         |read in  |in copy_
@@ -265,17 +265,17 @@ contains
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
     ! Allocate here if stand alone
-    allocate(MHData_VIB(LagrID_:nMHData, 1:nVertexMax, nLine))
+    allocate(MHData_VIB(LagrID_:nMhData, 1:nVertexMax, nLine))
     !
-    MHData_VIB(1:nMHData,:,:) = 0.0
+    MhData_VIB(1:nMhData,:,:) = 0.0
     !
     ! reset lagrangian ids
     !
     do iVertex = 1, nVertexMax
-       MHData_VIB(LagrID_, iVertex, 1:nLine) = real(iVertex)
+       MhData_VIB(LagrID_, iVertex, 1:nLine) = real(iVertex)
     end do
     ! Allocate auxiliary State vector
-    allocate(State_VIB(nMHData+1:nVar, 1:nVertexMax, nLine))
+    allocate(State_VIB(nMhData+1:nVar, 1:nVertexMax, nLine))
     State_VIB = -1
     allocate(nVertex_B(nLine))
     nVertex_B = 0
