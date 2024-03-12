@@ -189,13 +189,14 @@ contains
   end subroutine initialize
   !============================================================================
   subroutine finalize
-
+    use SP_ModRestart,    ONLY: stand_alone_final_restart
     use SP_ModPlot,       ONLY: finalize_plot       =>finalize
     use SP_ModReadMhData, ONLY: finalize_mhdata     =>finalize
     ! use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
     ! finalize the model
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
+    if(IsStandAlone)call stand_alone_final_restart
     call finalize_plot
     call finalize_mhdata
     ! call finalize_turbulence

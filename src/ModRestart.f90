@@ -5,7 +5,7 @@ module SP_ModRestart
 
   ! This module contains methods for writing output files
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModGrid,   ONLY: iblock_to_lon_lat, LagrID_, Z_,&
+  use SP_ModGrid,   ONLY: iblock_to_lon_lat,&
        nLine, MhData_VIB, iShock_IB,  Used_B,&
        FootPoint_VB, nVertex_B, nShockParam, &
        nLon, nLat
@@ -24,7 +24,7 @@ module SP_ModRestart
 
   ! Public members
   public:: save_restart, read_restart, stand_alone_save_restart, read_param
-  public:: NameRestartInDir, NameRestartOutDir
+  public:: NameRestartInDir, NameRestartOutDir, stand_alone_final_restart
 
   ! the restart directory
   character (len=100) :: NameRestartOutDir="SP/restartOUT/"
@@ -59,18 +59,27 @@ contains
     if(.not.DoSaveRestart) RETURN
     nIterSinceRestart = nIterSinceRestart + 1
     TimeSinceRestart  = TimeSinceRestart  + Dt
-    if(  DtSaveRestart > 0..and.  TimeSinceRestart >= DtSaveRestart .or. &
-         DnSaveRestart > 0 .and. nIterSinceRestart == DnSaveRestart)then
+    if(  DtSaveRestart > 0.0 .and.  TimeSinceRestart >= DtSaveRestart .or. &
+         DnSaveRestart > 0   .and. nIterSinceRestart == DnSaveRestart)then
        call save_restart
-       if(DtSaveRestart > 0.)then
+       if(DtSaveRestart > 0.0)then
           TimeSinceRestart  = modulo(TimeSinceRestart, DtSaveRestart)
        else
-          TimeSinceRestart = 0.
+          TimeSinceRestart = 0.0
        end if
        nIterSinceRestart = 0
     end if
 
   end subroutine stand_alone_save_restart
+  !============================================================================
+  subroutine stand_alone_final_restart
+
+    !--------------------------------------------------------------------------
+    if(.not.DoSaveRestart) RETURN
+    if(  DtSaveRestart > 0.0 .and.  TimeSinceRestart > 0.0 .or. &
+         DnSaveRestart > 0   .and. nIterSinceRestart > 0)call save_restart
+
+  end subroutine stand_alone_final_restart
   !============================================================================
   subroutine save_restart
 
@@ -92,7 +101,6 @@ contains
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
        call iblock_to_lon_lat(iLine, iLon, iLat)
-
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameRestartOutDir)//'data_',iLon,'_',iLat,&
@@ -103,7 +111,7 @@ contains
             real(iShock_IB(:, iLine))
        write(UnitTmp_)&
             FootPoint_VB(:, iLine),&
-            MhData_VIB(LagrID_:Z_,1:nVertex_B(iLine), iLine),&
+            MhData_VIB(:,1:nVertex_B(iLine), iLine),&
             Distribution_IIB(:,1:nVertex_B(iLine), iLine)
        call close_file
     end do
@@ -152,8 +160,13 @@ contains
        iShock_IB(:, iLine) = nint(Aux_I)
        read(UnitTmp_, iostat = iError) &
             FootPoint_VB(:, iLine),&
-            MhData_VIB(LagrID_:Z_,1:nVertex_B(iLine), iLine),&
+            MhData_VIB(:,1:nVertex_B(iLine), iLine),&
             Distribution_IIB(:,1:nVertex_B(iLine), iLine)
+       if(iError>0)then
+          write(*,*)'Error in reading nPoint in line=', iLine
+          call close_file
+          call CON_stop('Run stops')
+       end if
        call close_file
     end do
 
