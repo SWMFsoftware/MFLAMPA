@@ -10,7 +10,7 @@ module SP_ModRestart
        FootPoint_VB, nVertex_B, nShockParam, &
        nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_IIB
-  use SP_ModTime,   ONLY: SPTime, iIter
+  use SP_ModTime,   ONLY: SPTime, iIter, iStartTime_I
   use SP_ModUnit,   ONLY: NameEnergyUnit
   use ModPlotFile,  ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, CON_stop
@@ -23,7 +23,7 @@ module SP_ModRestart
   private ! except
 
   ! Public members
-  public:: save_restart, read_restart, stand_alone_save_restart, read_param
+  public:: save_restart, read_restart, check_save_restart, read_param
   public:: NameRestartInDir, NameRestartOutDir, stand_alone_final_restart
 
   ! the restart directory
@@ -52,7 +52,7 @@ contains
 
   end subroutine read_param
   !============================================================================
-  subroutine stand_alone_save_restart(Dt)
+  subroutine check_save_restart(Dt)
 
     real, intent(in) :: Dt
     !--------------------------------------------------------------------------
@@ -70,7 +70,7 @@ contains
        nIterSinceRestart = 0
     end if
 
-  end subroutine stand_alone_save_restart
+  end subroutine check_save_restart
   !============================================================================
   subroutine stand_alone_final_restart
 
@@ -195,6 +195,15 @@ contains
     write(UnitTmp_,'(i8,a)') nVertexMax,cTab//cTab//'nVertexMax'
     write(UnitTmp_,'(i8,a)') nLon,     cTab//cTab//'nLon'
     write(UnitTmp_,'(i8,a)') nLat,     cTab//cTab//'nLat'
+    write(UnitTmp_,*)
+    write(UnitTmp_,'(a)')'#STARTTIME'
+    write(UnitTmp_,'(i4.4,a)')iStartTime_I(1),cTab//cTab//'iYear'
+    write(UnitTmp_,'(i2.2,a)')iStartTime_I(2),cTab//cTab//'iMonth'
+    write(UnitTmp_,'(i2.2,a)')iStartTime_I(3),cTab//cTab//'iDay'
+    write(UnitTmp_,'(i2.2,a)')iStartTime_I(4),cTab//cTab//'iHour'
+    write(UnitTmp_,'(i2.2,a)')iStartTime_I(5),cTab//cTab//'iMinute'
+    write(UnitTmp_,'(i2.2,a)')iStartTime_I(6),cTab//cTab//'iSecond'
+    write(UnitTmp_,'(a)')'0.0'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#NSTEP'
     write(UnitTmp_,'(i8,a)')iIter,cTab//cTab//'nStep'

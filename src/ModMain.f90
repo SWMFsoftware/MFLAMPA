@@ -129,10 +129,10 @@ contains
           call check_stand_alone
           call read_var('DoEcho', DoEcho)
           if(iProc==0)call read_echo_set(DoEcho)
-       case('#NSTEP','#TIMESIMULATION')
+       case("#STARTTIME",'#NSTEP','#TIMESIMULATION')
           if(i_session_read() /= 1)CYCLE
           call read_param_time(NameCommand)
-       case("#STARTTIME", "#SETREALTIME",'#TIMEACCURATE')
+       case("#SETREALTIME",'#TIMEACCURATE')
           if(i_session_read() /= 1)CYCLE
           call check_stand_alone
           call read_param_time(NameCommand)
@@ -210,7 +210,7 @@ contains
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
          get_shock_location
     use SP_ModReadMhData,    ONLY: read_mh_data
-    use SP_ModRestart,       ONLY: stand_alone_save_restart
+    use SP_ModRestart,       ONLY: check_save_restart
     use SP_ModPlot,          ONLY: save_plot_all
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
     ! advance the solution in time
@@ -258,8 +258,8 @@ contains
     SPTime = SPTime + Dt
     call save_plot_all
 
-    ! save restart in the stand alone mod
-    if(IsStandAlone) call stand_alone_save_restart(Dt)
+    ! save restart if needed
+    call check_save_restart(Dt)
   end subroutine run
   !============================================================================
   subroutine check
