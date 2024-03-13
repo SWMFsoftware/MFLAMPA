@@ -139,15 +139,16 @@ contains
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameRestartInDir)//'data_',iLon,'_',iLat,&
             '.rst'
-       inquire(file=NameFile,exist=Used_B(iLine))
+       !inquire(file=NameFile,exist=Used_B(iLine))
+       call open_file(file=NameFile,  status='old',&
+            form='UNFORMATTED', NameCaller=NameSub, iErrorOut=iError)
+       Used_B(iLine) = iError==0
        if(.not.Used_B(iLine))then
           write(*,'(a)')NameSub//': the restart file '//NameFile//' lacks'
           write(*,'(a)')NameSub//': line is marked as unused'
           nVertex_B(iLine) = 0
           CYCLE
        end if
-       call open_file(file=NameFile,  status='old',&
-            form='UNFORMATTED', NameCaller=NameSub)
        read(UnitTmp_,iostat = iError)Aux, Aux_I
        if(iError>0)then
           write(*,*)'Error in reading nPoint in line=', iLine
