@@ -5,7 +5,7 @@ module SP_wrapper
 
   use CON_coupler, ONLY: SP_, CON_stop
   use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
-  use SP_ModTime, ONLY: DataInputTime, SPTime
+  use SP_ModTime, ONLY: DataInputTime, SPTime, IsSteadyState
   use SP_ModProc, ONLY: iProc
 
   implicit none
@@ -50,8 +50,7 @@ contains
     ! Interface routine to be called from super-structure on all PEs
 
     use CON_comp_info
-    use SP_ModTime,  ONLY: StartTimeJulian, StartTime, SPTime,&
-         time_real_to_julian, IsSteadyState
+    use SP_ModTime,  ONLY: StartTimeJulian, StartTime, time_real_to_julian
     use SP_ModMain,  ONLY: check, read_param
     use SP_ModGrid,  ONLY: TypeCoordSystem
     use CON_coupler, ONLY: is_proc
@@ -159,7 +158,7 @@ contains
     call run(TimeSimulationLimit)
     if(DoReadMhData)then
        TimeSimulation = DataInputTime
-    else
+    elseif(.not.IsSteadyState)then
        TimeSimulation = TimeSimulationLimit
     end if
   end subroutine SP_run
