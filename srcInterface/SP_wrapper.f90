@@ -5,7 +5,7 @@ module SP_wrapper
 
   use CON_coupler, ONLY: SP_, CON_stop
   use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
-  use SP_ModTime, ONLY: DataInputTime, SPTime, IsSteadyState
+  use SP_ModTime, ONLY: DataInputTime, SPTime, IsSteadyState, iIter
   use SP_ModProc, ONLY: iProc
 
   implicit none
@@ -76,9 +76,6 @@ contains
     case('STDOUT')
        ! placeholder
     case('CHECK')
-       call get_time(DoTimeAccurateOut=DoTimeAccurate)
-       IsSteadyState = .not. DoTimeAccurate
-       if(iProc==0)write(*,*)'IsSteadyState=',IsSteadyState
        if(.not.DoCheck)RETURN
        DoCheck = .false.
        if(iProc==0)then
@@ -91,6 +88,9 @@ contains
        DataInputTime = SPTime
        call check
     case('READ')
+       call get_time(DoTimeAccurateOut=DoTimeAccurate)
+       IsSteadyState = .not. DoTimeAccurate
+       if(iProc==0)write(*,*)'SP: IsSteadyState=',IsSteadyState
        call read_param
     case('GRID')
        if(.not.DoSetGrid)RETURN
@@ -120,6 +120,7 @@ contains
          State_VIB, MHData_VIB, nVertex_B, FootPoint_VB, Used_B
     use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
     use SP_ModSize,         ONLY: nVertexMax
+    use SP_ModPlot,          ONLY: init_plot       => init
     use CON_bline,          ONLY: BL_init, BL_get_origin_points
     use SP_ModProc,         ONLY: iProc
     integer,  intent(in) :: iSession         ! session number (starting from 1)
@@ -128,7 +129,10 @@ contains
     logical, save:: IsInitialized = .false.
 
     !--------------------------------------------------------------------------
-    if(IsInitialized)RETURN
+    if(IsInitialized)then
+       call init_plot
+       RETURN
+    end if
     IsInitialized = .true.
 
     call init_grid
@@ -149,7 +153,6 @@ contains
   end subroutine SP_init_session
   !============================================================================
   subroutine SP_run(TimeSimulation,TimeSimulationLimit)
-    use SP_ModTime, ONLY: iIter
     real,intent(inout)::TimeSimulation
     real,intent(in)::TimeSimulationLimit
 
@@ -171,13 +174,15 @@ contains
     ! if data are read from files, no special finalization is needed
 
     !--------------------------------------------------------------------------
-    if(.not.DoReadMhData)then
+    if(.not.(DoReadMhData.or.IsSteadyState))then
        if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                    &
             'Call run from SP_finalize, DataInputTime=', DataInputTime,     &
             ' SPTime=', SPTime
        call run(TimeSimulation)
     end if
-
+    if(iProc==0)write(*,'(a,es12.5,a,i8)')'SP:'//                    &
+         'Call SP_finalize, Time=', DataInputTime,     &
+         ' nStep=', iIter
     call finalize
   end subroutine SP_finalize
   !============================================================================
@@ -188,12 +193,15 @@ contains
     ! if data are read from files, no need for additional run
 
     !--------------------------------------------------------------------------
-    if(.not.DoReadMhData)then
+    if(.not.(DoReadMhData.or.IsSteadyState))then
        if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                    &
             'Call run from SP_save_restart, DataInputTime=', DataInputTime, &
             ' SPTime=', SPTime
        call run(TimeSimulation)
     end if
+    if(iProc==0)write(*,'(a,es12.5,a,i6)')'SP:'//                    &
+            'Call SP_save_restart, Time=', TimeSimulation, &
+            ' nStep=', iIter
     call save_restart
   end subroutine SP_save_restart
   !============================================================================
