@@ -24,7 +24,7 @@ module SP_wrapper
   public:: SP_put_coupling_param
   public:: SP_adjust_lines
 
-  logical :: DoCheck = .true.
+  logical :: DoCheck = .true., DoSetGrid = .true.
 
 contains
   !============================================================================
@@ -76,6 +76,9 @@ contains
     case('STDOUT')
        ! placeholder
     case('CHECK')
+       call get_time(DoTimeAccurateOut=DoTimeAccurate)
+       IsSteadyState = .not. DoTimeAccurate
+       if(iProc==0)write(*,*)'IsSteadyState=',IsSteadyState
        if(.not.DoCheck)RETURN
        DoCheck = .false.
        if(iProc==0)then
@@ -83,17 +86,15 @@ contains
           write(*,'(a)')'SP:  check parameters'
           write(*,'(a)')'SP:'
        end if
-       call get_time(&
-            DoTimeAccurateOut=DoTimeAccurate, &
-            tSimulationOut = SPTime,        &
-            tStartOut = StartTime)
-       IsSteadyState = .not. DoTimeAccurate
+       call get_time(tSimulationOut = SPTime, tStartOut = StartTime)
        call time_real_to_julian(StartTime, StartTimeJulian)
        DataInputTime = SPTime
        call check
     case('READ')
        call read_param
     case('GRID')
+       if(.not.DoSetGrid)RETURN
+       DoSetGrid = .false.
        if(is_proc(SP_))then
           UnitX = Io2Si_V(UnitX_)
           EnergyCoeff = Si2Io_V(UnitEnergy_)
@@ -148,13 +149,14 @@ contains
   end subroutine SP_init_session
   !============================================================================
   subroutine SP_run(TimeSimulation,TimeSimulationLimit)
+    use SP_ModTime, ONLY: iIter
     real,intent(inout)::TimeSimulation
     real,intent(in)::TimeSimulationLimit
 
     !--------------------------------------------------------------------------
-    if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                   &
+    if(iProc==0)write(*,'(a,es12.5,a,es12.5,a,i6)')'SP:'//              &
          'Call run from SP_run, DataInputTime=', DataInputTime,         &
-         ' SPTime=', SPTime
+         ' SPTime=', SPTime, ' nStep=', iIter
     call run(TimeSimulationLimit)
     if(DoReadMhData)then
        TimeSimulation = DataInputTime
