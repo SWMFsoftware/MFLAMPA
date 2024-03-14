@@ -169,7 +169,7 @@ module SP_ModPlot
   ! If DoSaveInitial=.false.,the initial files are not saved
   logical :: DoSaveInitial = .true.
   !
-  logical :: DoInit        = .true.
+  logical :: DoInit        = .false.
 contains
   !============================================================================
   subroutine init
@@ -315,7 +315,9 @@ contains
        ! check correctness
        if(nFileOut == 0) RETURN ! no output file requested
        if(nFileOut  < 0) call CON_stop(NameSub//': incorrect SAVEPLOT section')
-
+       DoInit = .true.
+       if(allocated(File_I))&
+            call CON_stop(NameSub//'Only a single #SAVEPLOT is allowed')
        ! allocate the storage for file info
        allocate(File_I(nFileOut))
 

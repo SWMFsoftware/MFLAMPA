@@ -6,6 +6,7 @@ program MFLAMPA
   use SP_ModProc,   ONLY: iProc, nProc, iComm
   use ModUtilities, ONLY: remove_file, touch_file
   use SP_ModTime,   ONLY: iIter, init_time  => init
+  use SP_ModPlot,   ONLY:        init_plot  => init
   use SP_ModTiming, ONLY: nTiming
   use SP_ModMain,   ONLY: &
        IsLastRead, IsStandAlone,          &
@@ -69,13 +70,13 @@ program MFLAMPA
         ! DataInputTime=0, SPTime=0 unless set in PARAM.in or restart.H
         ! In SWMF, SPTime is set in SP_set_param('CHECK'), DataInput time is
         ! set either in coupling or in reading the MHD data from file.
-     end if
-     if(IsFirstSession)then
         call timing_stop('setup')
         if(nTiming > -3) call timing_report_total
         if(iProc==0)&
              write(*,*)'Resetting timing counters after setup.'
         call timing_reset('#all', 3)
+     else
+        call init_plot
      end if
 
      TIMELOOP: do
