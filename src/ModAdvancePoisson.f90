@@ -21,11 +21,10 @@ contains
     ! diffuse the distribution function at each time step
 
     use ModPoissonBracket, ONLY: explicit
-    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I, DLogP, &
-         Distribution_IIB, Momentum_I, Background_I
+    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I,    &
+         DLogP, Distribution_IIB
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, SpectralIndex, &
-         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
     integer, intent(in):: iLine, iShock ! indices of line and shock
     integer, intent(in):: nX        ! # of meshes along lnp-coordinate
     real,    intent(in):: tFinal    ! time interval to advance through
@@ -56,10 +55,10 @@ contains
     ! Prediction for the next time step:
     real    :: DtNext
     ! Now this is the particle-number-conservative advection scheme
-    !--------------------------------------------------------------------------
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
+    !--------------------------------------------------------------------------
     VolumeXStart_I(1:nX) = 1/nOldSi_I(1:nX)
     VolumeXStart_I(0)    = VolumeXStart_I(1)
     VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
@@ -93,7 +92,7 @@ contains
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
        ! update bc for at minimal and maximal energy
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
-       call set_VDF
+       call set_VDF(iLine, nX, VDF_G)
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX=dHamiltonian01_FX,         &
             dVolumeDt_G = dVolumeDt_G,                   &
@@ -121,31 +120,6 @@ contains
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
     end do
-  contains
-    !==========================================================================
-    subroutine set_VDF
-      ! We need the VDF on the extended grid with two layers of ghost cells,
-      ! to solve the second order scheme. Add solution in physical cells and
-      ! in a single layer of the ghost cells along the momentum coordinate:
-      !------------------------------------------------------------------------
-      VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
-      ! Apply bc along the line coordinate:
-      VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*  &
-           (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
-      if(UseUpperEndBc) then
-         call set_upper_end_bc(iLine, nX)
-         VDF_G(1:nP, nX+1) = UpperEndBc_I
-         VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
-      else
-         VDF_G(0:nP+1, nX+1) = Background_I
-      end if
-      ! Add a second layer of the ghost cells along the line coordinate:
-      VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
-      VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
-      ! Add a second layer of the ghost cells along the momentum coordinate:
-      VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
-    end subroutine set_VDF
-    !==========================================================================
   end subroutine advect_via_poisson
   !============================================================================
   subroutine iterate_poisson(iLine, nX, iShock, CflIn, &
@@ -155,11 +129,10 @@ contains
 
     use ModNumConst,        ONLY: cTiny
     use ModPoissonBracket,  ONLY: explicit
-    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I,         &
-         Distribution_IIB, Momentum_I, Background_I
+    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I,    &
+         Distribution_IIB
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, SpectralIndex,     &
-         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
     integer, intent(in):: iLine, iShock ! indices of line and shock
     integer, intent(in):: nX        ! # of meshes along lnP-coordinate
     real,    intent(in):: CflIn     ! input CFL number
@@ -184,7 +157,7 @@ contains
     ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
     ! Initialize arrays
-    VolumeX_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1) +      &
+    VolumeX_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1) + &
          DsSi_I(1:nX-2)), cTiny)/BSi_I(2:nX-1)
     VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
     VolumeX_I(0)      = VolumeX_I(1)
@@ -213,9 +186,9 @@ contains
 
     ! Update bc for at minimal and maximal energy (left BC)
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
-    call set_VDF
-    call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
-         Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,  &
+    call set_VDF(iLine, nX, VDF_G)
+    call explicit(nP, nX, VDF_G, Volume_G, Source_C,   &
+         Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,   &
          IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
@@ -233,32 +206,38 @@ contains
                nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
        end if
     end if
-  contains
-    !==========================================================================
-    subroutine set_VDF
-      ! We need the VDF on the extended grid with two layers of ghost cells,
-      ! to solve the second order scheme. Add solution in physical cells and
-      ! in a single layer of the ghost cells along the momentum coordinate:
-      !------------------------------------------------------------------------
-      VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
-      ! Apply bc along the line coordinate:
-      VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*  &
-           (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
-      if(UseUpperEndBc) then
-         call set_upper_end_bc(iLine, nX)
-         VDF_G(1:nP, nX+1) = UpperEndBc_I
-         VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
-      else
-         VDF_G(0:nP+1, nX+1) = Background_I
-      end if
-      ! Add a second layer of the ghost cells along the line coordinate:
-      VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
-      VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
-      ! Add a second layer of the ghost cells along the momentum coordinate:
-      VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
-    end subroutine set_VDF
-    !==========================================================================
   end subroutine iterate_poisson
+  !============================================================================
+  subroutine set_VDF(iLine, nX, VDF_G)
+    ! We need the VDF on the extended grid with two layers of ghost cells,
+    ! to solve the second order scheme. Add solution in physical cells and
+    ! in a single layer of the ghost cells along the momentum coordinate.
+
+    use SP_ModDistribution, ONLY: nP, Distribution_IIB,     &
+         Momentum_I, Background_I
+    use SP_ModBc,           ONLY: SpectralIndex,            &
+         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    integer, intent(in):: iLine     ! indices of line and shock
+    integer, intent(in):: nX        ! # of meshes along lnP-coordinate
+    real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
+    !--------------------------------------------------------------------------
+    VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
+    ! Apply bc along the line coordinate:
+    VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*    &
+         (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
+    if(UseUpperEndBc) then
+       call set_upper_end_bc(iLine, nX)
+       VDF_G(1:nP, nX+1) = UpperEndBc_I
+       VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
+    else
+       VDF_G(0:nP+1, nX+1) = Background_I
+    end if
+    ! Add a second layer of the ghost cells along the line coordinate:
+    VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
+    VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
+    ! Add a second layer of the ghost cells along the momentum coordinate:
+    VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
+  end subroutine set_VDF
   !============================================================================
 end module SP_ModAdvancePoisson
 !==============================================================================
