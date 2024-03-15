@@ -32,7 +32,7 @@ contains
     ! Input variables for diffusion
     real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
-    integer :: iP
+    integer :: iX
     ! Extended arrays for implementation of the Poisson Bracket Alg.
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
@@ -69,13 +69,13 @@ contains
     ! Time derivative
     dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)/tFinal
     ! Phase volume: initial and time derivative
-    do iP = 0, nP+1
-       Volume_G(iP,:)    = VolumeP_I(iP)*VolumeXStart_I
-       dVolumeDt_G(iP,:) = VolumeP_I(iP)*dVolumeXDt_I
+    do iX = 0, nX+1
+       Volume_G(:,iX)    = VolumeP_I*VolumeXStart_I(iX)
+       dVolumeDt_G(:,iX) = VolumeP_I*dVolumeXDt_I(iX)
     end do
     ! calculate: dHamiltonian/dVolumeSubX
-    do iP = -1, nP+1
-       dHamiltonian01_FX(iP,:) = - Momentum3_I(iP)*dVolumeXDt_I
+    do iX = 0, nX+1
+       dHamiltonian01_FX(:,iX) = - Momentum3_I*dVolumeXDt_I(iX)
     end do
     ! Time initialization
     Time   = 0.0
@@ -139,7 +139,7 @@ contains
     ! Input variables for diffusion
     real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX), DsSi_I(nX)
     ! Loop variable
-    integer :: iP
+    integer :: iX
     ! Volume_G: phase space volume
     real    :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume
@@ -164,8 +164,8 @@ contains
     VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
     VolumeX_I(nX+1)   = VolumeX_I(nX)
     ! Phase volume: initial values
-    do iP = 0, nP+1
-       Volume_G(iP,:) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
+    do iX = 0, nX+1
+       Volume_G(:,iX) = VolumeP_I*VolumeX_I(iX)
     end do
     ! Calculate node-centered u=|vector{u}*vector{B}|/|vector{B}|
     uNodeSi_I(2:nX-1) = 0.5*(uSi_I(2:nX-1) + uSi_I(1:nX-2))
@@ -180,8 +180,8 @@ contains
     BNodeSi_I(nX)     = BSi_I(nX)
     BNodeSi_I(nX+1)   = BNodeSi_I(nX)
     ! Calculate Hamiltonian = (u/B)*(p**3/3), node-centered
-    do iP = -1, nP+1
-       Hamiltonian_N(iP, :) = -uNodeSi_I/BNodeSi_I*Momentum3_I(iP)
+    do iX = -1, nX+1
+       Hamiltonian_N(:, iX) = -uNodeSi_I(iX)/BNodeSi_I(iX)*Momentum3_I
     end do
 
     ! Update bc for at minimal and maximal energy (left BC)
