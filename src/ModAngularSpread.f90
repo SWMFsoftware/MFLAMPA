@@ -370,8 +370,8 @@ contains
     integer:: iLon, iLat
     !--------------------------------------------------------------------------
     ! compute spread over grid for current line
-    do iLon = 1, nSpreadLon
-       do iLat = 1, nSpreadLat
+    do iLat = 1, nSpreadLat
+       do iLon = 1, nSpreadLon
           call get_normalized_spread_point(iLine, Radius, &
                SpreadLon_I(iLon), SpreadLat_I(iLat), Spread_II(iLon, iLat))
        end do

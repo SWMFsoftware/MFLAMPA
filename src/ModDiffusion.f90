@@ -215,6 +215,7 @@ contains
           Main_I(1) = Main_I(1) + Aux2
           Res_I(1) = Res_I(1) + Aux2*LowerEndSpectrum_I(iP)
        end if
+
        ! For i=2, n-1:
        do iVertex = 2, nX-1
           Aux1 = DtLocal_II(iVertex,iP)*DOuterSi_I(iVertex)*         &
