@@ -613,12 +613,12 @@ Sets the name of input directory with MHD data.
 </command>
 
 <command name="MHDATA" if="$_IsFirstSession">
-        <parameter name="TypeFile" type="string" input="select">
-                 <option name="idl" default="T" />
-		 <option name="ascii" />
-		 <option name="tec" />
-		 <option name="real4" />
-		 <option name="real8" />
+    <parameter name="TypeFile" type="string" input="select">
+      <option name="idl" default="T" />
+	  <option name="ascii" />
+	  <option name="tec" />
+	  <option name="real4" />
+	  <option name="real8" />
 	</parameter>
 	<parameter name="nFileRead" type="integer" default="0"/>
 	<parameter name="NameTagFile" type="string" default=""/>
@@ -640,12 +640,38 @@ the header file, which is then included into the MFLAMPA parameter file
 120            nTag  
 
 The number of different time-line tags of the MH_data files.
-
 </command>
+
 <command name="SAVEPLOT">
-  <parameter name="nFileOut" type="integer" default="0"/>
-  <parameter name="StringPlot" type="string"/>
-  
+  <parameter name="nFileOut" type="integer" default="0" />
+    <for name="iPlot" from="1" to="$nFileOut">
+      <parameter name="StringPlot" type="strings" min="1" max="4" >
+	    <part name="StringLogVar" type="string" input="select" required="T">
+	      <option name="MHD variables"           value="MHD" default="T" />
+		  <option name="MHD vars. scaled"     	 value="mhd" />
+		  <option name="MHD vars. scaled in 1D"  value="mh1d" />
+		  <option name="MHD vars. scaled in 2D"  value="mh2d" />
+		  <option name="MHD vars. scaled in 3D"  value="mh3d" />
+		  <option name="MHD vars. in accu. time" value="mhtime" />
+		  <option name="Raw variables"    value="R" />
+		  <option name="Raw vars. scaled" value="r" />
+		  <option name="IDL" value="idl" default="T"/>
+		  <option value="idl_real4" name="IDL single prec"/>
+	      <option value="idl_real8" name="IDL double prec"/>
+		  <option value="idl_ascii" name="IDL ascii"/>
+		  <option value="idl_tec"   name="IDL to Tecplot"/>
+		  <option name="Flux variables"    value="FLUX" />
+		  <option name="Flux vars. scaled" value="flux" />
+		  <option name="points" value="pnt"/>
+		  <option name="ascii" />
+		  <option name="spread" />
+		</part>
+	  </parameter>
+	  <if expr="$nFileOut gt 1">
+		<parameter name="Undocumented parameter" type="real" default="215.0" />
+	  </if>
+	</for>
+
 #SAVEPLOT
 3                             nFileOut
 mh1d flux ascii               StringPlot
