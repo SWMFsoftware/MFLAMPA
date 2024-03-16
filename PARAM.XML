@@ -653,16 +653,16 @@ The number of different time-line tags of the MH_data files.
 		  <option name="MHD vars. scaled in 2D"  value="mh2d" />
 		  <option name="MHD vars. scaled in 3D"  value="mh3d" />
 		  <option name="MHD vars. in accu. time" value="mhtime" />
-		  <option name="Raw variables"    value="R" />
-		  <option name="Raw vars. scaled" value="r" />
-		  <option name="IDL" value="idl" default="T"/>
-		  <option value="idl_real4" name="IDL single prec"/>
-	      <option value="idl_real8" name="IDL double prec"/>
-		  <option value="idl_ascii" name="IDL ascii"/>
-		  <option value="idl_tec"   name="IDL to Tecplot"/>
+		  <option name="Raw variables"     value="R" />
+		  <option name="Raw vars. scaled"  value="r" />
+		  <option name="IDL" 	value="idl" />
+		  <option name="IDL single prec"   value="idl_real4" />
+	      <option name="IDL double prec"   value="idl_real8" />
+		  <option name="IDL ascii" 		   value="idl_ascii" />
+		  <option name="IDL to Tecplot"    value="idl_tec"/>
 		  <option name="Flux variables"    value="FLUX" />
 		  <option name="Flux vars. scaled" value="flux" />
-		  <option name="points" value="pnt"/>
+		  <option name="points"	value="pnt"/>
 		  <option name="ascii" />
 		  <option name="spread" />
 		</part>
