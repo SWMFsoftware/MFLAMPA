@@ -6,22 +6,21 @@ Begin session: 1
 T			DoEcho
 
 #STARTTIME
-2012
-01
-23
-04
-00
-0
-0.0
+2012			iYear
+01			iMonth
+23			iDay
+04			iHour
+00			iMinute
+0			iSecond
 
 #TIMEACCURATE
-F			DoTimeAccurate
+F			IsTimeAccurate
 
 #USEDATETIME
-T
+T			UseDateTime
 
 #DORUN
-T
+T			DoRun
 
 #TRACESHOCK
 F			DoTraceShock
@@ -33,45 +32,42 @@ T			UsePoissonBracket
 MH_data_e20120123/MH_data.H
 
 #READMHDATA
-T
-MH_data_e20120123
-real8
+T			DoReadMhData
+MH_data_e20120123		NameInputDir
 
 #UPPERENDBC
-T           UseUpperEndBc
-lism        TypeUpperEndBc
-default     TypeLisBc
-T           UseModulationPot
-534.7       ModulationPot
+T			UseUpperEndBc
+lism			TypeUpperEndBc
+default			TypeLisBc
+T			UseModulationPot
+534.7			ModulationPot
 
 #SAVEPLOT
-2
-mh1d flux ascii
-mh2d flux ascii
-215.0
+2			nFileOut
+mh1d flux ascii		StringPlot
+mh2d flux ascii		StringPlot
+215.0			Radius
 
-#NPUTPUT
+#NOUTPUT
 10			nOutput
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType
-0.2402397832	ScaleTurbulence [AU] at 1 AU
+0.2402397832		ScaleTurbulence [AU] at 1 AU
 
 #STOP
 10			nIterMax
--1.0		TimeMax
+-1.0			TimeMax
 
-#RUN
-
-==============================================================================
+#RUN ##########################################################################
 
 #USEFIXEDMFPUPSTREAM
 T			UseFixedMeanFreePathUpstream
-0.3			MeanFreePath0 [AU]
+0.3			MeanFreePath0InAu [AU]
 
 #STOP
 20			nIterMax
--1.0		TimeMax
+-1.0			TimeMax
 
 End session: 1
 #END ##########################################################################

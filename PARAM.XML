@@ -156,14 +156,6 @@ need to use the #RUN command, since the #END command or simply
 the end of the PARAM.in file makes MFLAMPA execute the last session.
 </command>
 
-<command name="TEST">
-
-#TEST
-
-The #TEST command signals the test of the included file or the
-end of the PARAM.in file. 
-</command>
-
 <command name="END">
 
 #END

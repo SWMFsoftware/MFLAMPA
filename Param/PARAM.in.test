@@ -6,19 +6,18 @@ Begin session: 1
 T			DoEcho
 
 #STARTTIME
-2012
-01
-23
-04
-00
-0
-0.0
+2012			iYear
+01			iMonth
+23			iDay
+04			iHour
+00			iMinute
+0			iSecond
 
 #USEDATETIME
-T
+T			UseDateTime
 
 #DORUN
-T
+T			DoRun
 
 #TEST
 F			DoTraceShock
@@ -28,33 +27,32 @@ T			UseDiffusion
 MH_data_e20120123/MH_data.H
 
 #READMHDATA
-T
-MH_data_e20120123
-real8
+T			DoReadMhData
+MH_data_e20120123		NameInputDir
 
 #SAVEPLOT
-3
-mh1d flux ascii
-mh2d flux ascii
-215.0
-mhtime flux ascii
-215.0
+3			nFileOut
+mh1d flux ascii		StringPlot
+mh2d flux ascii		StringPlot
+215.0			Radius
+mhtime flux ascii		StringPlot
+215.0			Radius
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType
-0.2402397832	ScaleTurbulence [AU] at 1 AU
+0.2402397832		ScaleTurbulence [AU] at 1 AU
 
 #STOP
 -1			nIterMax
 300			TimeMax
 
-#RUN
+#RUN ##########################################################################
 
 ==============================================================================
 
 #USEFIXEDMFPUPSTREAM
-T			UseFixedMFPUpstream
-0.3			MeanFreePath0 [AU]
+T			UseFixedMeanFreePathUpstream
+0.3			MeanFreePath0InAu [AU]
 
 #STOP
 -1			nIterMax
