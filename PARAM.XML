@@ -11,11 +11,11 @@ component of the SWMF.
 <commandgroup name="DOMAIN">
 
 <command name="ORIGIN">
-  <parameter name="ROrigin" type="real" min="1" default="2.5"/>
-  <parameter name="LonMin"  type="real" min="-359" max="359" default="0"/>
-  <parameter name="LatMin"  type="real" min="-90" max="89" default="-70"/>
-  <parameter name="LonMax"  type="real" min="1" max="360" default="360"/>
-  <parameter name="LatMax"  type="real" min="-89" max="90" default="70"/>
+  <parameter name="ROrigin" type="real" min="1.0" default="2.5"/>
+  <parameter name="LonMin"  type="real" min="-359.0" max="359.0" default="0.0"/>
+  <parameter name="LatMin"  type="real" min="-90.0" max="89.0" default="-70.0"/>
+  <parameter name="LonMax"  type="real" min="1.0" max="360" default="360.0"/>
+  <parameter name="LatMax"  type="real" min="-89.0" max="90.0" default="70.0"/>
 
 #ORIGIN
 2.5             ROrigin [Rs]
@@ -53,7 +53,7 @@ We use keV as the default value.
 <command name="STARTTIME">
 	<parameter name="iYear"   type="integer" default="2000" />
 	<parameter name="iMonth"  type="integer" min="1" max="12" default="3"/>
-	<parameter name="iDay"   type="integer" min="1" max="31" default="21"/>
+	<parameter name="iDay"    type="integer" min="1" max="31" default="21"/>
 	<parameter name="iHour"   type="integer" min="0" max="23" default="10"/>
 	<parameter name="iMinute" type="integer" min="0" max="59" default="45"/>
 	<parameter name="iSecond" type="integer" min="0" max="59" default="0"/>
@@ -85,7 +85,7 @@ by setting DoTimeAccurate to .false.
 </command>
 
 <command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
-	<parameter name="SPTime" type="real" min="0" default="0.0" />
+	<parameter name="SPTime" type="real" min="0.0" default="0.0" />
 
 #TIMESIMULATION
 1			SPTime [sec]
@@ -176,6 +176,7 @@ of the included file or PARAM.in file is equivalent with an
 </command>
 
 </commandgroup>
+
 <commandgroup name="STOPPING CRITERIA">
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!! STOPPING CRITERIA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -185,11 +186,11 @@ The commands in this group only work in stand alone mode.
 
 <command name="STOP" if="$_IsStandAlone">
 	<parameter name="nIterMax" type="integer" min="-1" default="-1" />
-	<parameter name="TimeMax" type="real"  min="-1" default="-1" />
+	<parameter name="TimeMax" type="real"  min="-1.0" default="-1.0" />
 
 #STOP
 -1			nIterMax
-600.0			TimeMax [sec]
+600.0		TimeMax [sec]
 
 This command is only used in stand alone mode.
 
@@ -242,10 +243,10 @@ The default is DoEcho=.false.
 
 
 <command name="CPUTIMEMAX" if="$_IsStandAlone">
-	<parameter name="CpuTimeMax" type="real" min="-1" default="-1" />
+	<parameter name="CpuTimeMax" type="real" min="-1.0" default="-1.0" />
 
 #CPUTIMEMAX
-3600                    CpuTimeMax [sec]
+3600        CpuTimeMax [sec]
 
 This command is only used in stand alone mode.
 
@@ -266,26 +267,26 @@ To do the check the CpuTimeMax variable has to be set to a positive value.
 <commandgroup name="GRID">
 Parameters of the Lagrangian grid used in MFLAMPA 
 <command name="CHECKGRIDSIZE">
-	<parameter name="nVertexMax" type="integer" default="2000" />
-	<parameter name="nLon"  type="integer" default="20" />
-	<parameter name="nLat"  type="integer" default="20" />
+	<parameter name="nVertexMax" type="integer" min="1" default="2000" />
+	<parameter name="nLon"  type="integer" min="1" default="20" />
+	<parameter name="nLat"  type="integer" min="1" default="20" />
 
 #CHECKGRIDSIZE
- 1000     nParticleMax
-    4     nLon
-    4     nLat
+1000     	nParticleMax
+4     		nLon
+4     		nLat
 
 Check if the configured parameters of the Lagrangian grid match those
 assumed in the input files
 </command>
 
 <command name="GRIDNODE">
-	<parameter name="nLon"  type="integer" default="20" />
-	<parameter name="nLat"  type="integer" default="20" />
+	<parameter name="nLon"  type="integer" min="1" default="20" />
+	<parameter name="nLat"  type="integer" min="1" default="20" />
 
 #GRIDNODE
-    4     nLon
-    4     nLat
+4     		nLon
+4     		nLat
 
 Set the configured parameters of the Lagrangian grid
 </command>
@@ -296,9 +297,9 @@ Set the configured parameters of the Lagrangian grid
 	<parameter name="iPTest"  type="integer" default="1" />
 
 #TESTPOS
-    1     iNodeTest
-    99    iParticleTest
-    1     iPTest
+1     		iNodeTest
+99    		iParticleTest
+1     		iPTest
 
 Set the test position and momentum
 </command>
@@ -308,19 +309,19 @@ Set the test position and momentum
 	<parameter name="nSpreadLat"  type="integer" min="1" />
 
 #PREADGRID
-    6  	  nSpreadLon
-    6  	  nSpreadLat
+6  	  		nSpreadLon
+6  	  		nSpreadLat
 
 Set the size of angular grid in longitude and latitude
 </command>
 
 <command name="SPREADSIGMA">
 	<parameter name="SigmaMode"  type="string" />
-	<parameter name="Sigma [deg]"  type="real" />
+	<parameter name="Sigma"  type="real" />
 
 #SPREADGRID
-    const  	  SigmaMode
-	5.0	      Sigma [deg]
+const		SigmaMode
+5.0	  		Sigma [deg]
 
 Set the sigma changes to the lines:
 SigmaMode is const: all line have the same characteristic spread
@@ -331,12 +332,12 @@ Then we set the "Sigma" of the lines, namely the changes in degrees.
 </command>
 
 <command name="SPREADSOLIDANGLE">
-	<parameter name="RadiusRef [Rs]"  type="real" />
+	<parameter name="RadiusRef"  type="real" />
 	<parameter name="SolidAngleRef"  type="real" />
 
 #SPREADGRID
-    -1.0  	  RadiusRef [Rs]
-	-1.0	  Sigma [deg]
+-1.0  	  	RadiusRef [Rs]
+-1.0	  	Sigma [deg]
 
 Set reference radius and value of solid angle associated with lines.
 </command>
@@ -349,7 +350,7 @@ Set reference radius and value of solid angle associated with lines.
 	</parameter>
 
 #COORDSYSTEM
-HGI       TypeCoordSystem
+HGI       	TypeCoordSystem
 
 Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 </command>
@@ -361,10 +362,10 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
   <parameter name="NameEnergyUnit" type="string"/>
 
 #MOMENTUMGRID
-1.0                   EnergyMin
-1000.0                EnergyMax
-100                   nP
-kev                   NameEnergyUnit
+1.0   		EnergyMin
+1000.0 		EnergyMax
+100    		nP
+kev    		NameEnergyUnit
 
 Read energy range, the number of energy bins and the energy unit.
 Usually read from the restart.H file. 
@@ -429,7 +430,7 @@ https://cosmicrays.oulu.fi/phi/phi.html.
 
 <command name="INJECTION">
 	<parameter name="SpectralIndex" type="real" default="5.0" />
-	<parameter name="CInj" type="real" default="0.25" />
+	<parameter name="Efficency" type="real" default="0.25" />
 
 #INJECTION
 5.0         SpectralIndex
@@ -458,7 +459,7 @@ Please send an email to Igor Sokolov for more information.
   <parameter name="UsePoissonBracket" type="logical" default="T" />
 
 #POISSONBRACKET
-F           UsePoissonBracket
+F       UsePoissonBracket
 
 If UsePoissonBracket is True, the advection scheme is conservative
 Poisson bracket scheme; otherwise, it is non-conservative.
@@ -475,7 +476,7 @@ The default value is false.
 	<parameter name="DoRestart" type="logical" default="T" />
 
 #RESTART
-T	DoRestart
+T	    DoRestart
 
 The default value is true.
 </command>
@@ -496,7 +497,7 @@ The default value is true.
   <parameter name="DoTraceShock" type="logical" default="T" />
 
 #TRACESHOCK
-T          DoTraceShock
+T       DoTraceShock
 
 If DoTraceShock is False, the shock wave is not traced and the density
 profile is not sharpened around it.
@@ -535,7 +536,7 @@ The default value is true.
 
 <command name="#SCALETURBULENCE">
   <parameter name="ScaleTurbulenceType" type="string" default="const" />
-  <parameter name="ScaleTurbulence [AU] at 1 AU" type="real" default="0.1" />
+  <parameter name="ScaleTurbulence" type="real" min="0.0" default="0.1" />
 
 #SCALETURBULENCE
 const			ScaleTurbulenceType
@@ -649,25 +650,25 @@ The number of different time-line tags of the MH_data files.
   <parameter name="nFileOut" type="integer" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">
       <parameter name="StringPlot" type="strings" min="2" max="5" >
-	<part name="KindData" type="string" input="select">
-	  <option name="MHD, fluxes 1D"  value="mh1d" />
-	  <option name="MHD 2D"  value="mh2d" />
-	  <option name="Distrubution function, 1D" value="distr1d" />
-          <option name="Flux 2D"  value="flux2d" />
-	  <option name="MHD, fluxes timeline" value="mhtime" />
-          <option name="Flux timeline"  value="fluxtime" />
-	</part>
-	<part name="StringLogVar" type="string" required="T" />
-	<part name="StringLogVar" type="string" required="F" />
-	<part name="StringLogVar" type="string" required="F" />
-	<part name="StringLogVar" type="string" required="F" />
+		<part name="KindData" type="string" input="select">
+	  	  <option name="MHD, fluxes 1D"  value="mh1d" />
+	  	  <option name="MHD 2D"  value="mh2d" />
+	  	  <option name="Distrubution function, 1D" value="distr1d" />
+	  	  <option name="Flux 2D"  value="flux2d" />
+	  	  <option name="MHD, fluxes timeline" value="mhtime" />
+	  	  <option name="Flux timeline"  value="fluxtime" />
+	    </part>
+		<part name="StringLogVar" type="string" required="T" />
+		<part name="StringLogVar" type="string" required="F" />
+		<part name="StringLogVar" type="string" required="F" />
+		<part name="StringLogVar" type="string" required="F" />
       </parameter>
       <if expr="$KindData=~/mh2d|mhtime|flux2d|fluxtime/">
-	<parameter name="Radius" type="real" />
-	<if expr="$KindData eq fluxtime">
-	  <parameter name="Longitude" type="real" />
-	  <parameter name="Latitude" type="real" />
-	</if>
+		<parameter name="Radius" type="real" />
+		<if expr="$KindData eq fluxtime">
+	  	  <parameter name="Longitude" type="real" />
+	  	  <parameter name="Latitude" type="real" />
+		</if>
       </if>
     </for>
 
@@ -681,9 +682,16 @@ mhtime flux ascii             StringPlot
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
+As an example, "mh1d" means to save 1D plot (for each magnetic field line)
+including coordinates and MHD variables; "R" means radial coordinate (R) plus
+fluxes; "idl" means to save the data in the idl format. In StringPlot, the
+first identifier is always a type of plot, the last identifier is a type of
+file, and the string variables in between denote the list of plot variables
+extra to the MHD ones.
 
 Please send an email to Igor Sokolov for more information on this command.
 </command>
+
 <command name="NOUTPUT">
   <parameter name="nOutput" type="integer" default="1" />
   
