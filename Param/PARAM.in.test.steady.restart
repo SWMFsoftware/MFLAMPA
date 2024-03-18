@@ -47,6 +47,8 @@ T           UseModulationPot
 mh1d flux ascii
 mh2d flux ascii
 215.0
+
+#NOUTPUT
 10			nOutput
 
 #SCALETURBULENCE

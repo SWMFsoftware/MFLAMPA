@@ -484,6 +484,7 @@ contains
        if(count(File_I(1:nFileOut)%iKindData == MH1D_,1) > 1)&
             call CON_stop(NameSub//&
             ": only one MH1D output file can be requested")
+    case("#NOUTPUT")
        if(IsSteadyState)call read_var('nOutput',nOutput)
     case("#USEDATETIME")
        call read_var('UseDateTime',UseDateTime)

@@ -91,7 +91,7 @@ contains
           call read_param_bc(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
           call read_param_diffuse(NameCommand)
-       case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG')
+       case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG', '#NOUTPUT')
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
@@ -133,12 +133,14 @@ contains
        case("#STARTTIME",'#NSTEP','#TIMESIMULATION')
           if(i_session_read() /= 1)CYCLE
           call read_param_time(NameCommand)
-       case("#SETREALTIME",'#TIMEACCURATE')
+       case("#SETREALTIME")
           if(i_session_read() /= 1)CYCLE
           call check_stand_alone
           call read_param_time(NameCommand)
+       case("#TIMEACCURATE")
+          call check_stand_alone
+          call read_param_time(NameCommand)
        case('#SAVERESTART')
-          if(i_session_read() /= 1)CYCLE
           call check_stand_alone
           call read_param_restart
        case default
