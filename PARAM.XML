@@ -75,17 +75,17 @@ There is no default value.
 </command>
 
 <command name="TIMEACCURATE" if="$_IsStandAlone">
-	<parameter name="DoTimeAccurate" type="logical" default="T" />
+	<parameter name="IsTimeAccurate" type="logical" default="T" />
 
 #TIMEACCURATE
-T			DoTimeAccurate
+T			IsTimeAccurate
 
 Allows solving steady-state distribution (cosmic rays, seed population)
 by setting DoTimeAccurate to .false.
 </command>
 
 <command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
-	<parameter name="tSimulation" type="real" min="0" default="0.0" />
+	<parameter name="SPTime [sec]" type="real" min="0" default="0.0" />
 
 #TIMESIMULATION
 1 			SPTime [sec]
@@ -509,8 +509,8 @@ The default value is true.
   <parameter name="MeanFreePath0InAu" type="real" default="1.0" />
 
 #USEFIXEDMFPUPSTREAM
-F			UseFixedMeanFreePathUpstream
-1.0         MeanFreePath0InAu
+F          UseFixedMeanFreePathUpstream
+1.0        MeanFreePath0InAu
 
 Determine whether we set the mean free path, 
 see Li et al. (2003), doi:10.1029/2002JA009666.
@@ -645,47 +645,51 @@ The number of different time-line tags of the MH_data files.
 <command name="SAVEPLOT">
   <parameter name="nFileOut" type="integer" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">
-      <parameter name="StringPlot" type="strings" min="1" max="4" >
-	    <part name="StringLogVar" type="string" input="select" required="T">
-	      <option name="MHD variables"           value="MHD" default="T" />
-		  <option name="MHD vars. scaled"     	 value="mhd" />
-		  <option name="MHD vars. scaled in 1D"  value="mh1d" />
-		  <option name="MHD vars. scaled in 2D"  value="mh2d" />
-		  <option name="MHD vars. scaled in 3D"  value="mh3d" />
-		  <option name="MHD vars. in accu. time" value="mhtime" />
-		  <option name="Raw variables"     value="R" />
-		  <option name="Raw vars. scaled"  value="r" />
-		  <option name="IDL" 	value="idl" />
-		  <option name="IDL single prec"   value="idl_real4" />
-	      <option name="IDL double prec"   value="idl_real8" />
-		  <option name="IDL ascii" 		   value="idl_ascii" />
-		  <option name="IDL to Tecplot"    value="idl_tec"/>
-		  <option name="Flux variables"    value="FLUX" />
-		  <option name="Flux vars. scaled" value="flux" />
-		  <option name="points"	value="pnt"/>
-		  <option name="ascii" />
-		  <option name="spread" />
-		</part>
-	  </parameter>
-	  <if expr="$nFileOut gt 1">
-		<parameter name="Undocumented parameter" type="real" default="215.0" />
-	  </if>
-	</for>
+      <parameter name="StringPlot" type="strings" min="2" max="5" >
+	<part name="KindData" type="string" input="select">
+	  <option name="MHD, fluxes 1D"  value="mh1d" />
+	  <option name="MHD 2D"  value="mh2d" />
+	  <option name="Distrubution function, 1D" value="distr1d" />
+          <option name="Flux 2D"  value="flux2d" />
+	  <option name="MHD, fluxes timeline" value="mhtime" />
+          <option name="Flux timeline"  value="fluxtime" />
+	</part>
+	<part name="StringLogVar" type="string" required="T" />
+	<part name="StringLogVar" type="string" required="F" />
+	<part name="StringLogVar" type="string" required="F" />
+	<part name="StringLogVar" type="string" required="F" />
+      </parameter>
+      <if expr="$KindData=~/mh2d|mhtime|flux2d|fluxtime/">
+	<parameter name="Radius" type="real" />
+	<if expr="$KindData eq fluxtime">
+	  <parameter name="Longitude" type="real" />
+	  <parameter name="Latitude" type="real" />
+	</if>
+      </if>
+    </for>
 
 #SAVEPLOT
 3                             nFileOut
 mh1d flux ascii               StringPlot
 mh2d flux spread ascii        StringPlot
-215.0                         Undocumented parameter
+215.0                         Radius [Rs]
 mhtime flux ascii             StringPlot
-215.0                         Undocumented parameter
+215.0                         Radius [Rs]
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
 
 Please send an email to Igor Sokolov for more information on this command.
 </command>
+<command name="NOUTPUT">
+  <parameter name="nOutput" type="integer" default="1" />
+  
+#NOUTPUT
+10                 nOutput
 
+Frequency to plot (effective for IsSteadyState only)
+
+</command>
 </commandgroup>
 
 </commandList>
