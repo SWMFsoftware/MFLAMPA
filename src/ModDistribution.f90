@@ -12,7 +12,7 @@ module SP_ModDistribution
   use ModUtilities, ONLY: CON_stop
   use ModNumConst, ONLY: cTiny
   use ModConst,    ONLY: cLightSpeed, energy_in, cMeV
-  use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum
+  use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum, nMu=>nPitchAngle
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
@@ -30,6 +30,7 @@ module SP_ModDistribution
   public:: offset            ! Sync. index in State_VIB and Dist_IIB
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
+  public:: nMu               ! Number of points over pitch-angle
 
   ! Injection and maximal energy, in kev (or, in Io energy unit)
   ! To be read from the PARAM.in file
@@ -75,7 +76,7 @@ module SP_ModDistribution
   ! 1st index - log(momentum)
   ! 2nd index - particle index along the field line
   ! 3rd index - local line number
-  real, public, allocatable :: Distribution_IIB(:,:,:)
+  real, public, allocatable :: Distribution_CB(:,:,:,:)
 
   ! distribution is initialized to have integral flux:
   real:: FluxInitIo = 0.01 ! [PFU]
@@ -90,7 +91,7 @@ contains
     use SP_ModUnit,   ONLY: momentum_to_kinetic_energy
     use ModUtilities, ONLY: check_allocate
     ! set the initial distribution on all lines
-    integer:: iLine, iVertex, iP, iError
+    integer:: iLine, iVertex, iP, iError, iMu
     ! maximal and current momenta
     real :: MomentumMaxSi, MomentumSi
     character(len=*), parameter:: NameSub = 'init'
@@ -124,7 +125,7 @@ contains
     end do
 
     ! Distribution function
-    allocate(Distribution_IIB(0:nP+1,1:nVertexMax,nLine), stat=iError)
+    allocate(Distribution_CB(0:nP+1,nMu,nVertexMax,nLine), stat=iError)
     call check_allocate(iError, 'Distribution_IIB')
 
     ! initialization depends on momentum, however, this corresponds
@@ -132,10 +133,12 @@ contains
     ! uniform backgound while visualizing this quantity
     do iLine = 1, nLine
        do iVertex = 1, nVertexMax
+          do iMu = 1, nMu
           ! Overall density of the fast particles is of the order
           ! of 10^-6 m^-3. Integral flux is less than 100 per
           ! (m^2 ster s). Differential background flux is constant.
-          Distribution_IIB(:,iVertex,iLine) = Background_I
+             Distribution_CB(:,iMu,iVertex,iLine) = Background_I
+          end do
        end do
     end do
 
@@ -253,8 +256,8 @@ contains
     if(iOffset==1)then
        State_VIB([RhoOld_,BOld_],2:nVertex_B(iLine),iLine) &
             = State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine)-1,iLine)
-       Distribution_IIB(:,2:nVertex_B(iLine), iLine)&
-            = Distribution_IIB(:,1:nVertex_B(iLine)-1, iLine)
+       Distribution_CB(:,:,2:nVertex_B(iLine), iLine)&
+            = Distribution_CB(:,:,1:nVertex_B(iLine)-1, iLine)
        ! Extrapolate state vector components and VDF at iVertex=1
        Distance2ToMin = norm2(MHData_VIB(X_:Z_,2,iLine) - &
             FootPoint_VB(X_:Z_,iLine))
@@ -264,25 +267,25 @@ contains
        State_VIB([RhoOld_, BOld_], 1, iLine) = &
             (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iLine) &
             -Alpha     * State_VIB([RhoOld_, BOld_], 3, iLine)
-       Distribution_IIB(:,1,iLine) = Distribution_IIB(:,2,iLine) + &
-            Alpha*(Distribution_IIB(:,2,iLine) - &
-            Distribution_IIB(:,3,iLine))
+       Distribution_CB(:,:,1,iLine) = Distribution_CB(:,:,2,iLine) + &
+            Alpha*(Distribution_CB(:,:,2,iLine) - &
+            Distribution_CB(:,:,3,iLine))
        ! extrapolation may introduced negative values
        ! for strictly positive quantities; such occurences need fixing
        where(State_VIB([RhoOld_,BOld_],1,iLine) <= 0.0)
           State_VIB([RhoOld_,BOld_],1,iLine) = &
                0.01 * State_VIB([RhoOld_,BOld_],2,iLine)
        end where
-       where(Distribution_IIB(:,1,iLine) <= 0.0)
-          Distribution_IIB(:,1,iLine) = &
-               0.01 * Distribution_IIB(:,2,iLine)
+       where(Distribution_CB(:,:,1,iLine) <= 0.0)
+          Distribution_CB(:,:,1,iLine) = &
+               0.01 * Distribution_CB(:,:,2,iLine)
        end where
     elseif(iOffset < 0)then
        State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &
             =  State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
             - iOffset, iLine)
-       Distribution_IIB(:,1:nVertex_B(iLine), iLine)&
-            = Distribution_IIB(:,1-iOffset:nVertex_B(iLine)-iOffset, &
+       Distribution_CB(:,:,1:nVertex_B(iLine), iLine)&
+            = Distribution_CB(:,:,1-iOffset:nVertex_B(iLine)-iOffset, &
             iLine)
     else
        call CON_stop('No algorithm for iOffset >1 in '//NameSub)
@@ -319,10 +322,10 @@ contains
              ! the flux increment from iP
              dFlux = 0.5 * &
                   (KinEnergy_I(iP+1) - KinEnergy_I(iP)) * (&
-                  Distribution_IIB(iP,  iVertex,iLine)*&
+                  Distribution_CB(iP,nMu,  iVertex,iLine)*&
                   Momentum_I(iP)**2 &
                   +&
-                  Distribution_IIB(iP+1,iVertex,iLine)*&
+                  Distribution_CB(iP+1,nMu,iVertex,iLine)*&
                   Momentum_I(iP+1)**2)
 
              ! increase the total flux
@@ -342,10 +345,10 @@ contains
                    dFlux1 =&
                         ((-0.50*(KinEnergy_I(iP) + EChannelIo_I(iFlux)) + &
                         KinEnergy_I(iP+1) )*&
-                        Distribution_IIB(iP,iVertex,iLine)*&
+                        Distribution_CB(iP,nMu,iVertex,iLine)*&
                         Momentum_I(iP)**2  &
                         -0.50*(KinEnergy_I(iP)-EChannelIo_I(iFlux))*&
-                        Distribution_IIB(iP+1,iVertex,iLine)*&
+                        Distribution_CB(iP+1,nMu,iVertex,iLine)*&
                         Momentum_I(iP+1)**2)*&
                         (KinEnergy_I(iP)-EChannelIo_I(iFlux))/&
                         (KinEnergy_I(iP+1)-KinEnergy_I(iP))
@@ -356,11 +359,11 @@ contains
              ! increase total energy flux
              EFlux = EFlux + 0.5 * &
                   (KinEnergy_I(iP+1) - KinEnergy_I(iP)) * (&
-                  Distribution_IIB(iP,  iVertex,iLine)*&
+                  Distribution_CB(iP,nMu,iVertex,iLine)*&
                   KinEnergy_I(iP) * &
                   Momentum_I(iP)**2 &
                   +&
-                  Distribution_IIB(iP+1,iVertex,iLine)*&
+                  Distribution_CB(iP+1,nMu,iVertex,iLine)*&
                   KinEnergy_I(iP+1) * &
                   Momentum_I(iP+1)**2)
           end do
