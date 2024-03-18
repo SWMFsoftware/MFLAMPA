@@ -4,7 +4,7 @@
 module SP_ModAdvanceAdvection
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_IIB, dLogP
+  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, dLogP
   implicit none
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
@@ -68,7 +68,7 @@ contains
        call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! advection in the momentum space
        do iVertex = 1, nX
-          if(any(Distribution_IIB(0:nP+1,iVertex,iLine) < 0.0)) then
+          if(any(Distribution_CB(0:nP+1,1,iVertex,iLine) < 0.0)) then
              write(*,*) NameSub, ': Distribution_IIB < 0'
              Used_B(iLine) = .false.
              nVertex_B(iLine) = 0
@@ -76,7 +76,7 @@ contains
              RETURN
           end if
           call advance_log_advection(FermiFirst_I(iVertex), &
-               1, 1, Distribution_IIB(0:nP+1,iVertex,iLine))
+               1, 1, Distribution_CB(0:nP+1,1,iVertex,iLine))
        end do
        ! compute diffusion along the field line
        ! set the left boundary condition (for diffusion)
@@ -85,13 +85,13 @@ contains
              ! Set and use BC at the upper end
              call set_upper_end_bc(iLine, nX)
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                  LowerEndSpectrum_I = Distribution_IIB(0, 1, iLine)        &
+                  LowerEndSpectrum_I = Distribution_CB(0, 1, 1, iLine)      &
                   /Momentum_I(1:nP)**SpectralIndex,                         &
                   UpperEndSpectrum_I = UpperEndBc_I)
           else
              ! No upper end BC
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                  LowerEndSpectrum_I = Distribution_IIB(0, 1, iLine)        &
+                  LowerEndSpectrum_I = Distribution_CB(0, 1, 1, iLine)     &
                   /Momentum_I(1:nP)**SpectralIndex)
           end if
        end if

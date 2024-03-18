@@ -7,7 +7,7 @@ module SP_ModBc
   use ModNumConst,        ONLY: cPi
   use ModCosmicRay,       ONLY: local_interstellar_spectrum,          &
        TypeLisBc, UseModulationPot, ModulationPot
-  use SP_ModDistribution, ONLY: nP, Distribution_IIB, Momentum_I,     &
+  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, Momentum_I, &
        MomentumInjSi
   use SP_ModGrid,         ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
   use SP_ModUnit,         ONLY: kinetic_energy_to_momentum,           &
@@ -101,7 +101,7 @@ contains
        if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
             iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
 
-       Distribution_IIB(0,iVertex,iLine) = DistributionBc*CoefInjLocal
+       Distribution_CB(0,:,iVertex,iLine) = DistributionBc*CoefInjLocal
     end do
 
   end subroutine set_momentum_bc
@@ -116,7 +116,7 @@ contains
     !--------------------------------------------------------------------------
     select case(trim(TypeUpperEndBc))
     case('float')
-       UpperEndBc_I = Distribution_IIB(1:nP,iEnd,iLine)
+       UpperEndBc_I = Distribution_CB(1:nP,nMu,iEnd,iLine)
     case('escape')
        UpperEndBc_I = Background_I(1:nP)
     case('lism')

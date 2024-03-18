@@ -9,7 +9,7 @@ module SP_ModPlot
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModDistribution, ONLY: nP, KinEnergy_I, Momentum_I, &
-       Distribution_IIB, FluxChannelInit_V,                  &
+       Distribution_CB, FluxChannelInit_V,                  &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
@@ -625,7 +625,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine save_plot_all(IsInitialOutputIn)
-    use SP_ModDistribution, ONLY: get_integral_flux
+    use SP_ModDistribution, ONLY: get_integral_flux, nMu
     use SP_ModTime,         ONLY: IsSteadyState, iIter
     ! write the output data
     logical, intent(in), optional:: IsInitialOutputIn
@@ -1189,7 +1189,7 @@ contains
             end if
             ! the actual distribution
             File_I(iFile) % Buffer_II(:,iVertex) = &
-                 log10(Distribution_IIB(1:nP,iVertex,iLine)*Factor_I(1:nP))
+                 log10(Distribution_CB(1:nP,nMu,iVertex,iLine)*Factor_I(1:nP))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)

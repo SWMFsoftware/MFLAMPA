@@ -6,6 +6,8 @@ module SP_ModAdvancePoisson
   ! High resolution finite volume method for kinetic equations
   ! with Poisson brackets (Sokolov et al., 2023)
   ! See https://doi.org/10.1016/j.jcp.2023.111923
+  use SP_ModDistribution, ONLY: nP, Distribution_CB
+
   implicit none
 
   PRIVATE ! Except
@@ -19,10 +21,8 @@ contains
        tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
-
+    use SP_ModDistribution, ONLY: DLogP, VolumeP_I, Momentum3_I
     use ModPoissonBracket, ONLY: explicit
-    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I,    &
-         DLogP, Distribution_IIB
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
     integer, intent(in):: iLine, iShock ! indices of line and shock
@@ -102,8 +102,8 @@ contains
        ! May need to correct the volume if the time step has been reduced
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
        ! Update velocity distribution function
-       Distribution_IIB(1:nP, 1:nX, iLine) = &
-            Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
+       Distribution_CB(1:nP, 1, 1:nX, iLine) = &
+            Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
 
        ! Diffuse the distribution function
        if(UseDiffusion) then
@@ -127,10 +127,9 @@ contains
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
+    use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
     use ModNumConst,        ONLY: cTiny
     use ModPoissonBracket,  ONLY: explicit
-    use SP_ModDistribution, ONLY: nP, Momentum3_I, VolumeP_I,    &
-         Distribution_IIB
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
     integer, intent(in):: iLine, iShock ! indices of line and shock
@@ -192,8 +191,8 @@ contains
          IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
-    Distribution_IIB(1:nP, 1:nX, iLine) = &
-         Distribution_IIB(1:nP, 1:nX, iLine) + Source_C
+    Distribution_CB(1:nP, 1, 1:nX, iLine) = &
+         Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
@@ -213,17 +212,16 @@ contains
     ! to solve the second order scheme. Add solution in physical cells and
     ! in a single layer of the ghost cells along the momentum coordinate.
 
-    use SP_ModDistribution, ONLY: nP, Distribution_IIB,     &
-         Momentum_I, Background_I
+    use SP_ModDistribution, ONLY: Background_I, Momentum_I
     use SP_ModBc,           ONLY: SpectralIndex,            &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     integer, intent(in):: iLine     ! indices of line and shock
     integer, intent(in):: nX        ! # of meshes along lnP-coordinate
     real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
     !--------------------------------------------------------------------------
-    VDF_G(0:nP+1, 1:nX) = Distribution_IIB(:, 1:nX, iLine)
+    VDF_G(0:nP+1, 1:nX) = Distribution_CB(:, 1, 1:nX, iLine)
     ! Apply bc along the line coordinate:
-    VDF_G(0:nP+1,    0) = Distribution_IIB(0, 1, iLine)*    &
+    VDF_G(0:nP+1,    0) = Distribution_CB(0, 1, 1, iLine)*    &
          (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
     if(UseUpperEndBc) then
        call set_upper_end_bc(iLine, nX)

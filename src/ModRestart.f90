@@ -9,7 +9,7 @@ module SP_ModRestart
        nLine, MhData_VIB, iShock_IB,  Used_B,&
        FootPoint_VB, nVertex_B, nShockParam, &
        nLon, nLat
-  use SP_ModDistribution, ONLY: Distribution_IIB
+  use SP_ModDistribution, ONLY: Distribution_CB
   use SP_ModTime,   ONLY: SPTime, iIter, iStartTime_I
   use SP_ModUnit,   ONLY: NameEnergyUnit
   use ModPlotFile,  ONLY: save_plot_file, read_plot_file
@@ -112,7 +112,7 @@ contains
        write(UnitTmp_)&
             FootPoint_VB(:, iLine),&
             MhData_VIB(:,1:nVertex_B(iLine), iLine),&
-            Distribution_IIB(:,1:nVertex_B(iLine), iLine)
+            Distribution_CB(:,:,1:nVertex_B(iLine), iLine)
        call close_file
     end do
 
@@ -162,7 +162,7 @@ contains
        read(UnitTmp_, iostat = iError) &
             FootPoint_VB(:, iLine),&
             MhData_VIB(:,1:nVertex_B(iLine), iLine),&
-            Distribution_IIB(:,1:nVertex_B(iLine), iLine)
+            Distribution_CB(:,:,1:nVertex_B(iLine), iLine)
        if(iError>0)then
           write(*,*)'Error in reading nPoint in line=', iLine
           call close_file
@@ -209,7 +209,7 @@ contains
     write(UnitTmp_,'(i8,a)')iIter,cTab//cTab//'nStep'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#TIMESIMULATION'
-    write(UnitTmp_,'(es22.15,a)')SPTime,cTab//cTab//'tSimulation'
+    write(UnitTmp_,'(es22.15,a)')SPTime,cTab//cTab//'SPTime'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#NTAG'
     write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//'nTag'
