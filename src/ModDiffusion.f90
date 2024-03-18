@@ -80,7 +80,7 @@ contains
   subroutine diffuse_distribution_s(iLine, nX, iShock, Dt, &
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! diffuse the distribution function with scalar/global Dt
-    use SP_ModDistribution, ONLY: nP!, SpeedSi_I, Momentum_I, Distribution_IIB
+    use SP_ModDistribution, ONLY: nP
     !  use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -103,7 +103,7 @@ contains
   subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocalIn_II,  &
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! diffuse the distribution function with vector/local Dt
-    use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, Distribution_IIB
+    use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, Distribution_CB
     use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -202,7 +202,7 @@ contains
        !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
 
        ! Set source term in the RHS:
-       Res_I = Distribution_IIB(iP, 1:nX, iLine)
+       Res_I = Distribution_CB(iP,1, 1:nX, iLine)
        ! Set elements of tri-diagonal matrix in the LHS
        Main_I = 1.0
        ! For i=1:
@@ -242,7 +242,7 @@ contains
        end if
        ! Update the solution from f^(n) to f^(n+1):
        call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I,   &
-            Distribution_IIB(iP, 1:nX, iLine))
+            Distribution_CB(iP,1, 1:nX, iLine))
     end do MOMENTUM
   end subroutine diffuse_distribution_arr
   !============================================================================

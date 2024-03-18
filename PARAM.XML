@@ -85,10 +85,10 @@ by setting DoTimeAccurate to .false.
 </command>
 
 <command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
-	<parameter name="SPTime [sec]" type="real" min="0" default="0.0" />
+	<parameter name="SPTime" type="real" min="0" default="0.0" />
 
 #TIMESIMULATION
-1 			SPTime [sec]
+1			SPTime [sec]
 
 The SPTime variable contains the simulation time in seconds
 relative to the initial time set by the #STARTTIME command.
