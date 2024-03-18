@@ -539,10 +539,10 @@ The default value is true.
   <parameter name="ScaleTurbulence" type="real" min="0.0" default="0.1" />
 
 #SCALETURBULENCE
-const			ScaleTurbulenceType
-0.2402397832 	ScaleTurbulence [AU] at 1 AU
+const		ScaleTurbulenceType
+0.24 		ScaleTurbulence [AU] at 1 AU
 
-cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
+cut-off wavenumber of turbulence spectrum: k0 = 2*cPi/Scale
 The default value is set as const (or constant), i.e.,
 the value (e.g., 0.1) of "ScaleTurbulence [AU] at 1 AU".
 </command>
