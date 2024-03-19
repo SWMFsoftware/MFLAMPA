@@ -29,6 +29,9 @@ OBJECTS = \
 	ModWrite.o \
 	ModTurbulence.o
 
+ModSize.f90: ModSize_orig.f90
+	cp -f ModSize_orig.f90 ModSize.f90
+
 # Object files not included into the library
 OBJECTS_EXE = SP_stand_alone.o
 
