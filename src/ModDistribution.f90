@@ -46,6 +46,9 @@ module SP_ModDistribution
 
   ! whether to use pitch-angle averaged equations
   logical, public:: IsMuAvg = nMu == 1
+  ! uniform distribution of pitch angle
+  real, public :: DeltaMu = 2.0/nMu
+  real, public :: MuFace_I(0:nMu), Mu_I(nMu)
 
   ! speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
@@ -60,8 +63,8 @@ module SP_ModDistribution
   integer, public :: EFlux_    = 7             ! Total integral energy flux
   integer, public :: FluxMax_  = 7
   real, allocatable :: EChannelIo_I(:) ! energy limits of the instrument
-  real, public, allocatable  :: Flux_VIB( :,:,:)
-  character(len=10), public, allocatable  :: NameFluxChannel_I(:)
+  real, public, allocatable  :: Flux_VIB(:,:,:)
+  character(len=10), public, allocatable :: NameFluxChannel_I(:)
 
   !-----------------Grid in the momentum space---------------------------------
   ! iP     0     1                         nP   nP+1
@@ -128,6 +131,12 @@ contains
             (EnergyMaxIo-EnergyInjIo)       &  ! Energy range
             /Momentum_I(iP)**2           ! Convert from diff flux to VDF
     end do
+
+    ! Calculate all the mu values at cell center and faces
+    do iMu = 0, nMu
+       MuFace_I(iMu) = -1.0 + real(iMu)*DeltaMu
+    end do
+    Mu_I = (MuFace_I(0:nMu-1) + MuFace_I(1:nMu))*0.5
 
     ! Distribution function
     allocate(Distribution_CB(0:nP+1,nMu,nVertexMax,nLine), stat=iError)

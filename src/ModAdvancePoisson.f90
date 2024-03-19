@@ -6,21 +6,23 @@ module SP_ModAdvancePoisson
   ! High resolution finite volume method for kinetic equations
   ! with Poisson brackets (Sokolov et al., 2023)
   ! See https://doi.org/10.1016/j.jcp.2023.111923
-  use SP_ModDistribution, ONLY: nP, Distribution_CB
+  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB
 
   implicit none
 
   PRIVATE ! Except
 
   SAVE
-  public :: advect_via_poisson ! Time-accurate advance through given Dt
-  public :: iterate_poisson    ! Local time-stepping
+  public :: advect_via_poisson   ! Time-accurate advance through given Dt
+  public :: iterate_poisson      ! Local time-stepping for steady states
+  public :: advect_multi_poisson ! Time-accurate advance with pitch angle
 contains
   !============================================================================
   subroutine advect_via_poisson(iLine, nX, iShock, &
        tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
+
     use SP_ModDistribution, ONLY: DLogP, VolumeP_I, Momentum3_I
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
@@ -55,10 +57,10 @@ contains
     ! Prediction for the next time step:
     real    :: DtNext
     ! Now this is the particle-number-conservative advection scheme
+    !--------------------------------------------------------------------------
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
-    !--------------------------------------------------------------------------
     VolumeXStart_I(1:nX) = 1/nOldSi_I(1:nX)
     VolumeXStart_I(0)    = VolumeXStart_I(1)
     VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
@@ -206,6 +208,57 @@ contains
        end if
     end if
   end subroutine iterate_poisson
+  !============================================================================
+  subroutine advect_multi_poisson(iLine, nX, iShock, &
+       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
+    ! advect via multiple Possion Bracket scheme for the
+    ! focused transport equation considering pitch angle
+    ! diffuse the distribution function at each time step
+
+    use SP_ModDistribution, ONLY: DLogP, VolumeP_I, Momentum3_I, Mu_I
+    use ModPoissonBracket, ONLY: explicit
+    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
+    integer, intent(in):: iLine, iShock ! indices of line and shock
+    integer, intent(in):: nX        ! # of meshes along lnp-coordinate
+    real,    intent(in):: tFinal    ! time interval to advance through
+    real,    intent(in):: CflIn     ! input CFL number
+    ! Input variables for diffusion
+    real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    ! Loop variables
+    integer :: iP, iMu, iX
+    ! Extended arrays for implementation of the Poisson Bracket Alg.
+    ! VolumeXStart_I: geometric volume when the subroutine starts
+    ! VolumeXEnd_I: geometric volume when the subroutine ends
+    ! dVolumeXDt_I: time derivative of geometric volume
+    real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
+    ! Volume_G: phase space volume at the end of each iteration
+    ! VolumeOld_G : phase space volume at the end of each iteration
+    ! dVolumeDt_G : phase space time derivative
+    real, dimension(0:nP+1, 0:nX+1):: VolumeOld_G, Volume_G, dVolumeDt_G
+    ! ------------ Hamiltonian functions ------------
+    ! Poisson bracket with regard to the first and second vars
+    ! considering the case when there are more than one Poisson bracket
+    ! and when there is a Poisson bracket with respect to the time
+    real :: dHamiltonian01_FX(0:nP+1, 0:nMu+1, -1:nX+1)
+    real :: Hamiltonian2_N(0:nP+1, -1:nMu+1, -1:nX+1)
+    real :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
+    ! Extended array for distribution function
+    real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
+    ! Advection term
+    real    :: Source_C(nP, nMu, nX)
+    ! Time, ranging from 0 to tFinal
+    real    :: Time
+    ! Time step
+    real    :: Dt
+    ! Prediction for the next time step:
+    real    :: DtNext
+    ! The data calculated directly from the MHD data
+    real :: DeltaSOverB_C(nX), dDeltaSOverBDt_C(nX),  &
+         InvB_C(nX), bDuDt_C(nX), dLnBDeltaS2Dt_C(nX)
+    ! Now this is the particle-number-conservative advection scheme with \mu
+    !--------------------------------------------------------------------------
+  end subroutine advect_multi_poisson
   !============================================================================
   subroutine set_VDF(iLine, nX, VDF_G)
     ! We need the VDF on the extended grid with two layers of ghost cells,
