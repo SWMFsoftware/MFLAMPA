@@ -5,7 +5,7 @@ module SP_ModMain
 
   use SP_ModProc,       ONLY: iProc
   use SP_ModReadMhData, ONLY: DoReadMhData
-  use ModUtilities, ONLY: CON_stop
+  use ModUtilities,     ONLY: CON_stop
 
   implicit none
 
@@ -82,7 +82,8 @@ contains
             ! Currently we do not need '#DOSMOOTH'
           if(i_session_read() /= 1) CYCLE
           call read_param_grid(NameCommand)
-       case('#MOMENTUMGRID', '#FLUXINITIAL', '#FLUXCHANNEL')
+       case('#MOMENTUMGRID', '#PITCHANGLEGRID', &
+            '#FLUXINITIAL', '#FLUXCHANNEL')
           if(i_session_read() /= 1) CYCLE
           call read_param_dist(NameCommand)
        case('#CFL', '#POISSONBRACKET', '#TRACESHOCK')
@@ -181,7 +182,7 @@ contains
     end if
     ! Inialize unit for energy ('keV', 'MeV', 'GeV') and convert energies
     call init_unit
-    ! Allocate the didtribution function arrays and set 'uniform' background
+    ! Allocate the distribution function arrays and set 'uniform' background
     call init_dist
     call init_plot
     ! if(DoReadMhData), inialize MH data reader and reads the first data file
@@ -193,8 +194,8 @@ contains
   !============================================================================
   subroutine finalize
     use SP_ModRestart,    ONLY: stand_alone_final_restart
-    use SP_ModPlot,       ONLY: finalize_plot       =>finalize
-    use SP_ModReadMhData, ONLY: finalize_mhdata     =>finalize
+    use SP_ModPlot,       ONLY: finalize_plot      => finalize
+    use SP_ModReadMhData, ONLY: finalize_mhdata    => finalize
     ! use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
     ! finalize the model
     character(len=*), parameter:: NameSub = 'finalize'

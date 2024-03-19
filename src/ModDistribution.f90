@@ -12,7 +12,8 @@ module SP_ModDistribution
   use ModUtilities, ONLY: CON_stop
   use ModNumConst, ONLY: cTiny
   use ModConst,    ONLY: cLightSpeed, energy_in, cMeV
-  use SP_ModSize,  ONLY: nVertexMax, nP=>nMomentum, nMu=>nPitchAngle
+  use SP_ModSize,  ONLY: nVertexMax, nP => nMomentum, &
+       nMu => nPitchAngle
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
@@ -30,7 +31,7 @@ module SP_ModDistribution
   public:: offset            ! Sync. index in State_VIB and Dist_IIB
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
-  public:: nMu               ! Number of points over pitch-angle
+  public:: nMu               ! Number of points over pitch-angle (\mu)
 
   ! Injection and maximal energy, in kev (or, in Io energy unit)
   ! To be read from the PARAM.in file
@@ -42,6 +43,9 @@ module SP_ModDistribution
   ! Size of a  log-momentum mesh. For momentum we use both the
   ! denotaion, P, and a word, momentum - whichever is more covenient
   real, public :: DLogP      ! log(MomentumMaxSi/MomentumInjSi)/nP
+
+  ! whether to use pitch-angle averaged equations
+  logical, public:: IsMuAvg = nMu == 1
 
   ! speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
@@ -90,11 +94,12 @@ contains
 
     use SP_ModUnit,   ONLY: momentum_to_kinetic_energy
     use ModUtilities, ONLY: check_allocate
-    ! set the initial distribution on all lines
+    ! loop variables
     integer:: iLine, iVertex, iP, iError, iMu
     ! maximal and current momenta
     real :: MomentumMaxSi, MomentumSi
     character(len=*), parameter:: NameSub = 'init'
+    ! set the initial distribution on all lines
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
     DoInit = .false.
@@ -108,7 +113,7 @@ contains
 
     ! Functions to convert the grid index to momentum and energy
     Momentum3_I(-1) = exp(-1.50*DLogP)/3
-    do iP = 0, nP +1
+    do iP = 0, nP+1
        Momentum_I(iP)    = MomentumInjSi*exp(iP*DLogP)
        SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
             momentum_to_energy(Momentum_I(iP))
@@ -147,7 +152,7 @@ contains
        nFluxChannel = 6
        allocate(NameFluxChannel_I(0:nFluxChannel+1))
        NameFluxChannel_I = ['flux_total', 'flux_00005', 'flux_00010', &
-            'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100', &
+            'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100',   &
             'eflux     ']
        if(allocated(EChannelIo_I))&
             deallocate(EChannelIo_I)
@@ -175,7 +180,7 @@ contains
     ! for the assumed initial distribution (~1/p^2)
     FluxChannelInit_V(0) = FluxInitIo
     FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
-         (EnergyMaxIo-EChannelIo_I(:)) / (EnergyMaxIo-EnergyInjIo)
+         (EnergyMaxIo - EChannelIo_I(:)) / (EnergyMaxIo - EnergyInjIo)
     FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * Io2Si_V(UnitFlux_) * &
          0.5 * (EnergyMaxIo + EnergyInjIo) * Si2Io_V(UnitFlux_)
   end subroutine init
@@ -185,7 +190,7 @@ contains
     use ModReadParam, ONLY: read_var
     use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-    integer:: nPCheck = nP, iFluxChannel
+    integer:: nPCheck = nP, nMuCheck = nMu, iFluxChannel
     character(len=5) :: NameFluxChannel
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
@@ -197,13 +202,24 @@ contains
        call read_var('nP',             nPCheck    )
 
        if(nP/=nPCheck)then
-          if(iProc==0)write(*,'(a,i6,a,i6)')NameSub//' '//         &
-               'Code is configured with nMomentum=', nP ,          &
-               ' while value read from PARAM.in is nP=',nPCheck
+          if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
+               'Code is configured with nMomentum=', nP,         &
+               ' while value read from PARAM.in is nP=', nPCheck
+          call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
+       end if
+    case('#PITCHANGLEGRID')
+       ! Read whether we use pitch angle and average results if we use
+       call read_var('IsPitchAngleAveraged', IsMuAvg)
+       call read_var('nMu', nMuCheck)
+
+       if(nMu/=nMuCheck)then
+          if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
+               'Code is configured with nMu=', nMu,              &
+               ' while value read from PARAM.in is nMu=', nMuCheck
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
     case('#FLUXINITIAL')
-       call read_var('FluxInit [p.f.u.]',FluxInitIo)
+       call read_var('FluxInit', FluxInitIo)
        ! check correctness
        if(FluxInitIo<=0)call CON_stop(NameSub//': flux value must be positive')
     case('#FLUXCHANNEL')
@@ -288,7 +304,7 @@ contains
             = Distribution_CB(:,:,1-iOffset:nVertex_B(iLine)-iOffset, &
             iLine)
     else
-       call CON_stop('No algorithm for iOffset >1 in '//NameSub)
+       call CON_stop('No algorithm for iOffset > 1 in '//NameSub)
     end if
     if(iShock_IB(ShockOld_, iLine)/=NoShock_)&
          iShock_IB(ShockOld_, iLine) = &

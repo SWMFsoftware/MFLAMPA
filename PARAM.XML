@@ -348,10 +348,10 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 </command>
 
 <command name="MOMENTUMGRID" if="$_IsFirstSession">
-  <parameter name="EnergyMin" type="real" />
-  <parameter name="EnergyMax" type="real" />
-  <parameter name="nP" type="integer" />
-  <parameter name="NameEnergyUnit" type="string"/>
+  <parameter name="EnergyMin" type="real" default="1.0" />
+  <parameter name="EnergyMax" type="real" default="1000.0" />
+  <parameter name="nP" type="integer" min="1" default="100" />
+  <parameter name="NameEnergyUnit" type="string" default="keV" />
 
 #MOMENTUMGRID
 1.0   		EnergyMin
@@ -361,6 +361,19 @@ kev    		NameEnergyUnit
 
 Read energy range, the number of energy bins and the energy unit.
 Usually read from the restart.H file. 
+</command>
+
+<command name="PITCHANGLEGRID" if="$_IsFirstSession">
+  <parameter name="IsPitchAngleAveraged" type="logical" default="T" />
+  <parameter name="nMu" type="integer" min="1" default="1"/>
+
+#MOMENTUMGRID
+T   		IsPitchAngleAveraged
+1	 		nMu
+
+Read the pitch angle information, determine whether we take the
+averaged value over all pitch angles. Also, we need to specify
+how many intervals in the range of [-1, 1] for pitch angle.
 </command>
 
 <command name="FLUXINITIAL">
