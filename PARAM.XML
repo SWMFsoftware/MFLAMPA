@@ -644,7 +644,8 @@ The number of different time-line tags of the MH_data files.
 <command name="SAVEPLOT">
   <parameter name="nFileOut" type="integer" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">
-      <parameter name="StringPlot" type="strings" min="3" max="8" >
+      <parameter name="StringPlot" type="strings" case="lower"
+		 min="3" max="20" >
 	<part name="KindData" type="string" input="select">
 	  <option name="MHD, fluxes 1D"  value="mh1d" />
 	  <option name="MHD 2D"  value="mh2d" />
@@ -659,7 +660,32 @@ The number of different time-line tags of the MH_data files.
 	  <option name="real4" />
 	  <option name="real8" />
 	</part>
-	<part name="NameVar" type="string" required="T" multiple="T"/>
+	<part name="NameVar" type="string" required="T" multiple="T"
+	      input="select">
+	  <option name="Flux"   value="flux" default="T"/>
+	  <option name="R"      value="r" />
+          <option name="LagrID" value="lagrid"/>
+          <option name="X"  	value="x"/>  
+          <option name="Y"  	value="y"/>  
+          <option name="Z"  	value="z"/>  
+          <option name="Rho"	value="rho"/>
+          <option name="T"  	value="t"/>  
+          <option name="Ux" 	value="ux"/> 
+          <option name="Uy" 	value="uy"/> 
+          <option name="Uz" 	value="uz"/> 
+          <option name="Bx" 	value="bx"/> 
+          <option name="By" 	value="by"/> 
+          <option name="Bz" 	value="bz"/> 
+          <option name="Wave1"  value="wave1"/>
+          <option name="Wave2"  value="wave2"/>
+          <option name="R"    	value="r"/>  
+          <option name="D"    	value="d"/>  
+          <option name="S"    	value="s"/>  
+          <option name="U"    	value="u"/>  
+          <option name="B"    	value="b"/>  
+          <option name="RhoOld" value="rhoold>"/>
+          <option name="BOld"   value="bold"/>
+	</part>
       </parameter>
       <if expr="$KindData=~/mh2d|mhtime|flux2d|fluxtime/">
 	<parameter name="Radius" type="real" />
