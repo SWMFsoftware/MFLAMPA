@@ -122,13 +122,13 @@ contains
             momentum_to_energy(Momentum_I(iP))
        Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*DLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
-       ! Normalize kinetic energy per Unit of energy:
+       ! Normalize kinetic energy per Unit of energy in SI unit:
        KinEnergy_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP)) &
             *Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
-       Momentum_I(iP) = Momentum_I(iP)/MomentumInjSi
+       Momentum_I(iP)    = Momentum_I(iP)/MomentumInjSi
        Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
-            (EnergyMaxIo-EnergyInjIo)       &  ! Energy range
+            (EnergyMaxIo-EnergyInjIo) &  ! Energy range
             /Momentum_I(iP)**2           ! Convert from diff flux to VDF
     end do
 
@@ -148,9 +148,9 @@ contains
     do iLine = 1, nLine
        do iVertex = 1, nVertexMax
           do iMu = 1, nMu
-          ! Overall density of the fast particles is of the order
-          ! of 10^-6 m^-3. Integral flux is less than 100 per
-          ! (m^2 ster s). Differential background flux is constant.
+             ! Overall density of the fast particles is of the order
+             ! of 10^-6 m^-3. Integral flux is less than 100 per
+             ! (m^2 ster s). Differential background flux is constant.
              Distribution_CB(:,iMu,iVertex,iLine) = Background_I
           end do
        end do

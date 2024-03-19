@@ -124,8 +124,8 @@ contains
     end do
   end subroutine advect_via_poisson
   !============================================================================
-  subroutine iterate_poisson(iLine, nX, iShock, CflIn, &
-       uSi_I, BSi_I, nSi_I, DsSi_I)
+  subroutine iterate_poisson(iLine, nX, iShock,    &
+       CflIn, uSi_I, BSi_I, nSi_I, DsSi_I)
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
@@ -209,7 +209,7 @@ contains
     end if
   end subroutine iterate_poisson
   !============================================================================
-  subroutine advect_multi_poisson(iLine, nX, iShock, &
+  subroutine advect_multi_poisson(iLine, nX, iShock,  &
        tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
     ! advect via multiple Possion Bracket scheme for the
     ! focused transport equation considering pitch angle
@@ -279,7 +279,8 @@ contains
     if(UseUpperEndBc) then
        call set_upper_end_bc(iLine, nX)
        VDF_G(1:nP, nX+1) = UpperEndBc_I
-       VDF_G(0, nX+1) = VDF_G(0, nX); VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
+       VDF_G(0   , nX+1) = VDF_G(0, nX)
+       VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
     else
        VDF_G(0:nP+1, nX+1) = Background_I
     end if
@@ -287,8 +288,115 @@ contains
     VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
     VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
     ! Add a second layer of the ghost cells along the momentum coordinate:
-    VDF_G(-1,:) = VDF_G(0,:); VDF_G(nP+2,:) = VDF_G(nP+1,:)
+    VDF_G(-1  ,:) = VDF_G(0   ,:)
+    VDF_G(nP+2,:) = VDF_G(nP+1,:)
   end subroutine set_VDF
+  !============================================================================
+  subroutine calc_hamiltonian_1(nX, dDeltaSOverBDt_C, dHamiltonian01_FX)
+    ! Calculate the 1st Hamiltonian function with time:
+    ! p^3/3*\deltas/B at cell face of p^3/3, regarding to tau and p^3/3
+
+    use SP_ModDistribution, ONLY: DeltaMu, Momentum3_I
+    integer, intent(in) :: nX                   ! Number of s_L grid
+    real, intent(in)    :: dDeltaSOverBDt_C(nX) ! D[delta(s_L)/B]/Dt
+    real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
+    integer             :: iX, iMu              ! Loop variables
+    ! Calculate the first Hamiltonian function
+    !--------------------------------------------------------------------------
+
+    do iX = 1, nX
+       do iMu = 0, nMu+1
+          dHamiltonian01_FX(:, iMu, iX) = -Momentum3_I*dDeltaSOverBDt_C(iX)
+       end do
+    end do
+
+    ! Calculate the Hamiltonian function used actually：\tilde\deltaH
+    dHamiltonian01_FX(0:nP, 0:nMu+1, 1:nX) =    &
+         dHamiltonian01_FX(0:nP, 0:nMu+1, 1:nX)*DeltaMu
+
+    ! Boundary condition of Hamiltonian function
+    dHamiltonian01_FX(:, :,    0) = dHamiltonian01_FX(:, :,  1)
+    dHamiltonian01_FX(:, :, nX+1) = dHamiltonian01_FX(:, :, nX)
+  end subroutine calc_hamiltonian_1
+  !============================================================================
+  subroutine calc_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
+    ! Calculate the 2nd Hamiltonian function at each fixed time:
+    ! (mu^2-1)*v/(2B) at face of s_L and mu, regarding to s_L and mu
+
+    use ModConst, ONLY: cProtonMass, cLightSpeed
+    use SP_ModDistribution, ONLY: Momentum_I, VolumeP_I, MuFace_I
+    integer, intent(in) :: nX             ! Number of s_L grid
+    real, intent(in)    :: BSi_I(nX)      ! B-field strength at cell center
+    real, intent(inout) :: Hamiltonian2_N(0:nP+1, -1:nMu+1, -1:nX+1)
+    real    :: Velocity_I(0:nP+1)   ! Particle velocity array at cell face
+    real    :: InvBSi_I(nX), InvBFaceSi_I(0:nX) ! 1/B at center and face
+    integer :: iX, iMu              ! Loop variables
+    !--------------------------------------------------------------------------
+
+    ! Considering the law of relativity, v=1/sqrt(1+m^2*c^2/p^2), v can be
+    ! calculated as a function of p. Note that light speed is the unit of
+    ! speed here, so we do not need to multiply c^2 in the following steps
+    Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
+
+    ! Calculate 1/B on the boundary of grid
+    InvBSi_I             = 1.0/BSi_I
+    InvBFaceSi_I(1:nX-1) = (InvBSi_I(2:nX) + InvBSi_I(1:nX-1))*0.5
+    InvBFaceSi_I(0 )     = InvBSi_I(1 ) - (InvBSi_I(2 ) - InvBSi_I(1   ))*0.5
+    InvBFaceSi_I(nX)     = InvBSi_I(nX) + (InvBSi_I(nX) - InvBSi_I(nX-1))*0.5
+
+    ! Calculate the second hamiltonian function = (mu^2-1)*v/(2B)
+    do iX = 1, nX
+       do iMu = 0, nMu
+          Hamiltonian2_N(:, iMu, iX) = (MuFace_I(iMu)**2 - 1.0)*  &
+               Velocity_I*InvBFaceSi_I(iX)
+          ! Here, what we use actually is: \tilde\deltaH
+          Hamiltonian2_N(:, iMu, iX) = Hamiltonian2_N(:, iMu, iX)*VolumeP_I
+       end do
+    end do
+
+    ! Boundary condition of Hamiltonian function
+    Hamiltonian2_N(:,     :,   -1) = Hamiltonian2_N(:,     :,  0)
+    Hamiltonian2_N(:,     :, nX+1) = Hamiltonian2_N(:,     :, nX)
+    Hamiltonian2_N(:,    -1,    :) = Hamiltonian2_N(:,     1,  :)
+    Hamiltonian2_N(:, nMu+1,    :) = Hamiltonian2_N(:, nMu-1,  :)
+  end subroutine calc_hamiltonian_2
+  !============================================================================
+  subroutine calc_hamiltonian_3(nX, DeltaSOverB_C,    &
+       dLnBDeltaS2Dt_C, bDuDt_C, Hamiltonian3_N)
+    ! Calculate the 3rd Hamiltonian function at each fixed time:
+    ! (1-mu^2)/2 * [ mu*(p^3/3)*(3\vec{b}\vec{b}:\nabla\vec{u} - div\vec{u})
+    ! + ProtonMass*p^2*(\vec{b}*d\vec{u}/dt) ], regarding to p^3/3 and mu,
+    ! so the coordinates of p^3/3 and mu are at face, and s_L is at center.
+    ! Here we list the variables in the analytical function:
+    ! (3\vec{b}\vec{b}:\nabla\vec{u} - div\vec{u}) = d(ln(B*ds^2))/dt
+    ! ProtonMass = cRmeProtonGeV, in the unit of GeV/c^2
+    ! \vec{b}*d\vec{u}/dt = bDuDt_C
+
+    use ModConst, ONLY: cProtonMass
+    use SP_ModDistribution, ONLY: Momentum3_I, MuFace_I
+    integer, intent(in) :: nX             ! Number of s_L grid
+    real, intent(in)    :: DeltaSOverB_C(nX), dLnBDeltaS2Dt_C(nX), bDuDt_C(nX)
+    real, intent(inout) :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
+    integer             :: iX, iMu        ! Loop variables
+    ! Calculate the third hamiltonian function
+    !--------------------------------------------------------------------------
+    do iX = 1, nX
+       do iMu = 0, nMu
+          Hamiltonian3_N(:, iMu, iX) = 0.5*(1.0 - MuFace_I(iMu)**2)* &
+               (MuFace_I(iMu)*Momentum3_I*dLnBDeltaS2Dt_C(iX) +      &
+               cProtonMass*(Momentum3_I*3.0)**(2.0/3.0)*bDuDt_C(iX))
+       end do
+       ! Here, what we use actually is: \tilde\deltaH
+       Hamiltonian3_N(:, 0:nMu, iX) = &
+            Hamiltonian3_N(:, 0:nMu, iX)*DeltaSOverB_C(iX)
+    end do
+
+    ! Boundary condition of Hamiltonian function
+    Hamiltonian3_N(:,     :,    0) = Hamiltonian3_N(:,     :,  1)
+    Hamiltonian3_N(:,     :, nX+1) = Hamiltonian3_N(:,     :, nX)
+    Hamiltonian3_N(:,    -1,    :) = Hamiltonian3_N(:,     1,  :)
+    Hamiltonian3_N(:, nMu+1,    :) = Hamiltonian3_N(:, nMu-1,  :)
+  end subroutine calc_hamiltonian_3
   !============================================================================
 end module SP_ModAdvancePoisson
 !==============================================================================
