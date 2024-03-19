@@ -6,7 +6,7 @@ module SP_ModSize
   implicit none
 
   private ! except
-  public :: nDim, nMomentum, nVertexMax, nPitchAngle
+  public :: nDim, nMomentum, nVertexMax, nPitchAngle, IsPitchAngleAverage
 
   ! Dimensionality
   integer, parameter:: nDim = 3
@@ -17,6 +17,7 @@ module SP_ModSize
   ! number of points along the phase coords (see ModAdvance);
   integer, parameter:: nMomentum   = 100
   integer, parameter:: nPitchAngle = 1
+  logical, parameter:: IsPitchAngleAverage = nPitchAngle == 1
 
 end module SP_ModSize
 !==============================================================================
