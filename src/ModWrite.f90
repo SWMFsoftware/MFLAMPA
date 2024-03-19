@@ -1516,7 +1516,9 @@ contains
   end subroutine save_plot_all
   !============================================================================
   subroutine finalize
-     use SP_ModGrid, ONLY: nLat, nLon
+
+    use ModUtilities,       ONLY: cTab
+    use SP_ModGrid, ONLY: nLat, nLon
     ! write the header file that contains necessary information
     ! for reading input files in a separate run
 
@@ -1530,14 +1532,14 @@ contains
          NameCaller=NameSub)
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
-    write(UnitTmp_,'(i8,a32)') nVertexMax,'nVertexMax'
-    write(UnitTmp_,'(i8,a32)') nLon,     'nLon'
-    write(UnitTmp_,'(i8,a32)') nLat,     'nLat'
+    write(UnitTmp_,'(i8,a)') nVertexMax,cTab//cTab//cTab//'nVertexMax'
+    write(UnitTmp_,'(i8,a)') nLon,     cTab//cTab//cTab//'nLon'
+    write(UnitTmp_,'(i8,a)') nLat,     cTab//cTab//cTab//'nLat'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#MHDATA'
-    write(UnitTmp_,'(a,a35)')trim(TypeMHDataFile),'  TypeFile'
-    write(UnitTmp_,'(i8,a32)')nTag,'nFileRead'
-    write(UnitTmp_,'(a,a29)')trim(NameTagFile), '  NameTagFile'
+    write(UnitTmp_,'(a)')trim(TypeMHDataFile)//cTab//cTab//'TypeFile'
+    write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//cTab//'nFileRead'
+    write(UnitTmp_,'(a)')trim(NameTagFile)//cTab//cTab//'NameTagFile'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#END'
     write(UnitTmp_,*)
