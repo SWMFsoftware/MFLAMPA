@@ -51,12 +51,12 @@ We use keV as the default value.
 
 
 <command name="STARTTIME">
-	<parameter name="iYear"   type="integer" default="2000" />
-	<parameter name="iMonth"  type="integer" min="1" max="12" default="3"/>
-	<parameter name="iDay"    type="integer" min="1" max="31" default="21"/>
-	<parameter name="iHour"   type="integer" min="0" max="23" default="10"/>
-	<parameter name="iMinute" type="integer" min="0" max="59" default="45"/>
-	<parameter name="iSecond" type="integer" min="0" max="59" default="0"/>
+  <parameter name="iYear"   type="integer" default="2000" />
+  <parameter name="iMonth"  type="integer" min="1" max="12" default="3"/>
+  <parameter name="iDay"    type="integer" min="1" max="31" default="21"/>
+  <parameter name="iHour"   type="integer" min="0" max="23" default="10"/>
+  <parameter name="iMinute" type="integer" min="0" max="59" default="45"/>
+  <parameter name="iSecond" type="integer" min="0" max="59" default="0"/>
 
 #STARTTIME
 2000			iYear
@@ -75,7 +75,7 @@ There is no default value.
 </command>
 
 <command name="TIMEACCURATE" if="$_IsStandAlone">
-	<parameter name="IsTimeAccurate" type="logical" default="T" />
+  <parameter name="IsTimeAccurate" type="logical" default="T" />
 
 #TIMEACCURATE
 T			IsTimeAccurate
@@ -85,7 +85,7 @@ by setting DoTimeAccurate to .false.
 </command>
 
 <command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
-	<parameter name="SPTime" type="real" min="0.0" default="0.0" />
+  <parameter name="SPTime" type="real" min="0.0" default="0.0" />
 
 #TIMESIMULATION
 1			SPTime [sec]
@@ -103,7 +103,7 @@ The default value is SPTime=0.
 </command>
 
 <command name="NSTEP" if="$_IsFirstSession" multiple="T">
-	<parameter name="nStep" type="integer" min="0" default="0" />
+  <parameter name="nStep" type="integer" min="0" default="0" />
 
 #NSTEP
 100			nStep
@@ -129,9 +129,9 @@ test suite, which contains these commands when the framework is tested.
 </command>
 
 <command name="SAVERESTART" if="$_IsStandAlone">
-	<parameter name="DoSaveRestart" type="logical" default="F" />
-	<parameter name="DnSaveRestart" type="integer" default="-1" />
-	<parameter name="DtSaveRestart" type="real" default="-1.0" />
+  <parameter name="DoSaveRestart" type="logical" default="F" />
+  <parameter name="DnSaveRestart" type="integer" default="-1" />
+  <parameter name="DtSaveRestart" type="real" default="-1.0" />
 
 #SAVERESTART
 F			DoSaveRestart
@@ -177,8 +177,8 @@ of the included file or PARAM.in file is equivalent with an
 The commands in this group only work in stand alone mode.
 
 <command name="STOP" if="$_IsStandAlone">
-	<parameter name="nIterMax" type="integer" min="-1" default="-1" />
-	<parameter name="TimeMax" type="real"  min="-1.0" default="-1.0" />
+  <parameter name="nIterMax" type="integer" min="-1" default="-1" />
+  <parameter name="TimeMax" type="real"  min="-1.0" default="-1.0" />
 
 #STOP
 -1			nIterMax
@@ -201,7 +201,7 @@ The #STOP command must be used in every session.
 </command>
 
 <command name="CHECKSTOPFILE" if="$_IsStandAlone">
-	<parameter name="DoCheckStopFile" type="logical" default="T" />
+  <parameter name="DoCheckStopFile" type="logical" default="T" />
 
 #CHECKSTOPFILE
 T			DoCheckStopFile
@@ -221,7 +221,7 @@ The default is DoCheckStopFile=.true.
 </command>
 
 <command name="ECHO" if="$_IsStandAlone">
-	<parameter name="DoEcho" type="logical" default="T" />
+  <parameter name="DoEcho" type="logical" default="T" />
 
 #ECHO
 T			DoEcho
@@ -235,7 +235,7 @@ The default is DoEcho=.false.
 
 
 <command name="CPUTIMEMAX" if="$_IsStandAlone">
-	<parameter name="CpuTimeMax" type="real" min="-1.0" default="-1.0" />
+  <parameter name="CpuTimeMax" type="real" min="-1.0" default="-1.0" />
 
 #CPUTIMEMAX
 3600        CpuTimeMax [sec]
@@ -259,9 +259,9 @@ To do the check the CpuTimeMax variable has to be set to a positive value.
 <commandgroup name="GRID">
 Parameters of the Lagrangian grid used in MFLAMPA 
 <command name="CHECKGRIDSIZE">
-	<parameter name="nVertexMax" type="integer" min="1" default="2000" />
-	<parameter name="nLon"  type="integer" min="1" default="20" />
-	<parameter name="nLat"  type="integer" min="1" default="20" />
+  <parameter name="nVertexMax" type="integer" min="1" default="2000" />
+  <parameter name="nLon"  type="integer" min="1" default="20" />
+  <parameter name="nLat"  type="integer" min="1" default="20" />
 
 #CHECKGRIDSIZE
 1000     	nParticleMax
@@ -273,8 +273,8 @@ assumed in the input files
 </command>
 
 <command name="GRIDNODE">
-	<parameter name="nLon"  type="integer" min="1" default="20" />
-	<parameter name="nLat"  type="integer" min="1" default="20" />
+  <parameter name="nLon"  type="integer" min="1" default="20" />
+  <parameter name="nLat"  type="integer" min="1" default="20" />
 
 #GRIDNODE
 4     		nLon
@@ -284,9 +284,9 @@ Set the configured parameters of the Lagrangian grid
 </command>
 
 <command name="TESTPOS">
-	<parameter name="iNodeTest"  type="integer" default="1" />
-	<parameter name="iParticleTest"  type="integer" default="99" />
-	<parameter name="iPTest"  type="integer" default="1" />
+  <parameter name="iNodeTest"  type="integer" default="1" />
+  <parameter name="iParticleTest"  type="integer" default="99" />
+  <parameter name="iPTest"  type="integer" default="1" />
 
 #TESTPOS
 1     		iNodeTest
@@ -297,8 +297,8 @@ Set the test position and momentum
 </command>
 
 <command name="SPREADGRID">
-	<parameter name="nSpreadLon"  type="integer" min="1" />
-	<parameter name="nSpreadLat"  type="integer" min="1" />
+  <parameter name="nSpreadLon"  type="integer" min="1" />
+  <parameter name="nSpreadLat"  type="integer" min="1" />
 
 #PREADGRID
 6  	  		nSpreadLon
@@ -308,8 +308,8 @@ Set the size of angular grid in longitude and latitude
 </command>
 
 <command name="SPREADSIGMA">
-	<parameter name="SigmaMode"  type="string" />
-	<parameter name="Sigma"  type="real" />
+  <parameter name="SigmaMode"  type="string" />
+  <parameter name="Sigma"  type="real" />
 
 #SPREADGRID
 const		SigmaMode
@@ -324,8 +324,8 @@ Then we set the "Sigma" of the lines, namely the changes in degrees.
 </command>
 
 <command name="SPREADSOLIDANGLE">
-	<parameter name="RadiusRef"  type="real" />
-	<parameter name="SolidAngleRef"  type="real" />
+  <parameter name="RadiusRef"  type="real" />
+  <parameter name="SolidAngleRef"  type="real" />
 
 #SPREADGRID
 -1.0  	  	RadiusRef [Rs]
@@ -335,11 +335,11 @@ Set reference radius and value of solid angle associated with lines.
 </command>
 
 <command name="COORDSYSTEM" alias="COORDINATESYSTEM" if="$_IsFirstSession">
-	<parameter name="TypeCoordSystem" type="string" input="select">
-		<option name="HGR" default="T"/>
-		<option name="HGI"/>
-		<option name="HGC"/>
-	</parameter>
+  <parameter name="TypeCoordSystem" type="string" input="select">
+    <option name="HGR" default="T"/>
+    <option name="HGI"/>
+    <option name="HGC"/>
+  </parameter>
 
 #COORDSYSTEM
 HGI       	TypeCoordSystem
@@ -425,8 +425,8 @@ https://cosmicrays.oulu.fi/phi/phi.html.
 <commandgroup name="ADVANCE">
 
 <command name="INJECTION">
-	<parameter name="SpectralIndex" type="real" default="5.0" />
-	<parameter name="Efficency" type="real" default="0.25" />
+  <parameter name="SpectralIndex" type="real" default="5.0" />
+  <parameter name="Efficency" type="real" default="0.25" />
 
 #INJECTION
 5.0         SpectralIndex
@@ -443,10 +443,10 @@ however, somewhat higher than one values may be of use.
 </command>
 
 <command name="CFL">
-	<parameter name="Cfl" type="real" default="1.0" />
+  <parameter name="Cfl" type="real" default="1.0" />
 
 #CFL
-1.0     Cfl
+1.0              Cfl
 
 Please send an email to Igor Sokolov for more information.
 </command>
@@ -469,7 +469,7 @@ The default value is false.
 <commandgroup name="ACTION">
 
 <command name="RESTART">
-	<parameter name="DoRestart" type="logical" default="T" />
+  <parameter name="DoRestart" type="logical" default="T" />
 
 #RESTART
 T	    DoRestart
@@ -478,7 +478,7 @@ The default value is true.
 </command>
 
 <command name="DORUN">
-	<parameter name="DoRun" type="logical" default="T" />
+  <parameter name="DoRun" type="logical" default="T" />
 
 #DORUN
 T	DoRun
@@ -544,7 +544,7 @@ the value (e.g., 0.1) of "ScaleTurbulence [AU] at 1 AU".
 </command>
 
 <command name="TURBULENTSPECTRUM">
-	 <parameter name="UseTurbulentSpectrum" type="logical" default="F" />
+  <parameter name="UseTurbulentSpectrum" type="logical" default="F" />
 
 #TURBULENTSPECTRUM
 F          UseTurbulentSpectrum
@@ -556,10 +556,9 @@ Set the default value is false.
 
 </commandgroup>
 
-
 <commandgroup name="INPUT/OUTPUT">
 <command name="USEDATETIME">
-	 <parameter name="UseDateTime" type="logical" default="F" />
+  <parameter name="UseDateTime" type="logical" default="F" />
 
 #USEDATETIME
 T          UseDateTime 
@@ -571,10 +570,10 @@ minutes-seconds passed after the initial time (set by the command #STARTTIME)
 </command>
 
 <command name="TIMING">
-	 <parameter name="UseTiming" type="logical" default="F" />
-	 <parameter name="nTiming" type="integer" />
-	 <parameter name="nDepthTiming" type="integer" />
-	 <parameter name="TypeTimingReport" type="string" />
+  <parameter name="UseTiming" type="logical" default="F" />
+  <parameter name="nTiming" type="integer" />
+  <parameter name="nDepthTiming" type="integer" />
+  <parameter name="TypeTimingReport" type="string" />
 
 #TIMING
 T          UseTiming
@@ -588,7 +587,7 @@ nTiming, nDepthTiming, and TypeTimingReport.
 </command>
 
 <command name="SAVEINITIAL">
-	 <parameter name="DoSaveInitial" type="logical" default="T" />
+  <parameter name="DoSaveInitial" type="logical" default="T" />
 
 #SAVEINITIAL
 T          DoSaveInitial 
@@ -613,15 +612,15 @@ Sets the name of input directory with MHD data.
 </command>
 
 <command name="MHDATA" if="$_IsFirstSession">
-    <parameter name="TypeFile" type="string" input="select">
-      <option name="idl" default="T" />
-	  <option name="ascii" />
-	  <option name="tec" />
-	  <option name="real4" />
-	  <option name="real8" />
-	</parameter>
-	<parameter name="nFileRead" type="integer" default="0"/>
-	<parameter name="NameTagFile" type="string" default=""/>
+  <parameter name="TypeFile" type="string" input="select">
+    <option name="idl" default="T" />
+    <option name="ascii" />
+    <option name="tec" />
+    <option name="real4" />
+    <option name="real8" />
+  </parameter>
+  <parameter name="nFileRead" type="integer" default="0"/>
+  <parameter name="NameTagFile" type="string" default=""/>
 
 #MHDATA
 idl            TypeFile
@@ -645,26 +644,29 @@ The number of different time-line tags of the MH_data files.
 <command name="SAVEPLOT">
   <parameter name="nFileOut" type="integer" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">
-      <parameter name="StringPlot" type="strings" min="2" max="5" >
-		<part name="KindData" type="string" input="select">
-	  	  <option name="MHD, fluxes 1D"  value="mh1d" />
-	  	  <option name="MHD 2D"  value="mh2d" />
-	  	  <option name="Distrubution function, 1D" value="distr1d" />
-	  	  <option name="Flux 2D"  value="flux2d" />
-	  	  <option name="MHD, fluxes timeline" value="mhtime" />
-	  	  <option name="Flux timeline"  value="fluxtime" />
-	    </part>
-		<part name="StringLogVar" type="string" required="T" />
-		<part name="StringLogVar" type="string" required="F" />
-		<part name="StringLogVar" type="string" required="F" />
-		<part name="StringLogVar" type="string" required="F" />
+      <parameter name="StringPlot" type="strings" min="3" max="8" >
+	<part name="KindData" type="string" input="select">
+	  <option name="MHD, fluxes 1D"  value="mh1d" />
+	  <option name="MHD 2D"  value="mh2d" />
+	  <option name="Distrubution function, 1D" value="distr1d" />
+	  <option name="Flux 2D"  value="flux2d" />
+	  <option name="MHD, fluxes timeline" value="mhtime" />
+	  <option name="Flux timeline"  value="fluxtime" />
+	</part>
+	<part name="TypeFile" type="string" input="select" required="T">
+	  <option name="ascii" value="ascii/idl" default="T"/>
+	  <option name="tec" value="tec/tcp" />
+	  <option name="real4" />
+	  <option name="real8" />
+	</part>
+	<part name="NameVar" type="string" required="T" multiple="T"/>
       </parameter>
       <if expr="$KindData=~/mh2d|mhtime|flux2d|fluxtime/">
-		<parameter name="Radius" type="real" />
-		<if expr="$KindData eq fluxtime">
-	  	  <parameter name="Longitude" type="real" />
-	  	  <parameter name="Latitude" type="real" />
-		</if>
+	<parameter name="Radius" type="real" />
+	<if expr="$KindData eq fluxtime">
+	  <parameter name="Longitude" type="real" />
+	  <parameter name="Latitude" type="real" />
+	</if>
       </if>
     </for>
 
@@ -672,9 +674,11 @@ The number of different time-line tags of the MH_data files.
 3                             nFileOut
 mh1d flux ascii               StringPlot
 mh2d flux spread ascii        StringPlot
-215.0                         Radius [Rs]
-mhtime flux ascii             StringPlot
-215.0                         Radius [Rs]
+215.0                         Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
+fluxtime flux ascii           StringPlot
+215.0                         Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
+30.0                          Longitude [deg] (red if fluxtime)
+46.0                          Latitude [deg] (red if fluxtime)
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
