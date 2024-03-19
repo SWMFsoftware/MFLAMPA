@@ -145,8 +145,8 @@ Additional options for MFLAMPA/Config.pl:
 #############################################################################
 
 sub current_settings{
-
-    $Settings .= 
-	"Number of particles per line   : nParticleMax=$nX\n";
+    $Settings  = "Number of particles per line   : nParticleMax=$nX\n";
+    $Settings .= "Mesh in momentum =$nP, in pitch-angle =$nMu\n";
+	
 }
 
