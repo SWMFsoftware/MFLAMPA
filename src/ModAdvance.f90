@@ -17,19 +17,20 @@ module SP_ModAdvance
   PRIVATE ! except
 
   ! Public members:
-  public:: read_param  ! read injection parameters
-  public:: advance     ! Advance Distribution_IIB through the time interval
+  public:: read_param ! Read parameters
+  public:: advance  ! Advance Distribution_IIB through the time interval
   public:: iterate_steady_state
 
   ! If the shock wave is traced, the advance algorithms are modified
   logical, public :: DoTraceShock = .true.
 
-  ! Local parameters
+  ! Local variables
   real:: Cfl = 0.9     ! Controls the maximum allowed time step
   logical :: UsePoissonBracket = .false.
 contains
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand ! From PARAM.in
     character(len=*), parameter:: NameSub = 'read_param'
@@ -44,9 +45,11 @@ contains
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
+    
   end subroutine read_param
   !============================================================================
   subroutine advance(TimeLimit)
+
     ! advance the solution of the diffusive kinetic equation:
     !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and Fermi acceleration
@@ -55,11 +58,13 @@ contains
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
+
     use SP_ModTime,             ONLY: SPTime
     use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
+
     real, intent(in):: TimeLimit
     ! Loop variable
     integer  :: iLine
@@ -161,6 +166,7 @@ contains
           end if
        end do PROGRESS
     end do line
+
   contains
     !==========================================================================
     subroutine steepen_shock(iEnd)
@@ -200,11 +206,13 @@ contains
       BSi_I(iShock+1-nWidth:iShock+1)=maxval(BSi_I(iShock+1-nWidth:iShock+1))
       ! pre shock part
       BSi_I(iShock+1:iShock+nWidth  )=minval(BSi_I(iShock+1:iShock+nWidth))
+
     end subroutine steepen_shock
     !==========================================================================
   end subroutine advance
   !============================================================================
   subroutine iterate_steady_state
+
     ! advance the solution of the diffusive kinetic equation:
     !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and Fermi acceleration
@@ -244,6 +252,7 @@ contains
        call iterate_poisson(iLine, iEnd, iShock, Cfl, uSi_I(1:iEnd), &
            BSi_I(1:iEnd), nSi_I(1:iEnd), DsSi_I(1:iEnd))
     end do
+
   end subroutine iterate_steady_state
   !============================================================================
 end module SP_ModAdvance

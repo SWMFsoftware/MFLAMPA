@@ -36,20 +36,21 @@ module SP_ModMain
 contains
   !============================================================================
   subroutine read_param
-    use SP_ModAdvance,       ONLY: read_param_adv        =>read_param
-    use SP_ModAngularSpread, ONLY: read_param_spread     =>read_param
-    use SP_ModBc,            ONLY: read_param_bc         =>read_param
-    use SP_ModDiffusion,     ONLY: read_param_diffuse    =>read_param
-    use SP_ModDistribution,  ONLY: read_param_dist       =>read_param
-    use SP_ModGrid,          ONLY: read_param_grid       =>read_param
-    use SP_ModOriginPoints,  ONLY: read_param_origin     =>read_param
-    use SP_ModPlot,          ONLY: read_param_plot       =>read_param
-    use SP_ModReadMHData,    ONLY: read_param_mhdata     =>read_param
-    use SP_ModRestart,       ONLY: read_param_restart    =>read_param
-    use SP_ModTime,          ONLY: read_param_time       =>read_param
-    use SP_ModTiming,        ONLY: read_param_timing     =>read_param
-    use SP_ModTurbulence,    ONLY: read_param_turbulence =>read_param
-    use SP_ModUnit,          ONLY: read_param_unit       =>read_param
+
+    use SP_ModAdvance,       ONLY: read_param_adv        => read_param
+    use SP_ModAngularSpread, ONLY: read_param_spread     => read_param
+    use SP_ModBc,            ONLY: read_param_bc         => read_param
+    use SP_ModDiffusion,     ONLY: read_param_diffuse    => read_param
+    use SP_ModDistribution,  ONLY: read_param_dist       => read_param
+    use SP_ModGrid,          ONLY: read_param_grid       => read_param
+    use SP_ModOriginPoints,  ONLY: read_param_origin     => read_param
+    use SP_ModPlot,          ONLY: read_param_plot       => read_param
+    use SP_ModReadMHData,    ONLY: read_param_mhdata     => read_param
+    use SP_ModRestart,       ONLY: read_param_restart    => read_param
+    use SP_ModTime,          ONLY: read_param_time       => read_param
+    use SP_ModTiming,        ONLY: read_param_timing     => read_param
+    use SP_ModTurbulence,    ONLY: read_param_turbulence => read_param
+    use SP_ModUnit,          ONLY: read_param_unit       => read_param
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: &
@@ -106,9 +107,6 @@ contains
           call read_var('DoRun', DoRun)
        case('#TIMING')
           call read_param_timing
-       case('#TEST')
-          call read_param_adv('#TRACESHOCK')
-          call read_param_diffuse('#DIFFUSION')
        case('#END')
           call check_stand_alone
           IsLastRead=.true.

@@ -489,16 +489,8 @@ distribution function is not solved.
 The default value is true.
 </command>
 
-<command name="TEST">
-  <parameter name="DoTraceShock" type="logical" default="T" />
-  <parameter name="UseDiffusion" type="logical" default="T" />
-
-  For backward compatibility only.
-</command>
-
 <command name="TRACESHOCK">
   <parameter name="DoTraceShock" type="logical" default="T" />
-  <parameter name="UseDiffusion" type="logical" default="T" />
 
 #TRACESHOCK
 T       DoTraceShock
