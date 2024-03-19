@@ -53,7 +53,9 @@ my $Src = 'src';
 # Grid size variables
 my $NameSizeFile = "$Src/ModSize.f90";
 my $GridSize;
+my $nX;
 my $nP;
+my $nMu;
 
 # Read previous grid size
 &get_settings;
@@ -84,7 +86,9 @@ sub get_settings{
     open(FILE, $NameSizeFile) or die "$ERROR could not open $NameSizeFile\n";
     while(<FILE>){
 	next if /^\s*!/;
-	$nP   =$1 if /\bnVertexMax\s*=[^0-9]*(\d+)/i;
+	$nX   =$1 if /\bnVertexMax\s*=[^0-9]*(\d+)/i;
+	$nP   =$1 if /\bnMomentum\s*=[^0-9]*(\d+)/i;
+	$nMu  =$1 if /\bnPitchAngle\s*=[^0-9]*(\d+)/i;
     }
     close FILE;
 
@@ -101,13 +105,15 @@ sub set_grid_size{
 
     $GridSize = $NewGridSize if $NewGridSize;
 
-    if($GridSize =~ /^[1-9]\d*$/){
-	$nP = $GridSize;
+      if($GridSize =~ /^[1-9]\d*,[1-9]\d*,[1-9]\d*$/){
+	  ($nX,$nP,$nMu) = split(',', $GridSize);
+    }elsif($GridSize =~ /^[1-9]\d*$/){
+	$nX = $GridSize;
     }elsif($GridSize){
-	die "$ERROR -g=$GridSize must be only one integer\n";
+	die "$ERROR -g=$GridSize must be one to three integers\n";
     }
     # Check the grid size (to be set)
-    die "$ERROR nParticleMax=$nP must be positive\n" if $nP<=0;
+    die "$ERROR nParticleMax=$nX must be positive\n" if $nX<=0;
 
     print "Writing new grid size $GridSize into ".
 	"$NameSizeFile ...\n";
@@ -115,7 +121,9 @@ sub set_grid_size{
     @ARGV = ($NameSizeFile);
     while(<>){
 	if(/^\s*!/){print; next} # Skip commented out lines
-	s/\b(nVertexMax\s*=[^0-9]*)(\d+)/$1$nP/i;
+	s/\b(nVertexMax\s*=[^0-9]*)(\d+)/$1$nX/i;
+	s/\b(nMomentum\s*=[^0-9]*)(\d+)/$1$nP/i if length($nP)>0;
+	s/\b(nPitchAngle\s*=[^0-9]*)(\d+)/$1$nMu/i if length($nMu)>0;
 	print;
     }
 }
@@ -127,9 +135,9 @@ sub print_help{
     print "
 Additional options for MFLAMPA/Config.pl:
 
--g=nP
+-g=nX,nP,nMu
                 Set grid size. 
-                nP is maximum number of particles per field line,
+                nX is maximum number of particles per field line,
 \n";
     exit 0;
 }
@@ -139,6 +147,6 @@ Additional options for MFLAMPA/Config.pl:
 sub current_settings{
 
     $Settings .= 
-	"Number of particles per line   : nParticleMax=$nP\n";
+	"Number of particles per line   : nParticleMax=$nX\n";
 }
 

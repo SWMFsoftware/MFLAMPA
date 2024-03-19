@@ -17,7 +17,7 @@ module SP_ModSize
   ! number of points along the phase coords (see ModAdvance);
   integer, parameter:: nMomentum   = 100
   integer, parameter:: nPitchAngle = 1
-  logical, parameter:: IsPitchAngleAverage = nPitchAngle == 1
+  logical, parameter:: IsPitchAngleAverage = 1 == nPitchAngle
 
 end module SP_ModSize
 !==============================================================================
