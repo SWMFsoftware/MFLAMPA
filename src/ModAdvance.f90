@@ -70,7 +70,7 @@ contains
     use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson, &
-         init_data_states, advect_multi_poisson
+         init_data_states, advect_via_multi_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
     use SP_ModDistribution,     ONLY: IsMuAvg
 
@@ -89,7 +89,7 @@ contains
     real     :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real     :: DtProgress
-    ! Current time
+    ! Current time: for updating states in multi-Poisson-bracket scheme
     real     :: Time
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
@@ -166,11 +166,15 @@ contains
              ! Poisson bracket scheme: particle-number-conservative
              if(IsMuAvg) then
                 ! Single Poisson bracket: Parker transport equation
-                call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
+                call advect_via_poisson(iLine, iEnd, iShock, DtProgress,&
                      Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
-                else
+             else
                 ! Multiple Poisson brackets: Focused transport equation
+                ! See the descriptions for development in ModAdvancePoisson.f90
+                Time = Alpha*DtProgress*DtFull - DtProgress ! Tstart this step
                 call init_data_states(iLine, iEnd, DtFull)  ! Inital states
+                call advect_via_multi_poisson(iLine, iEnd, iShock, &
+                     Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
              ! store density and B-field arrays at the end of this time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)

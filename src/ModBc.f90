@@ -80,9 +80,9 @@ contains
     integer, intent(in) :: iLine, iEnd, iShock
     real,    intent(in) :: nSi_I(1:iEnd)
     ! local variables
-    integer:: iVertex     ! loop variable
-    real   :: MomentumSi    ! Momentum for the thermal energy k_BTi
-    real   :: CoefInjLocal, DistributionBc
+    integer :: iVertex     ! loop variable
+    real    :: MomentumSi  ! Momentum for the thermal energy k_BTi
+    real    :: CoefInjLocal, DistributionBc
     !--------------------------------------------------------------------------
     do iVertex = 1, iEnd
        ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)

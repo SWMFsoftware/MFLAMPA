@@ -15,10 +15,10 @@ module SP_ModAdvancePoisson
   PRIVATE ! Except
 
   SAVE
-  public :: advect_via_poisson   ! Time-accurate advance through given Dt
-  public :: iterate_poisson      ! Local time-stepping for steady states
-  public :: advect_multi_poisson ! Time-accurate advance with pitch angle
-  public :: init_data_states     ! Initialize the states for multi_poisson
+  public:: advect_via_poisson       ! Time-accurate advance through given Dt
+  public:: iterate_poisson          ! Local time-stepping for steady states
+  public:: advect_via_multi_poisson ! Time-accurate advance with pitch angle
+  public:: init_data_states         ! Initialize the states for multi_poisson
 
   ! \Deltas/b, ln(B\deltas^2) at Old time
   real, public, dimension(nVertexMax) :: DeltaSOverBOld_C, LnBDeltaS2Old_C
@@ -46,7 +46,7 @@ contains
     real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
     integer :: iX
-    ! Extended arrays for implementation of the Poisson Bracket Alg.
+    ! Extended arrays for implementation of the Poisson bracket scheme
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
     ! dVolumeXDt_I: time derivative of geometric volume
@@ -96,22 +96,23 @@ contains
     DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
          max(VolumeXEnd_I, VolumeXStart_I))/(3*DLogP)
 
-    ! Advection by Poisson Bracket Algorithm
+    ! Advection by Poisson bracket scheme
     do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time)
-       ! Volume Updates
-       VolumeOld_G = Volume_G
-       Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
        ! update bc for at minimal and maximal energy
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        call set_VDF(iLine, nX, VDF_G)
+       ! Volume Updates
+       VolumeOld_G = Volume_G
+       Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
+       ! Advance by Poisson bracket scheme
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
-            dHamiltonian01_FX=dHamiltonian01_FX,         &
+            dHamiltonian01_FX = dHamiltonian01_FX,       &
             dVolumeDt_G = dVolumeDt_G,                   &
-            DtIn=Dt,           & ! Input time step, which may be reduced
-            CFLIn=CflIn,       & ! Input CFL to calculate next time step
-            DtOut=DtNext)
+            DtIn = Dt,         & ! Input time step, which may be reduced
+            CFLIn = CflIn,     & ! Input CFL to calculate next time step
+            DtOut = DtNext)
        ! May need to correct the volume if the time step has been reduced
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
        ! Update velocity distribution function
@@ -220,35 +221,30 @@ contains
     end if
   end subroutine iterate_poisson
   !============================================================================
-  subroutine advect_multi_poisson(iLine, nX, iShock,  &
-       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
+  subroutine advect_via_multi_poisson(iLine, nX, iShock,  &
+       TimeStart, DtFinal, CflIn, nSi_I, BSi_I)
     ! advect via multiple Possion Bracket scheme for the
     ! focused transport equation considering pitch angle
     ! diffuse the distribution function at each time step
 
-    use SP_ModDistribution, ONLY: DeltaMu, Mu_I, DLogP, VolumeP_I, Momentum3_I
+    use SP_ModDistribution, ONLY: DeltaMu, VolumeP_I
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
     integer, intent(in):: iLine, iShock ! indices of line and shock
-    integer, intent(in):: nX        ! # of meshes along lnp-coordinate
-    real,    intent(in):: tFinal    ! time interval to advance through
-    real,    intent(in):: CflIn     ! input CFL number
+    integer, intent(in):: nX        ! Number of meshes along lnp-axis
+    real,    intent(in):: TimeStart ! Start time before advancing
+    real,    intent(in):: DtFinal   ! Time interval to advance through
+    real,    intent(in):: CflIn     ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    real,    intent(in):: nSi_I(nX), BSi_I(nX)
     ! Loop variables
     integer :: iX, iMu, iP
     ! ------------ Control volume ------------
     ! Volume_G: total control volume at the end of each iteration
-    ! VolumeOld_G: total control volume at the end of each iteration
     ! dVolumeDt_G: total control time derivative
-    real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: VolumeOld_G, Volume_G 
+    real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: Volume_G 
     real :: dVolumeDt_G(0:nP+1, 0:nMu+1, 0:nX+1)
-    ! Extended arrays for implementation of the Poisson Bracket Alg.
-    ! VolumeXStart_I: geometric volume when the subroutine starts
-    ! VolumeXEnd_I: geometric volume when the subroutine ends
-    ! dVolumeXDt_I: time derivative of geometric volume
-    ! real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
     ! ------------ Hamiltonian functions ------------
     ! Poisson bracket with regard to the first and second vars
     ! considering the case when there are more than one Poisson bracket
@@ -260,12 +256,14 @@ contains
     real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
     ! Advection term
     real    :: Source_C(nP, nMu, nX)
-    ! Time, ranging from 0 to tFinal
-    real    :: Time
+    ! Time, ranging from TimeStart to tFinal
+    real    :: Time, tFinal
     ! Time step
     real    :: Dt
     ! Prediction of next time step:
     real    :: DtNext
+    ! Mark whether this is the last run:
+    logical :: IsExit
     ! Now this is the particle-number-conservative advection scheme with \mu
     !--------------------------------------------------------------------------
 
@@ -279,9 +277,115 @@ contains
     dVolumeDt_G(:, :,    0) = dVolumeDt_G(:, :,  1)
     dVolumeDt_G(:, :, nX+1) = dVolumeDt_G(:, :, nX)
     ! Time initialization
-    Time = 0.0
+    tFinal = TimeStart + DtFinal
+    Time = TimeStart
 
-  end subroutine advect_multi_poisson
+    ! Here we would like to get the first trial of DtNext
+    call set_VDF(iLine, nX, VDF_G)  ! Set the VDF first
+    call advance_multi_poisson      ! Now we get DtNext
+
+    ! Advection by multiple-Poisson-bracket scheme
+    do
+       ! Time Updates
+       if (DtNext > tFinal - Time) then
+          Dt = tFinal - Time
+          IsExit = .true.          ! Last step
+       else
+          Dt = DtNext
+          IsExit = .false.         ! Intermediate steps
+       end if
+
+       ! Update bc for at minimal and maximal energy
+       call set_momentum_bc(iLine, nX, nSi_I, iShock)
+       call set_VDF(iLine, nX, VDF_G)
+       ! Advance by multi-Poisson-bracket scheme
+       call advance_multi_poisson(DtIn=Dt)
+
+       if (IsExit) then
+          ! This step is the last step
+          Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =       &
+               Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) + Source_C
+       else
+          ! This step is not the last step
+          ! Update VDF_G considering the time-dependent Volume_G
+
+          Source_C = Source_C*Volume_G(1:nP, 1:nMu, 1:nX)
+          ! Update DeltaSOverB_C for the calculation of volume
+          call update_states(iLine, nX, Time)
+          ! Calculate the total control volume
+          do iX = 1, nX
+             Volume_G(:, 0, iX) = DeltaSOverB_C(iX)*DeltaMu*VolumeP_I
+             do iMu = 1, nMu+1
+                Volume_G(:, 0, iX) = Volume_G(:, 0, iX)
+             end do
+          end do
+
+          ! Update VDF_G to CURRENT time: no BCs for (1:nQ, 1:nP, 1;nR)
+          Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =        &
+               Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) +   &
+               Source_C/Volume_G(1:nP, 1:nMu, 1:nX)
+       end if
+
+       ! ------------ Future Work ------------
+       ! This is the first version of draft implementing multi-Poisson-bracket
+       ! scheme in SP/MFLAMPA made by Weihao Liu. It needs more development
+       ! in the future. Here, we will also include some scattering functions.
+       ! Moreover, the structure should be optimized, with some bugs fixed.
+       ! One can refer to test_multi_poisson in share/Library/test/
+       ! One should specify the TypeScatter in the PARAM.in file.
+       ! We will work on this further later since it is more advanced.
+       ! ------------ Thank you! ------------
+
+       ! Update time
+       Time = Time + Dt
+       if(Time > tFinal - 1.0e-8*DtNext) EXIT
+    end do
+
+  contains
+    !==========================================================================
+    subroutine advance_multi_poisson(DtIn)
+      ! advance by multiple Poisson brackets for each time step
+
+      real, optional :: DtIn
+      ! Get DeltaSOverB_C at current time: for calculating
+      ! the total control volume and Hamiltonian functions
+      call update_states(iLine, nX, Time)
+      Hamiltonian2_N = 0.0
+      Hamiltonian3_N = 0.0
+
+      ! Calculate 1st Hamiltonian function used in the time-dependent
+      ! poisson bracket: {f_jk, (p^3/3)*(DeltaS/B)}_{tau, p^3/3}
+      call calc_hamiltonian_1(nX, dHamiltonian01_FX)
+      ! Calculate 2nd Hamiltonian function used in the time-dependent
+      ! poisson bracket: {f_jk, (mu^2-1)*v/(2B)}_{s_L, mu}
+      call calc_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
+      ! Calculate 3rd Hamiltonian function used in the time-dependent
+      ! poisson bracket: {f_jk, (1-mu^2)/2 * [ mu*(p^3/3)*
+      ! d(ln(B*ds^2))/dt + ProtonMass*p^2*bDuDt_C ]}_{p^3/3, mu}
+      call calc_hamiltonian_3(nX, Hamiltonian3_N)
+
+      ! Calculate the total control volume
+      do iX = 1, nX
+         Volume_G(:, 0, iX) = DeltaSOverB_C(iX)*DeltaMu*VolumeP_I
+         do iMu = 1, nMu+1
+            Volume_G(:, 0, iX) = Volume_G(:, 0, iX)
+         end do
+      end do
+
+      ! Boundary conditions for total control volume
+      Volume_G(:, :,    0) = Volume_G(:, :,  1)
+      Volume_G(:, :, nX+1) = Volume_G(:, :, nX)
+
+      call explicit(nX, nMu, nX, VDF_G, Volume_G, Source_C, &
+           Hamiltonian12_N = Hamiltonian2_N,                &
+           Hamiltonian23_N = -Hamiltonian3_N,               &
+           dHamiltonian03_FZ = dHamiltonian01_FX,           &
+           dVolumeDt_G = dVolumeDt_G,                       &
+           DtIn = DtIn, DtOut = DtNext, CFLIn=CflIn)
+
+    end subroutine advance_multi_poisson
+    !==========================================================================
+  end subroutine advect_via_multi_poisson
   !============================================================================
   subroutine set_VDF(iLine, nX, VDF_G)
     ! We need the VDF on the extended grid with two layers of ghost cells,
@@ -360,7 +464,7 @@ contains
     LnBDeltaS2New_C(1:nX) = log(MHData_VIB(B_, 1:nX, iLine)*DeltaS_I**2)
 
     ! Calculate the time-derivative physical quantities
-    ! Calculate \deltas/B time derivative (for next time)
+    ! Calculate \deltas/B time derivative = D[delta(s_L)/B]/Dt
     dDeltaSOverBDt_C(1:nX) = &
          (DeltaSOverBNew_C(1:nX) - DeltaSOverBOld_C(1:nX))/DtFull
     ! Calculate Dln(B\deltas^2)/Dt
@@ -372,29 +476,26 @@ contains
 
   end subroutine init_data_states
   !============================================================================
-  subroutine update_states(iLine, nX, DtFull, Time)
+  subroutine update_states(iLine, nX, Time)
     ! Update states according to the current time
 
     integer, intent(in) :: iLine  ! Index of the current field line
     integer, intent(in) :: nX     ! Number of grid along s_L axis
-    real, intent(in)    :: DtFull ! Time difference between old and new states
     real, intent(in)    :: Time   ! Current time
 
     ! Calculate values for CURRENT time: here we use linear interpolation
     ! to get the data of each time step from every to consecutive files
     !--------------------------------------------------------------------------
     ! Update \deltas/B
-    DeltaSOverB_C(1:nX) = DeltaSOverBOld_C(1:nX) + &
-         (DeltaSOverBNew_C(1:nX) - DeltaSOverBOld_C(1:nX))/DtFull*Time
+    DeltaSOverB_C(1:nX) = DeltaSOverBOld_C(1:nX) + dDeltaSOverBDt_C(1:nX)*Time
   end subroutine update_states
   !============================================================================
-  subroutine calc_hamiltonian_1(nX, dDeltaSOverBDt_C, dHamiltonian01_FX)
+  subroutine calc_hamiltonian_1(nX, dHamiltonian01_FX)
     ! Calculate the 1st Hamiltonian function with time:
     ! p^3/3*\deltas/B at cell face of p^3/3, regarding to tau and p^3/3
 
     use SP_ModDistribution, ONLY: DeltaMu, Momentum3_I
     integer, intent(in) :: nX                   ! Number of s_L grid
-    real, intent(in)    :: dDeltaSOverBDt_C(nX) ! D[delta(s_L)/B]/Dt
     real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
     integer             :: iX, iMu              ! Loop variables
     ! Calculate the first Hamiltonian function
@@ -457,8 +558,7 @@ contains
     Hamiltonian2_N(:, nMu+1,    :) = Hamiltonian2_N(:, nMu-1,  :)
   end subroutine calc_hamiltonian_2
   !============================================================================
-  subroutine calc_hamiltonian_3(nX, DeltaSOverB_C,    &
-       dLnBDeltaS2Dt_C, bDuDt_C, Hamiltonian3_N)
+  subroutine calc_hamiltonian_3(nX, Hamiltonian3_N)
     ! Calculate the 3rd Hamiltonian function at each fixed time:
     ! (1-mu^2)/2 * [ mu*(p^3/3)*(3\vec{b}\vec{b}:\nabla\vec{u} - div\vec{u})
     ! + ProtonMass*p^2*(\vec{b}*d\vec{u}/dt) ], regarding to p^3/3 and mu,
@@ -471,7 +571,6 @@ contains
     use ModConst, ONLY: cProtonMass
     use SP_ModDistribution, ONLY: Momentum3_I, MuFace_I
     integer, intent(in) :: nX             ! Number of s_L grid
-    real, intent(in)    :: DeltaSOverB_C(nX), dLnBDeltaS2Dt_C(nX), bDuDt_C(nX)
     real, intent(inout) :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
     integer             :: iX, iMu        ! Loop variables
     ! Calculate the third hamiltonian function
