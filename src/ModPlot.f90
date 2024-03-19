@@ -2,9 +2,9 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModPlot
-  !
+
   ! Methods for saving plots
-  !
+
   use SP_ModAngularSpread, ONLY: get_normalized_spread, &
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
@@ -29,16 +29,26 @@ module SP_ModPlot
 
   SAVE
   private ! except
-  !
-  ! Public members
+
   public:: init         ! Initialize module parameters
   public:: read_param   ! Read module parameters
   public:: save_plot_all! Save output (plot) files
   public:: finalize     ! Save final list
+
   ! the output directory
   character(len=*), public, parameter :: NamePlotDir="SP/IO2/"
-  !
-  !
+  
+  ! If true the time tag format is YYYYMMDDHHMMSS
+  logical, public:: UseDateTime = .false.
+
+  character(len=*), parameter, public :: NameMHData = "MH_data"
+  character(len=*), parameter, public :: NameFluxData = "Flux"
+
+  ! number of different output file tags
+  integer, public :: nTag = 0
+
+  ! Local variables ----
+  
   ! Number of plot file types, to be read from param file
   integer:: nFileOut = 0
   ! Types of output files in terms of output dataa
@@ -60,8 +70,7 @@ module SP_ModPlot
   integer, parameter:: &
        CDF_ = 1,       &
        DEF_ = 2
-  !
-  !
+
   type TypePlotFile
      ! Full set of information, for each plot
      !
@@ -129,50 +138,38 @@ module SP_ModPlot
      ! spread of flux of an individual line over grid
      real, pointer :: Spread_II(:,:)
   end type TypePlotFile
-  !
-  !
+
   ! All plot files
   type(TypePlotFile), allocatable:: File_I(:)
-  !
-  !
+
   ! Arrays used to visualize the distribution function
   real, dimension(0:nP+1) :: Log10MomentumSi_I, Log10KinEnergySi_I,      &
        DMomentumOverDEnergy_I
-  !
-  !
+
   ! auxilary array, used to write data on a sphere
   ! contains integers 1:nLineAll
   integer, allocatable:: iNodeIndex_I(:)
-  !
-  !
+
   ! info for MH1D header and tag list
   logical:: DoWriteHeader = .false.
-  character(len=*), parameter, public :: NameMHData = "MH_data"
-  character(len=*), parameter, public :: NameFluxData = "Flux"
   ! name of the header file
   character(len=*), parameter :: NameHeaderFile = NameMHData//'.H'
   ! name of the tag list file
   character(len=*), parameter :: NameTagFile  = NameMHData//'.lst'
-  ! number of different output file tags
-  integer,  public :: nTag = 0
+
   integer          :: nOutput = 1
-  !
-  !
+
   character(len=20) :: TypeMHDataFile
-  !
-  !
-  ! Format for saving time tag. If .true. the time tag format is
-  ! YYYYMMDDHHMMSS
-  logical, public:: UseDateTime = .false.
-  !
-  !
+
   ! If DoSaveInitial=.false.,the initial files are not saved
   logical :: DoSaveInitial = .true.
   !
   logical :: DoInit        = .false.
+
 contains
   !============================================================================
   subroutine init
+
     use SP_ModDistribution, ONLY: SpeedSi_I
     ! storage for existing tags (possible during restart
     character(len=50),allocatable:: StringTag_I(:)
@@ -190,11 +187,9 @@ contains
     Log10KinEnergySi_I     = log10(KinEnergy_I)
     DMomentumOverDEnergy_I = 1/SpeedSi_I
 
-    !
     ! Finalize setting output files:
     ! number and names of flux channels are known at this point;
     ! also, allocate buffers for output data
-    !
     do iFile = 1, nFileOut
        File_I(iFile)%nFluxVar = 0
        if(File_I(iFile)%DoPlotFlux)then
@@ -253,7 +248,6 @@ contains
        end select
     end do
 
-    !
     ! Reset/trim NameTagFile if nTag==0/nTag>0; the latter happens at restart.
     !
     ! During the run new tags are continuously appended to NameTagFile,
@@ -282,9 +276,11 @@ contains
        deallocate(StringTag_I)
     end if
     call close_file
+
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModUtilities, ONLY: split_string, lower_case
     use ModReadParam, ONLY: read_var
     use SP_ModTime,   ONLY: IsSteadyState
@@ -330,7 +326,7 @@ contains
           ! make comparison case insensitive: convert strings to lower case
           call lower_case(StringPlot)
 
-          ! put individual variables' and format names in separate array entries
+          ! put individual variables and format names in separate array entries
           call split_string(StringPlot, StringPlot_I, nStringPlot)
 
           ! data kind is the first entry
@@ -496,9 +492,11 @@ contains
        call CON_stop('Unknown command '//NameCommand//' in '//&
             NameSub)
     end select
+
   contains
     !==========================================================================
     subroutine process_mh
+
       ! process variables to plot
       ! NOTE: for iKindData == MH1D_ certain variables are always printed:
       !       Rho_, T_, Ux_:Uz_, Bx_:Bz_, Wave1_, Wave2_
@@ -506,7 +504,6 @@ contains
       character(len=10) ::  NameVarLowerCase
 
       ! reset
-
       !------------------------------------------------------------------------
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
@@ -581,15 +578,17 @@ contains
             File_I(iFile)%iVarMhd_V(iVarMhd) = iVar
          end if
       end do
+
     end subroutine process_mh
     !==========================================================================
     subroutine process_distr
+
       ! process output parameters for distribution output
+
       integer:: iStringPlot
       character(len=20):: NameVar, NameScale
 
       ! only 1 variable is printed
-
       !------------------------------------------------------------------------
       File_I(iFile) % nMhdVar = 1; File_I(iFile) % nExtraVar = 0
       ! reset string with variables' names and put defaults
@@ -620,14 +619,18 @@ contains
       ! form the name with variables' names'
       File_I(iFile) % NameVarPlot = &
            trim(NameScale)//' Distance '//trim(NameVar)
+
     end subroutine process_distr
     !==========================================================================
   end subroutine read_param
   !============================================================================
   subroutine save_plot_all(IsInitialOutputIn)
+
     use SP_ModDistribution, ONLY: get_integral_flux, nMu
     use SP_ModTime,         ONLY: IsSteadyState, iIter
+
     ! write the output data
+
     logical, intent(in), optional:: IsInitialOutputIn
 
     ! loop variables
@@ -676,7 +679,9 @@ contains
   contains
     !==========================================================================
     subroutine write_mh_1d
+
       use SP_ModGrid,    ONLY: FootPoint_VB, NoShock_
+
       ! write output with 1D MH data in the format to be read by
       ! IDL/TECPLOT; separate file is created for each field line,
       ! name format is:
@@ -786,11 +791,14 @@ contains
               1:iLast),&
               ParamIn_I    = Param_I(LagrID_:StartJulian_))
       end do
+
     end subroutine write_mh_1d
     !==========================================================================
     subroutine write_mh_2d
+
       use SP_ModProc, ONLY: iComm, nProc
       use ModMpi
+
       ! write output with 2D MH data in the format to be read by IDL/TECPLOT;
       ! single file is created for all field lines, name format is
       ! MH_data_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
@@ -971,9 +979,11 @@ contains
            pack(File_I(iFile) % Buffer_II(1:iVarLat + nFluxVar,1:nLineAll),&
            MASK = spread(DoPrint_I, 1,iVarLat + nFluxVar)), &
            [iVarLat + nFluxVar, count(DoPrint_I)]))
+
     end subroutine write_mh_2d
     !==========================================================================
     subroutine write_mh_time
+
       ! write output w/time series MH data in format to be read by IDL/TECPLOT;
       ! a file is created for each field lines, name format is
       ! MH_data_R=<Radius [AU]>_<iLon>_<iLat>.{out/dat}
@@ -1139,11 +1149,14 @@ contains
     end subroutine write_mh_time
     !==========================================================================
     subroutine write_distr_1d
+
       use SP_ModGrid, ONLY: S_
+
       ! write file with distribution in the format to be read by IDL/TECPLOT;
       ! separate file is created for each field line, name format is
       ! Distribution_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
       ! name of the output file
+
       character(len=100):: NameFile
       ! loop variables
       integer:: iLine, iVertex, iVarPlot
@@ -1214,15 +1227,19 @@ contains
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_II   = File_I(iFile) % Buffer_II(:,1:iLast))
       end do
+
     end subroutine write_distr_1d
     !==========================================================================
     subroutine write_flux_2d
+
       use SP_ModProc, ONLY: iComm, nProc
       use ModMpi
+
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
       ! single file is created for all field lines, name format is
       ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
       ! name of the output file
+
       character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
@@ -1339,15 +1356,19 @@ contains
            VarIn_VII      =  reshape(&
            File_I(iFile) % Buffer_II(1:nFlux*nSpreadLon,:),&
            [nFlux, nSpreadLon, nSpreadLat]))
+
     end subroutine write_flux_2d
     !==========================================================================
     subroutine write_flux_time
+
       use SP_ModProc, ONLY: iComm, nProc
       use ModMpi
+
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
       ! single time series file is created for all field line, name format is
       ! Flux_R=<Radius [AU]>_Lon=<Longitude[deg]>_Lat=<Latitude[deg]>.{out/dat}
       ! name of the output file
+
       character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
@@ -1357,7 +1378,6 @@ contains
       integer:: iAbove
       ! interpolation weight
       real:: Weight
-      !
       real:: Spread
       ! for better readability
       integer:: nFluxVar
@@ -1511,14 +1531,16 @@ contains
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nFluxVar,1:nDataLine))
       end if
+
     end subroutine write_flux_time
     !==========================================================================
   end subroutine save_plot_all
   !============================================================================
   subroutine finalize
 
-    use ModUtilities,       ONLY: cTab
+    use ModUtilities, ONLY: cTab
     use SP_ModGrid, ONLY: nLat, nLon
+
     ! write the header file that contains necessary information
     ! for reading input files in a separate run
 
@@ -1532,41 +1554,45 @@ contains
          NameCaller=NameSub)
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
-    write(UnitTmp_,'(i8,a)') nVertexMax,cTab//cTab//cTab//'nVertexMax'
-    write(UnitTmp_,'(i8,a)') nLon,     cTab//cTab//cTab//'nLon'
-    write(UnitTmp_,'(i8,a)') nLat,     cTab//cTab//cTab//'nLat'
+    write(UnitTmp_,'(i8,a)') nVertexMax, cTab//cTab//'nVertexMax'
+    write(UnitTmp_,'(i8,a)') nLon,       cTab//cTab//'nLon'
+    write(UnitTmp_,'(i8,a)') nLat,       cTab//cTab//'nLat'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#MHDATA'
-    write(UnitTmp_,'(a)')trim(TypeMHDataFile)//cTab//cTab//'TypeFile'
-    write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//cTab//'nFileRead'
-    write(UnitTmp_,'(a)')trim(NameTagFile)//cTab//cTab//'NameTagFile'
+    write(UnitTmp_,'(a)') trim(TypeMHDataFile)//cTab//cTab//'TypeFile'
+    write(UnitTmp_,'(i8,a)') nTag,              cTab//cTab//'nFileRead'
+    write(UnitTmp_,'(a)') trim(NameTagFile)//cTab//cTab//'NameTagFile'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#END'
     write(UnitTmp_,*)
     call close_file
+
   end subroutine finalize
   !============================================================================
   subroutine get_time_string(Time, StringTime)
+
     ! the subroutine converts real variable Time into a string,
     ! the structure of the string is 'ddhhmmss',
     ! i.e shows number of days, hours, minutes and seconds
     ! after the beginning of the simulation
+
     real,             intent(in) :: Time
     character(len=8), intent(out):: StringTime
 
-    ! This is the value if the time is too large
-
     !--------------------------------------------------------------------------
-    StringTime = '99999999'
+    StringTime = '99999999'  ! This is the value if the time is too large
+
     if(Time < 100.0*86400) &
          write(StringTime,'(i2.2,i2.2,i2.2,i2.2)') &
          int(                  Time          /86400.), & ! # days
          int((Time-(86400.*int(Time/86400.)))/ 3600.), & ! # hours
          int((Time-( 3600.*int(Time/ 3600.)))/   60.), & ! # minutes
          int( Time-(   60.*int(Time/   60.)))            ! # seconds
+
   end subroutine get_time_string
   !============================================================================
   subroutine get_date_time_string(Time, StringTime)
+
     use SP_ModTime,    ONLY: StartTime
     use ModTimeConvert, ONLY: time_real_to_int
     ! the subroutine converts real variable Time into a string,
@@ -1576,19 +1602,21 @@ contains
     real,              intent(in) :: Time
     character(len=15), intent(out):: StringTime
     integer :: iTime_I(7)
-
     !--------------------------------------------------------------------------
     call time_real_to_int(StartTime+Time, iTime_I)
     write(StringTime,'(i4.4,i2.2,i2.2,a,i2.2,i2.2,i2.2)')&
          iTime_I(1:3),'_',iTime_I(4:6)
+
   end subroutine get_date_time_string
   !============================================================================
   subroutine make_file_name(StringBase, Radius, Longitude, Latitude,&
        iLine, iIter, NameExtension, NameOut)
+
     ! creates a string with file name and stores in NameOut;
     ! result is as follows:
     !   StringBase[_R=?.?][_Lon=?.?_Lat=?.?][_???_???][_t?_n?].NameExtension
     ! parts in [] are written if present: Radius, iLineAll, iIter
+
     character(len=*),          intent(in) :: StringBase
     real,            optional, intent(in) :: Radius
     real,            optional, intent(in) :: Longitude
@@ -1664,6 +1692,7 @@ contains
     end if
 
     write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)
+
   end subroutine make_file_name
   !============================================================================
 end module SP_ModPlot

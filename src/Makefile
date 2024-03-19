@@ -19,6 +19,7 @@ OBJECTS = \
 	ModGrid.o \
 	ModMain.o \
 	ModOriginPoints.o \
+	ModPlot.o \
 	ModProc.o \
 	ModReadMhData.o \
 	ModRestart.o \
@@ -26,7 +27,6 @@ OBJECTS = \
 	ModTime.o \
 	SP_ModTiming.o \
 	ModUnit.o \
-	ModWrite.o \
 	ModTurbulence.o
 
 ModSize.f90: ModSize_orig.f90
