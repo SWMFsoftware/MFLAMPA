@@ -81,7 +81,6 @@ contains
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! diffuse the distribution function with scalar/global Dt
     use SP_ModDistribution, ONLY: nP
-    !  use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -144,7 +143,10 @@ contains
     real   :: Aux1, Aux2
     !--------------------------------------------------------------------------
     ! diffusion along the field line
-    ! Set up the local time step:
+    ! Set up the local time step: the reason is that, we loop through
+    ! each iX at the fixed iP, so we will visit each DtLocal_II(iX, iP)
+    ! in the loop with the inner-most iX and outer-most iP. It will
+    ! visit and put the data in cache that are stored adjacently.
     DtLocal_II = transpose(DtLocalIn_II)
 
     ! if using turbulent spectrum:

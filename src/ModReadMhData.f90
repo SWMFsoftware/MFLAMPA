@@ -5,10 +5,9 @@ module SP_ModReadMhData
 
   ! This module contains methods for reading input MH data
 
-  use SP_ModSize,    ONLY: nDim, nVertexMax
-  use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,&
-       nMHData,  nLine, Z_, Used_B,  &
-       FootPoint_VB, nVertex_B, MHData_VIB,  LagrID_
+  use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,   &
+       nMHData, nLine, Z_, Used_B,  &
+       FootPoint_VB, nVertex_B, MHData_VIB, LagrID_
   use SP_ModTime,    ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
   use ModPlotFile,   ONLY: read_plot_file
@@ -51,7 +50,7 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#READMHDATA')
-       !
+       ! determine whether to read the MHD data
        call read_var('DoReadMhData', DoReadMhData)
        if(.not. DoReadMhData)&
             RETURN
@@ -180,7 +179,7 @@ contains
        call read_plot_file(NameFile          ,&
             TypeFileIn = TypeMhDataFile      ,&
             TimeOut    = DataInputTime       ,&
-            n1out      = nVertex_B(iLine) ,&
+            n1out      = nVertex_B(iLine)    ,&
             ParamOut_I = Param_I(LagrID_:StartJulian_))
        ! find offset in data between new and old states
        if(DoOffset)then
@@ -203,7 +202,7 @@ contains
        call read_plot_file(NameFile           ,&
             TypeFileIn = TypeMhDataFile       ,&
             Coord1Out_I= MHData_VIB(LagrID_   ,&
-            1:nVertex_B(iLine),iLine)     ,&
+            1:nVertex_B(iLine),iLine)         ,&
             VarOut_VI  = MHData_VIB(1:nMHData ,&
             1:nVertex_B(iLine),iLine))
        ! apply offset
