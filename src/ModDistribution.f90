@@ -13,7 +13,7 @@ module SP_ModDistribution
   use ModNumConst, ONLY: cTiny
   use ModConst,    ONLY: cLightSpeed, energy_in, cMeV
   use SP_ModSize,  ONLY: nVertexMax, nP => nMomentum, &
-       nMu => nPitchAngle
+       nMu => nPitchAngle, IsMuAvg=>IsPitchAngleAverage
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
@@ -32,6 +32,7 @@ module SP_ModDistribution
   public:: get_integral_flux ! Calculate Flux_VIB
   public:: nP                ! Number of points in the momentum grid
   public:: nMu               ! Number of points over pitch-angle (\mu)
+  public:: IsMuAvg           ! If .true., dist. function is omnidirectional
 
   ! Injection and maximal energy, in kev (or, in Io energy unit)
   ! To be read from the PARAM.in file
@@ -42,10 +43,8 @@ module SP_ModDistribution
 
   ! Size of a  log-momentum mesh. For momentum we use both the
   ! denotaion, P, and a word, momentum - whichever is more covenient
-  real, public :: DLogP      ! log(MomentumMaxSi/MomentumInjSi)/nP
-
-  ! whether to use pitch-angle averaged equations
-  logical, public:: IsMuAvg = nMu == 1
+  real, public :: dLogP      ! log(MomentumMaxSi/MomentumInjSi)/nP
+  
   ! uniform distribution of pitch angle
   real, public :: DeltaMu = 2.0/nMu
   real, public :: MuFace_I(0:nMu), Mu_I(nMu)
@@ -112,15 +111,15 @@ contains
     MomentumMaxSi= kinetic_energy_to_momentum(EnergyMaxIo*Io2Si_V(UnitEnergy_))
 
     ! grid size in the log momentum space
-    DLogP = log(MomentumMaxSi/MomentumInjSi)/nP
+    dLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
     ! Functions to convert the grid index to momentum and energy
-    Momentum3_I(-1) = exp(-1.50*DLogP)/3
+    Momentum3_I(-1) = exp(-3*(0.50*dLogP))/3 !P^3/3 at -0.5*dLogP from PInj
     do iP = 0, nP+1
-       Momentum_I(iP)    = MomentumInjSi*exp(iP*DLogP)
+       Momentum_I(iP)    = MomentumInjSi*exp(iP*dLogP)
        SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
             momentum_to_energy(Momentum_I(iP))
-       Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*DLogP)
+       Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*dLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
        ! Normalize kinetic energy per Unit of energy in SI unit:
        KinEnergy_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP)) &
@@ -209,18 +208,13 @@ contains
        call read_var('EnergyMin',      EnergyInjIo)
        call read_var('EnergyMax',      EnergyMaxIo)
        call read_var('nP',             nPCheck    )
-
        if(nP/=nPCheck)then
           if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
                'Code is configured with nMomentum=', nP,         &
                ' while value read from PARAM.in is nP=', nPCheck
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
-    case('#PITCHANGLEGRID')
-       ! Read whether we use pitch angle and average results if we use
-       call read_var('IsPitchAngleAveraged', IsMuAvg)
        call read_var('nMu', nMuCheck)
-
        if(nMu/=nMuCheck)then
           if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
                'Code is configured with nMu=', nMu,              &

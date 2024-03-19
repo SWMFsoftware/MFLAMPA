@@ -178,7 +178,7 @@ contains
     use SP_ModPlot,         ONLY: nTag
     use SP_ModProc,         ONLY: iProc
     use ModUtilities,       ONLY: cTab
-    use SP_ModDistribution, ONLY: nP, EnergyInjIo, EnergyMaxIo
+    use SP_ModDistribution, ONLY: nP, EnergyInjIo, EnergyMaxIo, nMu
     ! full name of the header file
     character(len=100):: NameFile
 
@@ -206,19 +206,20 @@ contains
     write(UnitTmp_,'(i2.2,a)')iStartTime_I(6),cTab//cTab//cTab//'iSecond'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#NSTEP'
-    write(UnitTmp_,'(i8,a)')iIter,cTab//cTab//'nStep'
+    write(UnitTmp_,'(i8,a)')iIter,cTab//cTab//cTab//'nStep'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#TIMESIMULATION'
     write(UnitTmp_,'(es22.15,a)')SPTime,cTab//cTab//'SPTime'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#NTAG'
-    write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//'nTag'
+    write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//cTab//'nTag'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#MOMENTUMGRID'
-    write(UnitTmp_,'(es22.15,a)')EnergyInjIo,cTab//cTab//'EnergyMin'
-    write(UnitTmp_,'(es22.15,a)')EnergyMaxIo,cTab//cTab//'EnergyMax'
-    write(UnitTmp_,'(i8,a)')nP,cTab//cTab//'nP'
-    write(UnitTmp_,'(a8,a)')NameEnergyUnit,cTab//cTab//'NameEnergyUnit'
+    write(UnitTmp_,'(es22.15,a)')EnergyInjIo, cTab//cTab//'EnergyMin'
+    write(UnitTmp_,'(es22.15,a)')EnergyMaxIo, cTab//cTab//'EnergyMax'
+    write(UnitTmp_,'(i8,a)')nP,  cTab//cTab//'nP'
+    write(UnitTmp_,'(i8,a)')nMu, cTab//cTab//'nMu'
+    write(UnitTmp_,*)
     write(UnitTMP_,'(a)')'#END'
     write(UnitTmp_,*)
     call close_file
