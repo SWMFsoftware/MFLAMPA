@@ -18,7 +18,7 @@ module SP_ModAdvance
 
   ! Public members:
   public:: read_param ! Read parameters
-  public:: advance  ! Advance Distribution_IIB through the time interval
+  public:: advance    ! Advance Distribution_IIB through the time interval
   public:: iterate_steady_state
 
   ! If the shock wave is traced, the advance algorithms are modified
@@ -64,6 +64,7 @@ contains
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
+    use SP_ModDistribution,     ONLY: IsMuAvg
 
     real, intent(in):: TimeLimit
     ! Loop variable
@@ -80,6 +81,8 @@ contains
     real     :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real     :: DtProgress
+    ! Current time
+    real     :: Time
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
     ! Lagrangian derivatives
@@ -153,8 +156,13 @@ contains
                iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket) then
              ! Poisson bracket scheme: particle-number-conservative
-             call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
-                  Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
+             if(IsMuAvg) then
+                ! Single Poisson bracket: Parker transport equation
+                call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
+                     Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
+             ! else
+                ! Multiple Poisson brackets: Focused transport equation
+             end if
              ! store density and B-field arrays at the end of this time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
@@ -250,7 +258,7 @@ contains
             iShock, BSi_I(1:iEnd))
        ! Poisson bracket scheme: particle-number-conservative
        call iterate_poisson(iLine, iEnd, iShock, Cfl, uSi_I(1:iEnd), &
-           BSi_I(1:iEnd), nSi_I(1:iEnd), DsSi_I(1:iEnd))
+            BSi_I(1:iEnd), nSi_I(1:iEnd), DsSi_I(1:iEnd))
     end do
 
   end subroutine iterate_steady_state

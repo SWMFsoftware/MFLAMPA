@@ -13,7 +13,7 @@ module SP_ModDistribution
   use ModNumConst, ONLY: cTiny
   use ModConst,    ONLY: cLightSpeed, energy_in, cMeV
   use SP_ModSize,  ONLY: nVertexMax, nP => nMomentum, &
-       nMu => nPitchAngle, IsMuAvg=>IsPitchAngleAverage
+       nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy

@@ -6,6 +6,8 @@ module SP_ModAdvancePoisson
   ! High resolution finite volume method for kinetic equations
   ! with Poisson brackets (Sokolov et al., 2023)
   ! See https://doi.org/10.1016/j.jcp.2023.111923
+  use SP_ModSize,  ONLY: nVertexMax
+  use SP_ModGrid, ONLY: nLine
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB
 
   implicit none
@@ -16,6 +18,14 @@ module SP_ModAdvancePoisson
   public :: advect_via_poisson   ! Time-accurate advance through given Dt
   public :: iterate_poisson      ! Local time-stepping for steady states
   public :: advect_multi_poisson ! Time-accurate advance with pitch angle
+
+  ! \Deltas/b, ln(B\deltas^2) at Old time
+  real, public, dimension(nVertexMax) :: DeltaSOverBOld_C, LnBDeltaS2Old_C
+  ! \Deltas/b, ln(B\deltas^2) at New time
+  real, public, dimension(nVertexMax) :: DeltaSOverBNew_C, LnBDeltaS2New_C
+  ! Time-derivatives:
+  real, public, dimension(nVertexMax) :: DeltaSOverB_C,  &
+       dDeltaSOverBDt_C, dLnBdeltaS2Dt_C, bDuDt_C
 contains
   !============================================================================
   subroutine advect_via_poisson(iLine, nX, iShock, &
@@ -291,6 +301,79 @@ contains
     VDF_G(-1  ,:) = VDF_G(0   ,:)
     VDF_G(nP+2,:) = VDF_G(nP+1,:)
   end subroutine set_VDF
+  !============================================================================
+  subroutine init_data_states(iLine, nX, DtFull)
+    ! Calculate data states from the input files
+
+    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, x_, z_, BOld_, B_, U_
+    ! Line number and number along grid axis
+    integer, intent(in) :: iLine, nX
+    ! Time difference between Old (State_VIB) and New (MHData_VIB) States
+    real, intent(in)    :: DtFull
+    ! Midpoint for to consecutive points, \deltas
+    real                :: MidPoint_IB(x_:z_, nX), DeltaS_I(nX)
+    !------------------------------------------------------------------------
+    ! Calculate values at OLD time
+    ! Calculate midpoints
+    MidPoint_IB(x_:z_, 1:nX-1) = (State_VIB(x_:z_, 2:nX, iLine)   &
+         + State_VIB(x_:z_, 1:nX-1, iLine))*0.5
+    ! Calculate DeltaS
+    DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(x_:z_, 2:nX-1) &
+         - MidPoint_IB(x_:z_, 1:nX-2))**2, dim=1))
+    ! Linear interpolate the deltas such that there will be nQ deltas
+    DeltaS_I(1 ) = 2*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
+         - State_VIB(x_:z_,  1, iLine))**2))
+    DeltaS_I(nX) = 2*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
+         - State_VIB(x_:z_, nX, iLine))**2))
+    ! Calculate \DeltaS/B at grid center
+    DeltaSOverBOld_C(1:nX) = DeltaS_I/State_VIB(BOld_, 1:nX, iLine)
+    ! Calculate ln(B*\DeltaS^2) at grid center
+    LnBDeltaS2Old_C(1:nX) = log(State_VIB(BOld_, 1:nX, iLine)*DeltaS_I**2)
+
+    ! Calculate values at NEW time
+    MidPoint_IB(x_:z_, 1:nX-1) = (MHData_VIB(x_:z_, 2:nX, iLine)  &
+         + MhData_VIB(x_:z_, 1:nX-1, iLine))*0.5
+    ! Calculate DeltaS
+    DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(x_:z_, 2:nX-1) &
+         - MidPoint_IB(x_:z_, 1:nX-2))**2, dim=1))
+    ! Linear interpolate the deltas such that there will be nQ deltas
+    DeltaS_I(1 ) = 2*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
+         - MHData_VIB(x_:z_,  1, iLine))**2))
+    DeltaS_I(nX) = 2*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
+         - MHData_VIB(x_:z_, nX, iLine))**2))
+    ! Calculate \DeltaS/B at grid center
+    DeltaSOverBNew_C(1:nX) = DeltaS_I/MHData_VIB(B_, 1:nX, iLine)
+    ! Calculate ln(B*\DeltaS^2) at grid center
+    LnBDeltaS2New_C(1:nX) = log(MHData_VIB(B_, 1:nX, iLine)*DeltaS_I**2)
+
+    ! Calculate the time-derivative physical quantities
+    ! Calculate \deltas/B time derivative (for next time)
+    dDeltaSOverBDt_C(1:nX) = &
+         (DeltaSOverBNew_C(1:nX) - DeltaSOverBOld_C(1:nX))/DtFull
+    ! Calculate Dln(B\deltas^2)/Dt
+    dLnBdeltaS2Dt_C(1:nX)  = &
+         (LnBDeltaS2New_C(1:nX) - LnBDeltaS2Old_C(1:nX))/DtFull
+    ! Calculate b*Du/Dt
+    bDuDt_C(1:nX)          = &
+         (State_VIB(U_, 1:nX, iLine) - MHData_VIB(U_, 1:nX, iLine))/DtFull
+
+  end subroutine init_data_states
+  !============================================================================
+  subroutine update_states(iLine, nX, DtFull, Time)
+    ! Update states according to the current time
+
+    integer, intent(in) :: iLine  ! Index of the current field line
+    integer, intent(in) :: nX     ! Number of grid along s_L axis
+    real, intent(in)    :: DtFull ! Time difference between old and new states
+    real, intent(in)    :: Time   ! Current time
+
+    ! Calculate values for CURRENT time: here we use linear interpolation
+    ! to get the data of each time step from every to consecutive files
+    !--------------------------------------------------------------------------
+    ! Update \deltas/B
+    DeltaSOverB_C(1:nX) = DeltaSOverBOld_C(1:nX) + &
+         (DeltaSOverBNew_C(1:nX) - DeltaSOverBOld_C(1:nX))/DtFull*Time
+  end subroutine update_states
   !============================================================================
   subroutine calc_hamiltonian_1(nX, dDeltaSOverBDt_C, dHamiltonian01_FX)
     ! Calculate the 1st Hamiltonian function with time:
