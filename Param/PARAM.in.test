@@ -19,8 +19,10 @@ T			UseDateTime
 #DORUN
 T			DoRun
 
-#TEST
+#TRACESHOCK
 F			DoTraceShock
+
+#DIFFUSION
 T			UseDiffusion
 
 #INCLUDE

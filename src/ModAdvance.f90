@@ -25,7 +25,7 @@ module SP_ModAdvance
   logical, public :: DoTraceShock = .true.
 
   ! Local variables
-  real:: Cfl = 0.9     ! Controls the maximum allowed time step
+  real    :: Cfl = 0.9     ! Controls the maximum allowed time step
   logical :: UsePoissonBracket = .false.
 contains
   !============================================================================
@@ -45,13 +45,20 @@ contains
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
-    
+
   end subroutine read_param
   !============================================================================
   subroutine advance(TimeLimit)
 
     ! advance the solution of the diffusive kinetic equation:
-    !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
+    !    if IsMuAvg: Omnidirectional VDF (Parker transport equation):
+    !      f_t + [(1/3)*(d(ln rho)/dt]*f_{ln p} = B*d/ds[D/B*df/ds]
+    !    if not IsMuAvg: VDF with pitch angle (Focused transport equation):
+    !      f_t + {f; p^3/3*(\vec{u}*\vec{B}/|B|)}_{x, p^3/3}
+    !          + {f; (\mu^2-1)*p/(2|B|)}_{x, mu}
+    !          + {f; (1-mu^2)/2*(mu*(p^3/3)*
+    !             (3\vec{b}\vec{b}:\nabla\vec{u} - \nabla\cdot\vec{u})
+    !             + p^2*m_i*bDu/Dt)} = I^(s) = B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and Fermi acceleration
     ! from SPTime to TimeLimit
     ! Prototype: FLAMPA/src/SP_main, case("RUN"), Roussev&Sokolov2008
@@ -62,7 +69,8 @@ contains
     use SP_ModTime,             ONLY: SPTime
     use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_, U_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
-    use SP_ModAdvancePoisson,   ONLY: advect_via_poisson
+    use SP_ModAdvancePoisson,   ONLY: advect_via_poisson, &
+         init_data_states, advect_multi_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
     use SP_ModDistribution,     ONLY: IsMuAvg
 
@@ -160,8 +168,9 @@ contains
                 ! Single Poisson bracket: Parker transport equation
                 call advect_via_poisson(iLine, iEnd, iShock, DtProgress,   &
                      Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
-             ! else
+                else
                 ! Multiple Poisson brackets: Focused transport equation
+                call init_data_states(iLine, iEnd, DtFull)  ! Inital states
              end if
              ! store density and B-field arrays at the end of this time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
@@ -180,13 +189,13 @@ contains
     subroutine steepen_shock(iEnd)
       use SP_ModGrid, ONLY: dLogRhoThreshold
       integer, intent(in) :: iEnd ! To limit the range of search
-      ! change the density profile near the shock front so it becomes steeper
-      ! for the current line
+      ! change the density profile near the shock front so it
+      ! becomes steeper for the current line
       real   :: DsSi_I(1:iEnd)
       integer:: iVertex ! loop variable
       real   :: DLogRhoExcessIntegral, DLogRhoExcess
-      ! find the excess of DLogRho within the shock compared to background
-      ! averaged over length
+      ! find the excess of DLogRho within the shock compared
+      ! to background averaged over length
       !------------------------------------------------------------------------
       DLogRhoExcessIntegral = 0.0
       DsSi_I = State_VIB(D_,1:iEnd,iLine)*Io2Si_V(UnitX_)
@@ -222,8 +231,9 @@ contains
   subroutine iterate_steady_state
 
     ! advance the solution of the diffusive kinetic equation:
-    !            f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
+    !     f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and Fermi acceleration
+
     use SP_ModGrid,             ONLY: Rho_, U_, B_, D_
     use SP_ModAdvancePoisson,   ONLY: iterate_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
@@ -234,7 +244,7 @@ contains
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, uSi_I, BSi_I, DsSi_I
     ! go line by line and iterate the solution
-    character(len=*), parameter:: NameSub = 'iterate_steady_state'
+    character(len=*), parameter  :: NameSub = 'iterate_steady_state'
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE

@@ -6,8 +6,8 @@ module SP_ModAdvancePoisson
   ! High resolution finite volume method for kinetic equations
   ! with Poisson brackets (Sokolov et al., 2023)
   ! See https://doi.org/10.1016/j.jcp.2023.111923
-  use SP_ModSize,  ONLY: nVertexMax
-  use SP_ModGrid, ONLY: nLine
+  use SP_ModSize,         ONLY: nVertexMax
+  use SP_ModGrid,         ONLY: nLine
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB
 
   implicit none
@@ -18,6 +18,7 @@ module SP_ModAdvancePoisson
   public :: advect_via_poisson   ! Time-accurate advance through given Dt
   public :: iterate_poisson      ! Local time-stepping for steady states
   public :: advect_multi_poisson ! Time-accurate advance with pitch angle
+  public :: init_data_states     ! Initialize the states for multi_poisson
 
   ! \Deltas/b, ln(B\deltas^2) at Old time
   real, public, dimension(nVertexMax) :: DeltaSOverBOld_C, LnBDeltaS2Old_C
@@ -50,9 +51,9 @@ contains
     ! VolumeXEnd_I: geometric volume when the subroutine ends
     ! dVolumeXDt_I: time derivative of geometric volume
     real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
-    ! Volume_G: phase space volume at the end of each iteration
-    ! VolumeOld_G : phase space volume at the end of each iteration
-    ! dVolumeDt_G : phase space time derivative
+    ! Volume_G: total control volume at the end of each iteration
+    ! VolumeOld_G: total control volume at the end of each iteration
+    ! dVolumeDt_G: total control time derivative
     real, dimension(0:nP+1, 0:nX+1):: VolumeOld_G, Volume_G, dVolumeDt_G
     ! DeltaHamiltonian
     real    :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
@@ -71,16 +72,16 @@ contains
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
-    VolumeXStart_I(1:nX) = 1/nOldSi_I(1:nX)
+    VolumeXStart_I(1:nX) = 1.0/nOldSi_I(1:nX)
     VolumeXStart_I(0)    = VolumeXStart_I(1)
     VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
     ! End volume
-    VolumeXEnd_I(1:nX)   = 1/nSi_I(1:nX)
+    VolumeXEnd_I(1:nX)   = 1.0/nSi_I(1:nX)
     VolumeXEnd_I(0)      = VolumeXEnd_I(1)
     VolumeXEnd_I(nX+1)   = VolumeXEnd_I(nX)
     ! Time derivative
     dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)/tFinal
-    ! Phase volume: initial and time derivative
+    ! Total control volume: initial and time derivative
     do iX = 0, nX+1
        Volume_G(:,iX)    = VolumeP_I*VolumeXStart_I(iX)
        dVolumeDt_G(:,iX) = VolumeP_I*dVolumeXDt_I(iX)
@@ -225,7 +226,7 @@ contains
     ! focused transport equation considering pitch angle
     ! diffuse the distribution function at each time step
 
-    use SP_ModDistribution, ONLY: DLogP, VolumeP_I, Momentum3_I, Mu_I
+    use SP_ModDistribution, ONLY: DeltaMu, Mu_I, DLogP, VolumeP_I, Momentum3_I
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
@@ -236,16 +237,18 @@ contains
     ! Input variables for diffusion
     real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
-    integer :: iP, iMu, iX
+    integer :: iX, iMu, iP
+    ! ------------ Control volume ------------
+    ! Volume_G: total control volume at the end of each iteration
+    ! VolumeOld_G: total control volume at the end of each iteration
+    ! dVolumeDt_G: total control time derivative
+    real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: VolumeOld_G, Volume_G 
+    real :: dVolumeDt_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! Extended arrays for implementation of the Poisson Bracket Alg.
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
     ! dVolumeXDt_I: time derivative of geometric volume
-    real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
-    ! Volume_G: phase space volume at the end of each iteration
-    ! VolumeOld_G : phase space volume at the end of each iteration
-    ! dVolumeDt_G : phase space time derivative
-    real, dimension(0:nP+1, 0:nX+1):: VolumeOld_G, Volume_G, dVolumeDt_G
+    ! real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
     ! ------------ Hamiltonian functions ------------
     ! Poisson bracket with regard to the first and second vars
     ! considering the case when there are more than one Poisson bracket
@@ -261,13 +264,23 @@ contains
     real    :: Time
     ! Time step
     real    :: Dt
-    ! Prediction for the next time step:
+    ! Prediction of next time step:
     real    :: DtNext
-    ! The data calculated directly from the MHD data
-    real :: DeltaSOverB_C(nX), dDeltaSOverBDt_C(nX),  &
-         InvB_C(nX), bDuDt_C(nX), dLnBDeltaS2Dt_C(nX)
     ! Now this is the particle-number-conservative advection scheme with \mu
     !--------------------------------------------------------------------------
+
+    ! Calculate time derivative of total control volume
+    do iX = 1, nX
+       do iMu = 0, nMu+1
+          dVolumeDt_G(:, iMu, iX) = dDeltaSOverBDt_C(iX)*DeltaMu*VolumeP_I
+       end do
+    end do
+    ! BCs of the time derivative of total control volume
+    dVolumeDt_G(:, :,    0) = dVolumeDt_G(:, :,  1)
+    dVolumeDt_G(:, :, nX+1) = dVolumeDt_G(:, :, nX)
+    ! Time initialization
+    Time = 0.0
+
   end subroutine advect_multi_poisson
   !============================================================================
   subroutine set_VDF(iLine, nX, VDF_G)
