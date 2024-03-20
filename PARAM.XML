@@ -284,9 +284,9 @@ Set the configured parameters of the Lagrangian grid
 </command>
 
 <command name="TESTPOS">
-  <parameter name="iNodeTest"  type="integer" default="1" />
-  <parameter name="iParticleTest"  type="integer" default="99" />
-  <parameter name="iPTest"  type="integer" default="1" />
+  <parameter name="iNodeTest"  type="integer" min="0" default="1" />
+  <parameter name="iParticleTest"  type="integer" min="0" default="10" />
+  <parameter name="iPTest"  type="integer" min="0" default="1" />
 
 #TESTPOS
 1     		iNodeTest
@@ -297,8 +297,8 @@ Set the test position and momentum
 </command>
 
 <command name="SPREADGRID">
-  <parameter name="nSpreadLon"  type="integer" min="1" />
-  <parameter name="nSpreadLat"  type="integer" min="1" />
+  <parameter name="nSpreadLon"  type="integer" min="1" default="3" />
+  <parameter name="nSpreadLat"  type="integer" min="1" default="3" />
 
 #PREADGRID
 6  	  		nSpreadLon
@@ -309,7 +309,7 @@ Set the size of angular grid in longitude and latitude
 
 <command name="SPREADSIGMA">
   <parameter name="SigmaMode"  type="string" />
-  <parameter name="Sigma"  type="real" />
+  <parameter name="Sigma"  type="real" min="0.0" default="10.0"/>
 
 #SPREADGRID
 const		SigmaMode
@@ -324,8 +324,8 @@ Then we set the "Sigma" of the lines, namely the changes in degrees.
 </command>
 
 <command name="SPREADSOLIDANGLE">
-  <parameter name="RadiusRef"  type="real" />
-  <parameter name="SolidAngleRef"  type="real" />
+  <parameter name="RadiusRef"  type="real" default="1.0"/>
+  <parameter name="SolidAngleRef"  type="real" default="1.0"/>
 
 #SPREADGRID
 -1.0  	  	RadiusRef [Rs]
@@ -348,8 +348,8 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 </command>
 
 <command name="MOMENTUMGRID" if="$_IsFirstSession">
-  <parameter name="EnergyMin" type="real" default="1.0" />
-  <parameter name="EnergyMax" type="real" default="1000.0" />
+  <parameter name="EnergyMin" type="real" min="0.0" default="1.0" />
+  <parameter name="EnergyMax" type="real" min="0.0" default="1000.0" />
   <parameter name="nP" type="integer" min="1" default="100" />
   <parameter name="nMu" type="integer" min="1" default="1"/>
   <parameter name="NameEnergyUnit" type="string" default="keV" />
@@ -358,7 +358,7 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 1.0   		EnergyMin
 1000.0 		EnergyMax
 100    		nP
-1	 	nMu
+1	 		nMu
 
 Read energy range, the number of energy bins and the energy unit.
 Usually read from the restart.H file. 
@@ -368,20 +368,20 @@ how many intervals in the range of [-1, 1] for pitch angle.
 </command>
 
 <command name="FLUXINITIAL">
-  <parameter name="FluxInitIo" type="real" default="0.01" />
+  <parameter name="FluxInitIo" type="real" min="0.0" default="0.01" />
 
 #FLUXINITIAL
-0.01                   FluxInitIo
+0.01   		FluxInitIo
 
 Distribution is initialized to have integral flux: 
 default value is set as 0.01 [pfu].
 </command>
 
 <command name="FLUXCHANNEL">
-  <parameter name="nFluxChannel" type="integer" default="6" />
+  <parameter name="nFluxChannel" type="integer" min="1" default="6" />
 
 #FLUXCHANNEL
-6                   	nFluxChannel
+6			nFluxChannel
 
 Flux channel numbers: use the one on GOES by default, 6 channels.
 </command>
@@ -396,7 +396,7 @@ Flux channel numbers: use the one on GOES by default, 6 channels.
   <parameter name="TypeUpperEndBc" type="string" default="lism"/>
   <parameter name="TypeLisBc" type="string" default="default"/>
   <parameter name="UseModulationPot" type="logical" default="F"/>
-  <parameter name="ModulationPot" type="real" default="600"/>
+  <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
 
 #UPPERENDBC
 F           UseUpperEndBc
@@ -415,7 +415,7 @@ to determine whether we use LISM or the GCR spectrum at ~1 AU.
 For the latter, we also need the modulation potential (denoted
 as "phi" in Usoskin et al. 2005), which is temporal and spatial
 (and even energy) dependent. We stick to the one derived by Oulu
-neutron monitor and published in the dataset 1 of
+neutron monitor and published in the "Dataset 1" of
 https://cosmicrays.oulu.fi/phi/phi.html.
 </command>
 
@@ -426,7 +426,7 @@ https://cosmicrays.oulu.fi/phi/phi.html.
 
 <command name="INJECTION">
   <parameter name="SpectralIndex" type="real" default="5.0" />
-  <parameter name="Efficency" type="real" default="0.25" />
+  <parameter name="Efficency" type="real" min="0.0" default="0.25" />
 
 #INJECTION
 5.0         SpectralIndex
@@ -443,10 +443,10 @@ however, somewhat higher than one values may be of use.
 </command>
 
 <command name="CFL">
-  <parameter name="Cfl" type="real" default="1.0" />
+  <parameter name="Cfl" type="real" min="0.0" max="1.0" default="0.99" />
 
 #CFL
-1.0              Cfl
+0.99		Cfl
 
 Please send an email to Igor Sokolov for more information.
 </command>
@@ -455,7 +455,7 @@ Please send an email to Igor Sokolov for more information.
   <parameter name="UsePoissonBracket" type="logical" default="T" />
 
 #POISSONBRACKET
-F       UsePoissonBracket
+F       	UsePoissonBracket
 
 If UsePoissonBracket is True, the advection scheme is conservative
 Poisson bracket scheme; otherwise, it is non-conservative.
@@ -472,7 +472,7 @@ The default value is false.
   <parameter name="DoRestart" type="logical" default="T" />
 
 #RESTART
-T	    DoRestart
+T	    	DoRestart
 
 The default value is true.
 </command>
@@ -481,7 +481,7 @@ The default value is true.
   <parameter name="DoRun" type="logical" default="T" />
 
 #DORUN
-T	DoRun
+T			DoRun
 
 If DoRun is False, only magnetic field lines are extracted, but the particle
 distribution function is not solved.
@@ -493,7 +493,7 @@ The default value is true.
   <parameter name="DoTraceShock" type="logical" default="T" />
 
 #TRACESHOCK
-T       DoTraceShock
+T       	DoTraceShock
 
 If DoTraceShock is False, the shock wave is not traced and the density
 profile is not sharpened around it.
@@ -503,7 +503,7 @@ The default value is true.
 
 <command name="#USEFIXEDMFPUPSTREAM">
   <parameter name="UseFixedMeanFreePathUpstream" type="logical" default="F" />
-  <parameter name="MeanFreePath0InAu" type="real" default="1.0" />
+  <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="1.0" />
 
 #USEFIXEDMFPUPSTREAM
 F          UseFixedMeanFreePathUpstream
@@ -572,7 +572,7 @@ minutes-seconds passed after the initial time (set by the command #STARTTIME)
 <command name="TIMING">
   <parameter name="UseTiming" type="logical" default="F" />
   <parameter name="nTiming" type="integer" />
-  <parameter name="nDepthTiming" type="integer" />
+  <parameter name="nDepthTiming" type="integer" default="-1" />
   <parameter name="TypeTimingReport" type="string" />
 
 #TIMING
@@ -633,7 +633,7 @@ the header file, which is then included into the MFLAMPA parameter file
 </command>
 
 <command name="NTAG">
-  <parameter name="nTag" type="integer" default="0" />
+  <parameter name="nTag" type="integer" min="0" default="0" />
 
 #NTAG
 120            nTag  
@@ -642,7 +642,7 @@ The number of different time-line tags of the MH_data files.
 </command>
 
 <command name="SAVEPLOT">
-  <parameter name="nFileOut" type="integer" default="0" />
+  <parameter name="nFileOut" type="integer" min="0" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">
       <parameter name="StringPlot" type="strings" case="lower"
 		 min="3" max="20" >
@@ -683,15 +683,17 @@ The number of different time-line tags of the MH_data files.
           <option name="S"    	value="s"/>  
           <option name="U"    	value="u"/>  
           <option name="B"    	value="b"/>  
-          <option name="RhoOld" value="rhoold>"/>
+          <option name="RhoOld" value="rhoold"/>
           <option name="BOld"   value="bold"/>
 	</part>
       </parameter>
       <if expr="$KindData=~/mh2d|mhtime|flux2d|fluxtime/">
 	<parameter name="Radius" type="real" />
 	<if expr="$KindData eq fluxtime">
-	  <parameter name="Longitude" type="real" />
-	  <parameter name="Latitude" type="real" />
+	  <parameter name="Longitude" type="real"
+          min="-360.0" max="360.0" default="0.0"/>
+	  <parameter name="Latitude" type="real"
+          min="-90.0" max="90.0" default="0.0"/>
 	</if>
       </if>
     </for>
@@ -719,7 +721,7 @@ Please send an email to Igor Sokolov for more information on this command.
 </command>
 
 <command name="NOUTPUT">
-  <parameter name="nOutput" type="integer" default="1" />
+  <parameter name="nOutput" type="integer" min="0" default="1" />
   
 #NOUTPUT
 10                 nOutput
