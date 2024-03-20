@@ -38,10 +38,10 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
-    integer, intent(in):: iLine, iShock ! indices of line and shock
-    integer, intent(in):: nX        ! # of meshes along lnp-coordinate
-    real,    intent(in):: tFinal    ! time interval to advance through
-    real,    intent(in):: CflIn     ! input CFL number
+    integer, intent(in):: iLine, iShock ! Indices of line and shock
+    integer, intent(in):: nX        ! Number of meshes along s_L axis
+    real,    intent(in):: tFinal    ! Time interval to advance through
+    real,    intent(in):: CflIn     ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
@@ -69,6 +69,7 @@ contains
     real    :: DtNext
     ! Now this is the particle-number-conservative advection scheme
     !--------------------------------------------------------------------------
+
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
@@ -146,20 +147,20 @@ contains
     use ModPoissonBracket,  ONLY: explicit
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
-    integer, intent(in):: iLine, iShock ! indices of line and shock
-    integer, intent(in):: nX        ! # of meshes along lnP-coordinate
-    real,    intent(in):: CflIn     ! input CFL number
+    integer, intent(in):: iLine, iShock ! Indices of line and shock
+    integer, intent(in):: nX        ! Number of meshes along s_L axis
+    real,    intent(in):: CflIn     ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX), DsSi_I(nX)
     ! Loop variable
     integer :: iX
-    ! Volume_G: phase space volume
+    ! Volume_G: global space volume = product of distance in each dimension
     real    :: Volume_G(0:nP+1, 0:nX+1)
-    ! VolumeX_I: geometric volume
+    ! VolumeX_I: geometric volume = distance between two geometric faces
     real    :: VolumeX_I(0:nX+1)
-    ! Node-centered u and B variables
-    real    :: uNodeSi_I(-1:nX+1), BNodeSi_I(-1:nX+1)
-    ! Hamiltonian
+    ! u/B variable at cell center and face
+    real    :: uOverBSi_I(nX), uOverBNodeSi_I(-1:nX+1)
+    ! Hamiltonian at cell face
     real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
     real    :: VDF_G(-1:nP+2, -1:nX+2)
@@ -169,6 +170,7 @@ contains
     real    :: Dt_C(nP, nX)
     ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
+
     ! Initialize arrays
     VolumeX_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1) + &
          DsSi_I(1:nX-2)), cTiny)/BSi_I(2:nX-1)
@@ -180,21 +182,19 @@ contains
     do iX = 0, nX+1
        Volume_G(:,iX) = VolumeP_I*VolumeX_I(iX)
     end do
-    ! Calculate node-centered u=|vector{u}*vector{B}|/|vector{B}|
-    uNodeSi_I(2:nX-1) = 0.5*(uSi_I(2:nX-1) + uSi_I(1:nX-2))
-    uNodeSi_I(1)      = uSi_I(1)
-    uNodeSi_I(-1:0)   = uNodeSi_I(1)
-    uNodeSi_I(nX)     = uSi_I(nX)
-    uNodeSi_I(nX+1)   = uNodeSi_I(nX)
-    ! Calculate node-centered B=|vector{B}|
-    BNodeSi_I(2:nX-1) = 0.5*(BSi_I(2:nX-1) + BSi_I(1:nX-2))
-    BNodeSi_I(1)      = BSi_I(1)
-    BNodeSi_I(-1:0)   = BNodeSi_I(1)
-    BNodeSi_I(nX)     = BSi_I(nX)
-    BNodeSi_I(nX+1)   = BNodeSi_I(nX)
-    ! Calculate Hamiltonian = (u/B)*(p**3/3), node-centered
+
+    ! Calculate u/B = |\vec{u}*\vec{B}| / |\vec{B}|^2 at cell center
+    uOverBSi_I             = uSi_I/BSi_I
+    ! Calculate u/B = |\vec{u}*\vec{B}| / |\vec{B}|^2 at cell face
+    uOverBNodeSi_I(1:nX-1) = 0.5*(uOverBSi_I(2:nX) + uOverBSi_I(1:nX-1))
+    uOverBNodeSi_I(0 )     = uOverBSi_I(1)
+    uOverBNodeSi_I(-1)     = uOverBNodeSi_I(0)
+    uOverBNodeSi_I(nX)     = uOverBSi_I(nX-1)
+    uOverBNodeSi_I(nX+1)   = uOverBNodeSi_I(nX)
+
+    ! Calculate Hamiltonian = (u/B)*(p**3/3) at cell face
     do iX = -1, nX+1
-       Hamiltonian_N(:, iX) = -uNodeSi_I(iX)/BNodeSi_I(iX)*Momentum3_I
+       Hamiltonian_N(:, iX) = -uOverBNodeSi_I(iX)*Momentum3_I
     end do
 
     ! Update bc for at minimal and maximal energy (left BC)
@@ -231,8 +231,8 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
-    integer, intent(in):: iLine, iShock ! indices of line and shock
-    integer, intent(in):: nX        ! Number of meshes along lnp-axis
+    integer, intent(in):: iLine, iShock ! Indices of line and shock
+    integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: TimeStart ! Start time before advancing
     real,    intent(in):: DtFinal   ! Time interval to advance through
     real,    intent(in):: CflIn     ! Input CFL number
@@ -395,10 +395,11 @@ contains
     use SP_ModDistribution, ONLY: Background_I, Momentum_I
     use SP_ModBc,           ONLY: SpectralIndex,            &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
-    integer, intent(in):: iLine     ! indices of line and shock
-    integer, intent(in):: nX        ! # of meshes along lnP-coordinate
+    integer, intent(in):: iLine     ! Indices of line and shock
+    integer, intent(in):: nX        ! Number of meshes along s_L axis
     real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
     !--------------------------------------------------------------------------
+
     VDF_G(0:nP+1, 1:nX) = Distribution_CB(:, 1, 1:nX, iLine)
     ! Apply bc along the line coordinate:
     VDF_G(0:nP+1,    0) = Distribution_CB(0, 1, 1, iLine)*    &
@@ -430,6 +431,7 @@ contains
     ! Midpoint for to consecutive points, \deltas
     real                :: MidPoint_IB(x_:z_, nX), DeltaS_I(nX)
     !------------------------------------------------------------------------
+
     ! Calculate values at OLD time
     ! Calculate midpoints
     MidPoint_IB(x_:z_, 1:nX-1) = (State_VIB(x_:z_, 2:nX, iLine)   &
@@ -486,6 +488,7 @@ contains
     ! Calculate values for CURRENT time: here we use linear interpolation
     ! to get the data of each time step from every to consecutive files
     !--------------------------------------------------------------------------
+
     ! Update \deltas/B
     DeltaSOverB_C(1:nX) = DeltaSOverBOld_C(1:nX) + dDeltaSOverBDt_C(1:nX)*Time
   end subroutine update_states
@@ -575,6 +578,7 @@ contains
     integer             :: iX, iMu        ! Loop variables
     ! Calculate the third hamiltonian function
     !--------------------------------------------------------------------------
+
     do iX = 1, nX
        do iMu = 0, nMu
           Hamiltonian3_N(:, iMu, iX) = 0.5*(1.0 - MuFace_I(iMu)**2)* &

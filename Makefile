@@ -190,7 +190,7 @@ test_steady_rundir:
 
 test_steady_run: test_run
 
-test_steady_restart::
+test_steady_restart:
 	cd ${TESTDIR}; ${SCRIPTDIR}/Restart.pl; rm -f PARAM.in; \
 	cp -f SP/Param/PARAM.in.test.steady.restart PARAM.in
 	${MAKE} test_run
