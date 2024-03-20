@@ -243,7 +243,7 @@ contains
     ! ------------ Control volume ------------
     ! Volume_G: total control volume at the end of each iteration
     ! dVolumeDt_G: total control time derivative
-    real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: Volume_G 
+    real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: Volume_G
     real :: dVolumeDt_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! ------------ Hamiltonian functions ------------
     ! Poisson bracket with regard to the first and second vars
@@ -349,6 +349,8 @@ contains
       real, optional :: DtIn
       ! Get DeltaSOverB_C at current time: for calculating
       ! the total control volume and Hamiltonian functions
+      !------------------------------------------------------------------------
+
       call update_states(iLine, nX, Time)
       Hamiltonian2_N = 0.0
       Hamiltonian3_N = 0.0
@@ -430,7 +432,7 @@ contains
     real, intent(in)    :: DtFull
     ! Midpoint for to consecutive points, \deltas
     real                :: MidPoint_IB(x_:z_, nX), DeltaS_I(nX)
-    !------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
 
     ! Calculate values at OLD time
     ! Calculate midpoints
@@ -484,7 +486,6 @@ contains
     integer, intent(in) :: iLine  ! Index of the current field line
     integer, intent(in) :: nX     ! Number of grid along s_L axis
     real, intent(in)    :: Time   ! Current time
-
     ! Calculate values for CURRENT time: here we use linear interpolation
     ! to get the data of each time step from every to consecutive files
     !--------------------------------------------------------------------------
@@ -533,10 +534,10 @@ contains
     integer :: iX, iMu              ! Loop variables
     !--------------------------------------------------------------------------
 
+    Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
     ! Considering the law of relativity, v=1/sqrt(1+m^2*c^2/p^2), v can be
     ! calculated as a function of p. Note that light speed is the unit of
     ! speed here, so we do not need to multiply c^2 in the following steps
-    Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
 
     ! Calculate 1/B on the boundary of grid
     InvBSi_I             = 1.0/BSi_I

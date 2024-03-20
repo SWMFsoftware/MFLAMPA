@@ -37,7 +37,7 @@ module SP_ModPlot
 
   ! the output directory
   character(len=*), public, parameter :: NamePlotDir="SP/IO2/"
-  
+
   ! If true the time tag format is YYYYMMDDHHMMSS
   logical, public:: UseDateTime = .false.
 
@@ -47,19 +47,19 @@ module SP_ModPlot
   ! number of different output file tags
   integer, public :: nTag = 0
 
-  ! Local variables ----
-  
+  ! ---- Local variables ----
+
   ! Number of plot file types, to be read from param file
   integer:: nFileOut = 0
   ! Types of output files in terms of output dataa
   integer, parameter:: &
-       ! Background mhd data
+                                ! Background mhd data
        MH1D_      = 0, & ! along each line
        MH2D_      = 1, & ! at given radius as Lon-Lat plot
        MHTime_    = 2, & ! at given radius as time series for lines
-       ! Distribution
+                                ! Distribution
        Distr1D_   = 3, & ! along each line
-       ! Flux
+                                ! Flux
        Flux2D_    = 4, & ! at a given radius on rectangular Lon-Lat grid
        FluxTime_  = 5    ! at a given radius as time series on Lon-Lat grid
   ! Momentum or energy axis to use for Distribution plots
@@ -212,39 +212,39 @@ contains
        end if
        ! prepare the output data containers
        select case(File_I(iFile) % iKindData)
-          case(MH1D_)
-             allocate(File_I(iFile) % Buffer_II(&
-                  File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-                  File_I(iFile)%nFluxVar, 1:nVertexMax))
-          case(MH2D_)
-             ! extra space is reserved for longitude and latitude
-             allocate(File_I(iFile) % Buffer_II(&
-                  2 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-                  File_I(iFile)%nFluxVar, nLineAll))
-          case(MHTime_)
-             ! note extra space reserved for time of the output
-             allocate(File_I(iFile) % Buffer_II(&
-                  1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-                  File_I(iFile)%nFluxVar, 1))
-          case(Distr1D_)
-             allocate(File_I(iFile) % &
-                  Buffer_II(nP,1:nVertexMax))
-          case(Flux2D_)
-             if(.not.IsReadySpreadGrid) &
-                  call CON_stop(NameSub//&
-                  ": Angular spread parameters haven't been set;"&
-                  //" use #SPREADGRID and #SPREADSOLIDANGLE in PARAM.in")
-             allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
-             ! extra space is reserved for sum of spreads
-             allocate(File_I(iFile) % Buffer_II(&
-                  File_I(iFile)%nFluxVar * nSpreadLon, nSpreadLat))
-          case(FluxTime_)
-             if(.not.IsReadySpreadPoint) &
-                  call CON_stop(NameSub//&
-                  ": Angular spread parameters haven't been set;"&
-                  //" use #SPREADSOLIDANGLE in PARAM.in")
-             ! extra space reserved for time of the output
-             allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1))
+       case(MH1D_)
+          allocate(File_I(iFile) % Buffer_II(&
+               File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
+               File_I(iFile)%nFluxVar, 1:nVertexMax))
+       case(MH2D_)
+          ! extra space is reserved for longitude and latitude
+          allocate(File_I(iFile) % Buffer_II(&
+               2 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
+               File_I(iFile)%nFluxVar, nLineAll))
+       case(MHTime_)
+          ! note extra space reserved for time of the output
+          allocate(File_I(iFile) % Buffer_II(&
+               1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
+               File_I(iFile)%nFluxVar, 1))
+       case(Distr1D_)
+          allocate(File_I(iFile) % &
+               Buffer_II(nP,1:nVertexMax))
+       case(Flux2D_)
+          if(.not.IsReadySpreadGrid) &
+               call CON_stop(NameSub//&
+               ": Angular spread parameters haven't been set;"&
+               //" use #SPREADGRID and #SPREADSOLIDANGLE in PARAM.in")
+          allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
+          ! extra space is reserved for sum of spreads
+          allocate(File_I(iFile) % Buffer_II(&
+               File_I(iFile)%nFluxVar * nSpreadLon, nSpreadLat))
+       case(FluxTime_)
+          if(.not.IsReadySpreadPoint) &
+               call CON_stop(NameSub//&
+               ": Angular spread parameters haven't been set;"&
+               //" use #SPREADSOLIDANGLE in PARAM.in")
+          ! extra space reserved for time of the output
+          allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1))
        end select
     end do
 
@@ -405,9 +405,9 @@ contains
              ! add line index, lon and lat to variable names
              select case(File_I(iFile) % TypeFile)
              case('tec','tcp')
-             File_I(iFile) % NameVarPlot = &
-                  'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
-                  ' Longitude_[deg] Latitude_[deg]'
+                File_I(iFile) % NameVarPlot = &
+                     'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
+                     ' Longitude_[deg] Latitude_[deg]'
              case default
                 File_I(iFile) % NameVarPlot = &
                      'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
@@ -961,7 +961,7 @@ contains
            File_I(iFile) % Buffer_II([iVarLon,iVarLat], :) * cRadToDeg
 
       if(iProc==0)&
-           ! print data to file
+                                ! print data to file
            call save_plot_file(&
            NameFile      = NameFile, &
            StringHeaderIn= StringHeader, &
@@ -1119,8 +1119,8 @@ contains
          if(File_I(iFile) % DoPlotFlux)&
               File_I(iFile)%Buffer_II(1 + nMhdVar + nExtraVar:nFluxVar + &
               nMhdVar + nExtraVar, nDataLine)=&
-             Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
-             Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
+              Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
+              Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
 
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime
@@ -1171,6 +1171,7 @@ contains
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_1d'
       !------------------------------------------------------------------------
+
       select case(File_I(iFile)%iScale)
       case(Momentum_)
          Scale_I = Log10MomentumSi_I
@@ -1183,13 +1184,13 @@ contains
          if(.not.Used_B(iLine))CYCLE
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
-            ! set the file name
-            call make_file_name(&
-                 StringBase    = 'Distribution_',                &
-                 iLine        = iLine,                         &
-                 iIter         = iIter,                          &
-                 NameExtension = File_I(iFile)%NameFileExtension,&
-                 NameOut       = NameFile)
+         ! set the file name
+         call make_file_name(&
+              StringBase    = 'Distribution_',                &
+              iLine        = iLine,                         &
+              iIter         = iIter,                          &
+              NameExtension = File_I(iFile)%NameFileExtension,&
+              NameOut       = NameFile)
 
          ! get max particle indexes on this field line
          iLast  = nVertex_B(   iLine)
@@ -1339,7 +1340,7 @@ contains
       Param_I(StartJulian_)= StartTimeJulian
 
       if(iProc==0)&
-           ! print data to file
+                                ! print data to file
            call save_plot_file(&
            NameFile      = NameFile, &
            StringHeaderIn= StringHeader, &
@@ -1401,6 +1402,7 @@ contains
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_flux_time'
       !------------------------------------------------------------------------
+
       nFluxVar= File_I(iFile)%nFluxVar
       ! set header
       StringHeader = &
@@ -1632,6 +1634,7 @@ contains
     character(len=100)::StringFmt
     ! lon, lat indexes corresponding to iLineAll
     integer:: iLon, iLat
+
     !--------------------------------------------------------------------------
     write(NameOut,'(a)')trim(NamePlotDir)//trim(StringBase)
 
@@ -1680,15 +1683,15 @@ contains
     end if
 
     if(present(iIter))then
-      if(UseDateTime)then
-         call get_date_time_string(SPTime, StringTime)
-         write(NameOut,'(a,i6.6)')  &
-              trim(NameOut)//'_e'//StringTime//'_n', iIter
-      else
-         call get_time_string(SPTime, StringTime(1:8))
-         write(NameOut,'(a,i6.6,a)')  &
-              trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
-      end if
+       if(UseDateTime)then
+          call get_date_time_string(SPTime, StringTime)
+          write(NameOut,'(a,i6.6)')  &
+               trim(NameOut)//'_e'//StringTime//'_n', iIter
+       else
+          call get_time_string(SPTime, StringTime(1:8))
+          write(NameOut,'(a,i6.6,a)')  &
+               trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
+       end if
     end if
 
     write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)

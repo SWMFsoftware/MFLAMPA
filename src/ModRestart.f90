@@ -139,7 +139,7 @@ contains
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameRestartInDir)//'data_',iLon,'_',iLat,&
             '.rst'
-       !inquire(file=NameFile,exist=Used_B(iLine))
+       ! inquire(file=NameFile,exist=Used_B(iLine))
        call open_file(file=NameFile,  status='old',&
             form='UNFORMATTED', NameCaller=NameSub, iErrorOut=iError)
        Used_B(iLine) = iError==0

@@ -73,14 +73,14 @@ contains
        if(.not.read_command(NameCommand)) CYCLE
        select case(NameCommand)
        case('#RESTART')
-          call read_var('DoRestart',DoRestart)
+          call read_var('DoRestart', DoRestart)
           ! read parameters for each module
        case('#ORIGIN')
           if(IsStandAlone) CYCLE
           call read_param_origin
        case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
-            '#CHECKGRIDSIZE', '#GRIDNODE') 
-            ! Currently we do not need '#DOSMOOTH'
+            '#CHECKGRIDSIZE', '#GRIDNODE')
+          ! Currently we do not need '#DOSMOOTH'
           if(i_session_read() /= 1) CYCLE
           call read_param_grid(NameCommand)
        case('#MOMENTUMGRID', '#PITCHANGLEGRID', &
@@ -170,6 +170,7 @@ contains
     use SP_ModTurbulence,    ONLY: init_turbulence => init, &
          UseTurbulentSpectrum
     use SP_ModUnit,          ONLY: init_unit       => init
+
     ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
@@ -195,6 +196,7 @@ contains
     use SP_ModPlot,       ONLY: finalize_plot      => finalize
     use SP_ModReadMhData, ONLY: finalize_mhdata    => finalize
     ! use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
+
     ! finalize the model
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
@@ -272,6 +274,7 @@ contains
     ! Make output directory
     character(len=*), parameter:: NameSub = 'check'
     !--------------------------------------------------------------------------
+
     if(iProc==0) then
        call make_dir(NamePlotDir)
        ! Initialize timing

@@ -44,7 +44,7 @@ module SP_ModDistribution
   ! Size of a  log-momentum mesh. For momentum we use both the
   ! denotaion, P, and a word, momentum - whichever is more covenient
   real, public :: dLogP      ! log(MomentumMaxSi/MomentumInjSi)/nP
-  
+
   ! uniform distribution of pitch angle
   real, public :: DeltaMu = 2.0/nMu
   real, public :: MuFace_I(0:nMu), Mu_I(nMu)
@@ -100,9 +100,10 @@ contains
     integer:: iLine, iVertex, iP, iError, iMu
     ! maximal and current momenta
     real :: MomentumMaxSi, MomentumSi
-    character(len=*), parameter:: NameSub = 'init'
     ! set the initial distribution on all lines
+    character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
+
     if(.not.DoInit)RETURN
     DoInit = .false.
 
@@ -114,7 +115,7 @@ contains
     dLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
     ! Functions to convert the grid index to momentum and energy
-    Momentum3_I(-1) = exp(-3*(0.50*dLogP))/3 !P^3/3 at -0.5*dLogP from PInj
+    Momentum3_I(-1) = exp(-3*(0.50*dLogP))/3 ! P^3/3 at -0.5*dLogP from PInj
     do iP = 0, nP+1
        Momentum_I(iP)    = MomentumInjSi*exp(iP*dLogP)
        SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
@@ -271,6 +272,7 @@ contains
     real :: Alpha, Distance2ToMin, Distance3To2
     character(len=*), parameter:: NameSub = 'offset'
     !--------------------------------------------------------------------------
+
     if(iOffset==0)RETURN
     if(iOffset==1)then
        State_VIB([RhoOld_,BOld_],2:nVertex_B(iLine),iLine) &

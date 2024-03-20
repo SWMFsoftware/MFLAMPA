@@ -95,11 +95,11 @@ contains
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I
-
     ! Check if any Distribution_IIB < 0 in advect_via_log
     logical  :: IsDistNeg
     character(len=*), parameter:: NameSub = 'advance'
     !--------------------------------------------------------------------------
+
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
 
@@ -248,8 +248,9 @@ contains
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, uSi_I, BSi_I, DsSi_I
     ! go line by line and iterate the solution
-    character(len=*), parameter  :: NameSub = 'iterate_steady_state'
+    character(len=*), parameter:: NameSub = 'iterate_steady_state'
     !--------------------------------------------------------------------------
+
     do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE
        ! the active particles on the line
