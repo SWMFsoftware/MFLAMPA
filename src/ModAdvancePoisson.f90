@@ -316,7 +316,7 @@ contains
           do iX = 1, nX
              Volume_G(:, 0, iX) = DeltaSOverB_C(iX)*DeltaMu*VolumeP_I
              do iMu = 1, nMu+1
-                Volume_G(:, 0, iX) = Volume_G(:, 0, iX)
+                Volume_G(:, iMu, iX) = Volume_G(:, 0, iX)
              end do
           end do
 
@@ -370,7 +370,7 @@ contains
       do iX = 1, nX
          Volume_G(:, 0, iX) = DeltaSOverB_C(iX)*DeltaMu*VolumeP_I
          do iMu = 1, nMu+1
-            Volume_G(:, 0, iX) = Volume_G(:, 0, iX)
+            Volume_G(:, iMu, iX) = Volume_G(:, 0, iX)
          end do
       end do
 
@@ -409,7 +409,7 @@ contains
     if(UseUpperEndBc) then
        call set_upper_end_bc(iLine, nX)
        VDF_G(1:nP, nX+1) = UpperEndBc_I
-       VDF_G(0   , nX+1) = VDF_G(0, nX)
+       VDF_G(0   , nX+1) = VDF_G(0   , nX)
        VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
     else
        VDF_G(0:nP+1, nX+1) = Background_I
@@ -418,8 +418,8 @@ contains
     VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
     VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
     ! Add a second layer of the ghost cells along the momentum coordinate:
-    VDF_G(-1  ,:) = VDF_G(0   ,:)
-    VDF_G(nP+2,:) = VDF_G(nP+1,:)
+    VDF_G(-1  , :) = VDF_G(0   , :)
+    VDF_G(nP+2, :) = VDF_G(nP+1, :)
   end subroutine set_VDF
   !============================================================================
   subroutine init_data_states(iLine, nX, DtFull)
@@ -476,7 +476,7 @@ contains
          (LnBDeltaS2New_C(1:nX) - LnBDeltaS2Old_C(1:nX))/DtFull
     ! Calculate b*Du/Dt
     bDuDt_C(1:nX)          = &
-         (State_VIB(U_, 1:nX, iLine) - MHData_VIB(U_, 1:nX, iLine))/DtFull
+         (MHData_VIB(U_, 1:nX, iLine) - State_VIB(U_, 1:nX, iLine))/DtFull
 
   end subroutine init_data_states
   !============================================================================
