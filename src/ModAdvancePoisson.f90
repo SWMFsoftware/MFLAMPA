@@ -89,7 +89,7 @@ contains
     end do
     ! calculate: dHamiltonian/dVolumeSubX
     do iX = 0, nX+1
-       dHamiltonian01_FX(:,iX) = - Momentum3_I*dVolumeXDt_I(iX)
+       dHamiltonian01_FX(:,iX) = -Momentum3_I*dVolumeXDt_I(iX)
     end do
     ! Time initialization
     Time   = 0.0
@@ -183,18 +183,18 @@ contains
        Volume_G(:,iX) = VolumeP_I*VolumeX_I(iX)
     end do
 
-    ! Calculate u/B = |\vec{u}*\vec{B}| / |\vec{B}|^2 at cell center
+    ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|^2 at cell center
     uOverBSi_I             = uSi_I/BSi_I
-    ! Calculate u/B = |\vec{u}*\vec{B}| / |\vec{B}|^2 at cell face
+    ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|^2 at cell face
     uOverBNodeSi_I(1:nX-1) = 0.5*(uOverBSi_I(2:nX) + uOverBSi_I(1:nX-1))
     uOverBNodeSi_I(0 )     = uOverBSi_I(1)
     uOverBNodeSi_I(-1)     = uOverBNodeSi_I(0)
     uOverBNodeSi_I(nX)     = uOverBSi_I(nX-1)
     uOverBNodeSi_I(nX+1)   = uOverBNodeSi_I(nX)
 
-    ! Calculate Hamiltonian = (u/B)*(p**3/3) at cell face
+    ! Hamiltonian = -abs(u/B)*(p**3/3) at cell face, for {s_L, p^3/3}
     do iX = -1, nX+1
-       Hamiltonian_N(:, iX) = -uOverBNodeSi_I(iX)*Momentum3_I
+       Hamiltonian_N(:, iX) = -abs(uOverBNodeSi_I(iX))*Momentum3_I
     end do
 
     ! Update bc for at minimal and maximal energy (left BC)
