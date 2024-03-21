@@ -425,14 +425,16 @@ contains
   subroutine init_data_states(iLine, nX, DtFull)
     ! Calculate data states from the input files
 
-    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, x_, z_, BOld_, B_, U_
+    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, x_, z_, BOld_, B_, UOld_, U_
     ! Line number and number along grid axis
     integer, intent(in) :: iLine, nX
     ! Time difference between Old (State_VIB) and New (MHData_VIB) States
     real, intent(in)    :: DtFull
     ! Midpoint for to consecutive points, \deltas
     real                :: MidPoint_IB(x_:z_, nX), DeltaS_I(nX)
+    real                :: InvDtFull
     !--------------------------------------------------------------------------
+    InvDtFull = 1.0/DtFull
 
     ! Calculate values at OLD time
     ! Calculate midpoints
@@ -463,20 +465,20 @@ contains
     DeltaS_I(nX) = 2*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
          - MHData_VIB(x_:z_, nX, iLine))**2))
     ! Calculate \DeltaS/B at grid center
-    DeltaSOverBNew_C(1:nX) = DeltaS_I/MHData_VIB(B_, 1:nX, iLine)
+    DeltaSOverBNew_C(1:nX) = DeltaS_I/State_VIB(B_, 1:nX, iLine)
     ! Calculate ln(B*\DeltaS^2) at grid center
-    LnBDeltaS2New_C(1:nX) = log(MHData_VIB(B_, 1:nX, iLine)*DeltaS_I**2)
+    LnBDeltaS2New_C(1:nX) = log(State_VIB(B_, 1:nX, iLine)*DeltaS_I**2)
 
     ! Calculate the time-derivative physical quantities
     ! Calculate \deltas/B time derivative = D[delta(s_L)/B]/Dt
-    dDeltaSOverBDt_C(1:nX) = &
-         (DeltaSOverBNew_C(1:nX) - DeltaSOverBOld_C(1:nX))/DtFull
+    dDeltaSOverBDt_C(1:nX) = (DeltaSOverBNew_C(1:nX) -   &
+         DeltaSOverBOld_C(1:nX))*InvDtFull
     ! Calculate Dln(B\deltas^2)/Dt
-    dLnBdeltaS2Dt_C(1:nX)  = &
-         (LnBDeltaS2New_C(1:nX) - LnBDeltaS2Old_C(1:nX))/DtFull
+    dLnBdeltaS2Dt_C(1:nX)  = (LnBDeltaS2New_C(1:nX) -    &
+         LnBDeltaS2Old_C(1:nX))*InvDtFull
     ! Calculate b*Du/Dt
-    bDuDt_C(1:nX)          = &
-         (MHData_VIB(U_, 1:nX, iLine) - State_VIB(U_, 1:nX, iLine))/DtFull
+    bDuDt_C(1:nX)          = (State_VIB(U_, 1:nX, iLine) -  &
+         State_VIB(UOld_, 1:nX, iLine))*InvDtFull
 
   end subroutine init_data_states
   !============================================================================

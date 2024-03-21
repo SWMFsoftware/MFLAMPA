@@ -69,6 +69,7 @@ module SP_ModUnit
        'm/s   ', &
        'T     ', &
        'amu/m3', &
+       'm/s   ', &
        'T     ']
 
   logical :: DoInit = .true.

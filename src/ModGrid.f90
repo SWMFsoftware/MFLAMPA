@@ -104,7 +104,7 @@ module SP_ModGrid
   !
   ! Number of variables in the state vector and the identifications
   !
-  integer, public, parameter :: nMhData = 13, nVar = 20,          &
+  integer, public, parameter :: nMhData = 13, nVar = 21,          &
        !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
        X_          = 1, & !                         |read in  |in copy_
@@ -127,7 +127,8 @@ module SP_ModGrid
        U_          =17, & ! Plasma speed along field line  |state_var
        B_          =18, & ! Magnitude of magnetic field    v
        RhoOld_     =19, & ! Background plasma density      ! copy_
-       BOld_       =20    ! Magnitude of magnetic field    ! old_state
+       UOld_       =20, & ! Background plasma bulk speed   ! old_
+       BOld_       =21    ! Magnitude of magnetic field    ! state
   !
   ! variable names
   !
@@ -152,6 +153,7 @@ module SP_ModGrid
        'U         ', &
        'B         ', &
        'RhoOld    ', &
+       'UOld      ', &
        'BOld      ' ]
   !
   logical:: DoInit = .true.
@@ -314,6 +316,8 @@ contains
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = &
             MhData_VIB(Rho_,  1:iEnd, iLine)
+       State_VIB(UOld_, 1:iEnd, iLine) = &
+            State_VIB(U_,  1:iEnd, iLine)
        State_VIB(BOld_, 1:iEnd, iLine) = &
             State_VIB(B_,  1:iEnd, iLine)
        ! reset variables read from file or received via coupler
