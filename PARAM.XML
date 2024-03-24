@@ -663,6 +663,7 @@ The number of different time-line tags of the MH_data files.
 	<part name="NameVar" type="string" required="T" multiple="T"
 	      input="select">
 	  <option name="Flux"   value="flux" default="T"/>
+    <option name="Spread" value="spread" />
 	  <option name="R"      value="r" />
           <option name="LagrID" value="lagrid"/>
           <option name="X"  	value="x"/>  
