@@ -352,7 +352,6 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
   <parameter name="EnergyMax" type="real" min="0.0" default="1000.0" />
   <parameter name="nP" type="integer" min="1" default="100" />
   <parameter name="nMu" type="integer" min="1" default="1"/>
-  <parameter name="NameEnergyUnit" type="string" default="keV" />
 
 #MOMENTUMGRID
 1.0   		EnergyMin
