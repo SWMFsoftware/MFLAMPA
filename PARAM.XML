@@ -424,12 +424,12 @@ https://cosmicrays.oulu.fi/phi/phi.html.
 <commandgroup name="ADVANCE">
 
 <command name="INJECTION">
+  <parameter name="Efficiency" type="real" min="0.0" default="1.0" />
   <parameter name="SpectralIndex" type="real" default="5.0" />
-  <parameter name="Efficency" type="real" min="0.0" default="0.25" />
 
 #INJECTION
+1.0         Efficiency
 5.0         SpectralIndex
-0.25        Efficency
 
 Set up parameters of the power-law spectrum of suprathermal
 particles at sqrt(2 mp Ti) lt p lt Pinj:
@@ -439,6 +439,7 @@ F ~ Efficiency * (Spectral index - 3) / p**SpectralIndex
 The injection efficiency is the ratio of suprathermal proton
 density to the total proton density. Should not exceed one,
 however, somewhat higher than one values may be of use.
+Default distribution is f(p) ~ 1.0 * 2 / p**5.
 </command>
 
 <command name="CFL">
