@@ -29,7 +29,7 @@ module SP_ModMain
   logical :: DoRestart   = .false.
   ! Methods and variables from ModReadMhData
   public  :: DoReadMhData
-
+  logical :: IsFirstSession = .true.
   ! Methods and variables from this module
   public:: read_param, initialize, finalize, run, check, DoRestart,        &
        IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax, IsStandAlone
@@ -54,7 +54,7 @@ contains
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: &
-         read_var, read_line, read_command, i_session_read, read_echo_set
+         read_var, read_line, read_command, read_echo_set
 
     ! aux variables
     integer:: nParticleCheck, nLonCheck, nLatCheck
@@ -81,11 +81,11 @@ contains
        case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
             '#CHECKGRIDSIZE', '#GRIDNODE')
           ! Currently we do not need '#DOSMOOTH'
-          if(i_session_read() /= 1) CYCLE
+          if(.not.IsFirstSession) CYCLE
           call read_param_grid(NameCommand)
        case('#MOMENTUMGRID', '#PITCHANGLEGRID', &
             '#FLUXINITIAL', '#FLUXCHANNEL')
-          if(i_session_read() /= 1) CYCLE
+          if(.not.IsFirstSession) CYCLE
           call read_param_dist(NameCommand)
        case('#CFL', '#POISSONBRACKET', '#TRACESHOCK')
           call read_param_adv(NameCommand)
@@ -130,10 +130,10 @@ contains
           call read_var('DoEcho', DoEcho)
           if(iProc==0)call read_echo_set(DoEcho)
        case("#STARTTIME",'#NSTEP','#TIMESIMULATION')
-          if(i_session_read() /= 1)CYCLE
+          if(.not.IsFirstSession)CYCLE
           call read_param_time(NameCommand)
        case("#SETREALTIME")
-          if(i_session_read() /= 1)CYCLE
+          if(.not.IsFirstSession)CYCLE
           call check_stand_alone
           call read_param_time(NameCommand)
        case("#TIMEACCURATE")
@@ -274,7 +274,7 @@ contains
     ! Make output directory
     character(len=*), parameter:: NameSub = 'check'
     !--------------------------------------------------------------------------
-
+    IsFirstSession = .false.
     if(iProc==0) then
        call make_dir(NamePlotDir)
        ! Initialize timing
