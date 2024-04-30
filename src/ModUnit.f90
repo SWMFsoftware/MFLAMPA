@@ -76,7 +76,7 @@ module SP_ModUnit
 contains
   !============================================================================
   subroutine read_param(NameCommand)
-    use ModReadParam, ONLY: read_var,i_session_read
+    use ModReadParam, ONLY: read_var
     use ModUtilities, ONLY: lower_case
     use SP_ModGrid, ONLY: T_
     character(len=*), intent(in):: NameCommand ! From PARAM.in
@@ -85,7 +85,6 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#PARTICLEENERGYUNIT')
-       if(i_session_read() /= 1)RETURN
        ! Read unit to be used for particle energy: keV, MeV, GeV
        call read_var('ParticleEnergyUnit', NameEnergyUnit)
 

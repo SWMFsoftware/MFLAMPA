@@ -163,18 +163,17 @@ contains
        NameFluxChannel_I = ['flux_total', 'flux_00005', 'flux_00010', &
             'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100',   &
             'eflux     ']
-       if(allocated(EChannelIo_I))&
-            deallocate(EChannelIo_I)
        allocate (EChannelIo_I(nFluxChannel))
-       EChannelIo_I = [5,10,30,50,60,100] & ! in MeV!
-            *cMeV                         & ! in SI
-            *Si2Io_V(UnitEnergy_)
-       if(allocated(NameFluxUnit_I))&
-            deallocate(NameFluxUnit_I)
-       allocate(NameFluxUnit_I(0:nFluxChannel+1))
-       NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
-       NameFluxUnit_I(1+nFluxChannel) = NameEnergyFluxUnit
+       EChannelIo_I = [5,10,30,50,60,100]  ! in MeV!
     end if
+    EChannelIo_I  = EChannelIo_I & ! In MeV Now!!
+         *cMeV                   & ! in SI
+         *Si2Io_V(UnitEnergy_)     ! in NameUnitEnergy
+    if(allocated(NameFluxUnit_I))&
+         deallocate(NameFluxUnit_I)
+    allocate(NameFluxUnit_I(0:nFluxChannel+1))
+    NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
+    NameFluxUnit_I(1+nFluxChannel) = NameEnergyFluxUnit
 
     if (.not. allocated(Flux_VIB)) then
        allocate(Flux_VIB(Flux0_:FluxMax_,1:nVertexMax,nLine), &
@@ -247,11 +246,12 @@ contains
           write(NameFluxChannel,'(I5.5)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
-       EChannelIo_I = EChannelIo_I & ! in MeV
-            *cMeV                  & ! in SI
-            *Si2Io_V(UnitEnergy_)
-       NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
-       NameFluxUnit_I(EFlux_)         = NameEnergyFluxUnit
+       ! Bug: here, Si2No_V is not yet calculated
+       ! EChannelIo_I = EChannelIo_I & ! in MeV
+       !     *cMeV                  & ! in SI
+       !     *Si2Io_V(UnitEnergy_)
+       ! NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
+       ! NameFluxUnit_I(EFlux_)         = NameEnergyFluxUnit
 
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
