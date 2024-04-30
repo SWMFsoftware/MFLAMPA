@@ -424,12 +424,12 @@ https://cosmicrays.oulu.fi/phi/phi.html.
 <commandgroup name="ADVANCE">
 
 <command name="INJECTION">
-  <parameter name="Efficiency" type="real" min="0.0" default="1.0" />
   <parameter name="SpectralIndex" type="real" default="5.0" />
+  <parameter name="Efficiency" type="real" min="0.0" default="1.0" />
 
 #INJECTION
-1.0         Efficiency
 5.0         SpectralIndex
+1.0         Efficiency
 
 Set up parameters of the power-law spectrum of suprathermal
 particles at sqrt(2 mp Ti) lt p lt Pinj:
