@@ -722,12 +722,14 @@ Please send an email to Igor Sokolov for more information on this command.
 </command>
 
 <command name="NOUTPUT">
-  <parameter name="nOutput" type="integer" min="0" default="1" />
+  <parameter name="nOutput" type="integer" min="-1" default="1" />
+  <parameter name="DtOutput" type="real" min="-1.0" default="-1.0"/>
   
 #NOUTPUT
 10                 nOutput
+-1.0               DtOutput
 
-Frequency to plot (effective for IsSteadyState only)
+Frequency to plot
 
 </command>
 </commandgroup>
