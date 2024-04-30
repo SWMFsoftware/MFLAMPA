@@ -43,8 +43,8 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#INJECTION')
-       call read_var('Efficiency',    CoefInj)
        call read_var('SpectralIndex', SpectralIndex)
+       call read_var('Efficiency',    CoefInj)
     case('#UPPERENDBC')
        ! Read whether to use UpperEndBc
        call read_var('UseUpperEndBc', UseUpperEndBc)
