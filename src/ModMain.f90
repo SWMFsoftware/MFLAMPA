@@ -215,7 +215,7 @@ contains
          get_shock_location
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
-    use SP_ModPlot,          ONLY: save_plot_all
+    use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
@@ -230,9 +230,9 @@ contains
        if(.not.DoReadMhData) call get_other_state_var
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
+       if(DtOutput > 0.0)iTimeOutput = int(SPTime/DtOutput)
        ! compute magnetic fluxes associated with lines if needed
        if(IsReadySpreadPoint) call get_magnetic_flux
-
        IsFirstCall = .false.
     end if
     if(IsSteadyState)then

@@ -8,7 +8,7 @@ module SP_ModPlot
   use SP_ModAngularSpread, ONLY: get_normalized_spread, &
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModDistribution, ONLY: nP, KinEnergy_I, Momentum_I, &
+  use SP_ModDistribution, ONLY: nP, KinEnergyIo_I, Momentum_I, &
        Distribution_CB, FluxChannelInit_V,                  &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
@@ -143,8 +143,7 @@ module SP_ModPlot
   type(TypePlotFile), allocatable:: File_I(:)
 
   ! Arrays used to visualize the distribution function
-  real, dimension(0:nP+1) :: Log10MomentumSi_I, Log10KinEnergySi_I,      &
-       DMomentumOverDEnergy_I
+  real :: Log10Momentum_I(0:nP+1), Log10KinEnergyIo_I(0:nP+1)
 
   ! auxilary array, used to write data on a sphere
   ! contains integers 1:nLineAll
@@ -157,7 +156,9 @@ module SP_ModPlot
   ! name of the tag list file
   character(len=*), parameter :: NameTagFile  = NameMHData//'.lst'
 
-  integer          :: nOutput = 1
+  integer          :: nOutput = 1, iTimeOutput = 0
+  real             :: DtOutput = -1.0
+  public :: DtOutput, iTimeOutput
 
   character(len=20) :: TypeMHDataFile
 
@@ -183,9 +184,8 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
     ! Array for plotting distribution function
-    Log10MomentumSi_I      = log10(Momentum_I)
-    Log10KinEnergySi_I     = log10(KinEnergy_I)
-    DMomentumOverDEnergy_I = 1/SpeedSi_I
+    Log10Momentum_I        = log10(Momentum_I)
+    Log10KinEnergyIo_I     = log10(KinEnergyIo_I)
 
     ! Finalize setting output files:
     ! number and names of flux channels are known at this point;
@@ -481,7 +481,10 @@ contains
             call CON_stop(NameSub//&
             ": only one MH1D output file can be requested")
     case("#NOUTPUT")
-       if(IsSteadyState)call read_var('nOutput',nOutput)
+       call read_var('nOutput',nOutput)
+       if(nOutput < 1)then
+          call read_var('DtOutput',DtOutput)
+       end if
     case("#USEDATETIME")
        call read_var('UseDateTime',UseDateTime)
     case('#SAVEINITIAL')
@@ -611,7 +614,7 @@ contains
             File_I(iFile) % iTypeDistr = CDF_
             NameVar = 'Log10Distribution'
          case('def')
-            ! differential energy flux
+            ! differential flux
             File_I(iFile) % iTypeDistr = DEF_
             NameVar = 'Log10DiffEnergyFlux'
          end select
@@ -627,7 +630,7 @@ contains
   subroutine save_plot_all(IsInitialOutputIn)
 
     use SP_ModDistribution, ONLY: get_integral_flux, nMu
-    use SP_ModTime,         ONLY: IsSteadyState, iIter
+    use SP_ModTime,         ONLY: IsSteadyState, iIter, SPTime
 
     ! write the output data
 
@@ -636,7 +639,7 @@ contains
     ! loop variables
     integer:: iFile
     integer:: iKindData
-
+    integer:: iTimeOutputNew
     logical:: IsInitialOutput
 
     character(len=*), parameter:: NameSub = 'save_plot_all'
@@ -653,7 +656,20 @@ contains
     else
        call get_integral_flux
     end if
-    if(IsSteadyState.and.mod(iIter,nOutput)/=0)RETURN
+    ! Check how often the output is needed
+    if(IsInitialOutput)then
+       ! Skip the check
+    elseif(nOutput > 0)then
+       ! Output if iIter is a multiple of nOutput
+       if(mod(iIter,nOutput)/=0)RETURN
+    elseif(DtOutput > 0.0.and..not.IsSteadyState)then
+       iTimeOutputNew = int(SPTime/DtOutput)
+       if(iTimeOutputNew > iTimeOutput)then
+          iTimeOutput = iTimeOutputNew
+       else
+          RETURN
+       end if
+    end if
     do iFile = 1, nFileOut
        iKindData = File_I(iFile) % iKindData
 
@@ -1165,8 +1181,7 @@ contains
       ! index of first/last particle on the field line
       integer:: iLast
       ! scale and conversion factor
-      real:: Scale_I(0:nP+1), Factor_I(0:nP+1)
-      real:: Unity_I(0:nP+1) = 1.0
+      real:: Scale_I(0:nP+1)
       ! timetag
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_1d'
@@ -1174,11 +1189,9 @@ contains
 
       select case(File_I(iFile)%iScale)
       case(Momentum_)
-         Scale_I = Log10MomentumSi_I
-         Factor_I= Unity_I
+         Scale_I = Log10Momentum_I
       case(Energy_)
-         Scale_I = Log10KinEnergySi_I
-         Factor_I= DMomentumOverDEnergy_I
+         Scale_I = Log10KinEnergyIo_I
       end select
       do iLine = 1, nLine
          if(.not.Used_B(iLine))CYCLE
@@ -1203,7 +1216,7 @@ contains
             end if
             ! the actual distribution
             File_I(iFile) % Buffer_II(:,iVertex) = &
-                 log10(Distribution_CB(1:nP,nMu,iVertex,iLine)*Factor_I(1:nP))
+                 log10(Distribution_CB(1:nP,nMu,iVertex,iLine))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
@@ -1211,7 +1224,7 @@ contains
             case(DEF_)
                File_I(iFile) % Buffer_II(:,iVertex) = &
                     File_I(iFile) % Buffer_II(:,iVertex) + &
-                    2*Log10MomentumSi_I
+                    2*Log10Momentum_I
             end select
          end do
          ! print data to file

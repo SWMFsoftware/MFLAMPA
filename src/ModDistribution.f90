@@ -51,7 +51,7 @@ module SP_ModDistribution
 
   ! speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
-       KinEnergy_I, VolumeP_I, Background_I
+       KinEnergyIo_I, VolumeP_I, Background_I
   real, public :: Momentum3_I(-1:nP+1) ! P**3/3, normalized per MomentumInjSi
 
   ! Total integral (simulated) particle flux
@@ -123,7 +123,7 @@ contains
        Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*dLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
        ! Normalize kinetic energy per Unit of energy in SI unit:
-       KinEnergy_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP)) &
+       KinEnergyIo_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP)) &
             *Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
        Momentum_I(iP)    = Momentum_I(iP)/MomentumInjSi
@@ -342,7 +342,7 @@ contains
           do iP = 1, nP - 1
              ! the flux increment from iP
              dFlux = 0.5 * &
-                  (KinEnergy_I(iP+1) - KinEnergy_I(iP)) * (&
+                  (KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP)) * (&
                   Distribution_CB(iP,nMu,  iVertex,iLine)*&
                   Momentum_I(iP)**2 &
                   +&
@@ -355,37 +355,37 @@ contains
              ! increase GOES channels' fluxes
              do iFlux = 1, nFluxChannel
                 ! check whether reached the channel's cut-off level
-                if(KinEnergy_I(iP+1) < EChannelIo_I(iFlux))&
+                if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux))&
                      CYCLE
 
-                if(KinEnergy_I(iP) >= EChannelIo_I(iFlux))then
+                if(KinEnergyIo_I(iP) >= EChannelIo_I(iFlux))then
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux
                 else
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
                    dFlux1 =&
-                        ((-0.50*(KinEnergy_I(iP) + EChannelIo_I(iFlux)) + &
-                        KinEnergy_I(iP+1) )*&
+                        ((-0.50*(KinEnergyIo_I(iP) + EChannelIo_I(iFlux)) + &
+                        KinEnergyIo_I(iP+1) )*&
                         Distribution_CB(iP,nMu,iVertex,iLine)*&
                         Momentum_I(iP)**2  &
-                        -0.50*(KinEnergy_I(iP)-EChannelIo_I(iFlux))*&
+                        -0.50*(KinEnergyIo_I(iP)-EChannelIo_I(iFlux))*&
                         Distribution_CB(iP+1,nMu,iVertex,iLine)*&
                         Momentum_I(iP+1)**2)*&
-                        (KinEnergy_I(iP)-EChannelIo_I(iFlux))/&
-                        (KinEnergy_I(iP+1)-KinEnergy_I(iP))
+                        (KinEnergyIo_I(iP)-EChannelIo_I(iFlux))/&
+                        (KinEnergyIo_I(iP+1)-KinEnergyIo_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 end if
              end do
 
              ! increase total energy flux
              EFlux = EFlux + 0.5 * &
-                  (KinEnergy_I(iP+1) - KinEnergy_I(iP)) * (&
+                  (KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP)) * (&
                   Distribution_CB(iP,nMu,iVertex,iLine)*&
-                  KinEnergy_I(iP) * &
+                  KinEnergyIo_I(iP) * &
                   Momentum_I(iP)**2 &
                   +&
                   Distribution_CB(iP+1,nMu,iVertex,iLine)*&
-                  KinEnergy_I(iP+1) * &
+                  KinEnergyIo_I(iP+1) * &
                   Momentum_I(iP+1)**2)
           end do
 
