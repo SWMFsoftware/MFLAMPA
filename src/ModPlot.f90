@@ -18,7 +18,8 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, Io2Si_V, UnitEnergy_
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, Io2Si_V,      &
+       UnitEnergy_, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cPi,cTwoPi, cDegToRad,cRadToDeg, cTolerance
@@ -1174,6 +1175,7 @@ contains
       ! name of the output file
 
       character(len=100):: NameFile
+      character(len=3):: TypeDistr
       ! loop variables
       integer:: iLine, iVertex, iVarPlot
       ! indexes of corresponding node, latitude and longitude
@@ -1198,9 +1200,15 @@ contains
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
          ! set the file name
+         select case(File_I(iFile) % iTypeDistr)
+         case(CDF_)
+            TypeDistr = 'cdf'
+         case(DEF_)
+            TypeDistr = 'def'
+         end select
          call make_file_name(&
-              StringBase    = 'Distribution_',                &
-              iLine         = iLine,                         &
+              StringBase    = 'Distribution_' // TypeDistr ,  &
+              iLine         = iLine,                          &
               iIter         = iIter,                          &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
