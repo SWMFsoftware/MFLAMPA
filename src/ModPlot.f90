@@ -228,7 +228,7 @@ contains
                File_I(iFile)%nFluxVar, 1))
        case(Distr1D_)
           allocate(File_I(iFile) % &
-               Buffer_II(nP,1:nVertexMax))
+               Buffer_II(0:nP+1,1:nVertexMax))
        case(Flux2D_)
           if(.not.IsReadySpreadGrid) &
                call CON_stop(NameSub//&
@@ -1200,7 +1200,7 @@ contains
          ! set the file name
          call make_file_name(&
               StringBase    = 'Distribution_',                &
-              iLine        = iLine,                         &
+              iLine         = iLine,                         &
               iIter         = iIter,                          &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
@@ -1216,7 +1216,7 @@ contains
             end if
             ! the actual distribution
             File_I(iFile) % Buffer_II(:,iVertex) = &
-                 log10(Distribution_CB(1:nP,nMu,iVertex,iLine))
+                 log10(Distribution_CB(0:nP+1,nMu,iVertex,iLine))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
