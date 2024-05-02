@@ -9,7 +9,7 @@ module SP_ModPlot
        nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModDistribution, ONLY: nP, KinEnergyIo_I, Momentum_I, &
-       Distribution_CB, FluxChannelInit_V,                  &
+       Distribution_CB, FluxChannelInit_V,                     &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
@@ -18,7 +18,7 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, Io2Si_V,      &
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, Io2Si_V, &
        UnitEnergy_, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
@@ -228,8 +228,7 @@ contains
                1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
                File_I(iFile)%nFluxVar, 1))
        case(Distr1D_)
-          allocate(File_I(iFile) % &
-               Buffer_II(0:nP+1,1:nVertexMax))
+          allocate(File_I(iFile) % Buffer_II(0:nP+1,1:nVertexMax))
        case(Flux2D_)
           if(.not.IsReadySpreadGrid) &
                call CON_stop(NameSub//&
@@ -438,7 +437,31 @@ contains
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
+             ! process the distr1d data
              call process_distr
+             ! header: [Momentum/Energy unit], [Rs], [CDF or DEF unit]
+             select case(File_I(iFile) % iScale)
+             case(Momentum_)
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)// &
+                     ' log10[kg*m/s]'
+             case(Energy_)
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)// &
+                     ' log10[' // NameEnergyUnit // ']'
+             end select
+             File_I(iFile) % StringHeaderAux = &
+                  trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
+             select case(File_I(iFile) % iTypeDistr)
+             case(CDF_)
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)// &
+                     ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
+             case(DEF_)
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)// &
+                     ' log10[p.f.u/' // NameEnergyUnit // ']'
+             end select
           case(Flux2D_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -1172,9 +1195,11 @@ contains
       ! write file with distribution in the format to be read by IDL/TECPLOT;
       ! separate file is created for each field line, name format is
       ! Distribution_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
-      ! name of the output file
 
+      ! name of the output file
       character(len=100):: NameFile
+      ! header of the output file
+      character(len=500):: StringHeader
       character(len=3):: TypeDistr
       ! loop variables
       integer:: iLine, iVertex, iVarPlot
@@ -1188,6 +1213,11 @@ contains
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_1d'
       !------------------------------------------------------------------------
+
+      ! set header
+      StringHeader = &
+           'MFLAMPA: Distribution data along a field line, with ' &
+           //trim(File_I(iFile)%StringHeaderAux)
 
       select case(File_I(iFile)%iScale)
       case(Momentum_)
@@ -1237,14 +1267,15 @@ contains
          end do
          ! print data to file
          call save_plot_file(&
-              NameFile   = NameFile, &
-              TypeFileIn = File_I(iFile) % TypeFile, &
-              nDimIn     = 2, &
-              TimeIn     = SPTime, &
-              nStepIn    = iIter, &
-              Coord1In_I = Scale_I, &
-              Coord2In_I = State_VIB(S_,1:iLast,iLine), &
-              NameVarIn  = &
+              NameFile       = NameFile, &
+              StringHeaderIn = StringHeader, &
+              TypeFileIn     = File_I(iFile) % TypeFile, &
+              nDimIn         = 2, &
+              TimeIn         = SPTime, &
+              nStepIn        = iIter, &
+              Coord1In_I     = Scale_I, &
+              Coord2In_I     = State_VIB(S_,1:iLast,iLine), &
+              NameVarIn      = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_II   = File_I(iFile) % Buffer_II(:,1:iLast))
