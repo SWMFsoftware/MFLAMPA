@@ -98,8 +98,8 @@ contains
     use ModUtilities, ONLY: check_allocate
     ! loop variables
     integer:: iLine, iVertex, iP, iError, iMu
-    ! maximal and current momenta
-    real :: MomentumMaxSi, MomentumSi
+    ! maximal momentum
+    real :: MomentumMaxSi
     ! set the initial distribution on all lines
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
