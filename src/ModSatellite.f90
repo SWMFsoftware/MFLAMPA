@@ -3,9 +3,6 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModSatellite
 
-! #ifdef _OPENACC
-!   use ModUtilities, ONLY: norm2
-! #endif
   use ModUtilities, ONLY: open_file, close_file, CON_stop
   use SP_ModProc,       ONLY: iProc, iComm
   use SP_ModTime, ONLY: StartTime
@@ -14,67 +11,58 @@ module SP_ModSatellite
   save
   private ! Except
 
-  public:: read_param  ! read satellite file input parameters
-  public:: set_satellite_file_status  ! open, open to append or close the file
+  public:: read_param                 ! read satellite file input parameters
+  public:: set_satellite_file_status  ! new, open to append, or close the file
   public:: read_satellite_input_files ! read satellite trajectories
-!   public:: get_satellite_ray ! map field line from satellite ^CFG IF RAYTRACE
-!   public:: gm_trace_sat      ! map field line from satellite ^CFG IF RAYTRACE
   public:: set_satellite_positions
 
-!   logical, public :: DoSaveSatelliteData = .false. ! save satellite data?
-  integer, public :: nSatellite = 0                ! number of satellites
+  integer, public :: nSat = 0         ! number of satellites
+  integer, parameter :: MaxSat = 300  ! Max number of satellites
 
-  integer, parameter :: MaxSatellite = 300
-
-  real, public :: TimeSatStart_I(MaxSatellite) = 0.
-  real, public :: TimeSatEnd_I(MaxSatellite) = 0.
+  real, public :: TimeSatStart_I(MaxSat) = 0.
+  real, public :: TimeSatEnd_I(MaxSat) = 0.
 
   ! These variables are public for write_logfile only !!! Should be improved
   ! Names and unit numbers for satellite files
-  character(len=50), public:: NameFileSat_I(MaxSatellite)
-  integer, public:: iUnitSat_I(MaxSatellite) = -1
-!   character(len=10), public:: NameSat_I(MaxSatellite)
-!   logical, public:: IsFirstWriteSat_I(MaxSatellite) = .true.
+  character(len=50), public:: NameFileSat_I(MaxSat)
+  integer, public:: iUnitSat_I(MaxSat) = -1
 
   ! current positions
-  real, public:: XyzSat_DI(3,MaxSatellite)
+  real, public:: XyzSat_DI(3,MaxSat)
 
   ! variables to control time output format
-  character(len=100), public :: TypeTimeSat_I(MaxSatellite)
+  character(len=100), public :: TypeTimeSat_I(MaxSat)
 
   ! variables to write to the satellite files
-  character(len=500), public :: StringSatVar_I(MaxSatellite)
+  character(len=500), public :: StringSatVar_I(MaxSat)
 
-  logical, public:: DoTrackSatellite_I(MaxSatellite) = .false.
-  integer, public:: iPointCurrentSat_I(MaxSatellite) = 1
+  ! variables to record tracked and current satellite position indices
+  logical, public:: DoTrackSatellite_I(MaxSat) = .false.
+  integer, public:: iPointCurrentSat_I(MaxSat) = 1
 
   ! Local variables
-  character(len=100) :: NameFile_I(MaxSatellite)
-  logical:: IsNameFileSet_I(MaxSatellite) = .false.
-  logical:: IsOpen_I(MaxSatellite) = .false.
-  logical:: UseSatFile_I(MaxSatellite) = .true.
-  integer, public :: nPointTraj_I(MaxSatellite)
-!   integer:: iProcSat_I(MaxSatellite)
-!   integer:: iBlockSat_I(MaxSatellite)
+  character(len=100) :: NameFile_I(MaxSat)
+  logical:: IsNameFileSet_I(MaxSat) = .false.
+  logical:: IsOpen_I(MaxSat) = .false.
+  logical:: UseSatFile_I(MaxSat) = .true.
+  integer, public :: nPointTraj_I(MaxSat)
   real, allocatable :: XyzSat_DII(:,:,:)
   real, public, allocatable :: TimeSat_II(:, :)
 
-  character(len=3)  :: TypeSatCoord_I(MaxSatellite)
+  ! Time and coordinate system
+  real, public   :: StartTimeTraj_I(MaxSat), EndTimeTraj_I(MaxSat)
+  real, public   :: DtTraj_I(MaxSat)
+  character(len=3) :: TypeSatCoord_I(MaxSat)
+  character(len=5), public :: TypeTrajTimeRange_I(MaxSat) = 'orig'
 
-  real, public   :: StartTimeTraj_I(MaxSatellite), EndTimeTraj_I(MaxSatellite)
-  real, public   :: DtTraj_I(MaxSatellite)
-  character(len=5), public :: TypeTrajTimeRange_I(MaxSatellite) = 'orig'
-
-  ! Time limits (in seconds) for satellite trajectory cut
-  ! for .not. IsTimeAccurate session.
-  ! If a steady-state simulation is run for a specific moment of time
-  ! (set in  StartTime), the TimeSatStart_I determines the starting point of
-  ! the satellite trajectory, while TimeSatEnd_I determines the trajectory
-  ! ending point.
+  ! Time limits (in the unit of seconds) for satellite trajectory
+  ! cut for .not. IsTimeAccurate session.
+  ! If a steady-state simulation is run for a specific moment of time (set at
+  ! StartTime), TimeSatStart_I determines the starting point of the satellite
+  ! trajectory, while TimeSatEnd_I determines the trajectory ending point.
   ! Both determine the considered trajectory cut.
-  ! Unlike in IsTimeAccurate sessions, after each DnOutput_I simulation
-  ! steps the satellite variables for ALL the trajectory cut are
-  ! saved in file.
+  ! Unlike in IsTimeAccurate sessions, after each DnOutput_I simulation step,
+  ! the satellite variables for ALL the trajectory cut are saved in file.
 
 contains
   !============================================================================
@@ -104,17 +92,16 @@ contains
 
        TypeTrajTimeRange_I = 'orig'
 
-       call read_var('nSatellite', nSatellite)
-       write(*,*) "nSatellite=", nSatellite
-       if(nSatellite <= 0) RETURN
+       call read_var('nSatellite', nSat)
+       if(nSat <= 0) RETURN
       !  if(iProc==0) call check_dir(NamePlotDir)
-       nFile = max(nFile, Satellite_ + nSatellite)
-       if (nFile > MaxFile .or. nSatellite > MaxSatellite)&
+       nFile = max(nFile, Satellite_ + nSat)
+       if (nFile > MaxFile .or. nSat > MaxSat)&
             call CON_stop(&
             'The number of output files is too large in #SATELLITE:'&
-            //' nFile > MaxFile .or. nSatellite > MaxSatellite')
+            //' nFile > MaxFile .or. nSat > MaxSat')
 
-       do iSat = 1, nSatellite
+       do iSat = 1, nSat
           iFile = Satellite_ + iSat
           call read_var('StringSatellite', StringSatellite)
           ! Satellite output frequency
@@ -229,7 +216,7 @@ contains
        end do
 
     case('#STEADYSTATESATELLITE')
-       do iSat = 1, nSatellite
+       do iSat = 1, nSat
           call read_var('SatelliteTimeStart', TimeSatStart_I(iSat))
           call read_var('SatelliteTimeEnd',   TimeSatEnd_I(iSat))
        end do
@@ -238,7 +225,7 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine set_satellite_file_status(iSat,TypeStatus)
+  subroutine set_satellite_file_status(iSat, TypeStatus)
     use ModIoUnit, ONLY: io_unit_new
 
     integer, intent(in) :: iSat
@@ -429,7 +416,7 @@ contains
     ! Count maximum number of points by reading all satellite files
     MaxPoint = 0
     if(iProc == 0)then
-       SATELLITES1: do iSat=1, nSatellite
+       SATELLITES1: do iSat=1, nSat
           if(.not.UseSatFile_I(iSat)) CYCLE SATELLITES1
           NameFile = NameFileSat_I(iSat)
           call open_file(file=NameFile, status="old")
@@ -458,11 +445,11 @@ contains
 
     ! allocate arrays depending on number of points
     allocate(Time_I(MaxPoint), Xyz_DI(MaxDim, MaxPoint))
-    allocate(XyzSat_DII(3, nSatellite, MaxPoint))
-    allocate(TimeSat_II(nSatellite, MaxPoint))
+    allocate(XyzSat_DII(3, nSat, MaxPoint))
+    allocate(TimeSat_II(nSat, MaxPoint))
 
     ! Read the trajectories
-    SATELLITES: do iSat=1, nSatellite
+    SATELLITES: do iSat=1, nSat
 
        if(.not.UseSatFile_I(iSat)) CYCLE SATELLITES
 
@@ -657,287 +644,5 @@ contains
 
   end subroutine satellite_trajectory_formula
   !============================================================================
-!   subroutine get_satellite_ray(iSatIn, SatRayVar_I)
-
-!     use ModFieldTrace, ONLY: Trace_DSNB
-!     use ModUpdateStateFast, ONLY: sync_cpu_gpu
-!     use BATL_size, ONLY:
-!     use BATL_lib, ONLY: iProc, nI, nJ, nK, IsCartesianGrid, &
-!          CellSize_DB, CoordMin_DB, xyz_to_coord
-!     use ModMpi
-
-!     integer, intent(in) :: iSatIn
-!     real,    intent(out):: SatRayVar_I(5)
-
-!     integer  :: iDir, iBlock, iDim
-!     real     :: Coord_D(3), Trace_DSC(3,2,nI,nJ,nK)
-!     real     :: Dx1, Dx2, Dy1, Dy2, Dz1, Dz2
-!     integer  :: i1, i2, j1, j2, k1, k2, iNear, jNear, kNear
-!     integer  :: i, j, k
-
-!     logical:: DoTest
-!     character(len=*), parameter:: NameSub = 'get_satellite_ray'
-!     !--------------------------------------------------------------------------
-!     call test_start(NameSub, DoTest)
-
-!     call sync_cpu_gpu('update on CPU', NameSub, Trace_DICB=Trace_DSNB)
-
-!     ! Initialize to zero
-!     SatRayVar_I = 0.0
-
-!     ! Only use this if we're on the correct node.
-!     if (iProc /= iProcSat_I(iSatIn)) RETURN
-
-!     iBlock = iBlockSat_I(iSatIn)
-!     if (iBlock == 0) RETURN
-
-!     if (IsCartesianGrid) then
-!        Coord_D = XyzSat_DI(:,iSatIn)
-!     else
-!        call xyz_to_coord(XyzSat_DI(:,iSatIn), Coord_D)
-!     end if
-
-!     ! Normalize coordinates to the cell center indexes
-!     Coord_D = (Coord_D - CoordMin_DB(:,iBlock)) / CellSize_DB(:,iBlock) + 0.5
-
-!     ! Set location assuming point is inside block.
-!     i1 = floor(Coord_D(1))
-!     j1 = floor(Coord_D(2))
-!     k1 = floor(Coord_D(3))
-!     i2 = ceiling(Coord_D(1))
-!     j2 = ceiling(Coord_D(2))
-!     k2 = ceiling(Coord_D(3))
-
-!     ! If Coord_D is outside of block, change i,j,k in order to extrapolate.
-!     if(any( Coord_D < 1) .or. any(Coord_D > [nI, nJ, nK])) then
-!        i1 = min(nI-1, max(1, i1));   i2 = i1 + 1
-!        j1 = min(nJ-1, max(1, j1));   j2 = j1 + 1
-!        k1 = min(nK-1, max(1, k1));   k2 = k1 + 1
-!     endif
-
-!     ! Set interpolation weights
-!     Dx1 = Coord_D(1) - i1; Dx2 = 1.0 - Dx1
-!     Dy1 = Coord_D(2) - j1; Dy2 = 1.0 - Dy1
-!     Dz1 = Coord_D(3) - k1; Dz2 = 1.0 - Dz1
-
-!     ! Calculate the nearest point.
-!     iNear = min( nI, max(nint(Coord_D(1)),1) )
-!     jNear = min( nJ, max(nint(Coord_D(2)),1) )
-!     kNear = min( nK, max(nint(Coord_D(3)),1) )
-
-!     ! Copy Trace_DSNB tracing values to new array so allow changing of values.
-!     Trace_DSC = Trace_DSNB(1:3,1:2,1:nI,1:nJ,1:nK,iBlock)
-
-!     ! Use the Trace_DSNB status of the nearest point to the satellite.
-!     SatRayVar_I(3) = Trace_DSC(3, 1, iNear,jNear,kNear)
-
-!     ! For each direction along the Trace_DSNB, determine if all lines
-!     ! surrounding point are open or closed, then set SatRayVar_I accordingly.
-!     do iDir = 1, 2
-
-!        if ( any(Trace_DSC(3,1,i1:i2,j1:j2,k1:k2) < 1) .or. &
-!             any(Trace_DSC(3,1,i1:i2,j1:j2,k1:k2) == iDir) ) then
-!           ! One or more lines is open in direction iDir, must use nearest point
-!           do iDim=1,2
-!              SatRayVar_I(iDim + 3*(iDir-1)) = &
-!                   Trace_DSC(iDim,iDir,iNear,jNear,kNear)
-!           end do
-
-!        else   ! All lines closed in direction iDir, interpolate.
-
-!           ! If the satellite is near the 0/360 degree boundary in longitude,
-!           ! the result of the interpolation will be incorrect.  Adjust
-!           ! longitudes accordingly.
-!           if (any(Trace_DSC(2,iDir,i1:i2,j1:j2,k1:k2)>330.0) .AND. &
-!                any(Trace_DSC(2,iDir,i1:i2,j1:j2,k1:k2)<30.0)) then
-
-!              do i=i1,i2
-!                 do j=j1,j2
-!                    do k=k1,k2
-!                       if (Trace_DSC(2,iDir,i,j,k) < 30.0) &
-!                            Trace_DSC(2,iDir,i,j,k) &
-!                            = Trace_DSC(2,iDir,i,j,k) + 360
-!                    enddo
-!                 enddo
-!              enddo
-!              ! forall(i=i1:i2,j=j1:j2,k=k1:k2,Trace_DSC(2,iDir,i,j,k)<30.0)
-!              !   Trace_DSC(2,iDir,i,j,k) = Trace_DSC(2,iDir,i,j,k) + 360.0
-!              ! end forall
-!           endif
-
-!           do iDim=1,2
-!              SatRayVar_I(iDim + 3*(iDir-1)) =                         &
-!                   Dz2*(   Dy2*(   Dx2*Trace_DSC(iDim,iDir,i1,j1,k1)   &
-!                   +                Dx1*Trace_DSC(iDim,iDir,i2,j1,k1))  &
-!                   +        Dy1*(   Dx2*Trace_DSC(iDim,iDir,i1,j2,k1)   &
-!                   +                Dx1*Trace_DSC(iDim,iDir,i2,j2,k1))) &
-!                   +Dz1*(   Dy2*(   Dx2*Trace_DSC(iDim,iDir,i1,j1,k2)   &
-!                   +                Dx1*Trace_DSC(iDim,iDir,i2,j1,k2))  &
-!                   +        Dy1*(   Dx2*Trace_DSC(iDim,iDir,i1,j2,k2)   &
-!                   +                Dx1*Trace_DSC(iDim,iDir,i2,j2,k2)))
-!           end do
-!        endif
-
-!     end do
-
-!     ! Ensure that longitude wraps around 0/360 degree boundary correctly.
-!     if(SatRayVar_I(2) <   0.0) SatRayVar_I(2) = SatRayVar_I(2) + 360.0
-!     if(SatRayVar_I(5) <   0.0) SatRayVar_I(5) = SatRayVar_I(5) + 360.0
-!     if(SatRayVar_I(2) > 360.0) SatRayVar_I(2) = SatRayVar_I(2) - 360.0
-!     if(SatRayVar_I(5) > 360.0) SatRayVar_I(5) = SatRayVar_I(5) - 360.0
-
-!     call test_stop(NameSub, DoTest)
-!   end subroutine get_satellite_ray
-!   !============================================================================
-!   subroutine GM_trace_sat(SatXyz_D, SatRay_D)
-
-!     use ModFieldTrace, ONLY: DoExtractState, DoExtractUnitSi, &
-!          extract_field_lines, rIonosphere
-!     use ModVarIndexes, ONLY: nVar
-!     use ModMain, ONLY: tSimulation, TypeCoordSystem
-!     use CON_line_extract, ONLY: line_init, line_collect, line_get, line_clean
-!     use ModNumConst,  ONLY: cRadToDeg
-!     use CON_axes,     ONLY: transform_matrix
-!     use CON_planet_field, ONLY: map_planet_field
-!     use ModPhysics,   ONLY: rBody
-
-!     ! Trace position SatXyz_D and return result in SatRay_D on Proc 0
-!     ! All other processors return 0-s
-
-!     real, intent(in) :: SatXyz_D(3) ! Satellite Position
-!     real, intent(out):: SatRay_D(3)
-!     real :: SatXyzIono_D(3), SatXyzEnd_D(3), SatXyzEnd2_D(3),B2
-
-!     integer            :: nStateVar
-!     integer            :: nPoint
-
-!     real, pointer :: PlotVar_VI(:,:)
-
-!     integer :: nLine, nVarOut, iHemisphere
-
-!     logical :: IsParallel = .true., IsOpen=.true.
-
-!     real    :: Rsat, Rxy2
-!     ! Conversion matrix between SM and GM coordinates
-!     ! (to be safe initialized to unit matrix)
-!     real :: GmSm_DD(3,3)
-!     logical:: DoTest
-!     character(len=*), parameter:: NameSub = 'GM_trace_sat'
-!     !--------------------------------------------------------------------------
-!     call test_start(NameSub, DoTest)
-
-!     DoExtractState  = .true.
-!     DoExtractUnitSi = .false.
-
-!     ! Set the number lines and variables to be extracted
-!     nLine     = 1
-!     nStateVar = 4
-!     if(DoExtractState) nStateVar = nStateVar + nVar
-
-!     if (sum(SatXyz_D(1:3)**2) > rBody**2) then
-!        ! Initialize CON_line_extract
-!        call line_init(nStateVar)
-
-!        ! Obtain the line data
-!        call extract_field_lines(nLine, [IsParallel], SatXyz_D)
-
-!        ! Collect lines from all PE-s to Proc 0
-!        call line_collect(iComm,0)
-
-!        if(iProc==0)then
-!           call line_get(nVarOut, nPoint)
-!           if(nVarOut /= nStateVar)call stop_mpi(NameSub//': nVarOut error')
-!           allocate(PlotVar_VI(0:nVarOut, nPoint))
-!           call line_get(nVarOut, nPoint, PlotVar_VI, DoSort=.true.)
-!        end if
-
-!        call line_clean
-
-!        ! Only iProc 0 stores result
-!        if(iProc == 0) then
-!           SatXyzEnd_D = PlotVar_VI(2:4,nPoint)
-!           deallocate(PlotVar_VI)
-!        endif
-
-!        ! Now Trace in opposite direction to make sure line is closed
-!        ! Initialize CON_line_extract
-!        call line_init(nStateVar)
-
-!        ! Obtain the line data
-!        call extract_field_lines(nLine, [.not.IsParallel], SatXyz_D)
-
-!        ! Collect lines from all PE-s to Proc 0
-!        call line_collect(iComm,0)
-
-!        if(iProc==0)then
-!           call line_get(nVarOut, nPoint)
-!           if(nVarOut /= nStateVar)call stop_mpi(NameSub//': nVarOut error')
-!           allocate(PlotVar_VI(0:nVarOut, nPoint))
-!           call line_get(nVarOut, nPoint, PlotVar_VI, DoSort=.true.)
-!        end if
-
-!        call line_clean
-!        DoExtractState  = .false.
-
-!        ! Only iProc 0 returns actual result. The rest sends back 0.
-!        SatRay_D = 0.0
-!        if(iProc /= 0) RETURN
-
-!        SatXyzEnd2_D = PlotVar_VI(2:4,nPoint)
-
-!        B2 = sum(PlotVar_VI(5:7,1)**2)
-
-!        deallocate(PlotVar_VI)
-
-!        ! Only iProc 0 works for returning line info
-!        !  if(iProc /= 0) RETURN
-
-!        ! Check that line is closed
-!        IsOpen =  sum(SatXyzEnd_D**2)  > 8*rIonosphere**2 &
-!             .or. sum(SatXyzEnd2_D**2) > 8*rIonosphere**2
-
-!        if (.not. IsOpen) then
-!           call map_planet_field(tSimulation, SatXyzEnd_D, &
-!                TypeCoordSystem//' NORM', rIonosphere, SatXyzIono_D, &
-!                iHemisphere)
-
-!           ! Transformation matrix between the SM(G) and GM coordinates
-!           GmSm_DD = transform_matrix(tSimulation, 'SMG', TypeCoordSystem)
-!           ! Convert GM position into RB position
-!           SatXyzIono_D = matmul(SatXyzIono_D, GmSm_DD)
-
-!           ! Convert XYZ to Lat-Lon-IsOpen
-!           ! Calculate  -90 < latitude = asin(z)  <  90
-!           SatRay_D(1) = cRadToDeg * asin(SatXyzIono_D(3)/rIonosphere)
-!           ! Calculate 0 < longitude = atan2(y,x) < 360
-!           SatRay_D(2) =  &
-!                modulo(cRadToDeg*atan2(SatXyzIono_D(2), SatXyzIono_D(1)), 360.0)
-
-!           ! set closed flag
-!           SatRay_D(3) = 3.0
-!        else
-!           SatRay_D(1) = -100.0
-!           SatRay_D(2) = -200.0
-!           SatRay_D(3) = 0.0
-!        endif
-!     else
-!        ! When planet is inside rBody use dipole assumption
-!        Rsat = norm2(SatXyz_D)
-!        Rxy2 = sum(SatXyz_D(1:2)**2)
-!        if(Rxy2 > 0.0)then
-!           SatRay_D(1) = acos(1/sqrt(Rsat**3/Rxy2))*cRadToDeg
-!        else
-!           SatRay_D(1) = 90.0
-!        endif
-
-!        SatRay_D(2) =  &
-!             modulo(cRadToDeg*atan2(SatXyz_D(2), SatXyz_D(1)), 360.0)
-!        ! set closed flag
-!        SatRay_D(3) = 3.0
-!     endif
-!     call test_stop(NameSub, DoTest)
-
-!   end subroutine GM_trace_sat
-!   !============================================================================
 end module SP_ModSatellite
 !==============================================================================
