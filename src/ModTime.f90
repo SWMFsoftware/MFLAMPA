@@ -9,12 +9,18 @@ module SP_ModTime
   implicit none
 
   SAVE
+
+  ! Indicator of stand alone mode
+  logical      :: IsStandAlone = .false.
+
   ! Iteration and time in SP
   integer      :: iIter   = 0
   real         :: SPTime  = 0.0
+
   ! Time of the last data output
   real         :: DataInputTime = 0.0
   logical      :: IsSteadyState = .false.
+
   ! SPTime is the time in the SP model, DataInputTime is the time
   ! of last data input. These two varables are set/modified in the
   ! following ways

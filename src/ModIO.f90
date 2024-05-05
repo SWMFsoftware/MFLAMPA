@@ -15,14 +15,14 @@ module SP_ModIO
   ! note that:
   !     MaxFile > MaxPlotFile + MaxSatelliteFile + extras
   ! is required. MaxSatelliteFile is defined in ModSatelliteFile.f90
-  integer, parameter :: MaxMagGridFile=5
-  integer, parameter :: MaxPlotFile=25
-  integer, parameter :: MaxParcel=100
-  integer, parameter :: MaxFile = 450
-  integer, parameter :: MaxPlotvarLos=20
-  integer, parameter :: MaxPlotRadioFreq=20
-  integer, parameter :: MaxPlotvar = max(30,nVar+10) ! Max number of plot vars
-  integer, parameter :: MaxLine=20          ! Max number of lines/plot file
+  integer, parameter :: MaxMagGridFile   = 5
+  integer, parameter :: MaxPlotFile      = 25
+  integer, parameter :: MaxParcel        = 100
+  integer, parameter :: MaxFile          = 450
+  integer, parameter :: MaxPlotvarLos    = 20
+  integer, parameter :: MaxPlotRadioFreq = 20
+  integer, parameter :: MaxPlotvar  = max(30,nVar+10) ! Max number of plot VARs
+  integer, parameter :: MaxLine     = 20    ! Max number of lines/plot file
   integer, parameter :: lNameLogVar = 20    ! Max length of NameLogVar
 
   ! Named indexes for output files
@@ -32,9 +32,9 @@ module SP_ModIO
        satellite_ = parcel_+MaxParcel
 
   ! I/O
-  integer             :: iUnitOut = STDOUT_
-  character (len=7)   :: StringPrefix=''
-  character (len=100) :: NamePlotDir="GM/IO2/"
+  integer            :: iUnitOut = STDOUT_
+  character (len=7)  :: StringPrefix=''
+  character (len=100):: NamePlotDir="GM/IO2/"
 
   ! Generic file name variable
   character (len=80) :: NameFile
@@ -88,12 +88,12 @@ module SP_ModIO
        LogTeMinDEM_I = 4.0, LogTeMaxDEM_I = 7.0, DLogTeDEM_I = 0.1
 
   ! Variables for SPECTRUM-FUX/PHX/NBI calculation
-  character (len=200)        :: NameSpmTable_I(MaxFile), &
+  character (len=200)       :: NameSpmTable_I(MaxFile), &
        NameNbiTable_I(MaxFile), NamePhxTable_I(MaxFile)
-  logical                   :: UseUnobserved_I(MaxFile) = .false.,&
-       UseAlfven_I(MaxFile) = .false., UseDoppler_I(MaxFile) = .false.,&
+  logical                   :: UseUnobserved_I(MaxFile) = .false., &
+       UseAlfven_I(MaxFile) = .false., UseDoppler_I(MaxFile) = .false., &
        UseIonFrac_I(MaxFile) = .false., UseIonTemp_I(MaxFile) = .false.
-  real, dimension(MaxFile)  :: LambdaMin_I = 10.0, LambdaMax_I=1700.0,&
+  real, dimension(MaxFile)  :: LambdaMin_I = 10.0, LambdaMax_I = 1700.0,&
        DLambda_I = 0.001, DLambdaIns_I = 0.0, TempMin_I = 1e5
 
   ! Variables for field/stream/current line files
@@ -187,5 +187,17 @@ module SP_ModIO
   ! The space separated list of primitive/conservative variables for plotting
   character(len=:), allocatable:: NamePrimitiveVarPlot, NameConservativeVarPlot
 
+contains
+  !============================================================================
+  subroutine write_prefix
+
+    use SP_ModTime, ONLY: IsStandAlone
+
+    !--------------------------------------------------------------------------
+    if(IsStandAlone) RETURN
+    if(iUnitOut==STDOUT_)write(*,'(a)',ADVANCE='NO')trim(StringPrefix)
+
+  end subroutine write_prefix
+  !============================================================================
 end module SP_ModIO
 !==============================================================================

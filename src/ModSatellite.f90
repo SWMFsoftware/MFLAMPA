@@ -3,9 +3,10 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModSatellite
 
-  use ModUtilities, ONLY: open_file, close_file, CON_stop
-  use SP_ModProc,       ONLY: iProc, iComm
-  use SP_ModTime, ONLY: StartTime
+  use ModUtilities,   ONLY: open_file, close_file, CON_stop
+  use SP_ModProc,     ONLY: iProc, iComm
+  use SP_ModTime,     ONLY: StartTime
+  use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
 
   implicit none
   save
@@ -16,11 +17,11 @@ module SP_ModSatellite
   public:: read_satellite_input_files ! read satellite trajectories
   public:: set_satellite_positions
 
-  integer, public :: nSat = 0         ! number of satellites
+  integer, public    :: nSat = 0      ! number of satellites
   integer, parameter :: MaxSat = 300  ! Max number of satellites
 
-  real, public :: TimeSatStart_I(MaxSat) = 0.
-  real, public :: TimeSatEnd_I(MaxSat) = 0.
+  real, public :: TimeSatStart_I(MaxSat) = 0.0
+  real, public :: TimeSatEnd_I(MaxSat)   = 0.0
 
   ! These variables are public for write_logfile only !!! Should be improved
   ! Names and unit numbers for satellite files
@@ -43,15 +44,15 @@ module SP_ModSatellite
   ! Local variables
   character(len=100) :: NameFile_I(MaxSat)
   logical:: IsNameFileSet_I(MaxSat) = .false.
-  logical:: IsOpen_I(MaxSat) = .false.
-  logical:: UseSatFile_I(MaxSat) = .true.
-  integer, public :: nPointTraj_I(MaxSat)
-  real, allocatable :: XyzSat_DII(:,:,:)
+  logical:: IsOpen_I(MaxSat)        = .false.
+  logical:: UseSatFile_I(MaxSat)    = .true.
+  integer, public           :: nPointTraj_I(MaxSat)
+  real, allocatable         :: XyzSat_DII(:,:,:)
   real, public, allocatable :: TimeSat_II(:, :)
 
   ! Time and coordinate system
-  real, public   :: StartTimeTraj_I(MaxSat), EndTimeTraj_I(MaxSat)
-  real, public   :: DtTraj_I(MaxSat)
+  real, public     :: StartTimeTraj_I(MaxSat), EndTimeTraj_I(MaxSat)
+  real, public     :: DtTraj_I(MaxSat)
   character(len=3) :: TypeSatCoord_I(MaxSat)
   character(len=5), public :: TypeTrajTimeRange_I(MaxSat) = 'orig'
 
@@ -75,14 +76,15 @@ contains
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in) :: NameCommand
-
-    integer :: iSat, iFile
+    integer           :: iSat, iFile
     character(len=100):: StringSatellite
     character(len=3)  :: NameSatVar
 
     logical:: DoTest
     character(len=*), parameter:: NameSub = 'read_satellite_parameters'
     !--------------------------------------------------------------------------
+    call test_start(NameSub, DoTest)
+
     select case(NameCommand)
     case("#SATELLITE")
        ! reset values
@@ -106,7 +108,7 @@ contains
           call read_var('StringSatellite', StringSatellite)
           ! Satellite output frequency
           ! Note that we broke with tradition here so that the
-          ! DtOutput_I will always we read!  This may be changed
+          ! DtOutput_I will always we read! This may be changed
           ! in later distributions
           call read_var('DnOutput', DnOutput_I(iFile))
           call read_var('DtOutput', DtOutput_I(iFile))
@@ -223,15 +225,18 @@ contains
     case default
        call CON_stop(NameSub//' unknown command='//NameCommand)
     end select
+
+    call test_stop(NameSub, DoTest)
+
   end subroutine read_param
   !============================================================================
   subroutine set_satellite_file_status(iSat, TypeStatus)
+
     use ModIoUnit, ONLY: io_unit_new
 
     integer, intent(in) :: iSat
-    character(LEN=*),intent(in) :: TypeStatus
-
-    character(len=*), parameter:: NameSub = 'set_satellite_file_status'
+    character(LEN=*), intent(in):: TypeStatus
+    character(len=*), parameter :: NameSub = 'set_satellite_file_status'
     !--------------------------------------------------------------------------
     select case(TypeStatus)
     case('open')
@@ -262,19 +267,21 @@ contains
     case default
        call CON_stop(NameSub//': unknown TypeStatus='//TypeStatus)
     end select
+
   end subroutine set_satellite_file_status
   !============================================================================
   subroutine set_name_file(iSat)
+    
     use SP_ModIO,     ONLY: NamePlotDir, StringDateOrTime
     use SP_ModTime,   ONLY: nStep => iIter, IsSteadyState
 
     integer, intent(in) :: iSat
-
-    character(LEN=50) :: NameFileOutSat
-    integer :: l1, l2
-
-    character(len=*), parameter:: NameSub = 'set_name_file'
+    character(LEN=50)   :: NameFileOutSat
+    integer             :: l1, l2
+    logical             :: DoTest
+    character(len=*), parameter :: NameSub = 'set_name_file'
     !--------------------------------------------------------------------------
+    call test_start(NameSub, DoTest)
 
     l1 = index(NameFileSat_I(iSat), '/', back=.true.) + 1
     l2 = index(NameFileSat_I(iSat), '.') - 1
@@ -306,6 +313,15 @@ contains
 
     IsNameFileSet_I(iSat) = .true.
 
+    if(DoTest) then
+       write(*,*) NameSub,': satellitename:', &
+            NameFileSat_I(iSat)
+       write(*,*) 'iSat,l1,l2: ', iSat, l1, l2
+       write(*,*) NameSub,': NameFile_I(iSat):', trim(NameFile_I(iSat))
+    end if
+
+    call test_stop(NameSub, DoTest)
+
   end subroutine set_name_file
   !============================================================================
   subroutine get_time_string
@@ -314,8 +330,8 @@ contains
     use SP_ModTime, ONLY: StartTime, tSimulation => SPTime
     use ModTimeConvert, ONLY: TimeType, time_real_to_int
 
-    integer:: i
-    type(TimeType):: Time
+    integer        :: i
+    type(TimeType) :: Time
     !--------------------------------------------------------------------------
     StringDateOrTime = '99999999'  ! This is the value if the time is too large
 
@@ -393,29 +409,32 @@ contains
     use ModIoUnit,      ONLY: UnitTmp_
     use ModKind,        ONLY: Real8_
     use ModMpi
+    use SP_ModIO,       ONLY: iUnitOut, write_prefix
     use SP_ModTime,     ONLY: StartTime
     
-    integer, parameter :: MaxDim=3
-    integer :: iError, i, iSat , nPoint
+    integer, parameter :: MaxDim = 3
+    integer            :: iError, i, iSat, nPoint
 
     ! One line of input
     character(len=100) :: StringLine
 
-    integer      :: iTime_I(7)
-    real         :: Xyz_D(MaxDim)
-    real(Real8_) :: DateTime
-    integer      :: MaxPoint
-    real, allocatable:: Time_I(:), Xyz_DI(:,:)
-    character(len=100):: NameFile
-    character(len=3) :: TypeCoordSystem = 'GSM'
+    ! Local VARs
+    integer            :: iTime_I(7)
+    real               :: Xyz_D(MaxDim)
+    real(Real8_)       :: DateTime
+    integer            :: MaxPoint
+    real, allocatable  :: Time_I(:), Xyz_DI(:,:)
+    character(len=100) :: NameFile
+    character(len=3)   :: TypeCoordSystem = 'GSM'
 
     logical:: DoTest
     character(len=*), parameter:: NameSub = 'read_satellite_input_files'
     !--------------------------------------------------------------------------
+    call test_start(NameSub, DoTest)
 
     ! Count maximum number of points by reading all satellite files
     MaxPoint = 0
-    if(iProc == 0)then
+    if(iProc == 0) then
        SATELLITES1: do iSat=1, nSat
           if(.not.UseSatFile_I(iSat)) CYCLE SATELLITES1
           NameFile = NameFileSat_I(iSat)
@@ -426,7 +445,7 @@ contains
           READFILE1: do
              read(UnitTmp_, '(a)', iostat=iError) StringLine
              if (iError /= 0) EXIT READFILE1
-             if(index(StringLine,'#START')>0)then
+             if(index(StringLine,'#START')>0) then
                 READPOINTS1: do
                    read(UnitTmp_, *, iostat=iError) iTime_I, Xyz_D
                    if (iError /= 0) EXIT READFILE1
@@ -458,9 +477,10 @@ contains
 
           NameFile = NameFileSat_I(iSat)
 
-          ! if(lVerbose>0)then
-          !    write(iUnitOut,*) NameSub, " reading: ", trim(NameFile)
-          ! end if
+          if(lVerbose>0)then
+             call write_prefix
+             write(iUnitOut,*) NameSub, " reading: ", trim(NameFile)
+          end if
 
           call open_file(file=NameFile, status="old")
           nPoint = 0
@@ -480,9 +500,7 @@ contains
              if(index(StringLine,'#START')>0) then
 
                 READPOINTS: do
-
                    read(UnitTmp_,*, iostat=iError) iTime_I, Xyz_D
-
                    if (iError /= 0) EXIT READFILE
 
                    ! Add new point
@@ -494,7 +512,6 @@ contains
                    ! Convert integer date/time to simulation time
                    call time_int_to_real(iTime_I, DateTime)
                    Time_I(nPoint) = DateTime - StartTime
-
                 enddo READPOINTS
 
              endif
@@ -503,14 +520,13 @@ contains
 
           call close_file
 
-          if(DoTest)write(*,*) NameSub,': nPoint=',nPoint
+          if(DoTest) write(*,*) NameSub, ': nPoint=', nPoint
 
           ! Convert the coordinates if necessary
           if(TypeSatCoord_I(iSat) /= TypeCoordSystem)then
              do i = 1, nPoint
-                Xyz_DI(:,i) = matmul( &
-                     transform_matrix( Time_I(i), &
-                     TypeSatCoord_I(iSat), TypeCoordSystem), Xyz_DI(:,i) )
+                Xyz_DI(:,i) = matmul(transform_matrix(Time_I(i), &
+                     TypeSatCoord_I(iSat), TypeCoordSystem), Xyz_DI(:,i))
              end do
           end if
 
@@ -527,14 +543,13 @@ contains
        call MPI_Bcast(Xyz_DI, MaxDim*nPoint, MPI_REAL, 0, iComm, iError)
 
        ! Store time and positions for satellite iSat on all PE-s
-
        TimeSat_II(iSat, 1:nPoint) = Time_I(1:nPoint)
        do i = 1, nPoint
           XyzSat_DII(:, iSat, i) = Xyz_DI(:, i)
        end do
 
        if(DoTest)then
-          nPoint = min(10,nPoint)
+          nPoint = min(10, nPoint)
           write(*,*) NameSub,': tSat=', TimeSat_II(iSat,1:nPoint)
           write(*,*) NameSub,': xSat=', XyzSat_DII(1,iSat,1:nPoint)
           write(*,*) NameSub,': ySat=', XyzSat_DII(2,iSat,1:nPoint)
@@ -545,9 +560,12 @@ contains
 
     deallocate(Time_I, Xyz_DI)
 
+    call test_stop(NameSub, DoTest)
+
   end subroutine read_satellite_input_files
   !============================================================================
   subroutine set_satellite_positions(iSat)
+
     use ModNumConst
     use SP_ModTime, ONLY: tSimulation => SPTime
 
@@ -555,9 +573,10 @@ contains
     integer :: i, nPoint
     real    :: dTime
 
-    logical:: DoTest
-    character(len=*), parameter:: NameSub = 'set_satellite_positions'
+    logical :: DoTest
+    character(len=*), parameter :: NameSub = 'set_satellite_positions'
     !--------------------------------------------------------------------------
+    call test_start(NameSub, DoTest)
 
     if (UseSatFile_I(iSat)) then
 
@@ -566,7 +585,7 @@ contains
 
           i = iPointCurrentSat_I(iSat)
 
-          if(DoTest)write(*,*) NameSub,' nPoint, iPoint, TimeSim, TimeSat=',&
+          if(DoTest) write(*,*) NameSub,' nPoint, iPoint, TimeSim, TimeSat=',&
                nPoint, i, tSimulation, TimeSat_II(iSat,i)
 
           do while (i < nPoint .and. TimeSat_II(iSat,i) <= tSimulation)
@@ -575,7 +594,7 @@ contains
 
           iPointCurrentSat_I(iSat) = i
 
-          if(DoTest)write(*,*) NameSub,' final iPoint=', i
+          if(DoTest) write(*,*) NameSub,' final iPoint=', i
 
           if ( (i == nPoint .and. tSimulation > TimeSat_II(iSat,i)) .or. &
                i == 1 ) then
@@ -595,25 +614,29 @@ contains
           end if
 
           if(DoTest) then
-             write(*,*) NameSub,' DoTrackSat =', DoTrackSatellite_I(iSat)
-             write(*,*) NameSub,' XyzSat     =', XyzSat_DI(:,iSat)
+             write(*,*) NameSub, ' DoTrackSat =', DoTrackSatellite_I(iSat)
+             write(*,*) NameSub, ' XyzSat     =', XyzSat_DI(:,iSat)
           end if
        end if
     else
        call satellite_trajectory_formula(iSat)
     end if
 
+    call test_stop(NameSub, DoTest)
+
   end subroutine set_satellite_positions
   !============================================================================
   subroutine satellite_trajectory_formula(iSat)
 
     integer, intent(in) :: iSat
-    real :: XyzSat_D(3)
+    real    :: XyzSat_D(3)
 
-    logical:: DoTest
+    logical :: DoTest
     character(len=*), parameter:: NameSub = 'satellite_trajectory_formula'
     !--------------------------------------------------------------------------
-    XyzSat_D(:) = XyzSat_DI(:,iSat)
+    call test_start(NameSub, DoTest)
+
+    XyzSat_D = XyzSat_DI(:,iSat)
 
     ! Case should be for a specific satellite.  The trajectories can depend
     ! on the 'real' time so that the satellite knows where it is at.  For
@@ -625,22 +648,15 @@ contains
     ! do not track flag (DoTrackSatellite_I(iSat) = .false.).
 
     select case(NameFileSat_I(iSat))
-    case ('earth')
-       XyzSat_D(1) = 5.0
-       XyzSat_D(2) = 5.0
-       XyzSat_D(3) = 5.0
-       DoTrackSatellite_I(iSat) = .true.
-    case ('cassini')
-       XyzSat_D(1) = 5.0
-       XyzSat_D(2) = 5.0
-       XyzSat_D(3) = 5.0
+    case ('earth', 'cassini')
+       XyzSat_D = 5.0
        DoTrackSatellite_I(iSat) = .true.
     case default
-       XyzSat_D(1) = 1.0
-       XyzSat_D(2) = 1.0
-       XyzSat_D(3) = 1.0
+       XyzSat_D = 1.0
        DoTrackSatellite_I(iSat) = .false.
     end select
+
+    call test_stop(NameSub, DoTest)
 
   end subroutine satellite_trajectory_formula
   !============================================================================

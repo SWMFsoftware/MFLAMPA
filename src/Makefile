@@ -27,6 +27,7 @@ OBJECTS = \
 	ModSatellite.o \
 	ModSize.o \
 	ModTime.o \
+	ModTestFunc.o \
 	SP_ModTiming.o \
 	ModUnit.o \
 	ModTurbulence.o
