@@ -3,17 +3,14 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModMain
 
+  use ModUtilities,     ONLY: CON_stop
   use SP_ModProc,       ONLY: iProc
   use SP_ModReadMhData, ONLY: DoReadMhData
-  use ModUtilities,     ONLY: CON_stop
+  use SP_ModTime,       ONLY: IsStandAlone
 
   implicit none
-
   SAVE
   private ! except
-
-  ! Indicator of stand alone mode
-  logical:: IsStandAlone = .false.
 
   ! Stopping conditions. These variables are only used in stand alone mode.
   real    :: TimeMax     = -1.0, CpuTimeMax = -1.0
@@ -31,7 +28,7 @@ module SP_ModMain
   public  :: DoReadMhData
   logical :: IsFirstSession = .true.
   ! Methods and variables from this module
-  public:: read_param, initialize, finalize, run, check, DoRestart,     &
+  public  :: read_param, initialize, finalize, run, check, DoRestart,   &
        IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax, IsStandAlone
 contains
   !============================================================================
@@ -48,6 +45,7 @@ contains
     use SP_ModReadMHData,    ONLY: read_param_mhdata     => read_param
     use SP_ModRestart,       ONLY: read_param_restart    => read_param
     use SP_ModSatellite,     ONLY: read_param_satellite  => read_param
+    use SP_ModTestFunc,      ONLY: read_param_testfunc   => read_param
     use SP_ModTime,          ONLY: read_param_time       => read_param
     use SP_ModTiming,        ONLY: read_param_timing     => read_param
     use SP_ModTurbulence,    ONLY: read_param_turbulence => read_param
@@ -98,6 +96,8 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
+       case('#VERBOSE')
+          call read_param_testfunc(NameCommand)
        case('#SATELLITE')
           call read_param_satellite(NameCommand)
        case('#TURBULENTSPECTRUM')

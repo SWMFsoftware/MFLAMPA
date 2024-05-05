@@ -3,23 +3,23 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTime
   use ModTimeConvert, ONLY: time_int_to_julian, time_real_to_julian
-  use ModKind,    ONLY: Real8_
-  use ModUtilities, ONLY: CON_stop
+  use ModKind,        ONLY: Real8_
+  use ModUtilities,   ONLY: CON_stop
 
   implicit none
 
   SAVE
 
   ! Indicator of stand alone mode
-  logical      :: IsStandAlone = .false.
+  logical :: IsStandAlone = .false.
 
   ! Iteration and time in SP
-  integer      :: iIter   = 0
-  real         :: SPTime  = 0.0
+  integer :: iIter   = 0
+  real    :: SPTime  = 0.0
 
   ! Time of the last data output
-  real         :: DataInputTime = 0.0
-  logical      :: IsSteadyState = .false.
+  real    :: DataInputTime = 0.0
+  logical :: IsSteadyState = .false.
 
   ! SPTime is the time in the SP model, DataInputTime is the time
   ! of last data input. These two varables are set/modified in the

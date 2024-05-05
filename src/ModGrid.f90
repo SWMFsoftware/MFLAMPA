@@ -31,81 +31,65 @@ module SP_ModGrid
 
   ! Coordinate system and geometry
   character(len=3), public :: TypeCoordSystem = 'HGR'
-  !
+
   ! Grid info
-  !
   ! Angular grid at origin surface
-  !
-  integer, public :: nLon  = 4
-  integer, public :: nLat  = 4
-  !
-  ! Total number of magnetic field lines on all PEs
-  ! (just a product of nLat * nLon)
+  integer, public :: nLon = 4
+  integer, public :: nLat = 4
+
+  ! Total number of magnetic field lines on all PEs (a product of nLat * nLon)
   integer, public :: nLineAll = 16
-  !
-  ! All nodes are enumerated. The last node number on the previous proc
-  ! (iProc-1)
+
+  ! All nodes are enumerated. Last node number on the previous proc = iProc-1,
   ! equals (iProc*nLineAll)/nProc. Store this:
-  !
   integer, public :: iLineAll0
-  !
+
   ! The nodes on a given PE have node numbers ranging from iLineAll0 +1 to
-  ! iNodeLast =((iProc + 1)*nLineAll)/nProc. The iLine index to enumerate
+  ! iNodeLast = ((iProc + 1)*nLineAll)/nProc. The iLine index to enumerate
   ! lines on a given proc ranges from 1 to iNodeLast.
-  ! nLine = nNodeLast - iLineAll0 is the number of
-  ! lines (blocks) on this processor. For iLine=1:nLine
-  ! iLineAll = iLineAll0+1:iNodeLast
-  !
+  ! nLine = nNodeLast - iLineAll0 is the number of lines (blocks) on this
+  ! processor. For iLine = 1:nLine, iLineAll = iLineAll0+1:iNodeLast.
   integer, public :: nLine
-  !
+
   ! Number of particles (vertexes, Lagrangian meshes) per line (line):
-  integer, public,     pointer :: nVertex_B(:)
-  !
+  integer, public, pointer :: nVertex_B(:)
+
   ! Function converting line number to lon-lat location of the line
-  !
   public :: iBlock_to_lon_lat
 
-  !
   ! Array for current and present location of shock wave
-  !
   integer, public, parameter:: nShockParam = 2,  &
        Shock_   = 1, & ! Current location of a shock wave
        ShockOld_= 2    ! Old location of a shock wave
   integer, public, allocatable:: iShock_IB(:,:)
   integer, public, parameter:: NoShock_ = 1
-  !
+
   ! Information about the magnetic field line foot point:
   ! the Lagrangian (0) and Cartesian (1:3) coordinates, and
   integer, public, parameter :: &! init length of segment 1-2:
-       Length_ = 4               ! control appending  new particles
+       Length_ = 4               ! control appending new particles
   real, public, pointer :: FootPoint_VB(:,:)
-  !
+
   ! Magnetic flux (absolute value) associated with lines
-  !
   real, public, allocatable:: MagneticFluxAbs_B(:)
-  !
+
   ! Logical to mark unusable lines
-  !
   logical, public, pointer :: Used_B(:)
-  !
+
   ! MHD state vector;
   ! 1st index - identification of variable (LagrID_:Wave2_)
   ! 2nd index - particle index along the field line
   ! 3rd index - local line number
-  !
-  real, public, pointer     :: MhData_VIB(:,:,:)
-  !
+  real, public, pointer :: MhData_VIB(:,:,:)
+
   ! Aux state vector;
   ! 1st index - identification of variable (D_:BOld_)
   ! 2nd index - particle index along the field line
   ! 3rd index - local line number
-  !
-  real, public, pointer     :: State_VIB(:,:,:)
-  !
+  real, public, pointer :: State_VIB(:,:,:)
+
   ! Number of variables in the state vector and the identifications
-  !
   integer, public, parameter :: nMhData = 13, nVar = 21,          &
-       !
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
        X_          = 1, & !                         |read in  |in copy_
        Y_          = 2, & ! Cartesian coordinates   |restart  |old_stat
@@ -129,11 +113,10 @@ module SP_ModGrid
        RhoOld_     =19, & ! Background plasma density      ! copy_
        UOld_       =20, & ! Background plasma bulk speed   ! old_
        BOld_       =21    ! Magnitude of magnetic field    ! state
-  !
+
   ! variable names
-  !
-  character(len=10), public, parameter:: NameVar_V(LagrID_:nVar)&
-    = ['LagrID    ', &
+  character(len=10), public, parameter:: NameVar_V(LagrID_:nVar) &
+       = ['LagrID    ', &
        'X         ', &
        'Y         ', &
        'Z         ', &
@@ -155,7 +138,8 @@ module SP_ModGrid
        'RhoOld    ', &
        'UOld      ', &
        'BOld      ' ]
-  !
+
+  ! whether the variables are initialized
   logical:: DoInit = .true.
 
   ! whether to use smoothing of length along lines,
@@ -165,7 +149,8 @@ module SP_ModGrid
   ! integer:: nSmooth = -1
 
   ! Test position and momentum
-  integer, public :: iPTest =1, iParticleTest = 99, iNodeTest =1
+  integer, public :: iPTest =1, iParticleTest = 99, iNodeTest = 1
+
   ! Shock algorithm parameters:
   real,    public, parameter :: dLogRhoThreshold = 0.01
   integer, public, parameter :: nWidth = 50
@@ -268,14 +253,15 @@ contains
     !--------------------------------------------------------------------------
     ! Allocate here if stand alone
     allocate(MhData_VIB(LagrID_:nMhData, 1:nVertexMax, nLine))
-    !
+
+    ! initialize MhData
     MhData_VIB(1:nMhData,:,:) = 0.0
-    !
+
     ! reset lagrangian ids
-    !
     do iVertex = 1, nVertexMax
        MhData_VIB(LagrID_, iVertex, 1:nLine) = real(iVertex)
     end do
+
     ! Allocate auxiliary State vector
     allocate(State_VIB(nMhData+1:nVar, 1:nVertexMax, nLine))
     State_VIB = -1
@@ -295,10 +281,8 @@ contains
     integer, intent(out):: iLatOut
 
     integer :: iLineAll
-    !--------------------------------------------------------------------------
-    !
     ! Get node number from line number
-    !
+    !--------------------------------------------------------------------------
     iLineAll = iBlockIn + iLineAll0
     iLatOut = 1 + (iLineAll - 1)/nLon
     iLonOut = iLineAll - nLon*(iLatOut - 1)
@@ -383,6 +367,7 @@ contains
   end subroutine get_other_state_var
   !============================================================================
   subroutine get_shock_location
+
     use SP_ModSize, ONLY: nVertexMax
     ! find location of a shock wave on a given line (line)
     ! shock front is assumed to be location of max log(Rho/RhoOld)
@@ -403,12 +388,14 @@ contains
           iShock_IB(Shock_,iLine) = NoShock_
           CYCLE
        end if
+
        ! shock front is assumed to be location of max log(Rho/RhoOld);
        do iVertex = 1, nVertex_B(  iLine)
           ! divergence of plasma velocity
           dLogRho_I(iVertex) = log(MhData_VIB(Rho_,iVertex,iLine)/&
                State_VIB(RhoOld_,iVertex,iLine))
        end do
+
        ! shock never moves back
        iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
        iShockMax = nVertex_B(iLine) - nWidth - 1
@@ -419,6 +406,7 @@ contains
        if(iShockCandidate >= iShockMin)&
             iShock_IB(Shock_, iLine) = iShockCandidate
     end do
+
   end subroutine get_shock_location
   !============================================================================
   subroutine search_line(iLine, Radius, iParticleOut, IsFound, Weight)
