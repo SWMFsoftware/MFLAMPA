@@ -31,7 +31,7 @@ module SP_ModMain
   public  :: DoReadMhData
   logical :: IsFirstSession = .true.
   ! Methods and variables from this module
-  public:: read_param, initialize, finalize, run, check, DoRestart,        &
+  public:: read_param, initialize, finalize, run, check, DoRestart,     &
        IsLastRead, UseStopFile, CpuTimeMax, TimeMax, nIterMax, IsStandAlone
 contains
   !============================================================================
@@ -47,6 +47,7 @@ contains
     use SP_ModPlot,          ONLY: read_param_plot       => read_param
     use SP_ModReadMHData,    ONLY: read_param_mhdata     => read_param
     use SP_ModRestart,       ONLY: read_param_restart    => read_param
+    use SP_ModSatellite,     ONLY: read_param_satellite  => read_param
     use SP_ModTime,          ONLY: read_param_time       => read_param
     use SP_ModTiming,        ONLY: read_param_timing     => read_param
     use SP_ModTurbulence,    ONLY: read_param_turbulence => read_param
@@ -97,6 +98,8 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
+       case('#SATELLITE')
+          call read_param_satellite(NameCommand)
        case('#TURBULENTSPECTRUM')
           call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')

@@ -17,12 +17,14 @@ OBJECTS = \
 	ModDistribution.o \
 	ModDiffusion.o \
 	ModGrid.o \
+	ModIO.o \
 	ModMain.o \
 	ModOriginPoints.o \
 	ModPlot.o \
 	ModProc.o \
 	ModReadMhData.o \
 	ModRestart.o \
+	ModSatellite.o \
 	ModSize.o \
 	ModTime.o \
 	SP_ModTiming.o \

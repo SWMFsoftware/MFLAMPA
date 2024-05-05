@@ -22,7 +22,7 @@ module SP_ModPlot
        UnitEnergy_, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
-  use ModNumConst, ONLY: cPi,cTwoPi, cDegToRad,cRadToDeg, cTolerance
+  use ModNumConst, ONLY: cPi, cTwoPi, cDegToRad, cRadToDeg, cTolerance
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, remove_file, CON_stop
 
@@ -60,9 +60,10 @@ module SP_ModPlot
        MHTime_    = 2, & ! at given radius as time series for lines
                                 ! Distribution
        Distr1D_   = 3, & ! along each line
+       DisTraj_   = 4, & ! along the specified spacecraft trajectory
                                 ! Flux
-       Flux2D_    = 4, & ! at a given radius on rectangular Lon-Lat grid
-       FluxTime_  = 5    ! at a given radius as time series on Lon-Lat grid
+       Flux2D_    = 5, & ! at a given radius on rectangular Lon-Lat grid
+       FluxTime_  = 6    ! at a given radius as time series on Lon-Lat grid
   ! Momentum or energy axis to use for Distribution plots
   integer, parameter:: &
        Momentum_= 1,   &
@@ -71,6 +72,13 @@ module SP_ModPlot
   integer, parameter:: &
        CDF_ = 1,       &
        DEF_ = 2
+  ! Satellite types for distribution function along trajectory
+  integer, parameter:: &
+       Earth_ = 1,     &
+       STA_   = 2,     &
+       STB_   = 3,     &
+       SolO_  = 4,     &
+       PSP_   = 5
 
   type TypePlotFile
      ! Full set of information, for each plot
@@ -124,6 +132,8 @@ module SP_ModPlot
      integer:: iScale      ! =Momentum_ or Energy_
      ! type out output (CDF or differential energy flow)
      integer:: iTypeDistr  ! =CDF_ or DEF_
+     ! type of the satellite saved for VDF along trajectory
+     integer:: iSatellite
      !
      ! Data on the sphere
      !
@@ -228,6 +238,8 @@ contains
                1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
                File_I(iFile)%nFluxVar, 1))
        case(Distr1D_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1,1:nVertexMax))
+       case(DisTraj_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1,1:nVertexMax))
        case(Flux2D_)
           if(.not.IsReadySpreadGrid) &
@@ -343,6 +355,8 @@ contains
              File_I(iFile) % iKindData = MHTime_
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
+          case('distraj')
+             File_I(iFile) % iKindData = DisTraj_
           case('flux2d')
              File_I(iFile) % iKindData = Flux2D_
           case('fluxtime')
@@ -438,30 +452,13 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
              ! process the distr1d data
-             call process_distr
-             ! header: [Momentum/Energy unit], [Rs], [CDF or DEF unit]
-             select case(File_I(iFile) % iScale)
-             case(Momentum_)
-                File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)// &
-                     ' log10[kg*m/s]'
-             case(Energy_)
-                File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)// &
-                     ' log10[' // NameEnergyUnit // ']'
-             end select
-             File_I(iFile) % StringHeaderAux = &
-                  trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
-             select case(File_I(iFile) % iTypeDistr)
-             case(CDF_)
-                File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)// &
-                     ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
-             case(DEF_)
-                File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)// &
-                     ' log10[p.f.u/' // NameEnergyUnit // ']'
-             end select
+             call process_distr(DoSaveTrj=.false.)
+          case(DisTraj_)
+             call process_distr(DoSaveTrj=.true.)
+             ! 1. Search the TRAJECTORY
+             ! 2. Set the TRIANGULORs
+             ! 3. INTERPOLATE the distribution function
+             ! 4. SAVE the results
           case(Flux2D_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -608,10 +605,10 @@ contains
 
     end subroutine process_mh
     !==========================================================================
-    subroutine process_distr
+    subroutine process_distr(DoSaveTrj)
 
       ! process output parameters for distribution output
-
+      logical, intent(in) :: DoSaveTrj
       integer:: iStringPlot
       character(len=20):: NameVar, NameScale
 
@@ -643,9 +640,44 @@ contains
             NameVar = 'Log10DiffEnergyFlux'
          end select
       end do
-      ! form the name with variables' names'
-      File_I(iFile) % NameVarPlot = &
-           trim(NameScale)//' Distance '//trim(NameVar)
+
+      ! form the name with variables' names
+      if (DoSaveTrj) then
+         File_I(iFile) % NameVarPlot = &
+             'X Y Z Distance DistanceFieldLine'// &
+             trim(NameScale) // ' ' // trim(NameVar)
+         ! Extra header string
+         File_I(iFile) % StringHeaderAux = &
+            trim(File_I(iFile)%StringHeaderAux)// &
+            ' [Rs] [Rs] [Rs] [Rs] [Rs]'
+      else
+         File_I(iFile) % NameVarPlot = &
+             trim(NameScale)//' Distance '//trim(NameVar)
+      end if
+
+      ! header: [Momentum/Energy unit], [Rs], [CDF or DEF unit]
+      select case(File_I(iFile) % iScale)
+      case(Momentum_)
+         File_I(iFile) % StringHeaderAux = &
+            trim(File_I(iFile)%StringHeaderAux)// &
+            ' log10[kg*m/s]'
+      case(Energy_)
+         File_I(iFile) % StringHeaderAux = &
+            trim(File_I(iFile)%StringHeaderAux)// &
+            ' log10[' // NameEnergyUnit // ']'
+      end select
+      File_I(iFile) % StringHeaderAux = &
+         trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
+      select case(File_I(iFile) % iTypeDistr)
+      case(CDF_)
+         File_I(iFile) % StringHeaderAux = &
+            trim(File_I(iFile)%StringHeaderAux)// &
+            ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
+      case(DEF_)
+         File_I(iFile) % StringHeaderAux = &
+            trim(File_I(iFile)%StringHeaderAux)// &
+            ' log10[p.f.u/' // NameEnergyUnit // ']'
+      end select
 
     end subroutine process_distr
     !==========================================================================
@@ -710,6 +742,8 @@ contains
           call write_mh_time
        case(Distr1D_)
           call write_distr_1d
+       case(DisTraj_)
+          call write_distraj
        case(Flux2D_)
           call write_flux_2d
        case(FluxTime_)
@@ -1283,6 +1317,14 @@ contains
 
     end subroutine write_distr_1d
     !==========================================================================
+    subroutine write_distraj
+      ! Distribution function along the spacecraft trajectory
+      ! 1. Search the TRAJECTORY
+      ! 2. Set the TRIANGULORs
+      ! 3. INTERPOLATE the distribution function
+      ! 4. SAVE the results
+    end subroutine write_distraj
+    !==========================================================================
     subroutine write_flux_2d
 
       use SP_ModProc, ONLY: iComm, nProc
@@ -1671,14 +1713,14 @@ contains
     !   StringBase[_R=?.?][_Lon=?.?_Lat=?.?][_???_???][_t?_n?].NameExtension
     ! parts in [] are written if present: Radius, iLineAll, iIter
 
-    character(len=*),          intent(in) :: StringBase
-    real,            optional, intent(in) :: Radius
-    real,            optional, intent(in) :: Longitude
-    real,            optional, intent(in) :: Latitude
-    integer,         optional, intent(in) :: iLine
-    integer,         optional, intent(in) :: iIter
-    character(len=*),          intent(in) :: NameExtension
-    character(len=100),        intent(out):: NameOut
+    character(len=*),   intent(in) :: StringBase
+    real,    optional,  intent(in) :: Radius
+    real,    optional,  intent(in) :: Longitude
+    real,    optional,  intent(in) :: Latitude
+    integer, optional,  intent(in) :: iLine
+    integer, optional,  intent(in) :: iIter
+    character(len=*),   intent(in) :: NameExtension
+    character(len=100), intent(out):: NameOut
 
     ! timetag
     character(len=15):: StringTime
