@@ -40,6 +40,7 @@ module SP_ModSatellite
   ! variables to record tracked and current satellite position indices
   logical, public:: DoTrackSatellite_I(MaxSat) = .false.
   integer, public:: iPointCurrentSat_I(MaxSat) = 1
+  logical, public:: DoEverUseSatellite         = .false.
 
   ! Local variables
   character(len=100) :: NameFile_I(MaxSat)
@@ -69,9 +70,9 @@ contains
   !============================================================================
   subroutine read_param(NameCommand)
 
-    use SP_ModIO,     ONLY: nFile, MaxFile, Satellite_,           &
-         IsDimensionalPlot_I, DnOutput_I, DtOutput_I, TypePlot_I, &
-         NamePlotDir, TypeCoordPlot_I, NamePrimitiveVarPlot
+    use SP_ModIO,     ONLY: nFile, MaxFile, Satellite_, &
+         IsDimensionalPlot_I, DnOutput_I, DtOutput_I,   &
+         TypePlot_I, TypeCoordPlot_I, NamePrimitiveVarPlot
     use ModUtilities, ONLY: check_dir
     use ModReadParam, ONLY: read_var
 
@@ -93,10 +94,10 @@ contains
        DtTraj_I         = 0.0
 
        TypeTrajTimeRange_I = 'orig'
-
        call read_var('nSatellite', nSat)
        if(nSat <= 0) RETURN
-      !  if(iProc==0) call check_dir(NamePlotDir)
+  
+       DoEverUseSatellite = .true.
        nFile = max(nFile, Satellite_ + nSat)
        if (nFile > MaxFile .or. nSat > MaxSat)&
             call CON_stop(&
@@ -468,7 +469,7 @@ contains
     allocate(TimeSat_II(nSat, MaxPoint))
 
     ! Read the trajectories
-    SATELLITES: do iSat=1, nSat
+    SATELLITES: do iSat = 1, nSat
 
        if(.not.UseSatFile_I(iSat)) CYCLE SATELLITES
 

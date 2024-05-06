@@ -195,6 +195,7 @@ contains
   end subroutine initialize
   !============================================================================
   subroutine finalize
+
     use SP_ModRestart,    ONLY: stand_alone_final_restart
     use SP_ModPlot,       ONLY: finalize_plot      => finalize
     use SP_ModReadMhData, ONLY: finalize_mhdata    => finalize
@@ -218,8 +219,11 @@ contains
          get_shock_location
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
+    use SP_ModSatellite,     ONLY: DoEverUseSatellite, &
+         read_satellite_input_files
     use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
+
     ! advance the solution in time
     real, intent(in)   :: TimeLimit
     logical, save :: IsFirstCall = .true.
@@ -231,6 +235,8 @@ contains
        ! recompute the derived components of state vector, e.g.
        ! magnitude of magnetic field and velocity etc. Smooth if needed.
        if(.not.DoReadMhData) call get_other_state_var
+       ! check ever use satellite files
+       if(DoEverUseSatellite) call read_satellite_input_files
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
        if(DtOutput > 0.0)iTimeOutput = int(SPTime/DtOutput)
@@ -238,6 +244,7 @@ contains
        if(IsReadySpreadPoint) call get_magnetic_flux
        IsFirstCall = .false.
     end if
+
     if(IsSteadyState)then
        call iterate_steady_state
     else
@@ -259,6 +266,7 @@ contains
        ! run the model
        if(DoRun) call advance(min(DataInputTime, TimeLimit))
     end if
+
     ! update time & iteration counters
     iIter = iIter + 1
     Dt = min(DataInputTime, TimeLimit) - SPTime
@@ -267,6 +275,7 @@ contains
 
     ! save restart if needed
     call check_save_restart(Dt)
+
   end subroutine run
   !============================================================================
   subroutine check

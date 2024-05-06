@@ -308,9 +308,7 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case("#SAVEPLOT")
-       ! initialize auxilary arrays
-       !
-       ! auxilary array, used to write data on a sphere
+       ! initialize auxilary arrays, used to write data on a sphere
        ! contains integers 1:nLineAll
        if (.not. allocated(iNodeIndex_I)) &
             allocate(iNodeIndex_I(nLineAll))
@@ -372,13 +370,13 @@ contains
           TypeFile = StringPlot_I(nStringPlot)
           ! check whether set properly
           select case(TypeFile)
-          case('tec','tcp')
+          case('tec', 'tcp')
              File_I(iFile) % NameFileExtension='.dat'
              File_I(iFile) % TypeFile  ='tec'
-          case('idl','ascii')
+          case('idl', 'ascii')
              File_I(iFile) % NameFileExtension='.out'
              File_I(iFile) % TypeFile  ='ascii'
-          case('real4','real8')
+          case('real4', 'real8')
              File_I(iFile) % NameFileExtension='.out'
              File_I(iFile) % TypeFile  = TypeFile
           case default
@@ -390,7 +388,7 @@ contains
           File_I(iFile) % NameVarPlot = ''
           File_I(iFile) % NameAuxPlot = ''
           select case(File_I(iFile)%TypeFile)
-          case('tec','tcp')
+          case('tec', 'tcp')
              File_I(iFile) % StringHeaderAux = ''
           case default
              File_I(iFile) % StringHeaderAux = 'Units:'
@@ -455,10 +453,6 @@ contains
              call process_distr(DoSaveTrj=.false.)
           case(DisTraj_)
              call process_distr(DoSaveTrj=.true.)
-             ! 1. Search the TRAJECTORY
-             ! 2. Set the TRIANGULORs
-             ! 3. INTERPOLATE the distribution function
-             ! 4. SAVE the results
           case(Flux2D_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -685,10 +679,10 @@ contains
   !============================================================================
   subroutine save_plot_all(IsInitialOutputIn)
 
+    ! write the output data
+
     use SP_ModDistribution, ONLY: get_integral_flux, nMu
     use SP_ModTime,         ONLY: IsSteadyState, iIter, SPTime
-
-    ! write the output data
 
     logical, intent(in), optional:: IsInitialOutputIn
 
@@ -726,6 +720,8 @@ contains
           RETURN
        end if
     end if
+
+    ! Save outputs into each file (according to StringPlot)
     do iFile = 1, nFileOut
        iKindData = File_I(iFile) % iKindData
 
@@ -1231,26 +1227,25 @@ contains
       ! Distribution_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
 
       ! name of the output file
-      character(len=100):: NameFile
+      character(len=100) :: NameFile
       ! header of the output file
-      character(len=500):: StringHeader
-      character(len=3):: TypeDistr
+      character(len=500) :: StringHeader
+      character(len=3)   :: TypeDistr
       ! loop variables
-      integer:: iLine, iVertex, iVarPlot
+      integer :: iLine, iVertex, iVarPlot
       ! indexes of corresponding node, latitude and longitude
-      integer:: iLat, iLon
+      integer :: iLat, iLon
       ! index of first/last particle on the field line
-      integer:: iLast
+      integer :: iLast
       ! scale and conversion factor
-      real:: Scale_I(0:nP+1)
+      real    :: Scale_I(0:nP+1)
       ! timetag
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_1d'
       !------------------------------------------------------------------------
 
       ! set header
-      StringHeader = &
-           'MFLAMPA: Distribution data along a field line, with ' &
+      StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
            //trim(File_I(iFile)%StringHeaderAux)
 
       select case(File_I(iFile)%iScale)
@@ -1259,6 +1254,7 @@ contains
       case(Energy_)
          Scale_I = Log10KinEnergyIo_I
       end select
+
       do iLine = 1, nLine
          if(.not.Used_B(iLine))CYCLE
          call iblock_to_lon_lat(iLine, iLon, iLat)
@@ -1318,11 +1314,52 @@ contains
     end subroutine write_distr_1d
     !==========================================================================
     subroutine write_distraj
-      ! Distribution function along the spacecraft trajectory
+      
+      ! Write the Distribution function along given spacecraft trajectories
       ! 1. Search the TRAJECTORY
       ! 2. Set the TRIANGULORs
       ! 3. INTERPOLATE the distribution function
       ! 4. SAVE the results
+
+      use SP_ModIO,        ONLY: TypeCoordPlot_I
+      use SP_ModSatellite, ONLY: nSat, XyzSat_DI, NameFileSat_I, &
+           set_satellite_positions
+
+      ! name of the output file
+      character(len=100) :: NameFile
+      ! header of the output file
+      character(len=500) :: StringHeader
+      character(len=3)   :: TypeDistr
+      ! loop variables
+      integer :: iLine, iSat
+      ! scale and conversion factor
+      real    :: Scale_I(0:nP+1)
+      !------------------------------------------------------------------------
+
+      select case(File_I(iFile)%iScale)
+      case(Momentum_)
+         Scale_I = Log10Momentum_I
+      case(Energy_)
+         Scale_I = Log10KinEnergyIo_I
+      end select
+
+      ! Save outputs for each satellite
+      do iSat = 1, nSat
+
+         ! set header
+         StringHeader = 'MFLAMPA: Distribution data along the trajectory of' &
+            // NameFileSat_I(iSat) // ', with ' &
+            // trim(File_I(iFile)%StringHeaderAux)
+
+         call set_satellite_positions(iSat)
+         ! write(*,*) "SPTime=", SPTime, "iSat=", iSat, XyzSat_DI(:, iSat)
+
+         do iLine = 1, nLine
+            if(.not.Used_B(iLine))CYCLE
+         end do
+
+      end do
+
     end subroutine write_distraj
     !==========================================================================
     subroutine write_flux_2d
