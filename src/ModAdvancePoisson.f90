@@ -9,7 +9,7 @@ module SP_ModAdvancePoisson
   use SP_ModSize,         ONLY: nVertexMax
   use SP_ModGrid,         ONLY: nLine
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB
-
+  use ModUtilities,     ONLY: CON_stop
   implicit none
 
   PRIVATE ! Except
@@ -119,7 +119,8 @@ contains
        ! Update velocity distribution function
        Distribution_CB(1:nP, 1, 1:nX, iLine) = &
             Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
-
+       if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
+            call CON_stop('Negative distribution function after Poisson, ta')
        ! Diffuse the distribution function
        if(UseDiffusion) then
           if(UseUpperEndBc) then
@@ -207,6 +208,8 @@ contains
     ! Update velocity distribution function
     Distribution_CB(1:nP, 1, 1:nX, iLine) = &
          Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
+    if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
+         call CON_stop('Negative distribution function after Poisson')
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
@@ -218,6 +221,8 @@ contains
           call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
                nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
        end if
+       if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
+            call CON_stop('Negative distribution function after diffusion')
     end if
   end subroutine iterate_poisson
   !============================================================================
