@@ -106,9 +106,11 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine init
+    use CON_axes, ONLY: init_axes
     use ModTimeConvert, ONLY: time_int_to_real
     !--------------------------------------------------------------------------
     call time_int_to_real(iStartTime_I, StartTime)
+    if(IsStandAlone)call init_axes(StartTime)
     ! also save the start time in Julian days;
     call time_int_to_julian(iStartTime_I, StartTimeJulian)
 
