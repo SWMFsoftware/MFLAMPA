@@ -18,6 +18,7 @@ program MFLAMPA
        SP_finalize   => finalize
   use SP_ModGrid,   ONLY: init_stand_alone, init_grid=>init
   use ModReadParam, ONLY: read_file, read_init
+  use CON_planet, ONLY: init_planet_const, set_planet_defaults
   use ModMpi
 
   implicit none
@@ -42,7 +43,10 @@ program MFLAMPA
      call remove_file('MFLAMPA.SUCCESS')
      call remove_file('MFLAMPA.STOP')
   end if
-
+  ! Initialize the planetary constant library and set Earth
+  ! as the default planet.
+  call init_planet_const
+  call set_planet_defaults
   ! Mark the run as a stand alone
   IsStandAlone = .true.
 
