@@ -1332,6 +1332,10 @@ contains
       character(len=3)   :: TypeDistr
       ! loop variables
       integer :: iLine, iSat
+      ! radial distance, longitude and latitude intersection point
+      real    :: rPoint, LonPoint, LatPoint
+      ! interpolation weight
+      real    :: Weight
       ! scale and conversion factor
       real    :: Scale_I(0:nP+1)
       !------------------------------------------------------------------------
@@ -1353,6 +1357,7 @@ contains
 
          call set_satellite_positions(iSat)
          ! write(*,*) "SPTime=", SPTime, "iSat=", iSat, XyzSat_DI(:, iSat)
+         call xyz_to_rlonlat(XyzSat_DI(:, iSat), rPoint, LonPoint, LatPoint)
 
          do iLine = 1, nLine
             if(.not.Used_B(iLine))CYCLE
