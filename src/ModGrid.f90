@@ -218,22 +218,19 @@ contains
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
     DoInit = .false.
-    !
+
     ! distribute nodes between processors
-    !
     if(nLineAll < nProc)call CON_stop(NameSub//&
          ': There are more processors than field lines')
     iLineAll0 = (iProc*nLineAll)/nProc
     iNodeLast = ((iProc+1)*nLineAll)/nProc
     nLine = iNodeLast - iLineAll0
-    !
+
     ! check consistency
-    !
     if(nLat <= 0 .or. nLon <= 0)&
          call CON_stop(NameSub//': Origin surface grid is invalid')
-    !
+
     ! allocate data and grid containers
-    !
     allocate(iShock_IB(nShockParam, nLine), stat=iError)
     call check_allocate(iError, NameSub//'iShock_IB')
     iShock_IB = NoShock_

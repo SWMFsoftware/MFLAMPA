@@ -25,7 +25,8 @@ module SP_ModSatellite
   ! These variables are public for write_logfile only !!! Should be improved
   ! Names and unit numbers for satellite files
   character(len=50), public:: NameFileSat_I(MaxSat)
-  integer, public :: iUnitSat_I(MaxSat) = -1
+  ! Names of the satellite
+  character(len=50), public:: NameSat_I(MaxSat)
 
   ! current positions
   real, public:: XyzSat_DI(3,MaxSat)
@@ -76,6 +77,7 @@ contains
     integer           :: iSat, iFile
     character(len=100):: StringSatellite
     character(len=3)  :: NameSatVar
+    integer           :: l1, l2
 
     logical:: DoTest
     character(len=*), parameter:: NameSub = 'read_param'
@@ -104,14 +106,20 @@ contains
           iFile = Satellite_ + iSat
           call read_var('StringSatellite', StringSatellite)
           ! Satellite output frequency
-          ! Note that we broke with tradition here so that the
-          ! DtOutput_I will always we read! This may be changed
-          ! in later distributions
+          ! Note that we broke with tradition here so that the DtOutput_I
+          ! will always we read! This may be changed in later distributions
           call read_var('DnOutput', DnOutput_I(iFile))
           call read_var('DtOutput', DtOutput_I(iFile))
 
-          ! Satellite inputfile name or the satellite name
+          ! Read satellite input file name and set the satellite name
           call read_var('NameTrajectoryFile', NameFileSat_I(iSat))
+          l1 = index(NameFileSat_I(iSat), '/', back=.true.) + 1
+          l2 = index(NameFileSat_I(iSat), '.', back=.true.) - 1
+          if(l1-1 <= 0) l1 = 1
+          if(l2+1 <= 0) l2 = len_trim(NameFileSat_I(iSat))
+          NameSat_I(iSat) = NameFileSat_I(iSat)(l1:l2)
+
+          ! whether to use the satellite files
           if(index(StringSatellite,'eqn') > 0 &
                .or. index(StringSatellite,'Eqn') > 0 &
                .or. index(StringSatellite,'EQN') > 0 ) then

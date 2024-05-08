@@ -13,13 +13,13 @@ module SP_ModPlot
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
-       X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
+       X_, Y_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
   use SP_ModGrid, ONLY: iblock_to_lon_lat, Used_B
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, UnitEnergy_, &
-       NameEnergyUnit
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I,      &
+       UnitEnergy_, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
@@ -29,6 +29,7 @@ module SP_ModPlot
   implicit none
 
   SAVE
+
   private ! except
 
   public:: init         ! Initialize module parameters
@@ -170,7 +171,6 @@ module SP_ModPlot
   integer :: nOutput = 1, iTimeOutput = 0
   real    :: DtOutput = -1.0
   public  :: DtOutput, iTimeOutput
-
   character(len=20) :: TypeMHDataFile
 
   ! If DoSaveInitial=.false.,the initial files are not saved
@@ -194,16 +194,16 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
     ! Array for plotting distribution function
-    Log10Momentum_I        = log10(Momentum_I)
-    Log10KinEnergyIo_I     = log10(KinEnergyIo_I)
+    Log10Momentum_I    = log10(Momentum_I)
+    Log10KinEnergyIo_I = log10(KinEnergyIo_I)
 
     ! Finalize setting output files:
     ! number and names of flux channels are known at this point;
     ! also, allocate buffers for output data
     do iFile = 1, nFileOut
        File_I(iFile)%nFluxVar = 0
-       if(File_I(iFile)%DoPlotFlux)then
-          File_I(iFile)%nFluxVar = FluxMax_ - Flux0_ + 1
+       if(File_I(iFile) % DoPlotFlux)then
+          File_I(iFile) % nFluxVar = FluxMax_ - Flux0_ + 1
           do iVar = Flux0_, FluxMax_
              File_I(iFile)%NameVarPlot = &
                   trim(File_I(iFile)%NameVarPlot)//' '//&
@@ -236,10 +236,8 @@ contains
           allocate(File_I(iFile) % Buffer_II(&
                1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
                File_I(iFile)%nFluxVar, 1))
-       case(Distr1D_)
-          allocate(File_I(iFile) % Buffer_II(0:nP+1,1:nVertexMax))
-       case(DisTraj_)
-          allocate(File_I(iFile) % Buffer_II(0:nP+1,1:nVertexMax))
+       case(Distr1D_, DisTraj_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nVertexMax))
        case(Flux2D_)
           if(.not.IsReadySpreadGrid) &
                call CON_stop(NameSub//&
@@ -784,6 +782,7 @@ contains
          NameFile = trim(NamePlotDir)//trim(NameTagFile)
          call open_file(file=NameFile, position='append', status='unknown', &
               NameCaller=NameSub)
+
          if(UseDateTime)then
             ! create date_time-iteration tag
             call get_date_time_string(SPTime, StringTime)
@@ -797,6 +796,7 @@ contains
          end if
          call close_file
       end if
+
       ! Write ouput files themselves
       nMhdVar    = File_I(iFile)%nMhdVar
       nExtraVar  = File_I(iFile)%nExtraVar
@@ -804,17 +804,18 @@ contains
       StringHeader = 'MFLAMPA: data along a field line; '//&
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
+
       do iLine = 1, nLine
          if(.not.Used_B(iLine))CYCLE
          call make_file_name(&
-              StringBase    = NameMHData,                     &
-              iLine        = iLine,                         &
-              iIter         = iIter,                          &
-              NameExtension = File_I(iFile)%NameFileExtension,&
+              StringBase    = NameMHData,                      &
+              iLine         = iLine,                           &
+              iIter         = iIter,                           &
+              NameExtension = File_I(iFile)%NameFileExtension, &
               NameOut       = NameFile)
 
          ! get min and max particle indexes on this field line
-         iLast  = nVertex_B(   iLine)
+         iLast  = nVertex_B(iLine)
          ! fill the output buffer
          if(nMhdVar>0)File_I(iFile) % Buffer_II(1:nMhdVar, 1:iLast) = &
               MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), &
@@ -822,11 +823,9 @@ contains
          if(nExtraVar>0)File_I(iFile) % Buffer_II(nMhdVar+1:nMhdVar+nExtraVar,&
               1:iLast) = State_VIB(File_I(iFile) % iVarExtra_V(1:nExtraVar), &
               1:iLast, iLine)
-         if(File_I(iFile)%DoPlotFlux) then
-            File_I(iFile)%Buffer_II(&
-                 nMhdVar + nExtraVar + 1:nMhdVar + nExtraVar + nFluxVar,&
-                 1:iLast) = Flux_VIB(Flux0_:FluxMax_, 1:iLast, iLine)
-         end if
+         if(File_I(iFile) % DoPlotFlux)File_I(iFile) % Buffer_II(&
+              nMhdVar + nExtraVar + 1:nMhdVar + nExtraVar + nFluxVar,&
+              1:iLast) = Flux_VIB(Flux0_:FluxMax_, 1:iLast, iLine)
 
          ! Parameters
          Param_I(LagrID_:Z_) = FootPoint_VB(LagrID_:Z_,iLine)
@@ -858,7 +857,7 @@ contains
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar,&
               1:iLast),&
-              ParamIn_I    = Param_I(LagrID_:StartJulian_))
+              ParamIn_I     = Param_I(LagrID_:StartJulian_))
       end do
 
     end subroutine write_mh_1d
@@ -927,10 +926,10 @@ contains
 
       ! set the file name
       call make_file_name(&
-           StringBase    = NameMHData,                     &
-           Radius        = File_I(iFile) % Radius,         &
-           iIter         = iIter,                          &
-           NameExtension = File_I(iFile)%NameFileExtension,&
+           StringBase    = NameMHData,                      &
+           Radius        = File_I(iFile) % Radius,          &
+           iIter         = iIter,                           &
+           NameExtension = File_I(iFile)%NameFileExtension, &
            NameOut       = NameFile)
 
       ! reset the output buffer
@@ -943,7 +942,7 @@ contains
       ! intersection with output sphere if present
       do iLine = 1, nLine
          if(.not.Used_B(iLine))CYCLE
-         iLineAll  = iLineAll0 + iLine
+         iLineAll = iLineAll0 + iLine
 
          ! find the particle just above the given radius
          call search_line(iLine, File_I(iFile)%Radius,&
@@ -1029,8 +1028,8 @@ contains
       File_I(iFile) % Buffer_II([iVarLon,iVarLat], :) = &
            File_I(iFile) % Buffer_II([iVarLon,iVarLat], :) * cRadToDeg
 
+      ! print data to file
       if(iProc==0)&
-                                ! print data to file
            call save_plot_file(&
            NameFile      = NameFile, &
            StringHeaderIn= StringHeader, &
@@ -1273,7 +1272,7 @@ contains
               NameOut       = NameFile)
 
          ! get max particle indexes on this field line
-         iLast  = nVertex_B(   iLine)
+         iLast = nVertex_B(iLine)
 
          do iVertex = 1, nVertexMax
             ! reset values outside the line's range
@@ -1315,30 +1314,59 @@ contains
     subroutine write_distraj
 
       ! Write the Distribution function along given spacecraft trajectories
-      ! 1. Search the TRAJECTORY
-      ! 2. Set the TRIANGULORs
-      ! 3. INTERPOLATE the distribution function
-      ! 4. SAVE the results
+      ! There are a few steps taken to achieve this:
+      !     1. Search the TRAJECTORY and read the satellite locations
+      !     2. Set up the TRIANGULATIONs as a mesh for interpolation
+      !     3. INTERPOLATE log(distribution) on the triangular mesh
+      !     4. Set the file name and SAVE the results
 
-      use SP_ModIO,        ONLY: TypeCoordPlot_I
-      use SP_ModSatellite, ONLY: nSat, XyzSat_DI, NameFileSat_I, &
-           set_satellite_positions
+      use ModTriangulateSpherical, ONLY: trmesh
+      use SP_ModIO,                ONLY: TypeCoordPlot_I
+      use SP_ModSatellite,         ONLY: nSat, XyzSat_DI,   &
+           NameFileSat_I, NameSat_I, set_satellite_positions
 
       ! name of the output file
       character(len=100) :: NameFile
       ! header of the output file
       character(len=500) :: StringHeader
-      character(len=3)   :: TypeDistr
-      ! loop variables
-      integer :: iLine, iSat
-      ! radial distance, longitude and latitude intersection point
-      real    :: rPoint, LonPoint, LatPoint
-      ! interpolation weight
-      real    :: Weight
+      character(len=4)   :: TypeDistr
       ! scale and conversion factor
       real    :: Scale_I(0:nP+1)
-      !------------------------------------------------------------------------
+      ! MPI error
+      integer :: iError
 
+      ! radial distance, longitude and latitude of satellite
+      real    :: rSat, LonSat, LatSat
+      ! radial distance, longitude and latitude intersection point
+      real    :: rPoint, LonPoint, LatPoint
+      ! interpolation weight (in radial direction)
+      real    :: Weight
+      ! skip a field line not reaching radius of output sphere
+      logical :: DoReachR_I(nLineAll)
+
+      ! loop variables
+      integer :: iLine, iSat
+      ! indexes of corresponding node, latitude and longitude
+      integer :: iLineAll
+      ! index of particle just above the radius
+      integer :: iAbove
+      ! xyz coordinates of all intersection point or average direction
+      real    :: Xyz_DII(X_:Z_,nLineAll)
+      ! useful intersection points on a sphere
+      real    :: XyzReachR_DII(X_:Z_, 0:nLineAll+1)
+      integer :: nReachR, iReachR
+      integer, allocatable, dimension(:) :: iList_I, iPointer_I, iEnd_I
+      real    :: Log10DistReachR_CB(0:nP, nMu, 0:nLineAll+1)
+      !------------------------------------------------------------------------
+      ! Determine string for the saved filename
+      select case(File_I(iFile) % iTypeDistr)
+      case(CDF_)
+         TypeDistr = '_cdf'
+      case(DEF_)
+         TypeDistr = '_def'
+      end select
+
+      ! Determine the saved distribution function (f or f*p^2)
       select case(File_I(iFile)%iScale)
       case(Momentum_)
          Scale_I = Log10Momentum_I
@@ -1350,18 +1378,81 @@ contains
       do iSat = 1, nSat
 
          ! set header
-         StringHeader = 'MFLAMPA: Distribution data along the trajectory of' &
-              // NameFileSat_I(iSat) // ', with ' &
-              // trim(File_I(iFile)%StringHeaderAux)
+         StringHeader = 'MFLAMPA: Distribution along the trajectory of'    &
+              //trim(NameFileSat_I(iSat))//', with outputs: '  &
+              //trim(File_I(iFile)%StringHeaderAux)
 
+         ! set the file name
+         call make_file_name(&
+              StringBase    = 'Distribution_' //               &
+              trim(NameSat_I(iSat)) // TypeDistr,              &
+              iIter         = iIter,                           &
+              NameExtension = File_I(iFile)%NameFileExtension, &
+              NameOut       = NameFile)
+
+         ! set and get the satellite location
          call set_satellite_positions(iSat)
-         call xyz_to_rlonlat(XyzSat_DI(:, iSat), rPoint, LonPoint, LatPoint)
-         write(*,*) "SPTime=", SPTime, "iSat=", iSat, XyzSat_DI(:, iSat), rPoint, LonPoint, LatPoint
+         call xyz_to_rlonlat(XyzSat_DI(:, iSat), rSat, LonSat, LatSat)
+         ! LonSat = LonSat * cRadToDeg ! Rad -> Deg for longitude
+         ! LatSat = LatSat * cRadToDeg ! Rad -> Deg for latitude
+         ! write(*,*) "SPTime=", SPTime, "iSat=", iSat, rSat, LonSat, LatSat
 
+         ! We then first have a radial interpolation at rPoint
+         ! reset the output buffer
+         File_I(iFile) % Buffer_II = 0.0
+
+         ! reset, all field lines are printed reaching output sphere
+         DoReachR_I = .true.
+
+         ! go over all lines on the processor and find the point of
+         ! intersection with output sphere if present
          do iLine = 1, nLine
-            if(.not.Used_B(iLine))CYCLE
+            if(.not.Used_B(iLine)) CYCLE
+            iLineAll = iLineAll0 + iLine
+
+            ! find the particle just above the given radius
+            call search_line(iLine, rSat, &
+                 iAbove, DoReachR_I(iLineAll), Weight)
+            DoReachR_I(iLineAll) = DoReachR_I(iLineAll) .and. iAbove /= 1
+            ! if no intersection found -> proceed to the next line
+            if(.not.DoReachR_I(iLineAll)) CYCLE
+
+            ! intersection is found -> get data at that location;
+            ! find coordinates of intersection
+            Xyz_DII(:, iLineAll) =  &
+                 MHData_VIB(X_:Z_, iAbove-1, iLine) * (1-Weight) + &
+                 MHData_VIB(X_:Z_, iAbove,   iLine) *    Weight
+            ! call xyz_to_rlonlat(Xyz_DII(:, iLineAll), rPoint, LonPoint, LatPoint)
          end do
 
+         ! Calculate the useful points on the sphere
+         nReachR = count(DoReachR_I)
+         if(nReachR == nLineAll) then
+            ! For most cases, the satellite we use is located in 1.1-240 AU
+            XyzReachR_DII(:, 1:nLineAll) = Xyz_DII
+         else
+            ! Otherwise, we need to spend some time reorganizing the points
+            iReachR = 0
+            do iLine = 1, nLine
+               if(.not.Used_B(iLine)) CYCLE
+               iLineAll = iLineAll0 + iLine
+
+               if(DoReachR_I(iLineAll)) then
+                  iReachR = iReachR + 1
+                  XyzReachR_DII(:, iReachR) = Xyz_DII(:, iLineall)
+               end if
+            end do
+         end if
+
+         ! Add two grid nodes at the poles:
+         XyzReachR_DII(:, 0)         = [0.0, 0.0, -1.0]
+         XyzReachR_DII(:, nReachR+1) = [0.0, 0.0, +1.0]
+
+         ! Construct the Triangular mesh used for interpolation
+         allocate(iList_I(6*nReachR), iPointer_I(6*nReachR), iEnd_I(nReachR+2))
+         ! call trmesh(nReachR+2, XyzReachR_DII(X_,0:nReachR+1),              &
+         !      XyzReachR_DII(Y_,0:nReachR+1), XyzReachR_DII(Z_,0:nReachR+1), &
+         !      iList_I, iPointer_I, iEnd_I, iError)
       end do
 
     end subroutine write_distraj
