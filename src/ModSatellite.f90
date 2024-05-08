@@ -78,7 +78,7 @@ contains
     character(len=3)  :: NameSatVar
 
     logical:: DoTest
-    character(len=*), parameter:: NameSub = 'read_satellite_parameters'
+    character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     call test_start(NameSub, DoTest)
 
@@ -92,7 +92,7 @@ contains
        TypeTrajTimeRange_I = 'orig'
        call read_var('nSatellite', nSat)
        if(nSat <= 0) RETURN
-  
+
        DoEverUseSatellite = .true.
        nFile = max(nFile, Satellite_ + nSat)
        if (nFile > MaxFile .or. nSat > MaxSat)&
@@ -236,7 +236,7 @@ contains
     use ModMpi
     use SP_ModIO,       ONLY: iUnitOut, write_prefix
     use SP_ModTime,     ONLY: StartTime
-    
+
     integer, parameter :: MaxDim = 3
     integer            :: iError, i, iSat, nPoint
 
@@ -390,7 +390,7 @@ contains
     real    :: dTime
 
     logical :: DoTest
-    character(len=*), parameter :: NameSub = 'set_satellite_positions'
+    character(len=*), parameter:: NameSub = 'set_satellite_positions'
     !--------------------------------------------------------------------------
     call test_start(NameSub, DoTest)
 
@@ -425,7 +425,7 @@ contains
              write(*,*) NameSub, ' DoTrackSat =', DoTrackSatellite_I(iSat)
              write(*,*) NameSub, ' XyzSat     =', XyzSat_DI(:,iSat)
           end if
-   
+
        end if
     else
        call satellite_trajectory_formula(iSat)

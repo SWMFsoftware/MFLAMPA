@@ -5,12 +5,12 @@ module SP_ModPlot
 
   ! Methods for saving plots
 
-  use SP_ModAngularSpread, ONLY: get_normalized_spread, &
-       nSpreadLon,nSpreadLat, SpreadLon_I,SpreadLat_I,  &
+  use SP_ModAngularSpread, ONLY: get_normalized_spread,     &
+       nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I,    &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModDistribution, ONLY: nP, KinEnergyIo_I, Momentum_I, &
-       Distribution_CB, FluxChannelInit_V,                     &
-       Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, nFluxChannel
+  use SP_ModDistribution, ONLY: nP, KinEnergyIo_I,          &
+       Momentum_I, Distribution_CB, FluxChannelInit_V,      &
+       Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
        X_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
@@ -18,11 +18,11 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, Io2Si_V, &
-       UnitEnergy_, NameEnergyUnit
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, UnitEnergy_, &
+       NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
-  use ModNumConst, ONLY: cPi, cTwoPi, cDegToRad, cRadToDeg, cTolerance
+  use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
   use ModPlotFile, ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, remove_file, CON_stop
 
@@ -167,15 +167,14 @@ module SP_ModPlot
   ! name of the tag list file
   character(len=*), parameter :: NameTagFile  = NameMHData//'.lst'
 
-  integer          :: nOutput = 1, iTimeOutput = 0
-  real             :: DtOutput = -1.0
-  public :: DtOutput, iTimeOutput
+  integer :: nOutput = 1, iTimeOutput = 0
+  real    :: DtOutput = -1.0
+  public  :: DtOutput, iTimeOutput
 
   character(len=20) :: TypeMHDataFile
 
   ! If DoSaveInitial=.false.,the initial files are not saved
   logical :: DoSaveInitial = .true.
-  !
   logical :: DoInit        = .false.
 
 contains
@@ -261,14 +260,14 @@ contains
     end do
 
     ! Reset/trim NameTagFile if nTag==0/nTag>0; the latter happens at restart.
-    !
+
     ! During the run new tags are continuously appended to NameTagFile,
     ! however, only when the run is succesfully finalized the list of tags is
     ! considered to be valid, i.e. new #NTAG is written to the header file.
-    !
+
     ! If previous run hasn't been properly finalized, NameTagFile may be
     ! inconsistent with nTag, therefore the file is trimmed according to nTag
-    !
+
     if(iProc/=0) RETURN ! done only by the root
     ! full file name
     NameFile = trim(NamePlotDir)//trim(NameTagFile)
@@ -535,7 +534,7 @@ contains
          ! coordinates are always printed
          File_I(iFile) % DoPlot_V(X_:Z_) = .true.
       end if
-      !
+
       ! determine, which variables were requested to be in the output file
       ! skip first and last
       do iStringPlot = 2, nStringPlot - 1
@@ -638,39 +637,39 @@ contains
       ! form the name with variables' names
       if (DoSaveTrj) then
          File_I(iFile) % NameVarPlot = &
-             'X Y Z Distance DistanceFieldLine'// &
-             trim(NameScale) // ' ' // trim(NameVar)
+              'X Y Z Distance DistanceFieldLine'// &
+              trim(NameScale) // ' ' // trim(NameVar)
          ! Extra header string
          File_I(iFile) % StringHeaderAux = &
-            trim(File_I(iFile)%StringHeaderAux)// &
-            ' [Rs] [Rs] [Rs] [Rs] [Rs]'
+              trim(File_I(iFile)%StringHeaderAux)// &
+              ' [Rs] [Rs] [Rs] [Rs] [Rs]'
       else
          File_I(iFile) % NameVarPlot = &
-             trim(NameScale)//' Distance '//trim(NameVar)
+              trim(NameScale)//' Distance '//trim(NameVar)
       end if
 
       ! header: [Momentum/Energy unit], [Rs], [CDF or DEF unit]
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          File_I(iFile) % StringHeaderAux = &
-            trim(File_I(iFile)%StringHeaderAux)// &
-            ' log10[kg*m/s]'
+              trim(File_I(iFile)%StringHeaderAux)// &
+              ' log10[kg*m/s]'
       case(Energy_)
          File_I(iFile) % StringHeaderAux = &
-            trim(File_I(iFile)%StringHeaderAux)// &
-            ' log10[' // NameEnergyUnit // ']'
+              trim(File_I(iFile)%StringHeaderAux)// &
+              ' log10[' // NameEnergyUnit // ']'
       end select
       File_I(iFile) % StringHeaderAux = &
-         trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
+           trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
          File_I(iFile) % StringHeaderAux = &
-            trim(File_I(iFile)%StringHeaderAux)// &
-            ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
+              trim(File_I(iFile)%StringHeaderAux)// &
+              ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
       case(DEF_)
          File_I(iFile) % StringHeaderAux = &
-            trim(File_I(iFile)%StringHeaderAux)// &
-            ' log10[p.f.u/' // NameEnergyUnit // ']'
+              trim(File_I(iFile)%StringHeaderAux)// &
+              ' log10[p.f.u/' // NameEnergyUnit // ']'
       end select
 
     end subroutine process_distr
@@ -694,18 +693,19 @@ contains
 
     character(len=*), parameter:: NameSub = 'save_plot_all'
     !--------------------------------------------------------------------------
-    ! check whether this is a call for initial output
     if(present(IsInitialOutputIn))then
        IsInitialOutput = IsInitialOutputIn
     else
        IsInitialOutput = .false.
     end if
     if(nFileOut == 0) RETURN
+    ! check whether this is a call for initial output
     if(IsInitialOutput)then
        if(.not.DoSaveInitial)RETURN
     else
        call get_integral_flux
     end if
+
     ! Check how often the output is needed
     if(IsInitialOutput)then
        ! Skip the check
@@ -801,8 +801,7 @@ contains
       nMhdVar    = File_I(iFile)%nMhdVar
       nExtraVar  = File_I(iFile)%nExtraVar
       nFluxVar  = File_I(iFile)%nFluxVar
-      StringHeader = &
-           'MFLAMPA: data along a field line; '//&
+      StringHeader = 'MFLAMPA: data along a field line; '//&
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
       do iLine = 1, nLine
@@ -910,7 +909,7 @@ contains
       nExtraVar = File_I(iFile)%nExtraVar
       nMhdVar   = File_I(iFile)%nMhdVar
       nFluxVar  = File_I(iFile)%nFluxVar
-      !
+
       ! Positions for longitude and Latitude
       iVarLon = nMhdVar + nExtraVar + 1
       iVarLat = iVarLon + 1
@@ -1314,7 +1313,7 @@ contains
     end subroutine write_distr_1d
     !==========================================================================
     subroutine write_distraj
-      
+
       ! Write the Distribution function along given spacecraft trajectories
       ! 1. Search the TRAJECTORY
       ! 2. Set the TRIANGULORs
@@ -1352,12 +1351,12 @@ contains
 
          ! set header
          StringHeader = 'MFLAMPA: Distribution data along the trajectory of' &
-            // NameFileSat_I(iSat) // ', with ' &
-            // trim(File_I(iFile)%StringHeaderAux)
+              // NameFileSat_I(iSat) // ', with ' &
+              // trim(File_I(iFile)%StringHeaderAux)
 
          call set_satellite_positions(iSat)
-         ! write(*,*) "SPTime=", SPTime, "iSat=", iSat, XyzSat_DI(:, iSat)
          call xyz_to_rlonlat(XyzSat_DI(:, iSat), rPoint, LonPoint, LatPoint)
+         write(*,*) "SPTime=", SPTime, "iSat=", iSat, XyzSat_DI(:, iSat), rPoint, LonPoint, LatPoint
 
          do iLine = 1, nLine
             if(.not.Used_B(iLine))CYCLE

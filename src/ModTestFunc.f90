@@ -1,3 +1,6 @@
+!  Copyright (C) 2002 Regents of the University of Michigan,
+!  portions used with permission
+!  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTestFunc
 
   ! Provides basic test functionality
@@ -31,12 +34,12 @@ module SP_ModTestFunc
 contains
   !============================================================================
   subroutine read_param(NameCommand)
-    
+
     use ModUtilities, ONLY: CON_stop
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in):: NameCommand
-    character(len=*), parameter:: NameSub = 'read_test_param'
+    character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case("#VERBOSE")
@@ -214,5 +217,5 @@ contains
 #endif
   end subroutine test_stop
   !============================================================================
-
 end module SP_ModTestFunc
+!==============================================================================
