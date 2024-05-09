@@ -1359,7 +1359,7 @@ contains
       ! useful intersection points on a unit sphere
       real    :: XyzReachR_DII(X_:Z_, 0:nLineAll+1)
       integer :: iReachR, nReachR
-      real    :: Log10DistReachR_CB(0:nP, nMu, 0:nLineAll+1)
+      real    :: Log10DistReachR_IIB(0:nP+1, nMu, nLineAll)
       ! arrays to construct a triangular mesh on a sphere
       integer :: nTriMesh, lidTri, ridTri
       logical :: IsTriangleFound
@@ -1404,10 +1404,11 @@ contains
          call xyz_to_rlonlat(XyzSat_DI(:, iSat), rSat, LonSat, LatSat)
 
          ! We then first have a radial interpolation at rSat
-         ! reset the output buffer, coordinates, and flags
+         ! reset the output buffer, coordinates, flags, and log(Distribution)
          File_I(iFile) % Buffer_II = 0.0
          Xyz_DII    = 0.0
          DoReachR_I = .false.
+         Log10DistReachR_IIB = 0.0
 
          ! go over all lines on the processor and find the point of
          ! intersection with output sphere if present
@@ -1422,11 +1423,14 @@ contains
             ! if no intersection found -> proceed to the next line
             if(.not.DoReachR_I(iLineAll)) CYCLE
 
-            ! intersection is found -> get data at that location;
-            ! find coordinates of intersection
+            ! intersection is found -> get data at that location and log10(f);
+            ! find coordinates and log(Distribution) at intersection
             Xyz_DII(:, iLineAll) = ( &
-                 MHData_VIB(X_:Z_, iAbove-1, iLine) * (1-Weight) + &
-                 MHData_VIB(X_:Z_, iAbove,   iLine) *    Weight ) / rSat
+                 MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) + &
+                 MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight ) / rSat
+            Log10DistReachR_IIB(:, :, iLineAll) = ( &
+                 log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight) + &
+                 log10(Distribution_CB(:, :, iAbove,   iLine))*   Weight)
          end do
 
          ! Gather interpolated coordinates on the source processor
@@ -1443,9 +1447,6 @@ contains
                     nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
             end if
          end if
-
-         ! wait until all processors finish communications
-         call MPI_Barrier(iComm, iError)
 
          ! Reorganize useful interpolated coordinates on the source processor
          if(iProc == 0)then
@@ -1466,17 +1467,11 @@ contains
             end if
          end if
 
-         ! wait until all processors finish communications
-         call MPI_Barrier(iComm, iError)
          ! broadcast the coordinates and flags to all processors
          call MPI_Bcast(XyzReachR_DII, 3*(nLineAll+2),   &
               MPI_REAL, 0, iComm, iError)
          call MPI_Bcast(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
          call MPI_Bcast(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
-
-         ! do iReachR = 1, nReachR
-         !    write(*,*) iReachR, XyzReachR_DII(:, iReachR)
-         ! end do
 
          if(UsePoleTri)then
             ! Add two grid nodes at the poles:
@@ -1490,15 +1485,17 @@ contains
          end if
 
          nTriMesh = ridTri - lidTri + 1
-         ! Allocate the arrays for trmesh
+         ! Allocate and initialize the arrays for trmesh
          allocate(iList_I(6*(nTriMesh-2)),         &
               iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
+         iList_I = 0; iPointer_I = 0; iEnd_I = 0
          ! Construct the Triangular mesh used for interpolation
          call trmesh(nTriMesh,                     &
               XyzReachR_DII(X_, lidTri:ridTri),    &
               XyzReachR_DII(Y_, lidTri:ridTri),    &
               XyzReachR_DII(Z_, lidTri:ridTri),    &
               iList_I, iPointer_I, iEnd_I, iError)
+         if(iError/=0) call CON_stop(NameSub//': Triangilation failed')
 
          ! Find the triangle where the satellite locates
          if(UsePlanarTri)then
@@ -1516,10 +1513,10 @@ contains
                  Weight_I(3), IsTriangleFound,     &
                  iStencil_I(1), iStencil_I(2), iStencil_I(3))
          end if
-         ! if(.not.IsTriangleFound)then
-         !    write(*,*) 'At the location x,y,z=', XyzSat_DI(:, iSat)/rSat
-         !    call CON_stop('Interpolation on triangulated sphere fails')
-         ! end if
+         if(.not.IsTriangleFound)then
+            write(*,*) 'At the location x,y,z=', XyzSat_DI(:, iSat)/rSat
+            call CON_stop('Interpolation on triangulated sphere fails')
+         end if
 
       end do
 
