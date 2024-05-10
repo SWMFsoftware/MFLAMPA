@@ -219,8 +219,7 @@ contains
          get_shock_location
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
-    use SP_ModSatellite,     ONLY: DoEverUseSatellite, &
-         read_satellite_input_files
+    use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
     use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
@@ -236,10 +235,10 @@ contains
        ! magnitude of magnetic field and velocity etc. Smooth if needed.
        if(.not.DoReadMhData) call get_other_state_var
        ! check ever use satellite files
-       if(DoEverUseSatellite) call read_satellite_input_files
+       if(UseSatellite) call read_satellite_input_files
        ! print the initial state
        call save_plot_all(IsInitialOutputIn = .true.)
-       if(DtOutput > 0.0)iTimeOutput = int(SPTime/DtOutput)
+       if(DtOutput > 0.0) iTimeOutput = int(SPTime/DtOutput)
        ! compute magnetic fluxes associated with lines if needed
        if(IsReadySpreadPoint) call get_magnetic_flux
        IsFirstCall = .false.

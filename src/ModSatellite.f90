@@ -38,9 +38,9 @@ module SP_ModSatellite
   character(len=500), public :: StringSatVar_I(MaxSat)
 
   ! variables to record tracked and current satellite position indices
+  logical, public:: UseSatellite               = .false.
   logical, public:: DoTrackSatellite_I(MaxSat) = .false.
   integer, public:: iPointCurrentSat_I(MaxSat) = 1
-  logical, public:: DoEverUseSatellite         = .false.
 
   ! Local variables
   logical:: UseSatFile_I(MaxSat)    = .true.
@@ -95,7 +95,7 @@ contains
        call read_var('nSatellite', nSat)
        if(nSat <= 0) RETURN
 
-       DoEverUseSatellite = .true.
+       UseSatellite = .true.
        nFile = max(nFile, Satellite_ + nSat)
        if (nFile > MaxFile .or. nSat > MaxSat)&
             call CON_stop(&

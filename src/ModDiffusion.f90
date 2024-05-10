@@ -204,7 +204,7 @@ contains
        !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
 
        ! Set source term in the RHS:
-       Res_I = Distribution_CB(iP,1, 1:nX, iLine)
+       Res_I = Distribution_CB(iP, 1, 1:nX, iLine)
        ! Set elements of tri-diagonal matrix in the LHS
        Main_I = 1.0
        ! For i=1:
@@ -244,7 +244,7 @@ contains
        end if
        ! Update the solution from f^(n) to f^(n+1):
        call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I,   &
-            Distribution_CB(iP,1, 1:nX, iLine))
+            Distribution_CB(iP, 1, 1:nX, iLine))
     end do MOMENTUM
   end subroutine diffuse_distribution_arr
   !============================================================================

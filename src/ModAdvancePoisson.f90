@@ -38,6 +38,7 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
+
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: tFinal    ! Time interval to advance through
@@ -136,6 +137,7 @@ contains
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
     end do
+
   end subroutine advect_via_poisson
   !============================================================================
   subroutine iterate_poisson(iLine, nX, iShock,    &
@@ -148,6 +150,7 @@ contains
     use ModPoissonBracket,  ONLY: explicit
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
+
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: CflIn     ! Input CFL number
@@ -224,6 +227,7 @@ contains
        if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
             call CON_stop('Negative distribution function after diffusion')
     end if
+
   end subroutine iterate_poisson
   !============================================================================
   subroutine advect_via_multi_poisson(iLine, nX, iShock,  &
@@ -236,6 +240,7 @@ contains
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
+
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: TimeStart ! Start time before advancing

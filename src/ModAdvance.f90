@@ -76,27 +76,27 @@ contains
 
     real, intent(in):: TimeLimit
     ! Loop variable
-    integer  :: iLine
+    integer :: iLine
     ! For a given line: nVertex_B, iShock_IB:
-    integer  :: iEnd, iShock, iShockOld
+    integer :: iEnd, iShock, iShockOld
     ! Upper limit and variable for the Loop which makes
     ! a time step so short that the shock wave passes
     ! a single grid interval per a progress step:
-    integer  :: iProgress, nProgress
+    integer :: iProgress, nProgress
     ! coefficient to interpolate "old" and "new"
-    real     :: Alpha
+    real    :: Alpha
     ! Full difference between DataInputTime and SPTime
-    real     :: DtFull
+    real    :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
-    real     :: DtProgress
+    real    :: DtProgress
     ! Current time: for updating states in multi-Poisson-bracket scheme
-    real     :: Time
+    real    :: Time
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I
     ! Check if any Distribution_IIB < 0 in advect_via_log
-    logical  :: IsDistNeg
+    logical :: IsDistNeg
     character(len=*), parameter:: NameSub = 'advance'
     !--------------------------------------------------------------------------
 
@@ -104,9 +104,9 @@ contains
     ! go line by line and advance the solution
 
     line:do iLine = 1, nLine
-       if(.not.Used_B(iLine))CYCLE line
+       if(.not.Used_B(iLine)) CYCLE line
        ! the active particles on the line
-       iEnd   = nVertex_B( iLine)
+       iEnd = nVertex_B(iLine)
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
@@ -124,7 +124,7 @@ contains
        if(DoTraceShock) then
           ! This is how many steps should be done to allow the shock to
           ! the move not more than one mesh size
-          nProgress = MAX(1, iShock - iShockOld)
+          nProgress = MAX(1, iShock-iShockOld)
           iShockOld = MIN(iShockOld, iShock-1)
        else
           nProgress = 1
@@ -238,13 +238,14 @@ contains
     !     f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and Fermi acceleration
 
-    use SP_ModGrid,             ONLY: Rho_, U_, B_, D_
-    use SP_ModAdvancePoisson,   ONLY: iterate_poisson
-    use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
+    use SP_ModGrid,           ONLY: Rho_, U_, B_, D_
+    use SP_ModAdvancePoisson, ONLY: iterate_poisson
+    use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
+
     ! Loop variable
-    integer  :: iLine
+    integer :: iLine
     ! For a given line: nVertex_B, iShock_IB:
-    integer  :: iEnd, iShock
+    integer :: iEnd, iShock
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, uSi_I, BSi_I, DsSi_I
     ! go line by line and iterate the solution
@@ -254,7 +255,8 @@ contains
     do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE
        ! the active particles on the line
-       iEnd   = nVertex_B( iLine)
+       iEnd = nVertex_B(iLine)
+
        ! Various data along the line in SI units. Temperature is in the unit
        ! of kinetic energy, all others are in SI units.
        ! Vector U and B are needed for Hamiltonian
@@ -266,7 +268,7 @@ contains
        DsSi_I(1:iEnd) = State_VIB(   D_, 1:iEnd, iLine)*Io2Si_V(UnitX_)
        ! find how far shock has travelled on this line
        iShock    = iShock_IB(Shock_,   iLine)
-       !
+
        ! First, set the diffusion coefficient, from the
        ! given formulae or from the turbulent specrtum, if known
        if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
