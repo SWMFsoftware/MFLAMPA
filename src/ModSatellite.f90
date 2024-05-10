@@ -29,7 +29,7 @@ module SP_ModSatellite
   character(len=50), public:: NameSat_I(MaxSat)
 
   ! current positions
-  real, public:: XyzSat_DI(3,MaxSat)
+  real, public:: XyzSat_DI(3, MaxSat)
 
   ! variables to control time output format
   character(len=100), public :: TypeTimeSat_I(MaxSat)
@@ -43,7 +43,7 @@ module SP_ModSatellite
   integer, public:: iPointCurrentSat_I(MaxSat) = 1
 
   ! Local variables
-  logical:: UseSatFile_I(MaxSat)    = .true.
+  logical:: UseSatFile_I(MaxSat) = .true.
   integer, public           :: nPointTraj_I(MaxSat)
   real, allocatable         :: XyzSat_DII(:,:,:)
   real, public, allocatable :: TimeSat_II(:, :)
@@ -308,12 +308,12 @@ contains
        if(.not.UseSatFile_I(iSat)) CYCLE SATELLITES
 
        ! Read file on the root processor
-       if (iProc == 0) then
+       if(iProc == 0) then
 
           NameFile = NameFileSat_I(iSat)
           if(lVerbose > 0)then
              call write_prefix
-             write(iUnitOut,*) NameSub, " reading: ", trim(NameFile)
+             write(iUnitOut, *) NameSub, " reading: ", trim(NameFile)
           end if
 
           call open_file(file=NameFile, status="old")
@@ -324,7 +324,7 @@ contains
           TypeSatCoord_I(iSat) = TypeCoordSystem
           READFILE: do
              read(UnitTmp_,'(a)', iostat=iError) StringLine
-             if (iError /= 0) EXIT READFILE
+             if(iError /= 0) EXIT READFILE
 
              if(index(StringLine,'#COOR')>0) &
                   read(UnitTmp_,'(a)') TypeSatCoord_I(iSat)
@@ -336,7 +336,7 @@ contains
                    ! Add new point
                    nPoint = nPoint + 1
                    ! Store coordinates
-                   Xyz_DI(:,nPoint) = Xyz_D
+                   Xyz_DI(:, nPoint) = Xyz_D
                    ! Convert integer date/time to simulation time
                    call time_int_to_real(iTime_I, DateTime)
                    Time_I(nPoint) = DateTime - StartTime
@@ -350,7 +350,7 @@ contains
           ! Convert the coordinates if necessary
           if(TypeSatCoord_I(iSat) /= TypeCoordSystem)then
              do i = 1, nPoint
-                Xyz_DI(:,i) = matmul(transform_matrix(Time_I(i), &
+                Xyz_DI(:, i) = matmul(transform_matrix(Time_I(i), &
                      TypeSatCoord_I(iSat), TypeCoordSystem), Xyz_DI(:,i))
              end do
           end if
@@ -402,31 +402,32 @@ contains
     !--------------------------------------------------------------------------
     call test_start(NameSub, DoTest)
 
-    if (UseSatFile_I(iSat)) then
+    if(UseSatFile_I(iSat)) then
 
        nPoint = nPointTraj_I(iSat)
-       if (nPoint > 0) then
+       if(nPoint > 0) then
 
           i = iPointCurrentSat_I(iSat)
-          if(DoTest) write(*,*) NameSub,' nPoint, iPoint, TimeSim, TimeSat=',&
+          if(DoTest) write(*,*) NameSub,  &
+               ' nPoint, iPoint, TimeSim, TimeSat=',   &
                nPoint, i, tSimulation, TimeSat_II(iSat,i)
 
-          do while (i < nPoint .and. TimeSat_II(iSat,i) <= tSimulation)
+          do while (i < nPoint .and. TimeSat_II(iSat, i) <= tSimulation)
              i = i + 1
-          enddo
+          end do
           iPointCurrentSat_I(iSat) = i
-          if(DoTest) write(*,*) NameSub,' final iPoint=', i
+          if(DoTest) write(*,*) NameSub, ' final iPoint=', i
 
-          if( (i == nPoint .and. tSimulation > TimeSat_II(iSat,i)) .or. &
-               i == 1 ) then
+          if( (i == nPoint .and. tSimulation > TimeSat_II(iSat, i))  &
+               .or. i == 1 ) then
              DoTrackSatellite_I(iSat) = .false.
-             XyzSat_DI(:,iSat) = 0.0
+             XyzSat_DI(:, iSat) = 0.0
           else
              DoTrackSatellite_I(iSat) = .true.
-             dTime = 1.0 - (TimeSat_II(iSat,i) - tSimulation) / &
-                  max((TimeSat_II(iSat,i) - TimeSat_II(iSat,i-1)), cTiny)
-             XyzSat_DI(:,iSat) = dTime * XyzSat_DII(:,iSat,i) + &
-                  (1.0 - dTime) * XyzSat_DII(:,iSat,i-1)
+             dTime = 1.0 - (TimeSat_II(iSat, i) - tSimulation) /     &
+                  max(TimeSat_II(iSat, i) - TimeSat_II(iSat, i-1), cTiny)
+             XyzSat_DI(:, iSat) = dTime * XyzSat_DII(:, iSat, i) +   &
+                  (1.0 - dTime) * XyzSat_DII(:, iSat, i-1)
           end if
 
           if(DoTest) then

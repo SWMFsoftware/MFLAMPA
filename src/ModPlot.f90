@@ -1111,7 +1111,7 @@ contains
       end if
 
       ! reset the output buffer
-      File_I(iFile) % Buffer_II = 0
+      File_I(iFile) % Buffer_II = 0.0
 
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present
@@ -1324,8 +1324,8 @@ contains
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
            find_triangle_orig, find_triangle_sph
       use SP_ModIO,                ONLY: TypeCoordPlot_I
-      use SP_ModSatellite,         ONLY: nSat, XyzSat_DI,   &
-           NameFileSat_I, NameSat_I, set_satellite_positions
+      use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
+           NameFileSat_I, set_satellite_positions, DoTrackSatellite_I
       use SP_ModProc,              ONLY: iComm, nProc
 
       ! name of the output file
@@ -1375,7 +1375,7 @@ contains
       end select
 
       ! Determine the saved distribution function (f or f*p^2)
-      select case(File_I(iFile)%iScale)
+      select case(File_I(iFile) % iScale)
       case(Momentum_)
          Scale_I = Log10Momentum_I
       case(Energy_)
@@ -1386,7 +1386,7 @@ contains
       do iSat = 1, nSat
 
          ! set header
-         StringHeader = 'MFLAMPA: Distribution along the trajectory of'    &
+         StringHeader = 'MFLAMPA: Distribution along the trajectory of' &
               //trim(NameFileSat_I(iSat))//', with outputs: '  &
               //trim(File_I(iFile)%StringHeaderAux)
 
@@ -1409,164 +1409,173 @@ contains
          DoReachR_I = .false.
          XyzReachR_DI = 0.0; Log10DistReachR_IIB = 0.0
 
-         ! go over all lines on the processor and find the point of
-         ! intersection with output sphere if present
-         do iLine = 1, nLine
-            if(.not.Used_B(iLine)) CYCLE
-            iLineAll = iLineAll0 + iLine
+         ! If we can track the satellite: we do triangulation and interpolation
+         ! Otherwise the outputs will be 0.0 but the simulations will not stop
+         if(DoTrackSatellite_I(iSat)) then
 
-            ! find the particle just above the given radius
-            call search_line(iLine, rSat, &
-                 iAbove, DoReachR_I(iLineAll), Weight)
-            DoReachR_I(iLineAll) = DoReachR_I(iLineAll) .and. iAbove /= 1
-            ! if no intersection found -> proceed to the next line
-            if(.not.DoReachR_I(iLineAll)) CYCLE
+            ! go over all lines on the processor and find the point of
+            ! intersection with output sphere if present
+            do iLine = 1, nLine
+               if(.not.Used_B(iLine)) CYCLE
+               iLineAll = iLineAll0 + iLine
 
-            ! intersection is found -> get data at that location and log10(f);
-            ! find coordinates and log(Distribution) at intersection
-            Xyz_DI(:, iLineAll) = ( &
-                 MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) + &
-                 MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight ) / rSat
-            Log10DistR_IIB(:, :, iLineAll) = ( &
-                 log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight) + &
-                 log10(Distribution_CB(:, :, iAbove,   iLine))*   Weight)
-         end do
+               ! find the particle just above the given radius
+               call search_line(iLine, rSat, &
+                    iAbove, DoReachR_I(iLineAll), Weight)
+               DoReachR_I(iLineAll) = DoReachR_I(iLineAll) .and. iAbove /= 1
+               ! if no intersection found -> proceed to the next line
+               if(.not.DoReachR_I(iLineAll)) CYCLE
 
-         ! Gather interpolated coordinates on the source processor
-         if(nProc > 1)then
-            if(iProc == 0)then
-               call MPI_Reduce(MPI_IN_PLACE, Xyz_DI,     &
-                    3*nLineAll, MPI_REAL, MPI_Sum, 0, iComm, iError)
-               call MPI_Reduce(MPI_IN_PLACE,             &
-                    Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
-                    MPI_REAL, MPI_Sum, 0, iComm, iError)
-               call MPI_Reduce(MPI_IN_PLACE, DoReachR_I, &
-                    nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
-            else
-               call MPI_Reduce(Xyz_DI, Xyz_DI,           &
-                    3*nLineAll, MPI_REAL, MPI_Sum, 0, iComm, iError)
-               call MPI_Reduce(Log10DistR_IIB,           &
-                    Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
-                    MPI_REAL, MPI_Sum, 0, iComm, iError)
-               call MPI_Reduce(DoReachR_I, DoReachR_I,   &
-                    nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
+               ! Found intersection -> get data at that location and log10(f)
+               ! Find coordinates and log(Distribution) at intersection
+               Xyz_DI(:, iLineAll) = ( &
+                    MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) + &
+                    MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight ) / rSat
+               Log10DistR_IIB(:, :, iLineAll) = ( &
+                    log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
+                    log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
+            end do
+
+            ! Gather interpolated coordinates on the source processor
+            if(nProc > 1)then
+               if(iProc == 0)then
+                  call MPI_Reduce(MPI_IN_PLACE, Xyz_DI,     &
+                       3*nLineAll, MPI_REAL, MPI_Sum, 0, iComm, iError)
+                  call MPI_Reduce(MPI_IN_PLACE,             &
+                       Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
+                       MPI_REAL, MPI_Sum, 0, iComm, iError)
+                  call MPI_Reduce(MPI_IN_PLACE, DoReachR_I, &
+                       nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
+               else
+                  call MPI_Reduce(Xyz_DI, Xyz_DI,           &
+                       3*nLineAll, MPI_REAL, MPI_Sum, 0, iComm, iError)
+                  call MPI_Reduce(Log10DistR_IIB,           &
+                       Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
+                       MPI_REAL, MPI_Sum, 0, iComm, iError)
+                  call MPI_Reduce(DoReachR_I, DoReachR_I,   &
+                       nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
+               end if
             end if
-         end if
 
-         ! Reorganize useful interpolated coordinates on the source processor
-         if(iProc == 0)then
-            ! Calculate the useful points on the sphere
-            nReachR = count(DoReachR_I)
-            if(nReachR == nLineAll) then
-               ! For most cases, the satellite we use is located in 1.1-240 AU
-               XyzReachR_DI(:, 2:nLineAll+1) = Xyz_DI
-               Log10DistReachR_IIB(:, :, 2:nLineAll+1) = Log10DistR_IIB
+            ! Send useful interpolated coordinates to the source processor
+            if(iProc == 0) then
+               ! Calculate the useful points on the sphere
+               nReachR = count(DoReachR_I)
+               if(nReachR == nLineAll) then
+                  ! For most cases, the satellite used falls in 1.1-240 AU
+                  XyzReachR_DI(:, 2:nLineAll+1) = Xyz_DI
+                  Log10DistReachR_IIB(:, :, 2:nLineAll+1) = Log10DistR_IIB
+               else
+                  ! Otherwise, we will spend some time reorganizing the points
+                  iReachR = 1
+                  do iLineAll = 1, nLineAll
+                     if(DoReachR_I(iLine)) then
+                        iReachR = iReachR + 1
+                        XyzReachR_DI(:, iReachR) = Xyz_DI(:, iLineAll)
+                        Log10DistReachR_IIB(:, :, iReachR) =   &
+                             Log10DistR_IIB(:, :, iLineAll)
+                     end if
+                  end do
+               end if
+            end if
+
+            ! broadcast the coordinates and flags to all processors
+            call MPI_Bcast(XyzReachR_DI, 3*(nLineAll+2),    &
+                 MPI_REAL, 0, iComm, iError)
+            call MPI_Bcast(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2),   &
+                 MPI_REAL, 0, iComm, iError)
+            call MPI_Bcast(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
+            call MPI_Bcast(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
+
+            if(UsePoleTri)then
+               ! Add two grid nodes at the poles:
+               lidTri = 1
+               ridTri = nReachR + 2
+               XyzReachR_DI(:, lidTri) = [0.0, 0.0, -1.0]
+               XyzReachR_DI(:, ridTri) = [0.0, 0.0, +1.0]
             else
-               ! Otherwise, we need to spend some time reorganizing the points
-               iReachR = 1
-               do iLineAll = 1, nLineAll
-                  if(DoReachR_I(iLine)) then
-                     iReachR = iReachR + 1
-                     XyzReachR_DI(:, iReachR) = Xyz_DI(:, iLineAll)
-                     Log10DistReachR_IIB(:, :, iReachR) =   &
-                          Log10DistR_IIB(:, :, iLineAll)
-                  end if
+               lidTri = 2
+               ridTri = nReachR + 1
+            end if
+
+            nTriMesh = ridTri - lidTri + 1
+            ! Allocate and initialize the arrays for trmesh
+            allocate(iList_I(6*(nTriMesh-2)),         &
+                 iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
+            iList_I = 0; iPointer_I = 0; iEnd_I = 0
+            ! Construct the Triangular mesh used for interpolation
+            call trmesh(nTriMesh,                     &
+                 XyzReachR_DI(X_, lidTri:ridTri),     &
+                 XyzReachR_DI(Y_, lidTri:ridTri),     &
+                 XyzReachR_DI(Z_, lidTri:ridTri),     &
+                 iList_I, iPointer_I, iEnd_I, iError)
+            if(iError/=0) call CON_stop(NameSub//': Triangilation failed')
+
+            ! Find the triangle where the satellite locates
+            if(UsePlanarTri)then
+               call find_triangle_orig(               &
+                    XyzSat_DI(:, iSat)/rSat, nTriMesh,&
+                    XyzReachR_DI(:, lidTri:ridTri),   &
+                    iList_I, iPointer_I, iEnd_I,      &
+                    Weight_I, IsTriangleFound, iStencil_I)
+            else
+               call find_triangle_sph(                &
+                    XyzSat_DI(:, iSat)/rSat, nTriMesh,&
+                    XyzReachR_DI(:, lidTri:ridTri),   &
+                    iList_I, iPointer_I, iEnd_I,      &
+                    Weight_I(1), Weight_I(2),         &
+                    Weight_I(3), IsTriangleFound,     &
+                    iStencil_I(1), iStencil_I(2), iStencil_I(3))
+            end if
+            if(.not.IsTriangleFound)then
+               write(*,*) 'At the location x,y,z=', XyzSat_DI(:, iSat)/rSat
+               call CON_stop('Interpolation on triangulated sphere fails')
+            end if
+
+            ! Fix states (log10 distribution) at the polar nodes
+            if(UsePoleTri)then
+               do iMu = 1, nMu
+                  ! North:
+                  call fix_state(&
+                       iNodeToFix = ridTri,     &
+                       nNode      = nTriMesh,   &
+                       iList_I    = iList_I,    &
+                       iPointer_I = iPointer_I, &
+                       iEnd_I     = iEnd_I,     &
+                       Xyz_DI     = XyzReachR_DI(:, lidTri:ridTri),  &
+                       nVar       = nP+2,       &
+                       State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
+                  ! South:
+                  call fix_state(&
+                       iNodeToFix = lidTri,     &
+                       nNode      = nTriMesh,   &
+                       iList_I    = iList_I,    &
+                       iPointer_I = iPointer_I, &
+                       iEnd_I     = iEnd_I,     &
+                       Xyz_DI     = XyzReachR_DI(:, lidTri:ridTri),  &
+                       nVar       = nP+2,       &
+                       State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
                end do
             end if
-         end if
-
-         ! broadcast the coordinates and flags to all processors
-         call MPI_Bcast(XyzReachR_DI, 3*(nLineAll+2),      &
-              MPI_REAL, 0, iComm, iError)
-         call MPI_Bcast(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2),   &
-              MPI_REAL, 0, iComm, iError)
-         call MPI_Bcast(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
-         call MPI_Bcast(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
-
-         if(UsePoleTri)then
-            ! Add two grid nodes at the poles:
-            lidTri = 1
-            ridTri = nReachR + 2
-            XyzReachR_DI(:, lidTri) = [0.0, 0.0, -1.0]
-            XyzReachR_DI(:, ridTri) = [0.0, 0.0, +1.0]
-         else
-            lidTri = 2
-            ridTri = nReachR + 1
-         end if
-
-         nTriMesh = ridTri - lidTri + 1
-         ! Allocate and initialize the arrays for trmesh
-         allocate(iList_I(6*(nTriMesh-2)),         &
-              iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
-         iList_I = 0; iPointer_I = 0; iEnd_I = 0
-         ! Construct the Triangular mesh used for interpolation
-         call trmesh(nTriMesh,                     &
-              XyzReachR_DI(X_, lidTri:ridTri),     &
-              XyzReachR_DI(Y_, lidTri:ridTri),     &
-              XyzReachR_DI(Z_, lidTri:ridTri),     &
-              iList_I, iPointer_I, iEnd_I, iError)
-         if(iError/=0) call CON_stop(NameSub//': Triangilation failed')
-
-         ! Find the triangle where the satellite locates
-         if(UsePlanarTri)then
-            call find_triangle_orig(               &
-                 XyzSat_DI(:, iSat)/rSat, nTriMesh,&
-                 XyzReachR_DI(:, lidTri:ridTri),   &
-                 iList_I, iPointer_I, iEnd_I,      &
-                 Weight_I, IsTriangleFound, iStencil_I)
-         else
-            call find_triangle_sph(                &
-                 XyzSat_DI(:, iSat)/rSat, nTriMesh,&
-                 XyzReachR_DI(:, lidTri:ridTri),   &
-                 iList_I, iPointer_I, iEnd_I,      &
-                 Weight_I(1), Weight_I(2),         &
-                 Weight_I(3), IsTriangleFound,     &
-                 iStencil_I(1), iStencil_I(2), iStencil_I(3))
-         end if
-         if(.not.IsTriangleFound)then
-            write(*,*) 'At the location x,y,z=', XyzSat_DI(:, iSat)/rSat
-            call CON_stop('Interpolation on triangulated sphere fails')
-         end if
-
-         ! Fix states (log10 distribution) at the polar nodes
-         if(UsePoleTri)then
-            do iMu = 1, nMu
-               ! North:
-               call fix_state(&
-                    iNodeToFix = ridTri,     &
-                    nNode      = nTriMesh,   &
-                    iList_I    = iList_I,    &
-                    iPointer_I = iPointer_I, &
-                    iEnd_I     = iEnd_I,     &
-                    Xyz_DI     = XyzReachR_DI(:, lidTri:ridTri),  &
-                    nVar       = nP+2,       &
-                    State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
-               ! South:
-               call fix_state(&
-                    iNodeToFix = lidTri,     &
-                    nNode      = nTriMesh,   &
-                    iList_I    = iList_I,    &
-                    iPointer_I = iPointer_I, &
-                    iEnd_I     = iEnd_I,     &
-                    Xyz_DI     = XyzReachR_DI(:, lidTri:ridTri),  &
-                    nVar       = nP+2,       &
-                    State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
+            ! Interpolate the log10(distribution) at satellite as outputs
+            do i = 1, 3
+               File_I(iFile) % Buffer_II = File_I(iFile) % Buffer_II +  &
+                    Log10DistReachR_IIB(:, :, iStencil_I(i))*Weight_I(i)
             end do
+            ! Account for the requested output
+            select case(File_I(iFile) % iTypeDistr)
+            case(CDF_)
+               ! Do nothing
+            case(DEF_)
+               ! nMu == 1
+               File_I(iFile) % Buffer_II(:, 1) =   &
+                    File_I(iFile) % Buffer_II(:, 1) + 2*Log10Momentum_I
+            end select
+
+            ! Deallocate arrays for triangulation and interpolation
+            deallocate(iList_I, iPointer_I, iEnd_I)
+
          end if
-         ! Interpolate the log10(distribution) at satellite as outputs
-         File_I(iFile) % Buffer_II = 0.0
-         do i = 1, 3
-            File_I(iFile) % Buffer_II = File_I(iFile) % Buffer_II +  &
-                 Log10DistReachR_IIB(:, :, iStencil_I(i))*Weight_I(i) ! nMu == 1
-         end do
-         ! account for the requested output
-         select case(File_I(iFile) % iTypeDistr)
-         case(CDF_)
-            ! do nothing
-         case(DEF_)
-            File_I(iFile) % Buffer_II(:, 1) =   &
-                 File_I(iFile) % Buffer_II(:, 1) + 2*Log10Momentum_I
-         end select
 
          ! print data to file
          call save_plot_file(&
@@ -1581,9 +1590,6 @@ contains
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_I       = File_I(iFile) % Buffer_II(:, nMu))
-
-         deallocate(iList_I, iPointer_I, iEnd_I)
-
       end do
 
     end subroutine write_distraj
