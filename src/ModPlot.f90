@@ -1490,8 +1490,8 @@ contains
             XyzReachR_DI(:, lidTri) = [0.0, 0.0, -1.0]
             XyzReachR_DI(:, ridTri) = [0.0, 0.0, +1.0]
          else
-            lidTri = 1
-            ridTri = nReachR
+            lidTri = 2
+            ridTri = nReachR + 1
          end if
 
          nTriMesh = ridTri - lidTri + 1
@@ -1581,6 +1581,8 @@ contains
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_I       = File_I(iFile) % Buffer_II(:, nMu))
+
+         deallocate(iList_I, iPointer_I, iEnd_I)
 
       end do
 
