@@ -1411,7 +1411,7 @@ contains
 
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
-         if(DoTrackSatellite_I(iSat)) then
+         TRI_INTERPOLATE: if(DoTrackSatellite_I(iSat)) then
 
             ! go over all lines on the processor and find the point of
             ! intersection with output sphere if present
@@ -1430,7 +1430,7 @@ contains
                ! Find coordinates and log(Distribution) at intersection
                Xyz_DI(:, iLineAll) = ( &
                     MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) + &
-                    MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight ) / rSat
+                    MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight )/rSat
                Log10DistR_IIB(:, :, iLineAll) = ( &
                     log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
                     log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
@@ -1499,17 +1499,25 @@ contains
             end if
 
             nTriMesh = ridTri - lidTri + 1
-            ! Allocate and initialize the arrays for trmesh
-            allocate(iList_I(6*(nTriMesh-2)),         &
+            ! Allocate and initialize arrays for triangulation and
+            ! interpolation; if allocated, first deallocate them
+            if(allocated(iList_I))    deallocate(iList_I)
+            if(allocated(iPointer_I)) deallocate(iPointer_I)
+            if(allocated(iEnd_I))     deallocate(iEnd_I)
+            allocate(iList_I(6*(nTriMesh-2)),      &
                  iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
             iList_I = 0; iPointer_I = 0; iEnd_I = 0
             ! Construct the Triangular mesh used for interpolation
-            call trmesh(nTriMesh,                     &
-                 XyzReachR_DI(X_, lidTri:ridTri),     &
-                 XyzReachR_DI(Y_, lidTri:ridTri),     &
-                 XyzReachR_DI(Z_, lidTri:ridTri),     &
+            call trmesh(nTriMesh,                  &
+                 XyzReachR_DI(X_, lidTri:ridTri),  &
+                 XyzReachR_DI(Y_, lidTri:ridTri),  &
+                 XyzReachR_DI(Z_, lidTri:ridTri),  &
                  iList_I, iPointer_I, iEnd_I, iError)
-            if(iError/=0) call CON_stop(NameSub//': Triangilation failed')
+            if(iError /= 0) then
+               write(*,*) NameSub//': Triangilation failed of ', &
+                  trim(NameSat_I(iSat)), ' at Iteration=', iIter
+               EXIT TRI_INTERPOLATE
+            end if
 
             ! Find the triangle where the satellite locates
             if(UsePlanarTri)then
@@ -1527,13 +1535,15 @@ contains
                     Weight_I(3), IsTriangleFound,     &
                     iStencil_I(1), iStencil_I(2), iStencil_I(3))
             end if
-            if(.not.IsTriangleFound)then
-               write(*,*) 'At the location x,y,z=', XyzSat_DI(:, iSat)/rSat
-               call CON_stop('Interpolation on triangulated sphere fails')
+            if(.not.IsTriangleFound) then
+               write(*,*) NameSub, ' WARNING: Interpolation fails on the', &
+                     'triangulated sphere, at the location of x,y,z=',     &
+                     XyzSat_DI(:, iSat), ' of ', trim(NameSat_I(iSat))
+               EXIT TRI_INTERPOLATE
             end if
 
             ! Fix states (log10 distribution) at the polar nodes
-            if(UsePoleTri)then
+            if(UsePoleTri) then
                do iMu = 1, nMu
                   ! North:
                   call fix_state(&
@@ -1572,10 +1582,7 @@ contains
                     File_I(iFile) % Buffer_II(:, 1) + 2*Log10Momentum_I
             end select
 
-            ! Deallocate arrays for triangulation and interpolation
-            deallocate(iList_I, iPointer_I, iEnd_I)
-
-         end if
+         end if TRI_INTERPOLATE
 
          ! print data to file
          call save_plot_file(&
