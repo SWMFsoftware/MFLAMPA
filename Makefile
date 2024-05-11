@@ -203,3 +203,35 @@ test_steady_check:
 		data/output/test_mflampa/MH_steady_data.ref.gz \
 		> test_steady.diff
 	ls -l test_steady.diff
+
+#### Spectra output test
+
+test_spectra:
+	@echo "test_spectra..." > test_spectra.diff
+	${MAKE} test_spectra_compile
+	@echo "test_spectra_rundir..." >> test_spectra.diff
+	${MAKE} test_spectra_rundir
+	@echo "test_spectra_run..." >> test_spectra.diff
+	${MAKE} test_spectra_run
+	@echo "test_spectra_check..." >> test_spectra.diff
+	${MAKE} test_spectra_check
+
+test_spectra_compile: test_compile
+
+test_spectra_rundir: 
+	rm -rf ${TESTDIR}
+	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
+	cp -rf ${DIR}/GM/BATSRUS/data/TRAJECTORY ./
+	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test.spectra PARAM.in
+	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
+
+test_spectra_run: test_run
+
+test_spectra_check:
+	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
+		> ${TESTDIR}/SP/IO2/MH_data.outs
+	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/MH_data.outs \
+		data/output/test_mflampa/MH_poisson_data.ref.gz \
+		> test_spectra.diff
+	ls -l test_spectra.diff
