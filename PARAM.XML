@@ -18,11 +18,11 @@ component of the SWMF.
   <parameter name="LatMax"  type="real" min="-89.0" max="90.0" default="70.0"/>
 
 #ORIGIN
-2.5						ROrigin [Rs]
-0.0						LonMin [deg]
--70.0					LatMin [deg]
-360.0					LonMax [deg]
-70.0					LatMax [deg]
+2.5			ROrigin [Rs]
+0.0			LonMin [deg]
+-70.0			LatMin [deg]
+360.0			LonMax [deg]
+70.0			LatMax [deg]
 
 Origin points on the surface R=ROrigin in the intervals of longitude,
 (LonMin,LonMax) and latitude, (LatMin,LatMax). Originating from these
@@ -37,7 +37,7 @@ and up from ROrigin to RIhMax.
   <parameter name="ParticleEnergyUnit" type="string" default="keV"/>
 
 #PARTICLEENERGYUNIT
-keV						ParticleEnergyUnit
+keV			ParticleEnergyUnit
 
 The particle energy unit: for example, keV, MeV, GeV, etc.
 We use keV as the default value.
@@ -59,12 +59,12 @@ We use keV as the default value.
   <parameter name="iSecond" type="integer" min="0" max="59" default="0"/>
 
 #STARTTIME
-2000					iYear
-   3					iMonth
-  22					iDay
-  10					iHour
-  45					iMinute
-   0					iSecond
+2000			iYear
+   3			iMonth
+  22			iDay
+  10			iHour
+  45			iMinute
+   0			iSecond
 
 This command can only be used in the first session.
 
@@ -78,7 +78,7 @@ There is no default value.
   <parameter name="IsTimeAccurate" type="logical" default="T" />
 
 #TIMEACCURATE
-T							IsTimeAccurate
+T			IsTimeAccurate
 
 Allows solving steady-state distribution (cosmic rays, seed population)
 by setting DoTimeAccurate to .false.
@@ -88,7 +88,7 @@ by setting DoTimeAccurate to .false.
   <parameter name="SPTime" type="real" min="0.0" default="0.0" />
 
 #TIMESIMULATION
-1							SPTime [sec]
+1			SPTime [sec]
 
 The SPTime variable contains the simulation time in seconds
 relative to the initial time set by the #STARTTIME command.
@@ -106,7 +106,7 @@ The default value is SPTime=0.
   <parameter name="nStep" type="integer" min="0" default="0" />
 
 #NSTEP
-100						nStep
+100			nStep
 
 Set nStep for the component. Typically used in the restart.H header file.
 Generally it is not inserted in a PARAM.in file by the user, except
@@ -134,9 +134,9 @@ test suite, which contains these commands when the framework is tested.
   <parameter name="DtSaveRestart" type="real" default="-1.0" />
 
 #SAVERESTART
-F							DoSaveRestart
--1						DnSaveRestart
--1.0					DtSaveRestart
+F			DoSaveRestart
+-1			DnSaveRestart
+-1.0			DtSaveRestart
 
 Determine whether and when to save the restart file (STAND ALONE ONLY)
 Set default value as: False, -1, and -1.0
@@ -181,8 +181,8 @@ The commands in this group only work in stand alone mode.
   <parameter name="TimeMax" type="real"  min="-1.0" default="-1.0" />
 
 #STOP
--1						nIterMax
-600.0					TimeMax [sec]
+-1			nIterMax
+600.0			TimeMax [sec]
 
 This command is only used in stand alone mode.
 
@@ -204,7 +204,7 @@ The #STOP command must be used in every session.
   <parameter name="DoCheckStopFile" type="logical" default="T" />
 
 #CHECKSTOPFILE
-T							DoCheckStopFile
+T			DoCheckStopFile
 
 This command is only used in stand alone mode.
 
@@ -224,7 +224,7 @@ The default is DoCheckStopFile=.true.
   <parameter name="DoEcho" type="logical" default="T" />
 
 #ECHO
-T							DoEcho
+T			DoEcho
 
 This command is only used in stand alone mode.
 
@@ -238,7 +238,7 @@ The default is DoEcho=.false.
   <parameter name="CpuTimeMax" type="real" min="-1.0" default="-1.0" />
 
 #CPUTIMEMAX
-3600					CpuTimeMax [sec]
+3600			CpuTimeMax [sec]
 
 This command is only used in stand alone mode.
 
@@ -264,9 +264,9 @@ Parameters of the Lagrangian grid used in MFLAMPA
   <parameter name="nLat"  type="integer" min="1" default="20" />
 
 #CHECKGRIDSIZE
-1000					nParticleMax
-4							nLon
-4							nLat
+1000			nParticleMax
+4			nLon
+4			nLat
 
 Check if the configured parameters of the Lagrangian grid match those
 assumed in the input files
@@ -277,8 +277,8 @@ assumed in the input files
   <parameter name="nLat"  type="integer" min="1" default="20" />
 
 #GRIDNODE
-4							nLon
-4							nLat
+4			nLon
+4			nLat
 
 Set the configured parameters of the Lagrangian grid
 </command>
@@ -289,9 +289,9 @@ Set the configured parameters of the Lagrangian grid
   <parameter name="iPTest"  type="integer" min="0" default="1" />
 
 #TESTPOS
-1							iNodeTest
-99						iParticleTest
-1							iPTest
+1			iNodeTest
+99			iParticleTest
+1			iPTest
 
 Set the test position and momentum
 </command>
@@ -301,8 +301,8 @@ Set the test position and momentum
   <parameter name="nSpreadLat"  type="integer" min="1" default="3" />
 
 #PREADGRID
-6							nSpreadLon
-6							nSpreadLat
+6			nSpreadLon
+6			nSpreadLat
 
 Set the size of angular grid in longitude and latitude
 </command>
@@ -312,8 +312,8 @@ Set the size of angular grid in longitude and latitude
   <parameter name="Sigma"  type="real" min="0.0" default="10.0"/>
 
 #SPREADGRID
-const					SigmaMode
-5.0						Sigma [deg]
+const			SigmaMode
+5.0			Sigma [deg]
 
 Set the sigma changes to the lines:
 SigmaMode is const: all line have the same characteristic spread
@@ -328,8 +328,8 @@ Then we set the "Sigma" of the lines, namely the changes in degrees.
   <parameter name="SolidAngleRef"  type="real" default="1.0"/>
 
 #SPREADGRID
--1.0					RadiusRef [Rs]
--1.0					Sigma [deg]
+-1.0			RadiusRef [Rs]
+-1.0			Sigma [deg]
 
 Set reference radius and value of solid angle associated with lines.
 </command>
@@ -342,7 +342,7 @@ Set reference radius and value of solid angle associated with lines.
   </parameter>
 
 #COORDSYSTEM
-HGI						TypeCoordSystem
+HGI			TypeCoordSystem
 
 Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 </command>
@@ -354,10 +354,10 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
   <parameter name="nMu" type="integer" min="1" default="1"/>
 
 #MOMENTUMGRID
-1.0						EnergyMin
-1000.0				EnergyMax
-100						nP
-1							nMu
+1.0			EnergyMin
+1000.0			EnergyMax
+100			nP
+1			nMu
 
 Read energy range, the number of energy bins and the energy unit.
 Usually read from the restart.H file. 
@@ -370,7 +370,7 @@ how many intervals in the range of [-1, 1] for pitch angle.
   <parameter name="FluxInitIo" type="real" min="0.0" default="0.01" />
 
 #FLUXINITIAL
-0.01					FluxInitIo
+0.01			FluxInitIo
 
 Distribution is initialized to have integral flux: 
 default value is set as 0.01 [pfu].
@@ -383,13 +383,13 @@ default value is set as 0.01 [pfu].
   </for>
 
 #FLUXCHANNEL
-6							nFluxChannel
-5							EChannelIo_I [MeV]
-10						EChannelIo_I [MeV]
-30						EChannelIo_I [MeV]
-50						EChannelIo_I [MeV]
-60						EChannelIo_I [MeV]
-100						EChannelIo_I [MeV]
+6			nFluxChannel
+5			EChannelIo_I [MeV]
+10			EChannelIo_I [MeV]
+30			EChannelIo_I [MeV]
+50			EChannelIo_I [MeV]
+60			EChannelIo_I [MeV]
+100			EChannelIo_I [MeV]
 
 Flux channel numbers: use the one on GOES by default, 6 channels.
 EChannelIo_I is the threshold in the unit of MeV above which the
@@ -409,11 +409,11 @@ particle flux is integrated over energy as the output.
   <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
 
 #UPPERENDBC
-F							UseUpperEndBc
-lism					TypeUpperEndBc
-default				TypeLisBc
-F							UseModulationPot
-600.0					ModulationPot
+F			UseUpperEndBc
+lism			TypeUpperEndBc
+default			TypeLisBc
+F			UseModulationPot
+600.0			ModulationPot
 
 To determine whether we set the upper boundary condition. If so, 
 we turn UseUpperEndBc and have UpperEndSpectrum_I in diffusion.
@@ -439,8 +439,8 @@ https://cosmicrays.oulu.fi/phi/phi.html.
   <parameter name="Efficiency" type="real" min="0.0" default="1.0" />
 
 #INJECTION
-5.0						SpectralIndex
-1.0						Efficiency
+5.0			SpectralIndex
+1.0			Efficiency
 
 Set up parameters of the power-law spectrum of suprathermal
 particles at sqrt(2 mp Ti) lt p lt Pinj:
@@ -457,7 +457,7 @@ Default distribution is f(p) ~ 1.0 * 2 / p**5.
   <parameter name="Cfl" type="real" min="0.0" max="1.0" default="0.99" />
 
 #CFL
-0.99						Cfl
+0.99			Cfl
 
 Please send an email to Igor Sokolov for more information.
 </command>
@@ -466,7 +466,7 @@ Please send an email to Igor Sokolov for more information.
   <parameter name="UsePoissonBracket" type="logical" default="T" />
 
 #POISSONBRACKET
-F								UsePoissonBracket
+F			UsePoissonBracket
 
 If UsePoissonBracket is True, the advection scheme is conservative
 Poisson bracket scheme; otherwise, it is non-conservative.
@@ -483,7 +483,7 @@ The default value is false.
   <parameter name="DoRestart" type="logical" default="T" />
 
 #RESTART
-T								DoRestart
+T			DoRestart
 
 The default value is true.
 </command>
@@ -492,7 +492,7 @@ The default value is true.
   <parameter name="DoRun" type="logical" default="T" />
 
 #DORUN
-T								DoRun
+T			DoRun
 
 If DoRun is False, only magnetic field lines are extracted, but the particle
 distribution function is not solved.
@@ -504,7 +504,7 @@ The default value is true.
   <parameter name="DoTraceShock" type="logical" default="T" />
 
 #TRACESHOCK
-T								DoTraceShock
+T			DoTraceShock
 
 If DoTraceShock is False, the shock wave is not traced and the density
 profile is not sharpened around it.
@@ -517,8 +517,8 @@ The default value is true.
   <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="0.3" />
 
 #USEFIXEDMFPUPSTREAM
-F								UseFixedMeanFreePathUpstream
-0.3							MeanFreePath0InAu
+F			UseFixedMeanFreePathUpstream
+0.3			MeanFreePath0InAu
 
 Determine whether we set the mean free path, 
 see Li et al. (2003), doi:10.1029/2002JA009666.
@@ -531,7 +531,7 @@ is set as false, and that for MeanFreePath0InAu is 0.3
   <parameter name="UseDiffusion" type="logical" default="T" />
 
 #DIFFUSION
-T								UseDiffusion
+T			UseDiffusion
 
 Used for testing, to disable diffusion, if UseDiffusion is false.
 The default value is true.
@@ -546,8 +546,8 @@ The default value is true.
   <parameter name="ScaleTurbulence" type="real" min="0.0" default="0.1" />
 
 #SCALETURBULENCE
-const						ScaleTurbulenceType
-0.24						ScaleTurbulence [AU] at 1 AU
+const			ScaleTurbulenceType
+0.24			ScaleTurbulence [AU] at 1 AU
 
 cut-off wavenumber of turbulence spectrum: k0 = 2*cPi/Scale
 The default value is set as const (or constant), i.e.,
@@ -558,7 +558,7 @@ the value (e.g., 0.1) of "ScaleTurbulence [AU] at 1 AU".
   <parameter name="UseTurbulentSpectrum" type="logical" default="F" />
 
 #TURBULENTSPECTRUM
-F								UseTurbulentSpectrum
+F			UseTurbulentSpectrum
 
 Determine whether we use the turbulence spectrum
 Set the default value is false.
@@ -572,7 +572,7 @@ Set the default value is false.
   <parameter name="UseDateTime" type="logical" default="F" />
 
 #USEDATETIME
-T								UseDateTime 
+T			UseDateTime 
 
 Set the format for the output file names like _eYYYYMMDD_HHMMSS tagging
 the file with real date and UT tume instant. When unset (default) the
@@ -587,10 +587,10 @@ minutes-seconds passed after the initial time (set by the command #STARTTIME)
   <parameter name="TypeTimingReport" type="string" />
 
 #TIMING
-T								UseTiming
--2							nTiming
--1							nDepthTiming
-cumm						TypeTimingReport
+T			UseTiming
+-2			nTiming
+-1			nDepthTiming
+cumm			TypeTimingReport
 
 Set the timing format in SP component, but as default, we set
 UseTiming as False; if UseTiming is True, one should specify
@@ -601,7 +601,7 @@ nTiming, nDepthTiming, and TypeTimingReport.
   <parameter name="DoSaveInitial" type="logical" default="T" />
 
 #SAVEINITIAL
-T								DoSaveInitial 
+T			DoSaveInitial 
 
 As the default (DoSaveInitial=T) the MFLAMPA saves datasets (at least the
 MHD information) starting from the initial state prior to the run. However,
@@ -616,8 +616,8 @@ previous run.
   <parameter name="NameInputDir" type="string"/>
 
 #READMHDATA
-T								DoReadMhData
-MH_data					NameInputDir
+T			DoReadMhData
+MH_data			NameInputDir
 
 Sets the name of input directory with MHD data.
 </command>
@@ -634,9 +634,9 @@ Sets the name of input directory with MHD data.
   <parameter name="NameTagFile" type="string" default=""/>
 
 #MHDATA
-idl							TypeFile
-120							nFileRead
-MH_data.lst			NameTagFile
+idl			TypeFile
+120			nFileRead
+MH_data.lst		NameTagFile
 
 Sets type, number and names of the MHD input files. While running MFLAMPA
 in cinjunction with the MHD code, these parameters are usually saved into
@@ -647,7 +647,7 @@ the header file, which is then included into the MFLAMPA parameter file
   <parameter name="nTag" type="integer" min="0" default="0" />
 
 #NTAG
-120							nTag  
+120			nTag  
 
 The number of different time-line tags of the MH_data files.
 </command>
@@ -720,19 +720,19 @@ The number of different time-line tags of the MH_data files.
     </for>
 
 #SAVEPLOT
-6															nFileOut
-mh1d flux ascii								StringPlot
-mh2d flux ascii								StringPlot
-215.0													Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
-fluxtime flux ascii						StringPlot
-215.0													Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
-30.0													Longitude [deg] (red if fluxtime)
-46.0													Latitude [deg] (red if fluxtime)
-distr1d cdf momentum ascii		StringPlot
-distr1d def energy idl				StringPlot
-distraj def energy idl				StringPlot
-T															UsePoleTriangulation
-T															UsePlanarTriangles
+6				nFileOut
+mh1d flux ascii			StringPlot
+mh2d flux ascii			StringPlot
+215.0				Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
+fluxtime flux ascii		StringPlot
+215.0				Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
+30.0				Longitude [deg] (red if fluxtime)
+46.0				Latitude [deg] (red if fluxtime)
+distr1d cdf momentum ascii	StringPlot
+distr1d def energy idl		StringPlot
+distraj def energy idl		StringPlot
+T				UsePoleTriangulation
+T				UsePlanarTriangles
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
@@ -751,8 +751,8 @@ Please send an email to Igor Sokolov for more information on this command.
   <parameter name="DtOutput" type="real" min="-1.0" default="-1.0"/>
   
 #NOUTPUT
-10							nOutput
--1.0						DtOutput
+10				nOutput
+-1.0				DtOutput
 
 Frequency to plot: iteration or simulation time
 
