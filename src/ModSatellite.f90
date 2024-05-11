@@ -19,23 +19,16 @@ module SP_ModSatellite
   integer, public    :: nSat   = 0    ! number of satellites
   integer, parameter :: MaxSat = 300  ! Max number of satellites
 
-  real, public :: TimeSatStart_I(MaxSat) = 0.0
-  real, public :: TimeSatEnd_I(MaxSat)   = 0.0
-
   ! These variables are public for write_logfile only !!! Should be improved
   ! Names and unit numbers for satellite files
   character(len=50), public:: NameFileSat_I(MaxSat)
   ! Names of the satellite
   character(len=50), public:: NameSat_I(MaxSat)
 
-  ! current positions
+  ! Coordinate system
+  character(len=3), public :: TypeSatCoord_I(MaxSat)
+  ! Current positions
   real, public:: XyzSat_DI(3, MaxSat)
-
-  ! variables to control time output format
-  character(len=100), public :: TypeTimeSat_I(MaxSat)
-
-  ! variables to write to the satellite files
-  character(len=500), public :: StringSatVar_I(MaxSat)
 
   ! variables to record tracked and current satellite position indices
   logical, public:: UseSatellite               = .false.
@@ -45,38 +38,22 @@ module SP_ModSatellite
   ! Local variables
   logical:: UseSatFile_I(MaxSat) = .true.
   integer, public           :: nPointTraj_I(MaxSat)
-  real, allocatable         :: XyzSat_DII(:,:,:)
+  real, allocatable         :: XyzSat_DII(:, :, :)
   real, public, allocatable :: TimeSat_II(:, :)
 
-  ! Time and coordinate system
-  real, public     :: StartTimeTraj_I(MaxSat), EndTimeTraj_I(MaxSat)
-  real, public     :: DtTraj_I(MaxSat)
-  character(len=3) :: TypeSatCoord_I(MaxSat)
-  character(len=5), public :: TypeTrajTimeRange_I(MaxSat) = 'orig'
-
-  ! Time limits (in the unit of seconds) for satellite trajectory
-  ! cut for .not. IsTimeAccurate session.
-  ! If a steady-state simulation is run for a specific moment of time (set at
-  ! StartTime), TimeSatStart_I determines the starting point of the satellite
-  ! trajectory, while TimeSatEnd_I determines the trajectory ending point.
-  ! Both determine the considered trajectory cut.
-  ! Unlike in IsTimeAccurate sessions, after each DnOutput_I simulation step,
-  ! the satellite variables for ALL the trajectory cut are saved in file.
-
+  ! Unlike ModSatellite in BASTRUS, here the saveplot frequencyis controlled
+  ! by #NOUTPUT in SP_ModPlot so we do not read StartTime/EndTime/DtTraj.
 contains
   !============================================================================
   subroutine read_param(NameCommand)
 
-    use SP_ModIO,     ONLY: nFile, MaxFile, Satellite_, &
-         IsDimensionalPlot_I, DnOutput_I, DtOutput_I,   &
-         TypePlot_I, TypeCoordPlot_I, NamePrimitiveVarPlot
+    use SP_ModIO,     ONLY: nFile, MaxFile, Satellite_, TypeCoordPlot_I
     use ModUtilities, ONLY: check_dir
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in) :: NameCommand
     integer           :: iSat, iFile
     character(len=100):: StringSatellite
-    character(len=3)  :: NameSatVar
     integer           :: l1, l2
 
     logical:: DoTest
@@ -86,30 +63,18 @@ contains
 
     select case(NameCommand)
     case("#SATELLITE")
-       ! reset values
-       StartTimeTraj_I  = 0.0
-       EndTimeTraj_I    = 0.0
-       DtTraj_I         = 0.0
-
-       TypeTrajTimeRange_I = 'orig'
        call read_var('nSatellite', nSat)
        if(nSat <= 0) RETURN
 
        UseSatellite = .true.
        nFile = max(nFile, Satellite_ + nSat)
        if (nFile > MaxFile .or. nSat > MaxSat)&
-            call CON_stop(&
-            'The number of output files is too large in #SATELLITE:'&
-            //' nFile > MaxFile .or. nSat > MaxSat')
+            call CON_stop('The number of output files is too large ' &
+            //'in #SATELLITE: nFile > MaxFile .or. nSat > MaxSat')
 
        do iSat = 1, nSat
           iFile = Satellite_ + iSat
           call read_var('StringSatellite', StringSatellite)
-          ! Satellite output frequency
-          ! Note that we broke with tradition here so that the DtOutput_I
-          ! will always we read! This may be changed in later distributions
-          call read_var('DnOutput', DnOutput_I(iFile))
-          call read_var('DtOutput', DtOutput_I(iFile))
 
           ! Read satellite input file name and set the satellite name
           call read_var('NameTrajectoryFile', NameFileSat_I(iSat))
@@ -128,89 +93,6 @@ contains
              UseSatFile_I(iSat) = .true.
           end if
 
-          ! time range for the satellite
-          if(index(StringSatellite,'traj') >0 ) then
-             if (index(StringSatellite,'range') >0) then
-                TypeTrajTimeRange_I(iSat) = 'range'
-
-                call read_var('StartTimeTraj', StartTimeTraj_I(iSat), &
-                     StartTimeIn=StartTime)
-                call read_var('EndTimeTraj',   EndTimeTraj_I(iSat), &
-                     StartTimeIn=StartTime)
-                call read_var('DtTraj',        DtTraj_I(iSat))
-
-                ! EndTimeTraj should not be smaller then StartTimeTraj
-                if (EndTimeTraj_I(iSat) < StartTimeTraj_I(iSat) .or. &
-                     (EndTimeTraj_I(iSat)-StartTimeTraj_I(iSat)) &
-                     /DtTraj_I(iSat) > 1e6 .or. DtTraj_I(iSat) <= 0) then
-                   write(*,*) ' StartTimeTraj_I =', StartTimeTraj_I(iSat)
-                   write(*,*) ' EndTimeTraj_I   =', EndTimeTraj_I(iSat)
-
-                   call CON_stop(NameSub//' correct #SATELLITE: '//         &
-                        'EndTimeTraj < StartTimeTraj or too small dtTraj '//&
-                        'or dtTraj <= 0.')
-                endif
-             else
-                TypeTrajTimeRange_I(iSat) = 'full'
-                StartTimeTraj_I(iSat) = -1e30
-                EndTimeTraj_I(iSat)   = -1e30
-                DtTraj_I(iSat)        = -1e30
-             end if
-          end if
-
-          ! Satellite variables
-          if(index(StringSatellite,'VAR')>0 .or. &
-               index(StringSatellite,'var')>0 )then
-             NameSatVar='var'
-             IsDimensionalPlot_I(iFile) = index(StringSatellite,'VAR')>0
-             TypeTimeSat_I(iSat) = 'step date'
-             call read_var('NameSatelliteVars',StringSatVar_I(iSat))
-          elseif(index(StringSatellite,'MHD')>0 .or. &
-               index(StringSatellite,'mhd')>0)then
-             NameSatVar='mhd'
-             IsDimensionalPlot_I(iFile)= index(StringSatellite,'MHD')>0
-             TypeTimeSat_I(iSat) = 'step date'
-             StringSatVar_I(iSat)=NamePrimitiveVarPlot//' jx jy jz'
-          elseif(index(StringSatellite,'FUL')>0 .or. &
-               index(StringSatellite,'ful')>0)then
-             NameSatVar='ful'
-             IsDimensionalPlot_I(ifile)= index(StringSatellite,'FUL')>0
-             TypeTimeSat_I(iSat) = 'step date'
-             StringSatVar_I(iSat)=&
-                  NamePrimitiveVarPlot//' b1x b1y b1z e jx jy jz'
-          else
-             call CON_stop(&
-                  'Variable definition (mhd,ful,var) missing' &
-                  //' from StringSatellite='//StringSatellite)
-          end if
-
-          ! Change by DTW, July 2007
-          ! Add Trace_DSNB-tracing variables if 'Trace_DSNB' is present.
-          if (index(StringSatellite,'Trace_DSNB')>0 .or. &
-               index(StringSatellite,'Trace_DSNB')>0) then
-             StringSatVar_I(iSat) = trim(StringSatVar_I(iSat)) // &
-                  ' theta1 phi1 status theta2 phi2'
-          endif
-
-          TypePlot_I(iFile) = "satellite"
-
-          ! Determine the time output format to use in the
-          ! satellite files.  This is loaded by default above,
-          ! but can be input in the log_string line.
-          if(index(StringSatellite,'none')>0) then
-             TypeTimeSat_I(iSat) = 'none'
-          elseif((index(StringSatellite,'step')>0) .or. &
-               (index(StringSatellite,'date')>0) .or. &
-               (index(StringSatellite,'time')>0)) then
-             TypeTimeSat_I(iSat) = ''
-             if(index(StringSatellite,'step')>0) &
-                  TypeTimeSat_I(iSat) = 'step'
-             if(index(StringSatellite,'date')>0) &
-                  TypeTimeSat_I(iSat) = trim(TypeTimeSat_I(iSat))//' date'
-             if(index(StringSatellite,'time')>0) &
-                  TypeTimeSat_I(iSat) = trim(TypeTimeSat_I(iSat))//' time'
-          end if
-
           ! Recognize coordinate system name if present
           if (index(StringSatellite,'GEO') > 0) TypeCoordPlot_I(iFile) = 'GEO'
           if (index(StringSatellite,'GSE') > 0) TypeCoordPlot_I(iFile) = 'GSE'
@@ -222,11 +104,6 @@ contains
           if (index(StringSatellite,'HGC') > 0) TypeCoordPlot_I(iFile) = 'HGC'
        end do
 
-    case('#STEADYSTATESATELLITE')
-       do iSat = 1, nSat
-          call read_var('SatelliteTimeStart', TimeSatStart_I(iSat))
-          call read_var('SatelliteTimeEnd',   TimeSatEnd_I(iSat))
-       end do
     case default
        call CON_stop(NameSub//' unknown command='//NameCommand)
     end select
@@ -258,7 +135,7 @@ contains
     integer            :: MaxPoint
     real, allocatable  :: Time_I(:), Xyz_DI(:,:)
     character(len=100) :: NameFile
-    character(len=3)   :: TypeCoordSystem = 'HGR' ! 'GSM' in BATSRUS
+    character(len=3)   :: TypeCoordSystem = 'HGR'  ! 'HGR' in SP as default
 
     logical:: DoTest
     character(len=*), parameter:: NameSub = 'read_satellite_input_files'

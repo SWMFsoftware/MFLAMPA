@@ -71,7 +71,7 @@ module SP_ModIO
   character(len=10)  :: TypeSatPos_I(MaxFile)
 
   ! Logical variable for OBS box type
-  logical  :: IsObsBox_I(MaxFile) = .false.
+  logical :: IsObsBox_I(MaxFile) = .false.
 
   ! Variables for radiowave image
   ! ObsPos_DI is borrowed from the LOS plot
@@ -97,8 +97,8 @@ module SP_ModIO
        DLambda_I = 0.001, DLambdaIns_I = 0.0, TempMin_I = 1e5
 
   ! Variables for field/stream/current line files
-  logical :: IsSingleLine_I(MaxPlotFile)      ! One subfile for the plot file?
-  integer :: nLine_I(MaxPlotFile)             ! Number of lines for a plot file
+  logical   :: IsSingleLine_I(MaxPlotFile)   ! One subfile for the plot file?
+  integer   :: nLine_I(MaxPlotFile)          ! Number of lines for a plot file
   character :: NameLine_I(MaxPlotFile)                 ! Name of vector field
   real      :: XyzStartLine_DII(3,MaxLine,MaxPlotFile) ! Starting positions
   logical   :: IsParallelLine_II(MaxLine,MaxPlotFile)  ! Parallel/anti-parallel
@@ -114,7 +114,7 @@ module SP_ModIO
   ! note that nfile is not the number of output files but rather the
   ! index of the maximum file number.  The array FileUsed contains a
   ! value that tells whether or not each file is used or not.
-  integer :: nFile=0, nPlotFile=0
+  integer :: nFile = 0, nPlotFile = 0
 
   ! Saving frequencies and the last saved time step and snapshot number
   real ::    DtOutput_I(MaxFile) = -1.0

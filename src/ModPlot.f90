@@ -1323,7 +1323,6 @@ contains
       use ModMpi
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
            find_triangle_orig, find_triangle_sph
-      use SP_ModIO,                ONLY: TypeCoordPlot_I
       use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
            NameFileSat_I, set_satellite_positions, DoTrackSatellite_I
       use SP_ModProc,              ONLY: iComm, nProc

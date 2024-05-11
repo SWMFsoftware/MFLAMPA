@@ -652,6 +652,27 @@ the header file, which is then included into the MFLAMPA parameter file
 The number of different time-line tags of the MH_data files.
 </command>
 
+<command name="SATELLITE">
+  <parameter name="nSatellite" type="integer" min="0" default="0" />
+  <for name="iSatellite" from="1" to="$nSatellite">
+    <parameter name="StringSatellite" type="strings" default="2" />
+    <parameter name="NameTrajectoryFile" type="string" />
+  </for>
+
+#SATELLITE
+4				nSatellite
+HGR trajrange			StringSatellite
+../TRAJECTORY/earth.dat		NameTrajectoryFile
+HGR trajrange			StringSatellite
+../TRAJECTORY/sta.dat		NameTrajectoryFile
+HGR trajrange			StringSatellite
+../TRAJECTORY/psp.dat		NameTrajectoryFile
+HGR trajrange			StringSatellite
+../TRAJECTORY/solo.dat		NameTrajectoryFile
+
+Set the satellites included for spectra outputs along the trajectory.
+</command>
+
 <command name="SAVEPLOT">
   <parameter name="nFileOut" type="integer" min="0" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">

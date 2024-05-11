@@ -57,38 +57,14 @@ T			UseModulationPot
 
 #SATELLITE
 4			nSatellite
-VAR HGR trajrange		StringSatellite
-5000			DnOutput
--1			DtOutput
+HGR trajrange		StringSatellite
 ../TRAJECTORY/earth.dat		NameTrajectoryFile
--14 d			StartTimeTraj
-14 d			EndTimeTraj
-1 m			DtTraj
-rho ux uy uz bx by bz p pe ehot I01 I02		NameSatelliteVars
-VAR HGR trajrange		StringSatellite
-5000			DnOutput
--1			DtOutput
+HGR trajrange		StringSatellite
 ../TRAJECTORY/sta.dat		NameTrajectoryFile
--14 d			StartTimeTraj
-14 d			EndTimeTraj
-1 m			DtTraj
-rho ux uy uz bx by bz p pe ehot I01 I02		NameSatelliteVars
-VAR HGR trajrange		StringSatellite
-5000			DnOutput
--1			DtOutput
+HGR trajrange		StringSatellite
 ../TRAJECTORY/psp.dat		NameTrajectoryFile
--14 d			StartTimeTraj
-14 d			EndTimeTraj
-1 m			DtTraj
-rho ux uy uz bx by bz p pe ehot I01 I02		NameSatelliteVars
-VAR HGR trajrange		StringSatellite
-5000			DnOutput
--1			DtOutput
+HGR trajrange		StringSatellite
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
--14 d			StartTimeTraj
-14 d			EndTimeTraj
-1 m			DtTraj
-rho ux uy uz bx by bz p pe ehot I01 I02		NameSatelliteVars
 
 #SAVEPLOT
 4			nFileOut
