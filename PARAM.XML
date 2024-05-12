@@ -654,13 +654,14 @@ The number of different time-line tags of the MH_data files.
 
 <command name="SATELLITE">
   <parameter name="nSatellite" type="integer" min="0" default="0" />
+  <parameter name="TypeCoordSystem" type="string" default="HGR" />
   <for name="iSatellite" from="1" to="$nSatellite">
-    <parameter name="StringSatellite" type="strings" default="2" />
     <parameter name="NameTrajectoryFile" type="string" />
   </for>
 
 #SATELLITE
 4				nSatellite
+HGR			TypeCoordSystem
 HGR trajrange			StringSatellite
 ../TRAJECTORY/earth.dat		NameTrajectoryFile
 HGR trajrange			StringSatellite
@@ -671,6 +672,9 @@ HGR trajrange			StringSatellite
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
 
 Set the satellites included for spectra outputs along the trajectory.
+nSatellite is the number of the satellite trajectory, TypeCoordSystem
+is the type of the coordinate system specified for the outputs and
+plotting, and NameTrajectoryFile is the path of the trajectory file.
 </command>
 
 <command name="SAVEPLOT">
