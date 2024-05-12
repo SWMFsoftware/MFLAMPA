@@ -1,4 +1,5 @@
-#  Copyright (C) 2002 Regents of the University of Michigan, portions used with permission 
+#  Copyright (C) 2002 Regents of the University of Michigan,
+#  portions used with permission
 #  For more information, see http://csem.engin.umich.edu/tools/swmf
 
 SHELL =/bin/sh
@@ -47,7 +48,6 @@ MY_LIB = libMFLAMPA.a
 LIBSHARE  = ${LIBDIR}/libSHARE.a
 LIBTIMING = ${LIBDIR}/libTIMING.a
 
-
 DEPEND:
 	@perl ${SCRIPTDIR}/depend.pl ${SEARCH} \
 		${MODULES} ${OBJECTS}
@@ -66,12 +66,11 @@ ${MY_LIB}: ${MODULES} ${OBJECTS} \
 # Additional ibraries should be compiled first
 ${OBJECTS_EXE}: ${LIBSHARE} ${LIBTIMING} ${MY_LIB}
 
-
 MFLAMPA:
 	make ${EXE}
 	@echo ' '
 	@echo Program MFLAMPA has been brought up to date.
-	@echo ' '  
+	@echo ' '
 
 ${EXE}: ${OBJECTS_EXE}
 	rm -rf Tmp_; mkdir Tmp_
@@ -82,7 +81,7 @@ ${EXE}: ${OBJECTS_EXE}
 		ar -x ${LIBSHARE}
 	${LINK.f90} -o ${EXE} ${OBJECTS_EXE} Tmp_/*.o \
 		${LflagMpi}
-	rm -rf Tmp_ 
+	rm -rf Tmp_
 
 clean: cleanfiles
 

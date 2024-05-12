@@ -1,6 +1,6 @@
-# Copyright (C) 2002 Regents of the University of Michigan, 
-# portions used with permission 
-# For more information, see http://csem.engin.umich.edu/tools/swmf
+#  Copyright (C) 2002 Regents of the University of Michigan,
+#  portions used with permission
+#  For more information, see http://csem.engin.umich.edu/tools/swmf
 
 DEFAULT_TARGET = MFLAMPA
 DEFAULT_EXE    = MFLAMPA.exe
@@ -32,7 +32,6 @@ help:
 	@echo '    clean         (remove temp files like: *~ *.o etc)'
 	@echo '    distclean     (equivalent to ./Config.pl -uninstall)'
 
-
 install: src/ModSize.f90
 
 src/ModSize.f90: src/ModSize_orig.f90
@@ -55,7 +54,7 @@ NOMPI:
 COMPONENT = SP
 
 rundir:
-	mkdir -p ${RUNDIR}/SP 
+	mkdir -p ${RUNDIR}/SP
 	cd ${RUNDIR}/SP; \
 		mkdir restartIN restartOUT IO2; \
 		ln -s ${SPDIR}/Param .
@@ -76,7 +75,7 @@ clean:  install
 		cd ../srcInterface; make clean; \
 	fi)
 
-distclean: 
+distclean:
 	./Config.pl -uninstall
 
 allclean:
@@ -99,7 +98,7 @@ test:
 # Same for all tests
 test_compile:
 	./Config.pl -g=20000
-	${MAKE} 
+	${MAKE}
 
 # Same for all tests
 test_run:
@@ -149,7 +148,7 @@ test_poisson:
 
 test_poisson_compile: test_compile
 
-test_poisson_rundir: 
+test_poisson_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.testpoisson PARAM.in
@@ -218,7 +217,7 @@ test_spectra:
 
 test_spectra_compile: test_compile
 
-test_spectra_rundir: 
+test_spectra_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
 	cp -rf ${DIR}/GM/BATSRUS/data/TRAJECTORY ./
