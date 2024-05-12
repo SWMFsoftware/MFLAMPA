@@ -17,7 +17,6 @@ OBJECTS = \
 	ModDistribution.o \
 	ModDiffusion.o \
 	ModGrid.o \
-	ModIO.o \
 	ModMain.o \
 	ModOriginPoints.o \
 	ModPlot.o \
