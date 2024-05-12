@@ -57,13 +57,10 @@ T			UseModulationPot
 
 #SATELLITE
 4			nSatellite
-HGR trajrange		StringSatellite
+HGR			TypeCoordSystem
 ../TRAJECTORY/earth.dat		NameTrajectoryFile
-HGR trajrange		StringSatellite
 ../TRAJECTORY/sta.dat		NameTrajectoryFile
-HGR trajrange		StringSatellite
 ../TRAJECTORY/psp.dat		NameTrajectoryFile
-HGR trajrange		StringSatellite
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
 
 #SAVEPLOT
