@@ -86,7 +86,7 @@ contains
     !--------------------------------------------------------------------------
     do iVertex = 1, iEnd
        ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
-       ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(3/2)/p_inj)^5
+       ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(1/2)/p_inj)^5
        !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
        ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
        CoefInjLocal = CoefInjTiny
@@ -129,7 +129,7 @@ contains
             DistTimesP2Si_I = UpperEndBc_I)
        ! Now, in UpperEndBc_I there is Distribution[Si]*Momentum[Si]**2
        ! Our Momentum_I is MomentumSi_I/MomentumInjSi
-       ! So, UpperEndDc_I is Distribution[Si]*MomentumInjSi**2*Momentum_I**2
+       ! So, UpperEndBc_I is Distribution[Si]*MomentumInjSi**2*Momentum_I**2
        ! The distribution used in our code is
        ! Distribution[Si]*MomentumInjSi**2*Io2Si_V(UnitEnergy_)
        UpperEndBc_I = (UpperEndBc_I/Momentum_I(1:nP)**2)*Io2Si_V(UnitEnergy_)
