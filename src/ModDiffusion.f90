@@ -137,7 +137,7 @@ contains
     ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
-    real   :: DsSi_I(1:nX-1), DsMesh_I(2:nX), DsFace_I(2:nX-1)
+    real   :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
     real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     real   :: Aux1, Aux2
@@ -156,15 +156,14 @@ contains
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
-    DsSi_I(1:nX-1) = State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_)
+    DsMesh_I(2:nX) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
 
     ! Within the framework of finite volume method, the cell
     ! volume is used, which is proportional to the distance between
     ! the faces bounding the volume with an index, i, which is half of
-    ! sum of distance between meshes i-1 and i (i.e. D_I(i-1) and that
-    ! between meshes i and i+1 (which is D_I(i)):
-    DsMesh_I(2:nX) = max(DsSi_I(1:nX-1), cTiny)
-
+    ! sum of distance between meshes i-1 and i (i.e. DsMesh_I(i) and that
+    ! between meshes i and i+1 (which is DsMesh_I(i+1)):
+    DsFace_I(2:nX-1) = max(0.5*(DsMesh_I(3:nX)+DsMesh_I(2:nX-1)), cTiny)
     ! In flux coordinates, the control volume associated with the
     ! given cell has a cross-section equal to (Magnetic Flux)/B,
     ! where the flux is a constant along the magnetic field line,
@@ -177,7 +176,6 @@ contains
     !                 (f^(n+1)_(i-1) - f^(n+1)_i),
     !  The multiplier, DsFace_i/B_i, is denoted as DsFace_i/DOuter_i
     !  The face-centered combination,
-    DsFace_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1)+DsSi_I(1:nX-2)), cTiny)
 
     MOMENTUM:do iP = 1, nP
        ! For each momentum account for dependence
@@ -202,19 +200,26 @@ contains
        ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
        !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
        !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
-
        ! Set source term in the RHS:
        Res_I = Distribution_CB(iP, 1, 1:nX, iLine)
        ! Set elements of tri-diagonal matrix in the LHS
-       Main_I = 1.0
+       Main_I = 1.0; Lower_I = 0.0; Upper_I = 0.0
        ! For i=1:
        Aux1 = DtLocal_II(1,iP)*DOuterSi_I(1)*                        &
             0.5*(DInnerSi_I(1) + DInnerSi_I(2))/DsMesh_I(2)**2
        Main_I(1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
        if(present(LowerEndSpectrum_I)) then
+          ! With the given value for f_0 behind the boundary,
+          ! the above scheme reads:
+          ! f^(n+1)_1-Dt*DOuter_I/DsFace_I*(&
+          !     DInner_(3/2)*(f^(n+1)_2-f^(n+1)_1)/DsMesh_(2)-&
+          !     DInner_(1/2)*(f^(n+1)_1 -f_0/DsMesh_(1))=f^n_1        
           Aux2 = DtLocal_II(1,iP)*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
+          ! With these regards, Aux2 is added to Main_I(1)... 
           Main_I(1) = Main_I(1) + Aux2
+          ! ...while the given Aux2*f_0 should moved to the RHS and summed up
+          ! with the source:
           Res_I(1) = Res_I(1) + Aux2*LowerEndSpectrum_I(iP)
        end if
 
@@ -232,11 +237,23 @@ contains
        end do
 
        ! For i=n:
-       Aux2 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*                      &
-            0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/DsMesh_I(nX)**2
-       Main_I( nX) = Main_I(nX) + Aux2
-       Lower_I(nX) = -Aux2
+       ! Version before Nov. 2023:
+       ! Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
+       !     DsMesh_I(n)**2
+       !
+       ! After Nov. 2023: set free escaping at outerboundary for now
+       ! Aux2=0.
+       ! In both these versions:
+       ! Main_I( n) = Main_I(n) + Aux2
+       ! Lower_I(n) = -Aux2
+       ! So, effectively for the version after Nov. 2023
+       ! Main_I(n) = 1; Lower_I(n) = 0 (equivalently to doing nothing)
+       ! For backward compatibility, keep this option for UseUpperBc=.false.
        if(present(UpperEndSpectrum_I)) then
+          Aux2 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*                      &
+               0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/DsMesh_I(nX)**2
+          Main_I( nX) = Main_I(nX) + Aux2
+          Lower_I(nX) = -Aux2
           Aux1 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*DInnerSi_I(nX)/    &
                DsMesh_I(nX)**2
           Main_I(nX) = Main_I(nX) + Aux1
