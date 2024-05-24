@@ -141,13 +141,15 @@ contains
   end subroutine advect_via_poisson
   !============================================================================
   subroutine iterate_poisson(iLine, nX, iShock,    &
-       CflIn, uSi_I, BSi_I, nSi_I, DsSi_I)
+       CflIn, uSi_I, BSi_I, nSi_I)
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
     use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
     use ModNumConst,        ONLY: cTiny
     use ModPoissonBracket,  ONLY: explicit
+    use SP_ModGrid,         ONLY: State_VIB, D_
+    use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
 
@@ -155,7 +157,8 @@ contains
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: CflIn     ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX), DsSi_I(nX)
+    real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX)
+    real               :: DsSi_I(nX-1)
     ! Loop variable
     integer :: iX
     ! Volume_G: global space volume = product of distance in each dimension
@@ -175,6 +178,8 @@ contains
     ! Now particle-number-conservative advection scheme for steady-state soln.
     !--------------------------------------------------------------------------
 
+    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
+    DsSi_I(1:nX-1) = State_VIB(   D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! Initialize arrays
     VolumeX_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1) + &
          DsSi_I(1:nX-2)), cTiny)/BSi_I(2:nX-1)
