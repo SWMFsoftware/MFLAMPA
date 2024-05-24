@@ -137,7 +137,7 @@ contains
     ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
-    real   :: DsSi_I(1:nX), DsMesh_I(2:nX), DsFace_I(2:nX-1)
+    real   :: DsSi_I(1:nX-1), DsMesh_I(2:nX), DsFace_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
     real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     real   :: Aux1, Aux2
@@ -156,7 +156,7 @@ contains
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
     ! while DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
-    DsSi_I(1:nX) = State_VIB(D_,1:nX,iLine)*Io2Si_V(UnitX_)
+    DsSi_I(1:nX-1) = State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_)
 
     ! Within the framework of finite volume method, the cell
     ! volume is used, which is proportional to the distance between
