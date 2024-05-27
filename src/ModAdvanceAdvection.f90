@@ -4,8 +4,8 @@
 module SP_ModAdvanceAdvection
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, dLogP, &
-       Background_I
+  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, &
+       dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
@@ -18,8 +18,8 @@ module SP_ModAdvanceAdvection
   public :: advect_via_log
 contains
   !============================================================================
-  subroutine advect_via_log(iLine, nX, iShock, DtProgress, Cfl, &
-       dLogRho_I, nSi_I, BSi_I, IsDistNeg)
+  subroutine advect_via_log(iLine, nX, iShock, DtProgress,  &
+       Cfl, dLogRho_I, nSi_I, BSi_I)
     ! The subroutine encapsulates the logarithmic advection scheme,
     ! which is non-conservative, and the diffusion
 
@@ -38,9 +38,6 @@ contains
     real,    intent(in):: dLogRho_I(1:nX)
     ! Density and magnetic field at the upper level
     real,    intent(in):: nSI_I(1:nX), BSI_I(1:nX)
-    ! OUTPUT:
-    ! Check if any distrubution function value is negative
-    logical, intent(out):: IsDistNeg
     ! local variables, declared in this subroutine
     integer  :: iStep, iVertex      ! loop variables
     ! time step is split for nStep intervals,  so short that the CFL for
@@ -56,7 +53,7 @@ contains
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
     ! first order Fermi acceleration for the current line
-    FermiFirst_I = DLogRho_I/(3*DLogP)
+    FermiFirst_I = DLogRho_I/(3*dLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1 + int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:
@@ -69,13 +66,8 @@ contains
        call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! advection in the momentum space
        do iVertex = 1, nX
-          if(any(Distribution_CB(0:nP+1,1,iVertex,iLine) < 0.0)) then
-             write(*,*) NameSub, ': Distribution_IIB < 0'
-             Used_B(iLine) = .false.
-             nVertex_B(iLine) = 0
-             IsDistNeg = .true.
-             RETURN
-          end if
+          call check_dist_neg(NameSub, iVertex, iVertex, iLine)
+          if(IsDistNeg)RETURN
           call advance_log_advection(FermiFirst_I(iVertex), &
                1, 1, Distribution_CB(0:nP+1,1,iVertex,iLine))
        end do
@@ -96,6 +88,8 @@ contains
                   /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)))
           end if
        end if
+       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+       if(IsDistNeg)RETURN
     end do STEP
   end subroutine advect_via_log
   !============================================================================

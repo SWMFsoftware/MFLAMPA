@@ -8,8 +8,9 @@ module SP_ModAdvancePoisson
   ! See https://doi.org/10.1016/j.jcp.2023.111923
   use SP_ModSize,         ONLY: nVertexMax
   use SP_ModGrid,         ONLY: nLine
-  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, Background_I
-  use ModUtilities,     ONLY: CON_stop
+  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, &
+       Background_I, IsDistNeg, check_dist_neg
+  use ModUtilities,       ONLY: CON_stop
   implicit none
 
   PRIVATE ! Except
@@ -25,7 +26,7 @@ module SP_ModAdvancePoisson
   ! \Deltas/b, ln(B\deltas^2) at New time
   real, public, dimension(nVertexMax) :: DeltaSOverBNew_C, LnBDeltaS2New_C
   ! Time-derivatives:
-  real, public, dimension(nVertexMax) :: DeltaSOverB_C,  &
+  real, public, dimension(nVertexMax) :: DeltaSOverB_C, &
        dDeltaSOverBDt_C, dLnBdeltaS2Dt_C, bDuDt_C
 contains
   !============================================================================
@@ -34,11 +35,12 @@ contains
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
 
-    use SP_ModDistribution, ONLY: DLogP, VolumeP_I, Momentum3_I
+    use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
-
+    use SP_ModGrid,      ONLY: Used_B, nVertex_B
+    ! INPUTS:
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: tFinal    ! Time interval to advance through
@@ -69,8 +71,10 @@ contains
     ! Prediction for the next time step:
     real    :: DtNext
     ! Now this is the particle-number-conservative advection scheme
+    character(len=*), parameter:: NameSub = 'advect_via_poisson'
     !--------------------------------------------------------------------------
 
+    IsDistNeg = .false.
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
@@ -96,18 +100,19 @@ contains
     Time   = 0.0
     ! Trial timestep
     DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
-         max(VolumeXEnd_I, VolumeXStart_I))/(3*DLogP)
+         max(VolumeXEnd_I, VolumeXStart_I))/(3*dLogP)
 
     ! Advection by Poisson bracket scheme
     do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time)
-       ! update bc for at minimal and maximal energy
+       ! Update Bc for VDF at minimal and maximal energy
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        call set_VDF(iLine, nX, VDF_G)
        ! Volume Updates
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
+
        ! Advance by Poisson bracket scheme
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX = dHamiltonian01_FX,       &
@@ -120,8 +125,10 @@ contains
        ! Update velocity distribution function
        Distribution_CB(1:nP, 1, 1:nX, iLine) = &
             Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
-       if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
-            call CON_stop('Negative distribution function after Poisson, ta')
+       ! Check if the VDF includes negative values
+       call check_dist_neg(NameSub, 1, nX, iLine)
+       if(IsDistNeg)RETURN
+
        ! Diffuse the distribution function
        if(UseDiffusion) then
           if(UseUpperEndBc) then
@@ -133,6 +140,9 @@ contains
                   nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
           end if
        end if
+       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+       if(IsDistNeg)RETURN
+
        ! Update time
        Time = Time + Dt
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
@@ -176,6 +186,7 @@ contains
     ! Time step
     real    :: Dt_C(nP, nX)
     ! Now particle-number-conservative advection scheme for steady-state soln.
+    character(len=*), parameter:: NameSub = 'iterate_poisson'
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
@@ -216,8 +227,8 @@ contains
     ! Update velocity distribution function
     Distribution_CB(1:nP, 1, 1:nX, iLine) = &
          Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
-    if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
-         call CON_stop('Negative distribution function after Poisson')
+    call check_dist_neg(NameSub, 1, nX, iLine)
+    if(IsDistNeg)RETURN
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
@@ -229,8 +240,8 @@ contains
           call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
                nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
        end if
-       if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
-            call CON_stop('Negative distribution function after diffusion')
+       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+       if(IsDistNeg)RETURN
     end if
 
   end subroutine iterate_poisson
@@ -280,6 +291,7 @@ contains
     ! Mark whether this is the last run:
     logical :: IsExit
     ! Now this is the particle-number-conservative advection scheme with \mu
+    character(len=*), parameter:: NameSub = 'advect_via_multi_poisson'
     !--------------------------------------------------------------------------
 
     ! Calculate time derivative of total control volume
@@ -302,7 +314,7 @@ contains
     ! Advection by multiple-Poisson-bracket scheme
     do
        ! Time Updates
-       if (DtNext > tFinal - Time) then
+       if(DtNext > tFinal - Time) then
           Dt = tFinal - Time
           IsExit = .true.          ! Last step
        else
@@ -316,7 +328,7 @@ contains
        ! Advance by multi-Poisson-bracket scheme
        call advance_multi_poisson(DtIn=Dt)
 
-       if (IsExit) then
+       if(IsExit) then
           ! This step is the last step
           Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =       &
                Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) + Source_C
@@ -340,11 +352,14 @@ contains
                Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) +   &
                Source_C/Volume_G(1:nP, 1:nMu, 1:nX)
        end if
+       call check_dist_neg(NameSub, 1, nX, iLine)
+       if(IsDistNeg)RETURN
 
        ! ------------ Future Work ------------
        ! This is the first version of draft implementing multi-Poisson-bracket
        ! scheme in SP/MFLAMPA made by Weihao Liu. It needs more development
        ! in the future. Here, we will also include some scattering functions.
+       ! (Clearly, UseDiffusion and diffuse_distrition is missing here.)
        ! Moreover, the structure should be optimized, with some bugs fixed.
        ! One can refer to test_multi_poisson in share/Library/test/
        ! One should specify the TypeScatter in the PARAM.in file.
