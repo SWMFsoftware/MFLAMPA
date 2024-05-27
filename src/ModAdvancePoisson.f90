@@ -120,7 +120,6 @@ contains
        ! Update velocity distribution function
        Distribution_CB(1:nP, 1, 1:nX, iLine) = &
             Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
-       end if
        if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
             call CON_stop('Negative distribution function after Poisson, ta')
        ! Diffuse the distribution function
