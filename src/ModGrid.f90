@@ -340,7 +340,7 @@ contains
                      - MhData_VIB(X_:Z_, iVertex, iLine)) ) & ! X_:Z_(iVertex))
                      /State_VIB(D_, iVertex, iLine)
              else
-                call CON_stop(NameSum//': zero size of mesh')
+                call CON_stop(NameSub//': zero size of mesh')
              end if
           end if
           ! else
