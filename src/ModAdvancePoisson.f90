@@ -159,7 +159,7 @@ contains
     use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
     use ModNumConst,        ONLY: cTiny
     use ModPoissonBracket,  ONLY: explicit
-    use SP_ModGrid,         ONLY: State_VIB, D_
+    use SP_ModGrid,         ONLY: State_VIB, D_, U_
     use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
@@ -168,16 +168,16 @@ contains
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: CflIn     ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: uSi_I(nX), BSi_I(nX), nSi_I(nX)
-    real               :: DsSi_I(nX-1)
+    real,    intent(in):: BSi_I(nX), nSi_I(nX)
+    real               :: uSi_I(nX-1), DsSi_I(nX-1)
     ! Loop variable
     integer :: iX
     ! Volume_G: global space volume = product of distance in each dimension
     real    :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real    :: VolumeX_I(0:nX+1)
-    ! u/B variable at cell center and face
-    real    :: uOverBSi_I(nX), uOverBNodeSi_I(-1:nX+1)
+    ! u/B variable at face
+    real    :: uOverBNodeSi_I(-1:nX+1)
     ! Hamiltonian at cell face
     real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
@@ -191,7 +191,7 @@ contains
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    DsSi_I(1:nX-1) = max(State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_), cTiny)
+    DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! Initialize arrays
     VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
     VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
@@ -203,18 +203,23 @@ contains
        Volume_G(:,iX) = VolumeP_I*VolumeX_I(iX)
     end do
 
-    ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|^2 at cell center
-    uOverBSi_I             = uSi_I/BSi_I
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|^2 at cell face
-    uOverBNodeSi_I(1:nX-1) = 0.5*(uOverBSi_I(2:nX) + uOverBSi_I(1:nX-1))
-    uOverBNodeSi_I(0 )     = uOverBSi_I(1)
+    ! u/B with the index of "i" is the value at the face between
+    ! the mesh "i" and "i+1"
+    ! uSi_I with the index of "i" is the value at the face between
+    ! the mesh "i" and "i+1"
+    uSi_I(1:nX-1)  = State_VIB(U_, 1:nX-1, iLine)
+    ! Average 1/B and multiply by uSi
+    uOverBNodeSi_I(1:nX-1) = (0.50/BSi_I(2:nX) + 0.50/BSi_I(1:nX-1))*&
+         uSi_I(1:nX-1)
+    uOverBNodeSi_I(0 )     = uSi_I(1)/BSi_I(1)
     uOverBNodeSi_I(-1)     = uOverBNodeSi_I(0)
-    uOverBNodeSi_I(nX)     = uOverBSi_I(nX-1)
+    uOverBNodeSi_I(nX)     = uSi_I(nX-1)/BSi_I(nX)
     uOverBNodeSi_I(nX+1)   = uOverBNodeSi_I(nX)
 
-    ! Hamiltonian = -abs(u/B)*(p**3/3) at cell face, for {s_L, p^3/3}
+    ! Hamiltonian = -(u/B)*(p**3/3) at cell face, for {s_L, p^3/3}
     do iX = -1, nX+1
-       Hamiltonian_N(:, iX) = -abs(uOverBNodeSi_I(iX))*Momentum3_I
+       Hamiltonian_N(:, iX) = - uOverBNodeSi_I(iX))*Momentum3_I
     end do
 
     ! Update bc for at minimal energy, at nP = 0
@@ -297,6 +302,7 @@ contains
     !--------------------------------------------------------------------------
 
     ! Calculate time derivative of total control volume
+    !--------------------------------------------------------------------------
     do iX = 1, nX
        do iMu = 0, nMu+1
           dVolumeDt_G(:, iMu, iX) = dDeltaSOverBDt_C(iX)*DeltaMu*VolumeP_I
@@ -567,8 +573,8 @@ contains
     real    :: Velocity_I(0:nP+1)   ! Particle velocity array at cell face
     real    :: InvBSi_I(nX), InvBFaceSi_I(0:nX) ! 1/B at center and face
     integer :: iX, iMu              ! Loop variables
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
     ! Considering the law of relativity, v=1/sqrt(1+m^2*c^2/p^2), v can be
     ! calculated as a function of p. Note that light speed is the unit of
@@ -613,8 +619,8 @@ contains
     real, intent(inout) :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
     integer             :: iX, iMu        ! Loop variables
     ! Calculate the third hamiltonian function
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     do iX = 1, nX
        do iMu = 0, nMu
           Hamiltonian3_N(:, iMu, iX) = 0.5*(1.0 - MuFace_I(iMu)**2)* &

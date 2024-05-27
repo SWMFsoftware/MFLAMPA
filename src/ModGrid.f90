@@ -312,6 +312,7 @@ contains
     integer:: iLine, iVertex, iEnd
     integer:: iAux1, iAux2
     real   :: XyzAux1_D(x_:z_), XyzAux2_D(x_:z_)
+    character(len=*), parameter:: NameSub = 'get_other_state_var'
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
@@ -320,18 +321,28 @@ contains
           ! magnetic field
           State_VIB(B_,iVertex, iLine) = &
                norm2(MhData_VIB(Bx_:Bz_,iVertex,iLine))
-          ! plasma speed (negative if velocity is antiparallel to
-          ! magnetic field)
-          State_VIB(U_,iVertex, iLine) = &
-               sum(MhData_VIB(Ux_:Uz_,iVertex,iLine)*&
-               MhData_VIB(Bx_:Bz_,iVertex,iLine))/   &
-               State_VIB(B_,iVertex, iLine)
           ! distances between particles
+          ! NOTE: the iVertex'th value is the distance from
+          ! i'th to (i+1)'th nodes
           ! if(.not.DoSmooth)then
-          if(iVertex /=nVertex_B(iLine))&
-               State_VIB(D_, iVertex, iLine) = norm2(&
-               MhData_VIB(X_:Z_, iVertex    , iLine) - &
-               MhData_VIB(X_:Z_, iVertex + 1, iLine))
+          if(iVertex /=nVertex_B(iLine))then
+             State_VIB(D_, iVertex, iLine) = norm2(&
+                  MhData_VIB(X_:Z_, iVertex    , iLine) - &
+                  MhData_VIB(X_:Z_, iVertex + 1, iLine))
+             ! plasma velocity projection onto the direction of
+             ! vector from X_:Z_(iVertex) to X_:Z_(iVertex+1)
+             ! which is the direction of the magnetic field at the face
+             if(State_VIB(D_, iVertex, iLine) > 0.0)then
+                State_VIB(U_,iVertex, iLine) = 0.50*&
+                     sum( (MhData_VIB(Ux_:Uz_,iVertex,iLine) & ! 0.5(u_{i+1}&
+                     + MhData_VIB(Ux_:Uz_,iVertex+1,iLine) )*& ! +u_i)\cdot
+                     (MhData_VIB(X_:Z_, iVertex+1,iLine) &! (X_:Z_(iVertex+1)-&
+                     - MhData_VIB(X_:Z_, iVertex, iLine)) ) & ! X_:Z_(iVertex))
+                     /State_VIB(D_, iVertex, iLine)
+             else
+                call CON_stop(NameSum//': zero size of mesh')
+             end if
+          end if
           ! else
           ! smoothing is done by groups:
           ! nSmooth particles are aggeregated into single effective one,
