@@ -351,15 +351,12 @@ contains
           EFlux = sum(dEFlux_I)
 
           ! Calculate GOES channels' fluxes
-          do iP = 1, nP - 1
-             do iFlux = 1, nFluxChannel
+          do iFlux = 1, nFluxChannel
+             do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
-                if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux))&
-                     CYCLE
+                if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux))CYCLE
 
-                if(KinEnergyIo_I(iP) >= EChannelIo_I(iFlux))then
-                   Flux_I(iFlux) = Flux_I(iFlux) + dFlux_I(iP)
-                else
+                if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux))then
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
                    dFlux1 = ( &
@@ -370,6 +367,9 @@ contains
                         (KinEnergyIo_I(iP)-EChannelIo_I(iFlux))/      &
                         (KinEnergyIo_I(iP+1)-KinEnergyIo_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
+                else
+                   Flux_I(iFlux) = Flux_I(iFlux) + sum(dFlux_I(iP:nP-1))
+                   EXIT
                 end if
              end do
           end do
