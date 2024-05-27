@@ -151,8 +151,7 @@ contains
 
   end subroutine advect_via_poisson
   !============================================================================
-  subroutine iterate_poisson(iLine, nX, iShock,    &
-       CflIn, uSi_I, BSi_I, nSi_I)
+  subroutine iterate_poisson(iLine, nX, iShock, CflIn, BSi_I, nSi_I)
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
@@ -219,7 +218,7 @@ contains
 
     ! Hamiltonian = -(u/B)*(p**3/3) at cell face, for {s_L, p^3/3}
     do iX = -1, nX+1
-       Hamiltonian_N(:, iX) = - uOverBNodeSi_I(iX))*Momentum3_I
+       Hamiltonian_N(:, iX) = -uOverBNodeSi_I(iX)*Momentum3_I
     end do
 
     ! Update bc for at minimal energy, at nP = 0
