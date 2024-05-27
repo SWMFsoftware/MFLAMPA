@@ -4,10 +4,10 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-  use SP_ModSize, ONLY: nVertexMax
-  use SP_ModGrid, ONLY: State_VIB, MHData_VIB, iShock_IB, D_,  &
+  use SP_ModSize,   ONLY: nVertexMax
+  use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, iShock_IB, D_,   &
        Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
-  use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+  use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -197,21 +197,20 @@ contains
       ! becomes steeper for the current line
       real   :: DsSi_I(1:iEnd-1)
       integer:: iVertex ! loop variable
-      real   :: DLogRhoExcessIntegral, DLogRhoExcess
+      real   :: DLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
+      real   :: DLogRhoExcessIntegral
       ! find the excess of DLogRho within the shock compared
       ! to background averaged over length
       !------------------------------------------------------------------------
-      DLogRhoExcessIntegral = 0.0
       DsSi_I = State_VIB(D_,1:iEnd-1,iLine)*Io2Si_V(UnitX_)
-      do iVertex = iShock-nWidth, iShock+nWidth-1
-         DLogRhoExcess = 0.5*(DLogRho_I(iVertex) + DLogRho_I(iVertex+1)) &
-              - DLogRhoThreshold ! D log(rho)/Dt*\Delta t = -\div U*\Delta t
-         if(DLogRhoExcess>0) then
-            ! This is a jump in velocity accross the shock wave * \Delta t
-            DLogRhoExcessIntegral = DLogRhoExcessIntegral + &
-                 DLogRhoExcess*DsSi_I(iVertex)
-         end if
-      end do
+      DLogRhoExcess = 0.5*(DLogRho_I(iShock-nWidth:iShock+nWidth-1) + &
+           DLogRho_I(iShock-nWidth+1:iShock+nWidth)) - DLogRhoThreshold
+      where(DLogRhoExcess<0.0)
+         DLogRhoExcess = 0.0
+      end where
+      ! A jump (DLogRhoExcess>0) in velocity accross the shock wave * \Delta t
+      DLogRhoExcessIntegral = sum(DLogRhoExcess*   &
+           DsSi_I(iShock-nWidth:iShock+nWidth-1))
 
       ! check for zero excess
       if(DLogRhoExcessIntegral == 0.0) RETURN
@@ -260,12 +259,12 @@ contains
        ! Various data along the line in SI units. Temperature is in the unit
        ! of kinetic energy, all others are in SI units.
        ! Vector U and B are needed for Hamiltonian
-       uSi_I(1:iEnd)  = State_VIB(   U_, 1:iEnd, iLine)
-       BSi_I(1:iEnd)  = State_VIB(   B_, 1:iEnd, iLine)
+       uSi_I(1:iEnd) = State_VIB(   U_, 1:iEnd, iLine)
+       BSi_I(1:iEnd) = State_VIB(   B_, 1:iEnd, iLine)
        ! nSi is needed to set up the distribution at the injection.
-       nSI_I(1:iEnd)  = MhData_VIB(Rho_, 1:iEnd, iLine)
+       nSI_I(1:iEnd) = MhData_VIB(Rho_, 1:iEnd, iLine)
        ! find how far shock has travelled on this line
-       iShock    = iShock_IB(Shock_,   iLine)
+       iShock = iShock_IB(Shock_,   iLine)
 
        ! First, set the diffusion coefficient, from the
        ! given formulae or from the turbulent specrtum, if known

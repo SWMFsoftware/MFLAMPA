@@ -10,8 +10,7 @@ module SP_ModDistribution
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use ModNumConst, ONLY: cTiny
-  use ModConst,    ONLY: cLightSpeed, energy_in, cMeV
+  use ModConst,    ONLY: cLightSpeed, cMeV
   use SP_ModSize,  ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
@@ -68,7 +67,7 @@ module SP_ModDistribution
   !-----------------Grid in the momentum space---------------------------------
   ! iP     0     1                         nP   nP+1
   !        |     |    ....                 |     |
-  ! P      P_inj P_inj*exp(\Delta(log P))  P_Max P_Max*exp(DLogP)
+  ! P     P_inj P_inj*exp(DLogP)          P_Max P_Max*exp(DLogP)
   !-----------------Control volumes and faces----------------------------------
   ! Vol  | 0  |  1  |.........          |  nP | nP+1 |
   ! Fcs -1    0     1 ....            nP-1    nP    nP+1
@@ -103,7 +102,6 @@ contains
     ! set the initial distribution on all lines
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
-
     if(.not.DoInit)RETURN
     DoInit = .false.
 
@@ -157,7 +155,7 @@ contains
     end do
 
     ! GOES by default
-    if (.not. allocated(NameFluxChannel_I)) then
+    if(.not. allocated(NameFluxChannel_I)) then
        nFluxChannel = 6
        allocate(NameFluxChannel_I(0:nFluxChannel+1))
        NameFluxChannel_I = ['flux_total', 'flux_00005', 'flux_00010', &
@@ -169,13 +167,12 @@ contains
     EChannelIo_I  = EChannelIo_I & ! In MeV Now!!
          *cMeV                   & ! in SI
          *Si2Io_V(UnitEnergy_)     ! in NameUnitEnergy
-    if(allocated(NameFluxUnit_I))&
-         deallocate(NameFluxUnit_I)
+    if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
     allocate(NameFluxUnit_I(0:nFluxChannel+1))
     NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
     NameFluxUnit_I(1+nFluxChannel) = NameEnergyFluxUnit
 
-    if (.not. allocated(Flux_VIB)) then
+    if(.not. allocated(Flux_VIB)) then
        allocate(Flux_VIB(Flux0_:FluxMax_,1:nVertexMax,nLine), &
             stat=iError); call check_allocate(iError, 'Flux_VIB')
        Flux_VIB = -1.0
@@ -205,9 +202,9 @@ contains
     select case(NameCommand)
     case('#MOMENTUMGRID')
        ! Read unit to be used for particle energy: eV, keV, GeV
-       call read_var('EnergyMin',      EnergyInjIo)
-       call read_var('EnergyMax',      EnergyMaxIo)
-       call read_var('nP',             nPCheck    )
+       call read_var('EnergyMin', EnergyInjIo)
+       call read_var('EnergyMax', EnergyMaxIo)
+       call read_var('nP',        nPCheck    )
        if(nP/=nPCheck)then
           if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
                'Code is configured with nMomentum=', nP,         &
@@ -262,7 +259,7 @@ contains
   subroutine offset(iLine, iOffset)
 
     use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_, ShockOld_, &
-         iShock_IB,  State_VIB, MHData_VIB, X_, Z_, FootPoint_VB
+         iShock_IB, State_VIB, MHData_VIB, X_, Z_, FootPoint_VB
     ! shift in the data arrays is required if the grid point(s) is
     ! appended or removed at the foot point of the magnetic field
     ! line. SHIFTED ARE: State_VIB(/RhoOld_,BOld_),Distribution_IIB
@@ -303,7 +300,7 @@ contains
        end where
     elseif(iOffset < 0)then
        State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &
-            =  State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
+            = State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
             - iOffset, iLine)
        Distribution_CB(:,:,1:nVertex_B(iLine), iLine)&
             = Distribution_CB(:,:,1-iOffset:nVertex_B(iLine)-iOffset, &
@@ -318,13 +315,11 @@ contains
   !============================================================================
   subroutine get_integral_flux
 
-    use ModConst, ONLY: energy_in
     use SP_ModGrid,  ONLY: Used_B
     ! compute the total (simulated) integral flux of particles as well as
     ! particle flux in the 6 GOES channels; also compute total energy flux
 
     integer:: iLine, iVertex, iP, iFlux ! loop variables
-    real   :: Flux, EFlux  ! the value of particle and energy fluxes
     real   :: DistTimesP2_I(1:nP), DistTimesP2E_I(1:nP) ! f*p**2, f*p**2*Ek
     real   :: dFlux_I(1:nP-1), dEFlux_I(1:nP-1) ! increments of each bin
     real   :: dFlux1       ! increments of the bin where channel falls in
@@ -334,22 +329,23 @@ contains
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
        do iVertex = 1, nVertex_B(iLine)
-          ! Integration loop with midpoint rule
-          ! Reset values
-          Flux_I = 0.0
           ! Calculate intermediate variables
           DistTimesP2_I = Distribution_CB(1:nP, nMu, iVertex, iLine)* &
                Momentum_I(1:nP)**2
           DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_I(1:nP)
           ! Increment of particle and energy fluxes
+          ! Integration loop with midpoint rule
           dFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))*  &
                (DistTimesP2_I(1:nP-1) + DistTimesP2_I(2:nP))
           dEFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))* &
                (DistTimesP2E_I(1:nP-1) + DistTimesP2E_I(2:nP))
-          ! Calculate the total particle and energy fluxes
-          Flux = sum(dFlux_I)
-          EFlux = sum(dEFlux_I)
 
+          ! Calculate and store the total particle and energy fluxes
+          Flux_VIB(Flux0_, iVertex, iLine) = sum(dFlux_I)*Si2Io_V(UnitFlux_)
+          Flux_VIB(EFlux_, iVertex, iLine) = sum(dEFlux_I)*Si2Io_V(UnitFlux_)
+
+          ! Reset values
+          Flux_I = 0.0
           ! Calculate GOES channels' fluxes
           do iFlux = 1, nFluxChannel
              do iP = 1, nP-1
@@ -368,19 +364,15 @@ contains
                         (KinEnergyIo_I(iP+1)-KinEnergyIo_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 else
+                   ! for the rest bins: make a summation
                    Flux_I(iFlux) = Flux_I(iFlux) + sum(dFlux_I(iP:nP-1))
                    EXIT
                 end if
              end do
           end do
-
-          ! Store the results
-          Flux_VIB(Flux0_,              iVertex, iLine) = &
-               Flux   * Si2Io_V(UnitFlux_)
+          ! Store the results for specified energy channels
           Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
                Flux_I * Si2Io_V(UnitFlux_)
-          Flux_VIB(EFlux_,              iVertex, iLine) = &
-               EFlux  * Si2Io_V(UnitFlux_)
        end do
     end do
   end subroutine get_integral_flux

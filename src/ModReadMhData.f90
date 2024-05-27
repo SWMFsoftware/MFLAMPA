@@ -4,15 +4,13 @@
 module SP_ModReadMhData
 
   ! This module contains methods for reading input MH data
-
-  use SP_ModGrid,    ONLY: iblock_to_lon_lat, get_other_state_var,   &
-       nMHData, nLine, Z_, Used_B,  &
-       FootPoint_VB, nVertex_B, MHData_VIB, LagrID_
-  use SP_ModTime,    ONLY: SPTime, DataInputTime
+  use SP_ModGrid,   ONLY: iblock_to_lon_lat, get_other_state_var, nMhData, &
+       nLine, Z_, Used_B, FootPoint_VB, nVertex_B, MhData_VIB, LagrID_
+  use SP_ModTime,   ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
-  use ModPlotFile,   ONLY: read_plot_file
-  use ModUtilities,  ONLY: fix_dir_name, open_file, close_file, CON_stop
-  use ModIoUnit,     ONLY: io_unit_new
+  use ModPlotFile,  ONLY: read_plot_file
+  use ModUtilities, ONLY: fix_dir_name, open_file, close_file, CON_stop
+  use ModIoUnit,    ONLY: io_unit_new
 
   implicit none
 
@@ -28,12 +26,12 @@ module SP_ModReadMhData
   ! If the folliwing logical is true, read MH_data from files
   logical, public :: DoReadMhData = .false.
   ! the input directory
-  character(len=100)         :: NameInputDir=""
+  character(len=100) :: NameInputDir=""
   ! the name with list of file tags
-  character(len=100)         :: NameTagFile=""
+  character(len=100) :: NameTagFile=""
   ! the input file name base
-  character(len=4)           :: NameFileExtension
-  character(len=20)          :: TypeMhDataFile
+  character(len=4)   :: NameFileExtension
+  character(len=20)  :: TypeMhDataFile
 
   ! IO unit for file with list of tags
   integer:: iIOTag
@@ -116,9 +114,9 @@ contains
   !============================================================================
   subroutine read_mh_data(DoOffsetIn)
 
-    use SP_ModPlot,    ONLY: NameMHData
+    use SP_ModPlot, ONLY: NameMHData
 
-    logical, optional, intent(in ):: DoOffsetIn
+    logical, optional, intent(in):: DoOffsetIn
     ! read 1D MH data, which are produced by write_mh_1d n ModWrite
     ! separate file is read for each field line, name format is
     ! (usually)MH_data_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
@@ -184,12 +182,10 @@ contains
        ! find offset in data between new and old states
        if(DoOffset)then
           ! check consistency: time counter MUST advance
-          if(DataInputTimeOld >= DataInputTime)then
-             call CON_stop(NameSub//&
-                  ': time counter didnt advance when reading mh data file '//&
-                  'with tag '//trim(StringTag)//&
-                  '; the tag may be repeated in '//trim(NameTagFile))
-          end if
+          if(DataInputTimeOld >= DataInputTime)&
+               call CON_stop(NameSub//': time counter didnt advance '//&
+               'when reading mh data file with tag '//trim(StringTag)//&
+               '; the tag may be repeated in '//trim(NameTagFile))
           ! amount of the offset is determined from difference
           ! in LagrID_
           iOffset = nint(FootPoint_VB(LagrID_,iLine) - Param_I(LagrID_))
@@ -199,12 +195,10 @@ contains
        ! Parameters
        FootPoint_VB(LagrID_:Z_,iLine) = Param_I(LagrID_:Z_)
        ! read MH data
-       call read_plot_file(NameFile           ,&
-            TypeFileIn = TypeMhDataFile       ,&
-            Coord1Out_I= MHData_VIB(LagrID_   ,&
-            1:nVertex_B(iLine),iLine)         ,&
-            VarOut_VI  = MHData_VIB(1:nMHData ,&
-            1:nVertex_B(iLine),iLine))
+       call read_plot_file(NameFile    ,  &
+            TypeFileIn = TypeMhDataFile,  &
+            Coord1Out_I= MhData_VIB(LagrID_,1:nVertex_B(iLine),iLine),&
+            VarOut_VI  = MhData_VIB(1:nMhData,1:nVertex_B(iLine),iLine))
        ! apply offset
        call offset(iLine, iOffset)
     end do line

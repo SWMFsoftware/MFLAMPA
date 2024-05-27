@@ -12,7 +12,7 @@ module SP_ModBc
   use SP_ModGrid,         ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
   use SP_ModUnit,         ONLY: kinetic_energy_to_momentum,           &
        UnitEnergy_, UnitX_, Io2Si_V
-  use ModUtilities, ONLY: CON_stop
+  use ModUtilities,       ONLY: CON_stop
   implicit none
 
   SAVE
@@ -90,12 +90,12 @@ contains
        !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
        ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
        CoefInjLocal = CoefInjTiny
-       MomentumSi   = kinetic_energy_to_momentum(                     &
+       MomentumSi   = kinetic_energy_to_momentum(  &
             MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
-       DistributionBc = (SpectralIndex-3)/(4*cPi)                     &
-            * MomentumInjSi**2*Io2Si_V(UnitEnergy_)                   &
-            * nSi_I(iVertex)/MomentumSi**3                            &
+       DistributionBc = (SpectralIndex-3)/(4*cPi)        &
+            * MomentumInjSi**2*Io2Si_V(UnitEnergy_)      &
+            * nSi_I(iVertex)/MomentumSi**3               &
             * (MomentumSi/MomentumInjSi)**SpectralIndex
 
        if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &

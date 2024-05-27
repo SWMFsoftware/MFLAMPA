@@ -12,9 +12,9 @@ module SP_ModGrid
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use SP_ModSize,  ONLY: nVertexMax
-  use SP_ModProc,  ONLY: iProc
-  use ModNumConst, ONLY: cTwoPi, cPi
+  use SP_ModSize,   ONLY: nVertexMax
+  use SP_ModProc,   ONLY: iProc
+  use ModNumConst,  ONLY: cTwoPi, cPi
 
   implicit none
   SAVE
@@ -293,14 +293,14 @@ contains
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
-       iEnd   = nVertex_B(  iLine)
+       iEnd = nVertex_B(iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = &
-            MhData_VIB(Rho_,  1:iEnd, iLine)
+            MhData_VIB(Rho_, 1:iEnd, iLine)
        State_VIB(UOld_, 1:iEnd, iLine) = &
-            State_VIB(U_,  1:iEnd, iLine)
+            State_VIB(U_, 1:iEnd, iLine)
        State_VIB(BOld_, 1:iEnd, iLine) = &
-            State_VIB(B_,  1:iEnd, iLine)
+            State_VIB(B_, 1:iEnd, iLine)
        ! reset variables read from file or received via coupler
        MhData_VIB(1:nMhData, 1:iEnd, iLine) = 0.0
     end do
