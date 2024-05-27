@@ -324,72 +324,57 @@ contains
     ! particle flux in the 6 GOES channels; also compute total energy flux
 
     integer:: iLine, iVertex, iP, iFlux ! loop variables
-    real   :: EFlux ! the value of energy flux
-    real   :: dFlux, dFlux1 ! increments
-    real   :: Flux          ! the value of particle flux
-    real   :: Flux_I(nFluxChannel)
+    real   :: Flux, EFlux  ! the value of particle and energy fluxes
+    real   :: DistTimesP2_I(1:nP), DistTimesP2E_I(1:nP) ! f*p**2, f*p**2*Ek
+    real   :: dFlux_I(1:nP-1), dEFlux_I(1:nP-1) ! increments of each bin
+    real   :: dFlux1       ! increments of the bin where channel falls in
+    real   :: Flux_I(nFluxChannel)      ! energy limits of GOES channels
     !--------------------------------------------------------------------------
-    ! energy limits of GOES channels
 
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
-       do iVertex = 1, nVertex_B( iLine)
+       do iVertex = 1, nVertex_B(iLine)
           ! Integration loop with midpoint rule
-          ! reset values
-          EFlux = 0.0
-          Flux_I= 0.0
-          Flux  = 0.0
+          ! Reset values
+          Flux_I = 0.0
+          ! Calculate intermediate variables
+          DistTimesP2_I = Distribution_CB(1:nP, nMu, iVertex, iLine)* &
+               Momentum_I(1:nP)**2
+          DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_I(1:nP)
+          ! Increment of particle and energy fluxes
+          dFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))*  &
+               (DistTimesP2_I(1:nP-1) + DistTimesP2_I(2:nP))
+          dEFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))* &
+               (DistTimesP2E_I(1:nP-1) + DistTimesP2E_I(2:nP))
+          ! Calculate the total particle and energy fluxes
+          Flux = sum(dFlux_I)
+          EFlux = sum(dEFlux_I)
+
+          ! Calculate GOES channels' fluxes
           do iP = 1, nP - 1
-             ! the flux increment from iP
-             dFlux = 0.5 * &
-                  (KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP)) * (&
-                  Distribution_CB(iP,nMu,  iVertex,iLine)*&
-                  Momentum_I(iP)**2 &
-                  +&
-                  Distribution_CB(iP+1,nMu,iVertex,iLine)*&
-                  Momentum_I(iP+1)**2)
-
-             ! increase the total flux
-             Flux = Flux + dFlux
-
-             ! increase GOES channels' fluxes
              do iFlux = 1, nFluxChannel
                 ! check whether reached the channel's cut-off level
                 if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux))&
                      CYCLE
 
                 if(KinEnergyIo_I(iP) >= EChannelIo_I(iFlux))then
-                   Flux_I(iFlux) = Flux_I(iFlux) + dFlux
+                   Flux_I(iFlux) = Flux_I(iFlux) + dFlux_I(iP)
                 else
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
-                   dFlux1 =&
-                        ((-0.50*(KinEnergyIo_I(iP) + EChannelIo_I(iFlux)) + &
-                        KinEnergyIo_I(iP+1) )*&
-                        Distribution_CB(iP,nMu,iVertex,iLine)*&
-                        Momentum_I(iP)**2  &
-                        -0.50*(KinEnergyIo_I(iP)-EChannelIo_I(iFlux))*&
-                        Distribution_CB(iP+1,nMu,iVertex,iLine)*&
-                        Momentum_I(iP+1)**2)*&
-                        (KinEnergyIo_I(iP)-EChannelIo_I(iFlux))/&
+                   dFlux1 = ( &
+                        (KinEnergyIo_I(iP+1) - 0.5*(KinEnergyIo_I(iP) &
+                        +EChannelIo_I(iFlux)))*DistTimesP2_I(iP)      &
+                        -0.5*(KinEnergyIo_I(iP)-EChannelIo_I(iFlux))* &
+                        DistTimesP2_I(iP+1))*                         &
+                        (KinEnergyIo_I(iP)-EChannelIo_I(iFlux))/      &
                         (KinEnergyIo_I(iP+1)-KinEnergyIo_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 end if
              end do
-
-             ! increase total energy flux
-             EFlux = EFlux + 0.5 * &
-                  (KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP)) * (&
-                  Distribution_CB(iP,nMu,iVertex,iLine)*&
-                  KinEnergyIo_I(iP) * &
-                  Momentum_I(iP)**2 &
-                  +&
-                  Distribution_CB(iP+1,nMu,iVertex,iLine)*&
-                  KinEnergyIo_I(iP+1) * &
-                  Momentum_I(iP+1)**2)
           end do
 
-          ! store the results
+          ! Store the results
           Flux_VIB(Flux0_,              iVertex, iLine) = &
                Flux   * Si2Io_V(UnitFlux_)
           Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
