@@ -4,7 +4,8 @@
 module SP_ModAdvanceAdvection
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, dLogP
+  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, dLogP, &
+       Background_I
   implicit none
   ! Revision history
   ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
@@ -87,7 +88,7 @@ contains
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
                   LowerEndSpectrum_I = max(Distribution_CB(0, 1, 1, iLine)  &
                   /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)),    &
-                  UpperEndSpectrum_I = max(UpperEndBc_I, Background_I(1:nP))
+                  UpperEndSpectrum_I = max(UpperEndBc_I, Background_I(1:nP)))
           else
              ! No upper end BC
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
