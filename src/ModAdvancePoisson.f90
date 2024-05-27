@@ -8,7 +8,7 @@ module SP_ModAdvancePoisson
   ! See https://doi.org/10.1016/j.jcp.2023.111923
   use SP_ModSize,         ONLY: nVertexMax
   use SP_ModGrid,         ONLY: nLine
-  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB
+  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, Background_I
   use ModUtilities,     ONLY: CON_stop
   implicit none
 
@@ -120,6 +120,7 @@ contains
        ! Update velocity distribution function
        Distribution_CB(1:nP, 1, 1:nX, iLine) = &
             Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
+       end if
        if(any(Distribution_CB(:, 1, 1:nX, iLine)<0.0))&
             call CON_stop('Negative distribution function after Poisson, ta')
        ! Diffuse the distribution function
@@ -419,13 +420,13 @@ contains
 
     VDF_G(0:nP+1, 1:nX) = Distribution_CB(:, 1, 1:nX, iLine)
     ! Apply bc along the line coordinate:
-    VDF_G(0:nP+1,    0) = Distribution_CB(0, 1, 1, iLine)*    &
-         (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex
+    VDF_G(0:nP+1,    0) = max(Distribution_CB(0, 1, 1, iLine)*    &
+         (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex, Background_I)
     if(UseUpperEndBc) then
        call set_upper_end_bc(iLine, nX)
-       VDF_G(1:nP, nX+1) = UpperEndBc_I
-       VDF_G(0   , nX+1) = VDF_G(0   , nX)
-       VDF_G(nP+1, nX+1) = VDF_G(nP+1, nX)
+       VDF_G(1:nP, nX+1) = max(UpperEndBc_I, Background_I(1:nP))
+       VDF_G(0   , nX+1) = max(VDF_G(0, nX), Background_I(0))
+       VDF_G(nP+1, nX+1) = max(VDF_G(nP+1,nX), Background_I(nP+1))
     else
        VDF_G(0:nP+1, nX+1) = Background_I
     end if

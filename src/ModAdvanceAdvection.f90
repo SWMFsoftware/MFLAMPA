@@ -85,14 +85,14 @@ contains
              ! Set and use BC at the upper end
              call set_upper_end_bc(iLine, nX)
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                  LowerEndSpectrum_I = Distribution_CB(0, 1, 1, iLine)      &
-                  /Momentum_I(1:nP)**SpectralIndex,                         &
-                  UpperEndSpectrum_I = UpperEndBc_I)
+                  LowerEndSpectrum_I = max(Distribution_CB(0, 1, 1, iLine)  &
+                  /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)),    &
+                  UpperEndSpectrum_I = max(UpperEndBc_I, Background_I(1:nP))
           else
              ! No upper end BC
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                  LowerEndSpectrum_I = Distribution_CB(0, 1, 1, iLine)     &
-                  /Momentum_I(1:nP)**SpectralIndex)
+                  LowerEndSpectrum_I = max(Distribution_CB(0, 1, 1, iLine)  &
+                  /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)))
           end if
        end if
     end do STEP
