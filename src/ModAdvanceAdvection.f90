@@ -41,7 +41,7 @@ contains
     ! local variables, declared in this subroutine
     integer  :: iStep, iVertex      ! loop variables
     ! time step is split for nStep intervals,  so short that the CFL for
-    ! (explicit) advection operator is less that CFL declared abobe.
+    ! (explicit) advection operator is less that CFL declared above.
     integer  :: nStep
     ! Time step in the STEP Loop, DtProgress/nStep
     real     :: Dt
@@ -62,17 +62,19 @@ contains
     FermiFirst_I = FermiFirst_I/nStep
 
     STEP:do iStep = 1, nStep
-       ! update bc for advection
+       ! update bc for advection, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! advection in the momentum space
        do iVertex = 1, nX
+          ! first check if the VDF includes negative values
           call check_dist_neg(NameSub, iVertex, iVertex, iLine)
           if(IsDistNeg)RETURN
+          ! then advance via advection
           call advance_log_advection(FermiFirst_I(iVertex), &
                1, 1, Distribution_CB(0:nP+1,1,iVertex,iLine))
        end do
+
        ! compute diffusion along the field line
-       ! set the left boundary condition (for diffusion)
        if(UseDiffusion) then
           if(UseUpperEndBc) then
              ! Set and use BC at the upper end
@@ -87,9 +89,10 @@ contains
                   LowerEndSpectrum_I = max(Distribution_CB(0, 1, 1, iLine)  &
                   /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)))
           end if
+          ! Check if the VDF includes negative values after diffusion
+          call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+          if(IsDistNeg)RETURN
        end if
-       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-       if(IsDistNeg)RETURN
     end do STEP
   end subroutine advect_via_log
   !============================================================================
@@ -109,8 +112,8 @@ contains
     integer :: iStep
     ! Extended version of the sulution array to implement BCc
     real    :: F_I(1-max(nGCLeft,2):nP+max(nGCRight,2))
-    real    :: FSemiintUp_I(0:nP+1), FSemiintDown_I(0:nP+1), Cfl
-    !-------------------------NonConservative---------------------------
+    real    :: FSemiUp_I(0:nP+1), FSemiDown_I(0:nP+1), Cfl
+    !--------------------------- Non-Conservative -----------------------------
     ! This is a single-stage second-order scheme for the advection equation:
     !             f_t+A f_{ln p}=0,
     !
@@ -128,9 +131,9 @@ contains
     ! Check for positivity
     if(any(F_I(1-nGCLeft:nP+nGCRight)<=0.0)) call CON_stop(&
          'Negative distribution function before log advection')
-    ! Single stage second order upwind scheme
 
-    if (CFL>0.0) then
+    ! Single stage second-order upwind scheme
+    if(CFL>0.0) then
        do iStep = 1, nStep
           ! Boundary condition at the left boundary
           if(nGCLeft<2)F_I(            -1:0-nGCLeft) = F_I( 1-nGCLeft )
@@ -138,13 +141,12 @@ contains
           if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
           ! f_(i+1/2):
-          FSemiintUp_I(0:nP) = F_I(0:nP) &
-               + 0.5*(1.0-CFL)*df_lim_array(0, nP)
+          FSemiUp_I(0:nP) = F_I(0:nP) + 0.5*(1.0-CFL)*df_lim_arr(0, nP)
           ! f_(i-1/2):
-          FSemiintDown_I(1:nP) = FSemiintUp_I(0:nP-1)
+          FSemiDown_I(1:nP) = FSemiUp_I(0:nP-1)
 
           ! Update the solution from f^(n) to f^(n+1):
-          F_I(1:nP) = F_I(1:nP)+Cfl*(FSemiintDown_I(1:nP)-FSemiintUp_I(1:nP))
+          F_I(1:nP) = F_I(1:nP)+Cfl*(FSemiDown_I(1:nP)-FSemiUp_I(1:nP))
        end do
     else
        do iStep = 1, nStep
@@ -154,13 +156,12 @@ contains
           if(nGCRight<2)F_I(nP+1-nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
           ! f_(i-1/2):
-          FSemiintDown_I(1:nP+1) = F_I(1:nP+1) &
-               - 0.5*(1.0+CFL)*df_lim_array(1, nP+1)
+          FSemiDown_I(1:nP+1) = F_I(1:nP+1) - 0.5*(1.0+CFL)*df_lim_arr(1,nP+1)
           ! f_(i+1/2):
-          FSemiintUp_I(1:nP) = FSemiintDown_I(2:nP+1)
+          FSemiUp_I(1:nP) = FSemiDown_I(2:nP+1)
 
           ! Update the solution from f^(n) to f^(n+1):
-          F_I(1:nP) = F_I(1:nP)+Cfl*(FSemiintDown_I(1:nP)-FSemiintUp_I(1:nP))
+          F_I(1:nP) = F_I(1:nP)+Cfl*(FSemiDown_I(1:nP)-FSemiUp_I(1:nP))
        end do
     end if
 
@@ -169,9 +170,9 @@ contains
          'Negative distribution function after log advection')
   contains
     !==========================================================================
-    function df_lim_array(iLeft, iRight)
+    function df_lim_arr(iLeft, iRight)
       integer, intent(in):: iLeft, iRight ! start/left and end/right indices
-      real :: df_lim_array(iLeft:iRight)  ! output results
+      real :: df_lim_arr(iLeft:iRight)    ! output results
       real :: dF1(iLeft:iRight), dF2(iLeft:iRight)
 
       !------------------------------------------------------------------------
@@ -179,11 +180,11 @@ contains
       dF2 = F_I(iLeft:iRight) - F_I(iLeft-1:iRight-1)
 
       ! df_lim=0 if dF1*dF2<0, sign(dF1) otherwise:
-      df_lim_array = sign(0.50,dF1) + sign(0.50,dF2)
+      df_lim_arr = sign(0.50,dF1) + sign(0.50,dF2)
       dF1 = abs(dF1)
       dF2 = abs(dF2)
-      df_lim_array = df_lim_array*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
-    end function df_lim_array
+      df_lim_arr = df_lim_arr*min(max(dF1,dF2),2.0*dF1,2.0*dF2)
+    end function df_lim_arr
     !==========================================================================
   end subroutine advance_log_advection
   !============================================================================

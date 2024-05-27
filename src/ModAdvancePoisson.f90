@@ -106,7 +106,7 @@ contains
     do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time)
-       ! Update Bc for VDF at minimal and maximal energy
+       ! Update Bc for VDF at minimal energy, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        call set_VDF(iLine, nX, VDF_G)
        ! Volume Updates
@@ -139,9 +139,10 @@ contains
              call diffuse_distribution(iLine, nX, iShock, Dt,         &
                   nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
           end if
+          ! Check if the VDF includes negative values after diffusion
+          call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+          if(IsDistNeg)RETURN
        end if
-       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-       if(IsDistNeg)RETURN
 
        ! Update time
        Time = Time + Dt
@@ -190,10 +191,9 @@ contains
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    DsSi_I(1:nX-1) = State_VIB(   D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
+    DsSi_I(1:nX-1) = max(State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_), cTiny)
     ! Initialize arrays
-    VolumeX_I(2:nX-1) = max(0.5*(DsSi_I(2:nX-1) + &
-         DsSi_I(1:nX-2)), cTiny)/BSi_I(2:nX-1)
+    VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
     VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
     VolumeX_I(0)      = VolumeX_I(1)
     VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
@@ -217,7 +217,7 @@ contains
        Hamiltonian_N(:, iX) = -abs(uOverBNodeSi_I(iX))*Momentum3_I
     end do
 
-    ! Update bc for at minimal and maximal energy (left BC)
+    ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
     call set_VDF(iLine, nX, VDF_G)
     call explicit(nP, nX, VDF_G, Volume_G, Source_C,   &
@@ -227,6 +227,7 @@ contains
     ! Update velocity distribution function
     Distribution_CB(1:nP, 1, 1:nX, iLine) = &
          Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
+    ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg)RETURN
 
@@ -239,9 +240,10 @@ contains
        else
           call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
                nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
-       end if
+       ! Check if the VDF includes negative values after diffusion
        call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
        if(IsDistNeg)RETURN
+       end if
     end if
 
   end subroutine iterate_poisson
@@ -322,7 +324,7 @@ contains
           IsExit = .false.         ! Intermediate steps
        end if
 
-       ! Update bc for at minimal and maximal energy
+       ! Update bc for at minimal energy, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        call set_VDF(iLine, nX, VDF_G)
        ! Advance by multi-Poisson-bracket scheme
@@ -352,6 +354,7 @@ contains
                Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) +   &
                Source_C/Volume_G(1:nP, 1:nMu, 1:nX)
        end if
+       ! Check if the VDF includes negative values
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg)RETURN
 
