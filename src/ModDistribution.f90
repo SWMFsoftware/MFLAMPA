@@ -356,7 +356,7 @@ contains
                 ! check whether reached the channel's cut-off level
                 if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux))CYCLE
 
-                if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux))then
+                if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux)) then
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
                    dFlux1 = ( &
@@ -383,7 +383,7 @@ contains
   !============================================================================
   subroutine check_dist_neg(NameSub, lVertex, rVertex, iLine)
 
-    ! check if any components of Distribution_CB(:,:,lVertex:rVertex,iLine) < 0.0
+    ! check if any of Distribution_CB(:, :, lVertex:rVertex, iLine) < 0.0
     ! if so, IsDistNeg = .true.; otherwise, IsDistNeg = .false. (normal case)
     character(len=*), intent(in):: NameSub  ! String for the module/subroutine
     integer, intent(in) :: lVertex, rVertex ! Start and end indices of iVertex
@@ -394,6 +394,10 @@ contains
        Used_B(iLine) = .false.
        nVertex_B(iLine) = 0
        IsDistNeg = .true.
+       ! For Poisson bracket scheme: should stop here
+       if((index(NameSub, 'poisson')>0) .or. (index(NameSub, 'Poisson')>0) &
+          .or. (index(NameSub, 'POISSON')>0)) &
+          call CON_stop(NameSub//': Distribution_IIB < 0')
     end if
   end subroutine check_dist_neg
   !============================================================================

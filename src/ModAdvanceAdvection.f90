@@ -146,7 +146,7 @@ contains
           FSemiDown_I(1:nP) = FSemiUp_I(0:nP-1)
 
           ! Update the solution from f^(n) to f^(n+1):
-          F_I(1:nP) = F_I(1:nP)+Cfl*(FSemiDown_I(1:nP)-FSemiUp_I(1:nP))
+          F_I(1:nP) = F_I(1:nP) + Cfl*(FSemiDown_I(1:nP)-FSemiUp_I(1:nP))
        end do
     else
        do iStep = 1, nStep
@@ -161,7 +161,7 @@ contains
           FSemiUp_I(1:nP) = FSemiDown_I(2:nP+1)
 
           ! Update the solution from f^(n) to f^(n+1):
-          F_I(1:nP) = F_I(1:nP)+Cfl*(FSemiDown_I(1:nP)-FSemiUp_I(1:nP))
+          F_I(1:nP) = F_I(1:nP) + Cfl*(FSemiDown_I(1:nP)-FSemiUp_I(1:nP))
        end do
     end if
 
