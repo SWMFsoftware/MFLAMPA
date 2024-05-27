@@ -153,8 +153,7 @@ contains
     ! set_dxx for diffusion along the field line
     if(UseTurbulentSpectrum) call set_dxx(nX, nP, BSi_I(1:nX))
 
-    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    ! while DsMesh_I(i) is the distance between centers of meshes
+    ! In M-FLAMPA DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
     DsMesh_I(2:nX) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
 
@@ -181,7 +180,7 @@ contains
        ! For each momentum account for dependence
        ! of the diffusion coefficient on momentum
        ! D\propto r_L*v\propto Momentum**2/TotalEnergy
-       if (UseTurbulentSpectrum) then
+       if(UseTurbulentSpectrum) then
           do iVertex=1, nX
              DInnerSi_I(iVertex) = Dxx(iVertex, iP,            &
                   Momentum_I(iP)*MomentumInjSi, SpeedSi_I(iP), &
@@ -205,7 +204,7 @@ contains
        ! Set elements of tri-diagonal matrix in the LHS
        Main_I = 1.0; Lower_I = 0.0; Upper_I = 0.0
        ! For i=1:
-       Aux1 = DtLocal_II(1,iP)*DOuterSi_I(1)*                        &
+       Aux1 = DtLocal_II(1,iP)*DOuterSi_I(1)*   &
             0.5*(DInnerSi_I(1) + DInnerSi_I(2))/DsMesh_I(2)**2
        Main_I(1) = Main_I(1) + Aux1
        Upper_I(1) = -Aux1
@@ -241,7 +240,7 @@ contains
        ! Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
        !     DsMesh_I(n)**2
        !
-       ! After Nov. 2023: set free escaping at outerboundary for now
+       ! After Nov. 2023: set free escaping at outer boundary for now
        ! Aux2=0.
        ! In both these versions:
        ! Main_I( n) = Main_I(n) + Aux2
@@ -250,11 +249,11 @@ contains
        ! Main_I(n) = 1; Lower_I(n) = 0 (equivalently to doing nothing)
        ! For backward compatibility, keep this option for UseUpperBc=.false.
        if(present(UpperEndSpectrum_I)) then
-          Aux2 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*                      &
+          Aux2 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*                &
                0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/DsMesh_I(nX)**2
           Main_I( nX) = Main_I(nX) + Aux2
           Lower_I(nX) = -Aux2
-          Aux1 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*DInnerSi_I(nX)/    &
+          Aux1 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*DInnerSi_I(nX)/ &
                DsMesh_I(nX)**2
           Main_I(nX) = Main_I(nX) + Aux1
           Res_I(nX) = Res_I(nX) + Aux1*UpperEndSpectrum_I(iP)
