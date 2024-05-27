@@ -16,7 +16,7 @@ module SP_ModDistribution
   use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
        Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
        kinetic_energy_to_momentum, momentum_to_energy
-  use SP_ModGrid,  ONLY: nLine, nVertex_B
+  use SP_ModGrid,  ONLY: nLine, nVertex_B, Used_B
 
   implicit none
 
@@ -27,8 +27,9 @@ module SP_ModDistribution
   ! Public members:
   public:: init              ! Initialize Distribution_IIB
   public:: read_param        ! Read momentum grid parameters
-  public:: offset            ! Sync. index in State_VIB and Dist_IIB
+  public:: offset            ! Sync. index in State_VIB and Distribution_CB
   public:: get_integral_flux ! Calculate Flux_VIB
+  public:: check_dist_neg    ! Check any of Distribution_CB is negative
   public:: nP                ! Number of points in the momentum grid
   public:: nMu               ! Number of points over pitch-angle (\mu)
   public:: IsMuAvg           ! If .true., dist. function is omnidirectional
@@ -82,6 +83,9 @@ module SP_ModDistribution
   ! 2nd index - particle index along the field line
   ! 3rd index - local line number
   real, public, allocatable :: Distribution_CB(:,:,:,:)
+
+  ! Check if any Distribution_CB < 0 (.true. for such case)
+  logical, public :: IsDistNeg = .false.
 
   ! distribution is initialized to have integral flux:
   real:: FluxInitIo = 0.01 ! [PFU]
@@ -376,6 +380,22 @@ contains
        end do
     end do
   end subroutine get_integral_flux
+  !============================================================================
+  subroutine check_dist_neg(NameSub, lVertex, rVertex, iLine)
+
+    ! check if any components of Distribution_CB(:,:,lVertex:rVertex,iLine) < 0.0
+    ! if so, IsDistNeg = .true.; otherwise, IsDistNeg = .false. (normal case)
+    character(len=*), intent(in):: NameSub  ! String for the module/subroutine
+    integer, intent(in) :: lVertex, rVertex ! Start and end indices of iVertex
+    integer, intent(in) :: iLine            ! index of line
+    !--------------------------------------------------------------------------
+    if(any(Distribution_CB(:, :, lVertex:rVertex, iLine)<0.0)) then
+       write(*,*) NameSub, ': Distribution_IIB < 0'
+       Used_B(iLine) = .false.
+       nVertex_B(iLine) = 0
+       IsDistNeg = .true.
+    end if
+  end subroutine check_dist_neg
   !============================================================================
 end module SP_ModDistribution
 !==============================================================================

@@ -72,7 +72,7 @@ contains
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson, &
          init_data_states, advect_via_multi_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
-    use SP_ModDistribution,     ONLY: IsMuAvg
+    use SP_ModDistribution,     ONLY: IsMuAvg, IsDistNeg
 
     real, intent(in):: TimeLimit
     ! Loop variable
@@ -95,11 +95,8 @@ contains
     real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: DLogRho_I
-    ! Check if any Distribution_IIB < 0 in advect_via_log
-    logical :: IsDistNeg
-    character(len=*), parameter:: NameSub = 'advance'
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
 
@@ -110,10 +107,8 @@ contains
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
-       ! summary is: Length is in the unit of Rs, Rho is in the unit of
-       ! amu/m^3, temperature is in the unit of kinetic energy, all others
-       ! are in SI units. So to convert the IO units, the three conversion
-       ! factors are needed as follows:
+       ! summary is: Length is in the unit of Rs, temperature is in the
+       ! unit of kinetic energy, all others are in SI units.
        uSi_I(   1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
        BOldSi_I(1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
@@ -140,8 +135,6 @@ contains
           ! account for change in the background up to the current moment
           Alpha = real(iProgress)/real(nProgress)
 
-          ! Recall that MhData_VIB(Rho_) and State_VIB(RhoOld_) are in
-          ! the unit of amu/m^3.
           ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
           nSI_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine) + Alpha* &
@@ -154,7 +147,7 @@ contains
 
           ! trace shock position and steepen the shock
           iShock = iShockOld + iProgress
-          if(iShock < iEnd-nWidth .and. iShock > nWidth     &
+          if(iShock < iEnd-nWidth .and. iShock > nWidth  &
                .and. DoTraceShock) call steepen_shock(iEnd)
 
           ! Advection (2 different schemes) and Diffusion
@@ -176,13 +169,13 @@ contains
                 call advect_via_multi_poisson(iLine, iEnd, iShock, &
                      Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
-             ! store density and B-field arrays at the end of this time step
+             ! Store density and B-field arrays at the end of this time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
              BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
           else
              ! No Poisson bracket scheme, use the default algorithm
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
-                  DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd), IsDistNeg)
+                  DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              if(IsDistNeg) CYCLE line
           end if
        end do PROGRESS
@@ -248,7 +241,6 @@ contains
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, uSi_I, BSi_I
     ! go line by line and iterate the solution
-    character(len=*), parameter:: NameSub = 'iterate_steady_state'
     !--------------------------------------------------------------------------
 
     do iLine = 1, nLine
@@ -256,8 +248,8 @@ contains
        ! the active particles on the line
        iEnd = nVertex_B(iLine)
 
-       ! Various data along the line in SI units. Temperature is in the unit
-       ! of kinetic energy, all others are in SI units.
+       ! Various data along the line in SI units. Temperature is
+       ! in the unit of kinetic energy, all others are in SI units.
        ! Vector U and B are needed for Hamiltonian
        uSi_I(1:iEnd) = State_VIB(   U_, 1:iEnd, iLine)
        BSi_I(1:iEnd) = State_VIB(   B_, 1:iEnd, iLine)
