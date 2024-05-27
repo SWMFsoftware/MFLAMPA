@@ -213,9 +213,9 @@ contains
           ! the above scheme reads:
           ! f^(n+1)_1-Dt*DOuter_I/DsFace_I*(&
           !     DInner_(3/2)*(f^(n+1)_2-f^(n+1)_1)/DsMesh_(2)-&
-          !     DInner_(1/2)*(f^(n+1)_1 -f_0/DsMesh_(1))=f^n_1        
+          !     DInner_(1/2)*(f^(n+1)_1 -f_0/DsMesh_(1))=f^n_1
           Aux2 = DtLocal_II(1,iP)*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
-          ! With these regards, Aux2 is added to Main_I(1)... 
+          ! With these regards, Aux2 is added to Main_I(1)...
           Main_I(1) = Main_I(1) + Aux2
           ! ...while the given Aux2*f_0 should moved to the RHS and summed up
           ! with the source:
