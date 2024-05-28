@@ -112,8 +112,8 @@ contains
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
 
        ! find how far shock has travelled on this line: nProgress
-       iShock    = iShock_IB(Shock_,   iLine)
-       iShockOld = iShock_IB(ShockOld_,iLine)
+       iShock    = iShock_IB(Shock_,    iLine)
+       iShockOld = iShock_IB(ShockOld_, iLine)
        if(DoTraceShock) then
           ! This is how many steps should be done to allow the shock to
           ! the move not more than one mesh size
@@ -186,7 +186,6 @@ contains
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
       real   :: DsSi_I(1:iEnd-1)
-      integer:: iVertex ! loop variable
       real   :: dLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
       real   :: dLogRhoExcessIntegral
       ! find the excess of dLogRho within the shock compared
@@ -201,13 +200,13 @@ contains
 
       ! check for zero excess
       if(dLogRhoExcessIntegral == 0.0) RETURN
-      ! nullify excess  within the smoothed shock
+      ! nullify excess within the smoothed shock
       dLogRho_I(iShock-nWidth:iShock+nWidth) = min(dLogRhoThreshold, &
            dLogRho_I(iShock-nWidth:iShock+nWidth))
-      ! ...and concetrate it at the shock front, applying the whole jump
+      ! ...and concentrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
       dLogRho_I(iShock) = dLogRhoThreshold + &
-           dLogRhoExcessIntegral/DsSi_I(iVertex)
+           dLogRhoExcessIntegral/DsSi_I(iShock+nWidth)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
       BSi_I(iShock+1-nWidth:iShock+1)=maxval(BSi_I(iShock+1-nWidth:iShock+1))

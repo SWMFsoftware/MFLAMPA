@@ -156,18 +156,18 @@ contains
     ! In M-FLAMPA DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
     DsMesh_I(2:nX) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
+    ! Note: The max(..., cTiny) in DsMesh_I and DsFace_I will be removed later
 
-    ! Within the framework of finite volume method, the cell
-    ! volume is used, which is proportional to the distance between
-    ! the faces bounding the volume with an index, i, which is half of
-    ! sum of distance between meshes i-1 and i (i.e. DsMesh_I(i) and that
+    ! Within the framework of finite volume method, the cell volume
+    ! is used, which is proportional to the distance between the faces
+    ! bounding the volume with an index, i, which is half of sum of
+    ! distance between meshes i-1 and i (i.e. DsMesh_I(i) and that
     ! between meshes i and i+1 (which is DsMesh_I(i+1)):
     DsFace_I(2:nX-1) = max(0.5*(DsMesh_I(3:nX)+DsMesh_I(2:nX-1)), cTiny)
-    ! In flux coordinates, the control volume associated with the
-    ! given cell has a cross-section equal to (Magnetic Flux)/B,
-    ! where the flux is a constant along the magnetic field line,
-    ! set to one hereafter. Therefore, the diffusion equation has
-    ! a following form:
+    ! In flux coordinates, the control volume associated with the given
+    ! cell has a cross-section equal to (Magnetic Flux)/B, where the flux
+    ! is a constant along the magnetic field line, set to one hereafter.
+    ! Therefore, the diffusion equation has a following form:
     ! (DsFace_i/B_i)(f^(n+1) - f^n) = Flux_(i-1/2) - Flux_(i+1/2),
     ! where the particle density flux should be multiplied by the
     ! cross-section area too (magnetic flux factor is one!):
@@ -177,18 +177,16 @@ contains
     !  The face-centered combination,
 
     MOMENTUM:do iP = 1, nP
-       ! For each momentum account for dependence
-       ! of the diffusion coefficient on momentum
-       ! D\propto r_L*v\propto Momentum**2/TotalEnergy
+       ! For each momentum, the dependence of the diffusion coefficient
+       ! on momentum is D \propto r_L*v \propto Momentum**2/TotalEnergy
        if(UseTurbulentSpectrum) then
-          do iVertex=1, nX
+          do iVertex = 1, nX
              DInnerSi_I(iVertex) = Dxx(iVertex, iP,            &
                   Momentum_I(iP)*MomentumInjSi, SpeedSi_I(iP), &
                   BSi_I(iVertex)) / BSi_I(iVertex)
           end do
        else
-          ! Add v (= p*c^2/E_total in the relativistic case)
-          ! and (p)^(1/3)
+          ! Add v (= p*c^2/E_total in the relativistic case) and p^(1/3)
           DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)     &
                *SpeedSi_I(iP)*Momentum_I(iP)**(1.0/3)
 
@@ -294,7 +292,7 @@ contains
           ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)^(1/3)
           ! see Li et al. (2003), doi:10.1029/2002JA009666
           ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-          ! 1/AU cancels with unit of Lambda0,no special attention needed;
+          ! 1/AU cancels with unit of Lambda0, no special attention needed;
           ! v (velocity) and (p)^(1/3) are calculated in momentum do loop
           CoefDInnerSi_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
                RadiusSi_I(1:nX)*(cLightSpeed*MomentumInjSi/cGeV)**(1.0/3)
@@ -347,10 +345,10 @@ contains
     do j = 2, n
        Aux_I(j) = Upper_I(j-1)/Aux
        Aux = Mean_I(j) - Lower_I(j)*Aux_I(j)
-       if (Aux == 0.0) then
-          write(*,*)'M_I(j), L_I(j), Aux_I(j) = ',&
+       if(Aux == 0.0) then
+          write(*,*) 'M_I(j), L_I(j), Aux_I(j) = ',&
                Mean_I(j),Lower_I(j),Aux_I(j)
-          write(*,*)'  For j=',j
+          write(*,*) ' For j=',j
           call CON_stop('Tridiag failed')
        end if
        W_I(j) = (Res_I(j) - Lower_I(j)*W_I(j-1))/Aux
