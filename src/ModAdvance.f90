@@ -203,10 +203,10 @@ contains
       ! nullify excess within the smoothed shock
       dLogRho_I(iShock-nWidth:iShock+nWidth) = min(dLogRhoThreshold, &
            dLogRho_I(iShock-nWidth:iShock+nWidth))
-      ! ...and concentrate it at the shock front, applying the whole jump
+      ! ... and concentrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
       dLogRho_I(iShock) = dLogRhoThreshold + &
-           dLogRhoExcessIntegral/DsSi_I(iShock+nWidth)
+           dLogRhoExcessIntegral/DsSi_I(iShock)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
       BSi_I(iShock+1-nWidth:iShock+1)=maxval(BSi_I(iShock+1-nWidth:iShock+1))
