@@ -185,6 +185,7 @@ contains
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
       use SP_ModGrid, ONLY: dLogRhoThreshold
+      integer, intent(in) :: iEnd
       real   :: DsSi_I(1:iEnd-1)
       real   :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real   :: dLogRhoExcessIntegral
