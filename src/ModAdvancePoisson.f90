@@ -207,7 +207,7 @@ contains
     ! the mesh "i" and "i+1"
     ! uSi_I with the index of "i" is the value at the face between
     ! the mesh "i" and "i+1"
-    uSi_I(1:nX-1)  = State_VIB(U_, 1:nX-1, iLine)
+    uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
     ! Average 1/B and multiply by uSi
     uOverBNodeSi_I(1:nX-1) = (0.50/BSi_I(2:nX) + 0.50/BSi_I(1:nX-1))*&
          uSi_I(1:nX-1)
@@ -433,7 +433,7 @@ contains
     ! in a single layer of the ghost cells along the momentum coordinate.
 
     use SP_ModDistribution, ONLY: Background_I, Momentum_I
-    use SP_ModBc,           ONLY: SpectralIndex,            &
+    use SP_ModBc,           ONLY: SpectralIndex,  &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     integer, intent(in):: iLine     ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis

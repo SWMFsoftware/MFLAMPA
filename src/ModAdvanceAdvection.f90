@@ -53,7 +53,7 @@ contains
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
     ! first order Fermi acceleration for the current line
-    FermiFirst_I = DLogRho_I/(3*dLogP)
+    FermiFirst_I = dLogRho_I/(3*dLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1 + int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:

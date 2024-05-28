@@ -68,7 +68,7 @@ module SP_ModDistribution
   !-----------------Grid in the momentum space---------------------------------
   ! iP     0     1                         nP   nP+1
   !        |     |    ....                 |     |
-  ! P     P_inj P_inj*exp(DLogP)          P_Max P_Max*exp(DLogP)
+  ! P     P_inj P_inj*exp(dLogP)          P_Max P_Max*exp(dLogP)
   !-----------------Control volumes and faces----------------------------------
   ! Vol  | 0  |  1  |.........          |  nP | nP+1 |
   ! Fcs -1    0     1 ....            nP-1    nP    nP+1
