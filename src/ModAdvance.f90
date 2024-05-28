@@ -184,21 +184,18 @@ contains
 
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
-
       use SP_ModGrid, ONLY: dLogRhoThreshold
-      integer, intent(in) :: iEnd ! To limit the range of search
-      real :: DsSi_I(1:iEnd-1)
-      real :: dLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
-      real :: dLogRhoExcessIntegral
+      real   :: DsSi_I(1:iEnd-1)
+      real   :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
+      real   :: dLogRhoExcessIntegral
       ! find the excess of dLogRho within the shock compared
       ! to background averaged over length
       !------------------------------------------------------------------------
-      DsSi_I = State_VIB(D_, 1:iEnd-1, iLine)*Io2Si_V(UnitX_)
-
-      ! A jump (dLogRhoExcess>0) in velocity accross the shock wave * \Delta t
-      dLogRhoExcess = max(0.5*(dLogRho_I(iShock-nWidth:iShock+nWidth-1) +  &
+      DsSi_I = State_VIB(D_,1:iEnd-1,iLine)*Io2Si_V(UnitX_)
+      dLogRhoExcess_I = max(0.5*(dLogRho_I(iShock-nWidth:iShock+nWidth-1) + &
            dLogRho_I(iShock-nWidth+1:iShock+nWidth)) - dLogRhoThreshold, 0.0)
-      dLogRhoExcessIntegral = sum(dLogRhoExcess*   &
+      ! A jump (dLogRhoExcess>0) in velocity accross the shock wave * \Delta t
+      dLogRhoExcessIntegral = sum(dLogRhoExcess_I*&
            DsSi_I(iShock-nWidth:iShock+nWidth-1))
 
       ! check for zero excess
