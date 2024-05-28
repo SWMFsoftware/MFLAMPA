@@ -92,9 +92,9 @@ contains
     ! Current time: for updating states in multi-Poisson-bracket scheme
     real    :: Time
     ! Local arrays to store the state vectors in SI units
-    real, dimension(1:nVertexMax):: nSi_I, BSi_I, BOldSi_I, nOldSi_I, uSi_I
+    real, dimension(1:nVertexMax):: nOldSi_I, nSi_I, BSi_I
     ! Lagrangian derivatives
-    real, dimension(1:nVertexMax):: DLogRho_I
+    real, dimension(1:nVertexMax):: dLogRho_I
 
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
@@ -109,8 +109,6 @@ contains
        ! The IO units of the state vectors could be seen in ModUnit, the
        ! summary is: Length is in the unit of Rs, temperature is in the
        ! unit of kinetic energy, all others are in SI units.
-       uSi_I(   1:iEnd) = State_VIB(U_,     1:iEnd,iLine)
-       BOldSi_I(1:iEnd) = State_VIB(BOld_,  1:iEnd,iLine)
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
 
        ! find how far shock has travelled on this line: nProgress
@@ -143,7 +141,7 @@ contains
           BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha* &
                (State_VIB(B_,  1:iEnd,iLine) - &
                State_VIB(BOld_,1:iEnd,iLine))
-          DLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
+          dLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
 
           ! trace shock position and steepen the shock
           iShock = iShockOld + iProgress
@@ -169,13 +167,12 @@ contains
                 call advect_via_multi_poisson(iLine, iEnd, iShock, &
                      Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
-             ! Store density and B-field arrays at the end of this time step
+             ! Store density array at the end of this time step
              nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
-             BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
           else
              ! No Poisson bracket scheme, use the default algorithm
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
-                  DLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
+                  dLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              if(IsDistNeg) CYCLE line
           end if
        end do PROGRESS
@@ -190,30 +187,27 @@ contains
       ! becomes steeper for the current line
       real   :: DsSi_I(1:iEnd-1)
       integer:: iVertex ! loop variable
-      real   :: DLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
-      real   :: DLogRhoExcessIntegral
-      ! find the excess of DLogRho within the shock compared
+      real   :: dLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
+      real   :: dLogRhoExcessIntegral
+      ! find the excess of dLogRho within the shock compared
       ! to background averaged over length
       !------------------------------------------------------------------------
       DsSi_I = State_VIB(D_,1:iEnd-1,iLine)*Io2Si_V(UnitX_)
-      DLogRhoExcess = 0.5*(DLogRho_I(iShock-nWidth:iShock+nWidth-1) + &
-           DLogRho_I(iShock-nWidth+1:iShock+nWidth)) - DLogRhoThreshold
-      where(DLogRhoExcess<0.0)
-         DLogRhoExcess = 0.0
-      end where
-      ! A jump (DLogRhoExcess>0) in velocity accross the shock wave * \Delta t
-      DLogRhoExcessIntegral = sum(DLogRhoExcess*   &
+      dLogRhoExcess = max(0.5*(dLogRho_I(iShock-nWidth:iShock+nWidth-1) + &
+           dLogRho_I(iShock-nWidth+1:iShock+nWidth)) - dLogRhoThreshold, 0.0)
+      ! A jump (dLogRhoExcess>0) in velocity accross the shock wave * \Delta t
+      dLogRhoExcessIntegral = sum(dLogRhoExcess*   &
            DsSi_I(iShock-nWidth:iShock+nWidth-1))
 
       ! check for zero excess
-      if(DLogRhoExcessIntegral == 0.0) RETURN
+      if(dLogRhoExcessIntegral == 0.0) RETURN
       ! nullify excess  within the smoothed shock
-      DLogRho_I(iShock-nWidth:iShock+nWidth) = min(DLogRhoThreshold, &
-           DLogRho_I(iShock-nWidth:iShock+nWidth))
+      dLogRho_I(iShock-nWidth:iShock+nWidth) = min(dLogRhoThreshold, &
+           dLogRho_I(iShock-nWidth:iShock+nWidth))
       ! ...and concetrate it at the shock front, applying the whole jump
       ! in the velocity at a single grid point
-      DLogRho_I(iShock) = DLogRhoThreshold + DLogRhoExcessIntegral/  &
-           DsSi_I(iVertex)
+      dLogRho_I(iShock) = dLogRhoThreshold + &
+           dLogRhoExcessIntegral/DsSi_I(iVertex)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
       BSi_I(iShock+1-nWidth:iShock+1)=maxval(BSi_I(iShock+1-nWidth:iShock+1))
@@ -254,7 +248,7 @@ contains
        ! nSi is needed to set up the distribution at the injection.
        nSI_I(1:iEnd) = MhData_VIB(Rho_, 1:iEnd, iLine)
        ! find how far shock has travelled on this line
-       iShock = iShock_IB(Shock_,   iLine)
+       iShock = iShock_IB(Shock_, iLine)
 
        ! First, set the diffusion coefficient, from the
        ! given formulae or from the turbulent specrtum, if known
