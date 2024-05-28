@@ -301,7 +301,6 @@ contains
     !--------------------------------------------------------------------------
 
     ! Calculate time derivative of total control volume
-    !--------------------------------------------------------------------------
     do iX = 1, nX
        do iMu = 0, nMu+1
           dVolumeDt_G(:, iMu, iX) = dDeltaSOverBDt_C(iX)*DeltaMu*VolumeP_I

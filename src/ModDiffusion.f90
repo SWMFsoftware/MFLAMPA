@@ -245,7 +245,7 @@ contains
        ! Lower_I(n) = -Aux2
        ! So, effectively for the version after Nov. 2023
        ! Main_I(n) = 1; Lower_I(n) = 0 (equivalently to doing nothing)
-       ! For backward compatibility, keep this option for UseUpperBc=.false.
+       ! For backward compatibility, keep this option for UseUpperEndBc=.false.
        if(present(UpperEndSpectrum_I)) then
           Aux2 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*                &
                0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/DsMesh_I(nX)**2
@@ -281,9 +281,8 @@ contains
     case(Linear_)
        ScaleSi_I(1:nX) = ScaleTurbulenceSi*RadiusSi_I(1:nX)/cAu
     end select
-    ! Compute the diffusion coefficient without the contribution of
-    ! v (velocity) and p (momentum), as v and p are different for
-    ! different iP
+    ! Compute diffusion coefficient without the contribution of v (velocity)
+    ! and p (momentum), as v and p are different for different iP
     if(UseFixedMeanFreePathUpstream) then
        ! diffusion is different up- and down-stream
        ! Sokolov et al. 2004, paragraphs before and after eq (4)

@@ -73,10 +73,9 @@ contains
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
 
-    allocate(IPlusSi_IX(0:nP+1,1:nVertexMax), &
-         IMinusSi_IX(0:nP+1,1:nVertexMax))
+    allocate(IPlusSi_IX(0:nP+1,1:nVertexMax), IMinusSi_IX(0:nP+1,1:nVertexMax))
     allocate(kOverBSi_I(0:nP+1), kSi_I(0:nP+1))
-    allocate(ICSi_X(1:nVertexMax),CorrectionMode_X(1:nVertexMax))
+    allocate(ICSi_X(1:nVertexMax), CorrectionMode_X(1:nVertexMax))
     allocate(vAlfvenSi_I(1:nVertexMax))
     allocate(DispersionA_I(1:nVertexMax))
 

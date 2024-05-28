@@ -25,7 +25,7 @@ module SP_ModDistribution
   private ! except
 
   ! Public members:
-  public:: init              ! Initialize Distribution_IIB
+  public:: init              ! Initialize Distribution_CB
   public:: read_param        ! Read momentum grid parameters
   public:: offset            ! Sync. index in State_VIB and Distribution_CB
   public:: get_integral_flux ! Calculate Flux_VIB
@@ -142,7 +142,7 @@ contains
 
     ! Distribution function
     allocate(Distribution_CB(0:nP+1,nMu,nVertexMax,nLine), stat=iError)
-    call check_allocate(iError, 'Distribution_IIB')
+    call check_allocate(iError, 'Distribution_CB')
 
     ! initialization depends on momentum, however, this corresponds
     ! to a constant differential flux (intensity), thus ensuring
@@ -264,10 +264,9 @@ contains
 
     use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_, ShockOld_, &
          iShock_IB, State_VIB, MHData_VIB, X_, Z_, FootPoint_VB
-    ! shift in the data arrays is required if the grid point(s) is
-    ! appended or removed at the foot point of the magnetic field
-    ! line. SHIFTED ARE: State_VIB(/RhoOld_,BOld_),Distribution_IIB
-    ! as well as ShockOld_
+    ! shift in the data arrays is required if the grid point(s) is appended
+    ! or removed at the foot point of the magnetic field line. SHIFTED ARE:
+    ! State_VIB(/RhoOld_,BOld_), Distribution_CB, as well as ShockOld_
     integer, intent(in)        :: iLine
     integer, intent(in)        :: iOffset
     real :: Alpha, Distance2ToMin, Distance3To2
@@ -354,7 +353,7 @@ contains
           do iFlux = 1, nFluxChannel
              do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
-                if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux))CYCLE
+                if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux)) CYCLE
 
                 if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux)) then
                    ! channel cutoff level is often in the middle of a bin;
@@ -390,14 +389,14 @@ contains
     integer, intent(in) :: iLine            ! index of line
     !--------------------------------------------------------------------------
     if(any(Distribution_CB(:, :, lVertex:rVertex, iLine)<0.0)) then
-       write(*,*) NameSub, ': Distribution_IIB < 0'
+       write(*,*) NameSub, ': Distribution_CB < 0'
        Used_B(iLine) = .false.
        nVertex_B(iLine) = 0
        IsDistNeg = .true.
        ! For Poisson bracket scheme: should stop here
        if((index(NameSub, 'poisson')>0) .or. (index(NameSub, 'Poisson')>0) &
           .or. (index(NameSub, 'POISSON')>0)) &
-          call CON_stop(NameSub//': Distribution_IIB < 0')
+          call CON_stop(NameSub//': Distribution_CB < 0')
     end if
   end subroutine check_dist_neg
   !============================================================================

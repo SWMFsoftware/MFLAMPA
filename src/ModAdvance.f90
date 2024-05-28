@@ -17,15 +17,15 @@ module SP_ModAdvance
   PRIVATE ! except
 
   ! Public members:
-  public:: read_param ! Read parameters
-  public:: advance    ! Advance Distribution_IIB through the time interval
-  public:: iterate_steady_state
+  public:: read_param    ! Read parameters
+  public:: advance       ! Advance Distribution_CB through the time interval
+  public:: iterate_steady_state ! Iterate to get steady-state Distribution_CB
 
   ! If the shock wave is traced, the advance algorithms are modified
   logical, public :: DoTraceShock = .true.
 
   ! Local variables
-  real    :: Cfl = 0.9     ! Controls the maximum allowed time step
+  real    :: Cfl = 0.9   ! Controls the maximum allowed time step
   logical :: UsePoissonBracket = .false.
 contains
   !============================================================================
@@ -100,7 +100,7 @@ contains
     DtFull = TimeLimit - SPTime
     ! go line by line and advance the solution
 
-    line:do iLine = 1, nLine
+    LINE:do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE line
        ! the active particles on the line
        iEnd = nVertex_B(iLine)
@@ -109,7 +109,7 @@ contains
        ! The IO units of the state vectors could be seen in ModUnit, the
        ! summary is: Length is in the unit of Rs, temperature is in the
        ! unit of kinetic energy, all others are in SI units.
-       nOldSi_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine)
+       nOldSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine)
 
        ! find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,    iLine)
@@ -117,8 +117,8 @@ contains
        if(DoTraceShock) then
           ! This is how many steps should be done to allow the shock to
           ! the move not more than one mesh size
-          nProgress = MAX(1, iShock-iShockOld)
-          iShockOld = MIN(iShockOld, iShock-1)
+          nProgress = max(1, iShock-iShockOld)
+          iShockOld = min(iShockOld, iShock-1)
        else
           nProgress = 1
           iShockOld = 0
@@ -135,12 +135,12 @@ contains
 
           ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
-          nSI_I(1:iEnd) = State_VIB(RhoOld_,1:iEnd,iLine) + Alpha* &
-               (MhData_VIB(Rho_,  1:iEnd,iLine) - &
-               State_VIB(RhoOld_,1:iEnd,iLine))
-          BSi_I(1:iEnd) = State_VIB(BOld_,1:iEnd,iLine) + Alpha* &
-               (State_VIB(B_,  1:iEnd,iLine) - &
-               State_VIB(BOld_,1:iEnd,iLine))
+          nSI_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine) + Alpha* &
+               (MhData_VIB( Rho_, 1:iEnd, iLine) - &
+               State_VIB(RhoOld_, 1:iEnd, iLine))
+          BSi_I(1:iEnd) = State_VIB(  BOld_, 1:iEnd, iLine) + Alpha* &
+               (State_VIB(  B_, 1:iEnd, iLine) - &
+               State_VIB(BOld_, 1:iEnd, iLine))
           dLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
 
           ! trace shock position and steepen the shock
@@ -173,28 +173,31 @@ contains
              ! No Poisson bracket scheme, use the default algorithm
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
                   dLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
-             if(IsDistNeg) CYCLE line
+             if(IsDistNeg) CYCLE LINE
           end if
        end do PROGRESS
-    end do line
+    end do LINE
 
   contains
     !==========================================================================
     subroutine steepen_shock(iEnd)
-      use SP_ModGrid, ONLY: dLogRhoThreshold
-      integer, intent(in) :: iEnd ! To limit the range of search
+
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
-      real   :: DsSi_I(1:iEnd-1)
-      real   :: dLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
-      real   :: dLogRhoExcessIntegral
+
+      use SP_ModGrid, ONLY: dLogRhoThreshold
+      integer, intent(in) :: iEnd ! To limit the range of search
+      real :: DsSi_I(1:iEnd-1)
+      real :: dLogRhoExcess(iShock-nWidth:iShock+nWidth-1)
+      real :: dLogRhoExcessIntegral
       ! find the excess of dLogRho within the shock compared
       ! to background averaged over length
       !------------------------------------------------------------------------
-      DsSi_I = State_VIB(D_,1:iEnd-1,iLine)*Io2Si_V(UnitX_)
-      dLogRhoExcess = max(0.5*(dLogRho_I(iShock-nWidth:iShock+nWidth-1) + &
-           dLogRho_I(iShock-nWidth+1:iShock+nWidth)) - dLogRhoThreshold, 0.0)
+      DsSi_I = State_VIB(D_, 1:iEnd-1, iLine)*Io2Si_V(UnitX_)
+
       ! A jump (dLogRhoExcess>0) in velocity accross the shock wave * \Delta t
+      dLogRhoExcess = max(0.5*(dLogRho_I(iShock-nWidth:iShock+nWidth-1) +  &
+           dLogRho_I(iShock-nWidth+1:iShock+nWidth)) - dLogRhoThreshold, 0.0)
       dLogRhoExcessIntegral = sum(dLogRhoExcess*   &
            DsSi_I(iShock-nWidth:iShock+nWidth-1))
 
