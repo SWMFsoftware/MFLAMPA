@@ -6,10 +6,10 @@ module SP_ModUnit
   ! for proton, names for all units
   ! Dec.24 2017 Sokolov & Borovikov.
   use SP_ModGrid, ONLY: nVar, LagrID_
-  use ModConst,   ONLY: Rsun, cProtonMass, energy_in         , &
-       gen_kin_energy_to_momentum=>kinetic_energy_to_momentum, &
-       gen_momentum_to_kin_energy=>momentum_to_kinetic_energy, &
-       gen_momentum_to_energy    =>momentum_to_energy
+  use ModConst,   ONLY: Rsun, energy_in,                        &
+       gen_kin_energy_to_momentum => kinetic_energy_to_momentum,&
+       gen_momentum_to_kin_energy => momentum_to_kinetic_energy,&
+       gen_momentum_to_energy     => momentum_to_energy
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -32,11 +32,11 @@ module SP_ModUnit
   character(len=3), public :: NameEnergyUnit = 'kev'
 
   ! Integral flux unit is SI
-  character(len=6), public,parameter  :: NameFluxUnit   = 'p.f.u.'
+  character(len=6), public, parameter :: NameFluxUnit = 'p.f.u.'
 
   ! Unit particle flux, 1 particle per cm2 per s per steradian,
   ! corresponds to 10,000 particles per m2 per s per steradian.
-  real,                    parameter  :: UnitParticleFluxSi = 10000.0
+  real,                     parameter :: UnitParticleFluxSi = 10000.0
   character(len=12),public            :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
   character(len=12),public,allocatable:: NameFluxUnit_I(:)
 
@@ -76,13 +76,14 @@ module SP_ModUnit
 contains
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     use ModUtilities, ONLY: lower_case
     use SP_ModGrid, ONLY: T_
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
+
     select case(NameCommand)
     case('#PARTICLEENERGYUNIT')
        ! Read unit to be used for particle energy: keV, MeV, GeV
@@ -94,6 +95,7 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
+
   end subroutine read_param
   !============================================================================
   subroutine init

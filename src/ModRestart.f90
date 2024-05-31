@@ -5,14 +5,11 @@ module SP_ModRestart
 
   ! This module contains methods for writing output files
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModGrid,   ONLY: iblock_to_lon_lat,&
-       nLine, MhData_VIB, iShock_IB,  Used_B,&
-       FootPoint_VB, nVertex_B, nShockParam, &
-       nLon, nLat
+  use SP_ModGrid,   ONLY: iblock_to_lon_lat, nLine, &
+       MhData_VIB, iShock_IB, Used_B, FootPoint_VB, &
+       nVertex_B, nShockParam, nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_CB
   use SP_ModTime,   ONLY: SPTime, iIter, iStartTime_I
-  use SP_ModUnit,   ONLY: NameEnergyUnit
-  use ModPlotFile,  ONLY: save_plot_file, read_plot_file
   use ModUtilities, ONLY: open_file, close_file, CON_stop
   use ModIoUnit,    ONLY: UnitTmp_
 
@@ -83,10 +80,7 @@ contains
   !============================================================================
   subroutine save_restart
 
-    use ModIoUnit,     ONLY: UnitTmp_
-    use ModUtilities,  ONLY: open_file, close_file
     ! write the restart data
-
     ! name of the output file
     character(len=100):: NameFile
     ! loop variable
@@ -103,14 +97,11 @@ contains
        call iblock_to_lon_lat(iLine, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
-            trim(NameRestartOutDir)//'data_',iLon,'_',iLat,&
-            '.rst'
-       call open_file(file=NameFile, form='UNFORMATTED',&
-            NameCaller=NameSub)
+            trim(NameRestartOutDir)//'data_',iLon,'_',iLat,'.rst'
+       call open_file(file=NameFile, form='UNFORMATTED', NameCaller=NameSub)
        write(UnitTmp_)real(nVertex_B(iLine)),&
             real(iShock_IB(:, iLine))
-       write(UnitTmp_)&
-            FootPoint_VB(:, iLine),&
+       write(UnitTmp_)FootPoint_VB(:, iLine),&
             MhData_VIB(:,1:nVertex_B(iLine), iLine),&
             Distribution_CB(:,:,1:nVertex_B(iLine), iLine)
        call close_file
@@ -121,7 +112,6 @@ contains
   subroutine read_restart
 
     ! read the restart data
-
     ! name of the input file
     character(len=100):: NameFile
     ! loop variables
@@ -140,7 +130,7 @@ contains
             trim(NameRestartInDir)//'data_',iLon,'_',iLat,&
             '.rst'
        ! inquire(file=NameFile,exist=Used_B(iLine))
-       call open_file(file=NameFile,  status='old',&
+       call open_file(file=NameFile, status='old',&
             form='UNFORMATTED', NameCaller=NameSub, iErrorOut=iError)
        Used_B(iLine) = iError==0
        if(.not.Used_B(iLine))then

@@ -178,7 +178,7 @@ contains
   !============================================================================
   subroutine init
 
-    use SP_ModDistribution, ONLY: SpeedSi_I
+    ! initialize the file matrix
     ! storage for existing tags (possible during restart
     character(len=50),allocatable:: StringTag_I(:)
     ! full tag file name
@@ -519,7 +519,7 @@ contains
       ! NOTE: for iKindData == MH1D_ certain variables are always printed:
       !       Rho_, T_, Ux_:Uz_, Bx_:Bz_, Wave1_, Wave2_
       integer:: iVar, iVarMhd, iVarExtra, iStringPlot
-      character(len=10) ::  NameVarLowerCase
+      character(len=10) :: NameVarLowerCase
 
       ! reset
       !------------------------------------------------------------------------
@@ -563,8 +563,8 @@ contains
 
       end do ! iStringPlot
 
-      File_I(iFile)%nMhdVar    = count(File_I(iFile)%DoPlot_V(1:nMhData))
-      File_I(iFile)%nExtraVar  = count(File_I(iFile)%DoPlot_V(1+nMhData:nVar))
+      File_I(iFile)%nMhdVar   = count(File_I(iFile)%DoPlot_V(1:nMhData))
+      File_I(iFile)%nExtraVar = count(File_I(iFile)%DoPlot_V(1+nMhData:nVar))
 
       ! indices in the state vectors
       if(File_I(iFile)%nMhdVar>0)allocate(File_I(iFile)%iVarMhd_V(&
@@ -722,8 +722,7 @@ contains
        iKindData = File_I(iFile) % iKindData
 
        ! during initial call only background 1D data is printed
-       if(IsInitialOutput .and. iKindData /= MH1D_)&
-            iKindData = -1
+       if(IsInitialOutput .and. iKindData /= MH1D_) iKindData = -1
 
        select case(iKindData)
        case(MH1D_)
@@ -785,7 +784,7 @@ contains
             ! create date_time-iteration tag
             call get_date_time_string(SPTime, StringTime)
             write(UnitTmp_,'(a,i6.6)') 'e'//StringTime//'_n',iIter
-            write(*,'(a,i6.6)')'Write plot file  e'//StringTime//'_n',iIter
+            write(*,'(a,i6.6)')'Write plot file e'//StringTime//'_n',iIter
          else
             ! create time-iteration tag
             call get_time_string(SPTime, StringTime(1:8))
@@ -796,8 +795,8 @@ contains
       end if
 
       ! Write ouput files themselves
-      nMhdVar    = File_I(iFile)%nMhdVar
-      nExtraVar  = File_I(iFile)%nExtraVar
+      nMhdVar   = File_I(iFile)%nMhdVar
+      nExtraVar = File_I(iFile)%nExtraVar
       nFluxVar  = File_I(iFile)%nFluxVar
       StringHeader = 'MFLAMPA: data along a field line; '//&
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
@@ -828,7 +827,7 @@ contains
          ! Parameters
          Param_I(LagrID_:Z_) = FootPoint_VB(LagrID_:Z_,iLine)
          ! shock location
-         if(iShock_IB(Shock_,iLine)/=NoShock_)then
+         if(iShock_IB(Shock_,iLine)/=NoShock_) then
             iShock             = iShock_IB(Shock_,iLine)
             Param_I(RShock_)   = State_VIB(R_,iShock,iLine)
             Param_I(RShock_-1) = real(iShock)
@@ -1100,10 +1099,10 @@ contains
             if(.not.Used_B(iLine))CYCLE
             ! set the file name
             call make_file_name(&
-                 StringBase    = NameMHData,                     &
-                 Radius        = File_I(iFile) % Radius,         &
-                 iLine        = iLine,                         &
-                 NameExtension = File_I(iFile)%NameFileExtension,&
+                 StringBase    = NameMHData,                      &
+                 Radius        = File_I(iFile) % Radius,          &
+                 iLine         = iLine,                           &
+                 NameExtension = File_I(iFile)%NameFileExtension, &
                  NameOut       = NameFile)
 
             call remove_file(NameFile)
@@ -1519,7 +1518,7 @@ contains
             end if
 
             ! Find the triangle where the satellite locates
-            if(UsePlanarTri)then
+            if(UsePlanarTri) then
                call find_triangle_orig(               &
                     XyzSat_DI(:, iSat)/rSat, nTriMesh,&
                     XyzReachR_DI(:, lidTri:ridTri),   &

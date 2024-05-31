@@ -14,7 +14,6 @@ module SP_ModGrid
   use ModUtilities, ONLY: CON_stop
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModProc,   ONLY: iProc
-  use ModNumConst,  ONLY: cTwoPi, cPi
 
   implicit none
   SAVE
@@ -316,7 +315,7 @@ contains
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine))CYCLE
-       iEnd   = nVertex_B(  iLine)
+       iEnd = nVertex_B(iLine)
        do iVertex = 1, iEnd
           ! magnetic field
           State_VIB(B_,iVertex, iLine) = &
@@ -380,8 +379,6 @@ contains
     ! find location of a shock wave on a given line (line)
     ! shock front is assumed to be location of max log(Rho/RhoOld)
     real :: dLogRho_I(1:nVertexMax)
-    ! Threshold for shock tracing
-    real, parameter :: DLogRhoThreshold = 0.01
     ! Do not search too close to the Sun
     real, parameter :: RShockMin = 1.20  ! *RSun
     integer         :: iShockMin
@@ -389,7 +386,7 @@ contains
     integer:: iShockMax
     ! Misc
     integer:: iShockCandidate
-    integer:: iLine, iVertex
+    integer:: iLine, iEnd
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine))then
@@ -398,11 +395,10 @@ contains
        end if
 
        ! shock front is assumed to be location of max log(Rho/RhoOld);
-       do iVertex = 1, nVertex_B(  iLine)
-          ! divergence of plasma velocity
-          dLogRho_I(iVertex) = log(MhData_VIB(Rho_,iVertex,iLine)/&
-               State_VIB(RhoOld_,iVertex,iLine))
-       end do
+       ! divergence of plasma velocity propto dLogRho
+       iEnd = nVertex_B(iLine)
+       dLogRho_I(1:iEnd) = log(MhData_VIB(Rho_,1:iEnd,iLine)/&
+               State_VIB(RhoOld_,1:iEnd,iLine))
 
        ! shock never moves back
        iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
@@ -410,7 +406,7 @@ contains
        iShockCandidate = iShockMin - 1 + maxloc(&
             DLogRho_I(   iShockMin:iShockMax),1, MASK = &
             State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
-            DLogRho_I(   iShockMin:iShockMax)       > DLogRhoThreshold)
+            DLogRho_I(   iShockMin:iShockMax)       > dLogRhoThreshold)
        if(iShockCandidate >= iShockMin)&
             iShock_IB(Shock_, iLine) = iShockCandidate
     end do
