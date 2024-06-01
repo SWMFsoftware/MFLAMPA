@@ -300,7 +300,7 @@ Set the test position and momentum
   <parameter name="nSpreadLon"  type="integer" min="1" default="3" />
   <parameter name="nSpreadLat"  type="integer" min="1" default="3" />
 
-#PREADGRID
+#SPREADGRID
 6			nSpreadLon
 6			nSpreadLat
 
@@ -308,10 +308,15 @@ Set the size of angular grid in longitude and latitude
 </command>
 
 <command name="SPREADSIGMA">
-  <parameter name="SigmaMode"  type="string" />
+  <parameter name="SigmaMode"  type="string" input="select">
+    <option name="const" default="T"/>
+    <option name="linear-lon"/>
+    <option name="linear-lat"/>
+    <option name="bilinear"/>
+  </parameter>
   <parameter name="Sigma"  type="real" min="0.0" default="10.0"/>
 
-#SPREADGRID
+#SPREADSIGMA
 const			SigmaMode
 5.0			Sigma [deg]
 
@@ -327,7 +332,7 @@ Then we set the "Sigma" of the lines, namely the changes in degrees.
   <parameter name="RadiusRef"  type="real" default="1.0"/>
   <parameter name="SolidAngleRef"  type="real" default="1.0"/>
 
-#SPREADGRID
+#SPREADSOLIDANGLE
 -1.0			RadiusRef [Rs]
 -1.0			Sigma [deg]
 
@@ -403,8 +408,17 @@ particle flux is integrated over energy as the output.
 
 <command name="UPPERENDBC">
   <parameter name="UseUpperEndBc" type="logical" default="F"/>
-  <parameter name="TypeUpperEndBc" type="string" default="lism"/>
-  <parameter name="TypeLisBc" type="string" default="default"/>
+  <parameter name="TypeUpperEndBc" type="string" input="select">
+    <option name="lism" default="T"/>
+    <option name="none"/>
+    <option name="float"/>
+    <option name="escape"/>
+  </parameter>
+  <parameter name="TypeLisBc" type="string" input="select">
+    <option name="default" default="T"/>
+    <option name="usoskin2005"/>
+    <option name="corti2019"/>
+  </parameter>
   <parameter name="UseModulationPot" type="logical" default="F"/>
   <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
 
