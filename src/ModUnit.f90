@@ -81,9 +81,9 @@ contains
     use ModUtilities, ONLY: lower_case
     use SP_ModGrid, ONLY: T_
     character(len=*), intent(in):: NameCommand ! From PARAM.in
+
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
-
     select case(NameCommand)
     case('#PARTICLEENERGYUNIT')
        ! Read unit to be used for particle energy: keV, MeV, GeV

@@ -50,8 +50,7 @@ contains
     case('#READMHDATA')
        ! determine whether to read the MHD data
        call read_var('DoReadMhData', DoReadMhData)
-       if(.not. DoReadMhData)&
-            RETURN
+       if(.not. DoReadMhData) RETURN
        ! the input directory
        call read_var('NameInputDir', NameInputDir)
        call fix_dir_name(NameInputDir) ! adds "/" if not present
@@ -91,12 +90,14 @@ contains
     iIOTag = io_unit_new()
     call open_file(iUnitIn=iIOTag, &
          file=trim(NameInputDir)//trim(NameTagFile), status='old')
+
     ! if nTag > 0, need to skip nTag lines
     if(nTag>0)then
        do iTag = 1, nTag-1
           read(iIOTag,'(a)') StringAux
        end do
     end if
+
     ! read the first input file
     call read_mh_data(DoOffsetIn = .false.)
     call get_other_state_var
@@ -141,20 +142,21 @@ contains
     real:: DataInputTimeOld
     ! timetag
     character(len=50):: StringTag
-
-    ! check whether need to apply offset, default is .true.
-
     character(len=*), parameter:: NameSub = 'read_mh_data'
     !--------------------------------------------------------------------------
     if(present(DoOffsetIn))then
+       ! check whether need to apply offset
        DoOffset = DoOffsetIn
     else
+       ! default is .true.
        DoOffset = .true.
     end if
+
     ! get the tag for files
     read(iIOTag,'(a)') StringTag
     ! save the current data input time
     DataInputTimeOld = DataInputTime
+
     ! read the data
     line:do iLine = 1, nLine
        if(.not.Used_B(iLine))then
@@ -162,6 +164,7 @@ contains
           CYCLE line
        end if
        call iblock_to_lon_lat(iLine, iLon, iLat)
+
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
             trim(NameInputDir)//NameMHData//'_',iLon,&
@@ -173,6 +176,7 @@ contains
           nVertex_B(iLine) = 0
           CYCLE line
        end if
+
        ! read the header first
        call read_plot_file(NameFile          ,&
             TypeFileIn = TypeMhDataFile      ,&
@@ -186,12 +190,12 @@ contains
                call CON_stop(NameSub//': time counter didnt advance '//&
                'when reading mh data file with tag '//trim(StringTag)//&
                '; the tag may be repeated in '//trim(NameTagFile))
-          ! amount of the offset is determined from difference
-          ! in LagrID_
+          ! amount of the offset is determined from difference in LagrID_
           iOffset = nint(FootPoint_VB(LagrID_,iLine) - Param_I(LagrID_))
        else
           iOffset = 0
        end if
+
        ! Parameters
        FootPoint_VB(LagrID_:Z_,iLine) = Param_I(LagrID_:Z_)
        ! read MH data
