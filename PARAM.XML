@@ -356,7 +356,6 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
   <parameter name="EnergyMin" type="real" min="0.0" default="1.0" />
   <parameter name="EnergyMax" type="real" min="0.0" default="1000.0" />
   <parameter name="nP" type="integer" min="1" default="100" />
-  <parameter name="nMu" type="integer" min="1" default="1"/>
 
 #MOMENTUMGRID
 1.0			EnergyMin
@@ -365,7 +364,15 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 1			nMu
 
 Read energy range, the number of energy bins and the energy unit.
-Usually read from the restart.H file. 
+Usually read from the restart.H file.
+</command>
+
+<command name="PITCHANGLEGRID" if="$_IsFirstSession">
+  <parameter name="nMu" type="integer" min="1" default="1"/>
+
+#PITCHANGLEGRID
+1			nMu
+
 Read the pitch angle information, determine whether we take the
 averaged value over all pitch angles. Also, we need to specify
 how many intervals in the range of [-1, 1] for pitch angle.
@@ -384,7 +391,7 @@ default value is set as 0.01 [pfu].
 <command name="FLUXCHANNEL">
   <parameter name="nFluxChannel" type="integer" min="1" default="6" />
   <for name="iFluxChannel" from="1" to="$nFluxChannel">
-      <parameter name="EChannelIo_I" type="real" min="0" />
+      <parameter name="EChannelIo_I" type="real" min="0.0" />
   </for>
 
 #FLUXCHANNEL
@@ -439,7 +446,7 @@ to determine whether we use LISM or the GCR spectrum at ~1 AU.
 For the latter, we also need the modulation potential (denoted
 as "phi" in Usoskin et al. 2005), which is temporal and spatial
 (and even energy) dependent. We stick to the one derived by Oulu
-neutron monitor and published in the "Dataset 1" of
+neutron monitor and published in the "Dataset 1" on
 https://cosmicrays.oulu.fi/phi/phi.html.
 </command>
 
@@ -468,10 +475,10 @@ Default distribution is f(p) ~ 1.0 * 2 / p**5.
 </command>
 
 <command name="CFL">
-  <parameter name="Cfl" type="real" min="0.0" max="1.0" default="0.99" />
+  <parameter name="Cfl" type="real" min="0.0" max="1.0" default="0.9" />
 
 #CFL
-0.99			Cfl
+0.9			Cfl
 
 Please send an email to Igor Sokolov for more information.
 </command>
@@ -557,15 +564,15 @@ The default value is true.
 
 <command name="#SCALETURBULENCE">
   <parameter name="ScaleTurbulenceType" type="string" default="const" />
-  <parameter name="ScaleTurbulence" type="real" min="0.0" default="0.1" />
+  <parameter name="ScaleTurbulence" type="real" min="0.0" default="0.3" />
 
 #SCALETURBULENCE
 const			ScaleTurbulenceType
-0.24			ScaleTurbulence [AU] at 1 AU
+0.3			ScaleTurbulence [AU] at 1 AU
 
 cut-off wavenumber of turbulence spectrum: k0 = 2*cPi/Scale
 The default value is set as const (or constant), i.e.,
-the value (e.g., 0.1) of "ScaleTurbulence [AU] at 1 AU".
+the value (e.g., 0.3 AU) of "ScaleTurbulence [AU] at 1 AU".
 </command>
 
 <command name="TURBULENTSPECTRUM">
@@ -574,7 +581,7 @@ the value (e.g., 0.1) of "ScaleTurbulence [AU] at 1 AU".
 #TURBULENTSPECTRUM
 F			UseTurbulentSpectrum
 
-Determine whether we use the turbulence spectrum
+Determine whether we use the turbulence spectrum.
 Set the default value is false.
 </command>
 
@@ -596,7 +603,7 @@ minutes-seconds passed after the initial time (set by the command #STARTTIME)
 
 <command name="TIMING">
   <parameter name="UseTiming" type="logical" default="F" />
-  <parameter name="nTiming" type="integer" />
+  <parameter name="nTiming" type="integer" default="-2"/>
   <parameter name="nDepthTiming" type="integer" default="-1" />
   <parameter name="TypeTimingReport" type="string" />
 
@@ -608,7 +615,11 @@ cumm			TypeTimingReport
 
 Set the timing format in SP component, but as default, we set
 UseTiming as False; if UseTiming is True, one should specify
-nTiming, nDepthTiming, and TypeTimingReport.
+nTiming, nDepthTiming, and TypeTimingReport. nTiming is set to
+be -2 as default: greater than -3 means that it reports the time
+at each specified spot; greater than -2 means that it reports
+the time in each TIMELOOP; greater than 0 is needed, to show the
+timing results, if required (with speed as cells/second/PE/step).
 </command>
 
 <command name="SAVEINITIAL">
@@ -676,13 +687,9 @@ The number of different time-line tags of the MH_data files.
 #SATELLITE
 4				nSatellite
 HGR			TypeCoordSystem
-HGR trajrange			StringSatellite
 ../TRAJECTORY/earth.dat		NameTrajectoryFile
-HGR trajrange			StringSatellite
 ../TRAJECTORY/sta.dat		NameTrajectoryFile
-HGR trajrange			StringSatellite
 ../TRAJECTORY/psp.dat		NameTrajectoryFile
-HGR trajrange			StringSatellite
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
 
 Set the satellites included for spectra outputs along the trajectory.

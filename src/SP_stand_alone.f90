@@ -2,21 +2,21 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 program MFLAMPA
+
   use ModKind
   use SP_ModProc,   ONLY: iProc, nProc, iComm
   use ModUtilities, ONLY: remove_file, touch_file
   use SP_ModTime,   ONLY: iIter, init_time  => init
   use SP_ModPlot,   ONLY:        init_plot  => init
   use SP_ModTiming, ONLY: nTiming
-  use SP_ModMain,   ONLY: &
-       IsLastRead, IsStandAlone,          &
-       TimeMax, nIterMax,                 &
+  use SP_ModMain,   ONLY: IsLastRead,     &
+       IsStandAlone, TimeMax, nIterMax,   &
        SP_read_param => read_param,       &
        SP_check      => check,            &
        SP_initialize => initialize,       &
        SP_run        => run,              &
        SP_finalize   => finalize
-  use SP_ModGrid,   ONLY: init_stand_alone, init_grid=>init
+  use SP_ModGrid,   ONLY: init_stand_alone, init_grid => init
   use ModReadParam, ONLY: read_file, read_init
   use CON_planet, ONLY: init_planet_const, set_planet_defaults
   use ModMpi
@@ -76,7 +76,7 @@ program MFLAMPA
         ! set either in coupling or in reading the MHD data from file.
         call timing_stop('setup')
         if(nTiming > -3) call timing_report_total
-        if(iProc==0)&
+        if(iProc==0) &
              write(*,*)'Resetting timing counters after setup.'
         call timing_reset('#all', 3)
      else
@@ -102,7 +102,7 @@ program MFLAMPA
           write(*,*)'----- End of Session   ',iSession,' ------'
      iSession       = iSession + 1
      IsFirstSession = .false.
-     if (nTiming > -2) call timing_report
+     if(nTiming > -2) call timing_report
      call timing_reset_all
   end do SESSIONLOOP
 
@@ -111,12 +111,9 @@ program MFLAMPA
      write(*,'(a)')'    Finished Numerical Simulation'
      write(*,'(a)')'    -----------------------------'
   end if
-
-  if (nTiming > -2) call timing_report
-
+  if(nTiming > -2) call timing_report
   call timing_stop('MFLAMPA')
-
-  if(nTiming > -3)call timing_report_total
+  if(nTiming > -3) call timing_report_total
 
   ! Finish writing to log file
   call SP_finalize
@@ -154,7 +151,7 @@ contains
        end if
        if(.not.IsTimeToStop .and. UseStopFile) then
           inquire(file='MFLAMPA.STOP',exist=IsTimeToStop)
-          if (IsTimeToStop) &
+          if(IsTimeToStop) &
                write(*,*)'MFLAMPA.STOP file exists: received stop signal'
        end if
     end if
@@ -176,14 +173,13 @@ contains
          .and. nProgress1>0 .and. mod(iIter,nProgress1) == 0 ) then
        CpuTimeMFLAMPA = timing_func_d('sum',1,'MFLAMPA','MFLAMPA')
        CpuTimeAdvance = timing_func_d('sum',1,'advance','MFLAMPA')
-
        ! placeholder
     end if
 
     ! Show timing tables
-    if(nTiming>0.and.mod(iIter,nTiming)==0) then
+    if(nTiming>0 .and. mod(iIter,nTiming)==0) then
        call timing_report
-    else if(nProgress2>0.and.mod(iIter,nProgress2) == 0) then
+    else if(nProgress2>0 .and. mod(iIter,nProgress2)==0) then
        call timing_tree(2,2)
     end if
 
@@ -192,4 +188,3 @@ contains
 
 end program MFLAMPA
 !==============================================================================
-

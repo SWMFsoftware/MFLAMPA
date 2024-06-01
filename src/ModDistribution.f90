@@ -215,6 +215,7 @@ contains
                ' while value read from PARAM.in is nP=', nPCheck
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
+    case('#PITCHANGLEGRID')
        call read_var('nMu', nMuCheck)
        if(nMu/=nMuCheck)then
           if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
@@ -242,7 +243,7 @@ contains
        NameFluxChannel_I(0)              = 'flux_total'
        NameFluxChannel_I(nFluxChannel+1) = 'eflux'
 
-       do iFluxChannel=1,nFluxChannel
+       do iFluxChannel = 1, nFluxChannel
           call read_var('EChannelIo_I [MeV]', EChannelIo_I(iFluxChannel))
           write(NameFluxChannel,'(I5.5)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
@@ -354,7 +355,6 @@ contains
              do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
                 if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux)) CYCLE
-
                 if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux)) then
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
