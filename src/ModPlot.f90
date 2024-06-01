@@ -1467,7 +1467,7 @@ contains
                   ! Otherwise, we will spend some time reorganizing the points
                   iReachR = 1
                   do iLineAll = 1, nLineAll
-                     if(DoReachR_I(iLine)) then
+                     if(DoReachR_I(iLineAll)) then
                         iReachR = iReachR + 1
                         XyzReachR_DI(:, iReachR) = Xyz_DI(:, iLineAll)
                         Log10DistReachR_IIB(:, :, iReachR) =   &
