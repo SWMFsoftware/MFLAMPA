@@ -51,9 +51,9 @@ contains
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in) :: NameCommand
-    integer :: iSat
-    integer :: l1, l2
-    character(len=3) :: TypeCoordSC = "HGR" ! as usually used in SC
+    integer :: iSat                          ! loop variable for satellites
+    integer :: l1, l2                        ! indices to get satellite name
+    character(len=3) :: TypeCoordSC = "HGR"  ! as usually used in SC
 
     logical:: DoTest
     character(len=*), parameter:: NameSub = 'read_param'
@@ -158,8 +158,8 @@ contains
 
     ! allocate arrays depending on number of points
     allocate(Time_I(MaxPoint), Xyz_DI(MaxDim, MaxPoint))
-    allocate(XyzSat_DII(3, nSat, MaxPoint))
-    allocate(TimeSat_II(nSat, MaxPoint))
+    allocate(XyzSat_DII(MaxDim, MaxPoint, nSat))
+    allocate(TimeSat_II(MaxPoint, nSat))
 
     ! Read the trajectories
     SATELLITES: do iSat = 1, nSat
@@ -168,9 +168,8 @@ contains
        if(iProc == 0) then
 
           NameFile = NameFileSat_I(iSat)
-          if(lVerbose > 0)then
+          if(lVerbose > 0) &
              write(STDOUT_, *) NameSub, " reading: ", trim(NameFile)
-          end if
 
           call open_file(file=NameFile, status="old")
           nPoint = 0
@@ -224,17 +223,15 @@ contains
        call MPI_Bcast(Xyz_DI, MaxDim*nPoint, MPI_REAL, 0, iComm, iError)
 
        ! Store time and positions for satellite iSat on all PE-s
-       TimeSat_II(iSat, 1:nPoint) = Time_I(1:nPoint)
-       do i = 1, nPoint
-          XyzSat_DII(:, iSat, i) = Xyz_DI(:, i)
-       end do
+       TimeSat_II(1:nPoint, iSat) = Time_I(1:nPoint)
+       XyzSat_DII(:, 1:nPoint, iSat) = Xyz_DI(:, 1:nPoint)
 
        if(DoTest) then
           nPoint = min(10, nPoint)
-          write(*,*) NameSub,': tSat=', TimeSat_II(iSat,1:nPoint)
-          write(*,*) NameSub,': xSat=', XyzSat_DII(1,iSat,1:nPoint)
-          write(*,*) NameSub,': ySat=', XyzSat_DII(2,iSat,1:nPoint)
-          write(*,*) NameSub,': zSat=', XyzSat_DII(3,iSat,1:nPoint)
+          write(*,*) NameSub,': tSat=', TimeSat_II(1:nPoint, iSat)
+          write(*,*) NameSub,': xSat=', XyzSat_DII(1, 1:nPoint, iSat)
+          write(*,*) NameSub,': ySat=', XyzSat_DII(2, 1:nPoint, iSat)
+          write(*,*) NameSub,': zSat=', XyzSat_DII(3, 1:nPoint, iSat)
        end if
 
     end do SATELLITES
@@ -262,26 +259,25 @@ contains
     if(nPoint > 0) then
 
        i = iPointCurrentSat_I(iSat)
-       if(DoTest) write(*,*) NameSub,  &
-            ' nPoint, iPoint, TimeSim, TimeSat=',   &
-            nPoint, i, tSimulation, TimeSat_II(iSat,i)
+       if(DoTest) write(*,*) NameSub, ' nPoint, iPoint, TimeSim, TimeSat=', &
+            nPoint, i, tSimulation, TimeSat_II(i, iSat)
 
-       do while (i < nPoint .and. TimeSat_II(iSat, i) <= tSimulation)
+       do while (i < nPoint .and. TimeSat_II(i, iSat) <= tSimulation)
           i = i + 1
        end do
        iPointCurrentSat_I(iSat) = i
        if(DoTest) write(*,*) NameSub, ' final iPoint=', i
 
-       if( (i == nPoint .and. tSimulation > TimeSat_II(iSat, i))  &
+       if( (i == nPoint .and. tSimulation > TimeSat_II(i, iSat))  &
             .or. i == 1 ) then
           DoTrackSatellite_I(iSat) = .false.
           XyzSat_DI(:, iSat) = 0.0
        else
           DoTrackSatellite_I(iSat) = .true.
-          dTime = 1.0 - (TimeSat_II(iSat, i) - tSimulation) /     &
-               max(TimeSat_II(iSat, i) - TimeSat_II(iSat, i-1), cTiny)
-          XyzSat_DI(:, iSat) = dTime * XyzSat_DII(:, iSat, i) +   &
-               (1.0 - dTime) * XyzSat_DII(:, iSat, i-1)
+          dTime = 1.0 - (TimeSat_II(i, iSat) - tSimulation) /     &
+               max(TimeSat_II(i, iSat) - TimeSat_II(i-1, iSat), cTiny)
+          XyzSat_DI(:, iSat) = dTime * XyzSat_DII(:, i, iSat) +   &
+               (1.0 - dTime) * XyzSat_DII(:, i-1, iSat)
        end if
 
        if(DoTest) then
