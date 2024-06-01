@@ -189,9 +189,9 @@ contains
     ! for the assumed initial distribution (~1/p^2)
     FluxChannelInit_V(0) = FluxInitIo
     FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
-         (EnergyMaxIo - EChannelIo_I(:)) / (EnergyMaxIo - EnergyInjIo)
-    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * Io2Si_V(UnitFlux_) * &
-         0.5 * (EnergyMaxIo + EnergyInjIo) * Si2Io_V(UnitFlux_)
+         (EnergyMaxIo - EChannelIo_I) / (EnergyMaxIo - EnergyInjIo)
+    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * &
+         0.5 * (EnergyMaxIo + EnergyInjIo)
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
@@ -233,9 +233,9 @@ contains
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
 
-       if (allocated(EChannelIo_I)) deallocate(EChannelIo_I)
+       if(allocated(EChannelIo_I)) deallocate(EChannelIo_I)
        allocate(EChannelIo_I(nFluxChannel))
-       if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
+       if(allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
        allocate(NameFluxChannel_I(0:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(0:FluxMax_))
@@ -306,9 +306,8 @@ contains
        State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &
             = State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
             - iOffset, iLine)
-       Distribution_CB(:,:,1:nVertex_B(iLine), iLine)&
-            = Distribution_CB(:,:,1-iOffset:nVertex_B(iLine)-iOffset, &
-            iLine)
+       Distribution_CB(:,:,1:nVertex_B(iLine), iLine) &
+            = Distribution_CB(:,:,1-iOffset:nVertex_B(iLine)-iOffset, iLine)
     else
        call CON_stop('No algorithm for iOffset > 1 in '//NameSub)
     end if
