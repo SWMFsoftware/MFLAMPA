@@ -38,11 +38,11 @@ module SP_ModUnit
   ! corresponds to 10,000 particles per m2 per s per steradian.
   real,                     parameter :: UnitParticleFluxSi = 10000.0
   character(len=12),public            :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
-  character(len=12),public,allocatable:: NameFluxUnit_I(:)
+  character(len=12),public, allocatable :: NameFluxUnit_I(:)
 
   ! Unit conversions
   integer, public, parameter:: &
-       UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3!, UnitEFlux_ = 4
+       UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3
   real, public, dimension(UnitX_:UnitFlux_) :: Io2Si_V, Si2Io_V
 
   ! Unit for all the state variables:
