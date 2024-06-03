@@ -161,10 +161,10 @@ contains
     ! GOES by default
     if(.not. allocated(NameFluxChannel_I)) then
        nFluxChannel = 6
-       allocate(character(LEN=10) :: NameFluxChannel_I(0:nFluxChannel+1))
-       NameFluxChannel_I = ['flux_total', 'flux_00005', 'flux_00010', &
-            'flux_00030', 'flux_00050', 'flux_00060', 'flux_00100',   &
-            'eflux     ']
+       allocate(character(LEN=13) :: NameFluxChannel_I(0:nFluxChannel+1))
+       NameFluxChannel_I = ['flux_total   ', 'flux_00000005', 'flux_00000010',&
+            'flux_00000030', 'flux_00000050', 'flux_00000060', &
+            'flux_00000100', 'eflux        ']
        allocate (EChannelIo_I(nFluxChannel))
        EChannelIo_I = [5,10,30,50,60,100]  ! in MeV!
     end if
@@ -200,7 +200,7 @@ contains
     use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in):: NameCommand ! From PARAM.in
     integer:: nPCheck = nP, nMuCheck = nMu, iFluxChannel
-    character(len=5) :: NameFluxChannel
+    character(len=8) :: NameFluxChannel
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
@@ -236,7 +236,7 @@ contains
        if (allocated(EChannelIo_I)) deallocate(EChannelIo_I)
        allocate(EChannelIo_I(nFluxChannel))
        if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(character(LEN=10) :: NameFluxChannel_I(0:FluxMax_))
+       allocate(character(LEN=13) :: NameFluxChannel_I(0:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(0:FluxMax_))
 
@@ -245,7 +245,7 @@ contains
 
        do iFluxChannel = 1, nFluxChannel
           call read_var('EChannelIo_I [MeV]', EChannelIo_I(iFluxChannel))
-          write(NameFluxChannel,'(I5.5)') int(EChannelIo_I(iFluxChannel))
+          write(NameFluxChannel,'(I8.8)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
 
