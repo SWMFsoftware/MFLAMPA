@@ -719,31 +719,31 @@ contains
     !==========================================================================
     subroutine write_mh_1d
 
+      ! write output with 1D MH data in the format to be read by IDL/TECPLOT;
+      ! separate file is created for each field line, and the name format is:
+      ! MH_data_<iLon>_<iLat>_n<ddhhmmss>_n<iIter>.{out/dat}
+
       use SP_ModGrid, ONLY: FootPoint_VB, NoShock_
 
-      ! write output with 1D MH data in the format to be read by
-      ! IDL/TECPLOT; separate file is created for each field line,
-      ! name format is:
-      ! MH_data_<iLon>_<iLat>_n<ddhhmmss>_n<iIter>.{out/dat}
       ! name of the output file
-      character(len=100):: NameFile
+      character(len=100) :: NameFile
       ! header for the file
-      character(len=500):: StringHeader
+      character(len=500) :: StringHeader
       ! loop variables
-      integer:: iLine, iVarPlot
-      ! index of last particle on the field line
-      integer:: iLast
+      integer :: iLine, iVarPlot
+      ! index of the last particle on the field line
+      integer :: iEnd
       ! for better readability
-      integer:: nMhdVar, nExtraVar, nFluxVar
+      integer :: nMhdVar, nExtraVar, nFluxVar
       ! shock location
-      integer:: iShock
-      integer, parameter:: RShock_     = Z_ + 2
-      integer, parameter:: StartTime_  = RShock_ + 1
-      integer, parameter:: StartJulian_= StartTime_ + 1
+      integer :: iShock
+      integer, parameter :: RShock_     = Z_ + 2
+      integer, parameter :: StartTime_  = RShock_ + 1
+      integer, parameter :: StartJulian_= StartTime_ + 1
       real :: Param_I(LagrID_:StartJulian_)
       ! timetag
-      character(len=15):: StringTime
-      character(len=*), parameter:: NameSub = 'write_mh_1d'
+      character(len=15) :: StringTime
+      character(len=*), parameter :: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
       !  Update number of time tags and write to tag l ist file
       if(iProc==0)then
@@ -786,16 +786,16 @@ contains
               NameOut       = NameFile)
 
          ! get min and max particle indexes on this field line
-         iLast = nVertex_B(iLine)
+         iEnd = nVertex_B(iLine)
          ! fill the output buffer
-         if(nMhdVar>0)File_I(iFile) % Buffer_II(1:nMhdVar, 1:iLast) = &
-              MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), 1:iLast, iLine)
+         if(nMhdVar>0)File_I(iFile) % Buffer_II(1:nMhdVar, 1:iEnd) = &
+              MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), 1:iEnd, iLine)
          if(nExtraVar>0)File_I(iFile) % Buffer_II(nMhdVar+1:nMhdVar+nExtraVar,&
-              1:iLast) = State_VIB(File_I(iFile) % iVarExtra_V(1:nExtraVar), &
-              1:iLast, iLine)
+              1:iEnd) = State_VIB(File_I(iFile) % iVarExtra_V(1:nExtraVar), &
+              1:iEnd, iLine)
          if(File_I(iFile) % DoPlotFlux)File_I(iFile) % Buffer_II(&
               nMhdVar + nExtraVar + 1:nMhdVar + nExtraVar + nFluxVar,&
-              1:iLast) = Flux_VIB(Flux0_:FluxMax_, 1:iLast, iLine)
+              1:iEnd) = Flux_VIB(Flux0_:FluxMax_, 1:iEnd, iLine)
 
          ! Parameters
          Param_I(LagrID_:Z_) = FootPoint_VB(LagrID_:Z_,iLine)
@@ -820,13 +820,13 @@ contains
               TimeIn        = SPTime, &
               nStepIn       = iIter, &
               CoordMinIn_D  = [MHData_VIB(LagrID_,1,iLine)], &
-              CoordMaxIn_D  = [MHData_VIB(LagrID_,iLast,iLine)], &
+              CoordMaxIn_D  = [MHData_VIB(LagrID_,iEnd,iLine)], &
               NameVarIn     = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar,&
-              1:iLast),&
+              1:iEnd),&
               ParamIn_I     = Param_I(LagrID_:StartJulian_))
       end do
 
@@ -971,9 +971,9 @@ contains
       end if
 
       ! start time in seconds from base year
-      Param_I(StartTime_)  = StartTime
+      Param_I(StartTime_)   = StartTime
       ! start time in Julian date
-      Param_I(StartJulian_)= StartTimeJulian
+      Param_I(StartJulian_) = StartTimeJulian
 
       ! spread data: average lon and lat, angle spread
       if(File_I(iFile) % DoPlotSpread)then
@@ -1054,9 +1054,9 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_mh_time'
       !------------------------------------------------------------------------
-      nMhdVar   = File_I(iFile)%nMhdVar
-      nExtraVar = File_I(iFile)%nExtraVar
-      nFluxVar  = File_I(iFile)%nFluxVar
+      nMhdVar   = File_I(iFile) % nMhdVar
+      nExtraVar = File_I(iFile) % nExtraVar
+      nFluxVar  = File_I(iFile) % nFluxVar
       ! set header
       StringHeader = &
            'MFLAMPA: data on a field line at fixed heliocentric distance; '//&
@@ -1187,11 +1187,11 @@ contains
     !==========================================================================
     subroutine write_distr_1d
 
-      use SP_ModGrid, ONLY: S_
+      ! write output with 1D MH data in the format to be read by IDL/TECPLOT;
+      ! separate file is created for each field line, and the name format is:
+      ! MH_data_<iLon>_<iLat>_n<ddhhmmss>_n<iIter>.{out/dat}
 
-      ! write file with distribution in the format to be read by IDL/TECPLOT;
-      ! separate file is created for each field line, name format is
-      ! Distribution_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
+      use SP_ModGrid, ONLY: S_
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -1202,8 +1202,8 @@ contains
       integer :: iLine, iVertex, iVarPlot
       ! indexes of corresponding node, latitude and longitude
       integer :: iLat, iLon
-      ! index of first/last particle on the field line
-      integer :: iLast
+      ! index of the last particle on the field line
+      integer :: iEnd
       ! scale and conversion factor
       real    :: Scale_I(0:nP+1)
       ! timetag
@@ -1241,11 +1241,11 @@ contains
               NameOut       = NameFile)
 
          ! get max particle indexes on this field line
-         iLast = nVertex_B(iLine)
+         iEnd = nVertex_B(iLine)
 
          do iVertex = 1, nVertexMax
             ! reset values outside the line's range
-            if(iVertex > iLast)then
+            if(iVertex > iEnd)then
                File_I(iFile) % Buffer_II(:,iVertex) = 0.0
                CYCLE
             end if
@@ -1272,11 +1272,11 @@ contains
               TimeIn         = SPTime, &
               nStepIn        = iIter, &
               Coord1In_I     = Scale_I, &
-              Coord2In_I     = State_VIB(S_,1:iLast,iLine), &
+              Coord2In_I     = State_VIB(S_,1:iEnd,iLine), &
               NameVarIn      = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
-              VarIn_II   = File_I(iFile) % Buffer_II(:,1:iLast))
+              VarIn_II   = File_I(iFile) % Buffer_II(:,1:iEnd))
       end do
 
     end subroutine write_distr_1d
@@ -1708,8 +1708,8 @@ contains
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
       ! single time series file is created for all field line, name format is
       ! Flux_R=<Radius [AU]>_Lon=<Longitude[deg]>_Lat=<Latitude[deg]>.{out/dat}
-      ! name of the output file
 
+      ! name of the output file
       character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
@@ -1816,8 +1816,7 @@ contains
          if(.not.DoPrint) CYCLE
 
          ! interpolate data and fill buffer
-         call get_normalized_spread(&
-              iLine, File_I(iFile)%Radius, &
+         call get_normalized_spread(iLine, File_I(iFile)%Radius, &
               File_I(iFile)%Lon, File_I(iFile)%Lat, Spread)
 
          ! apply spread to excess fluxes above background/initial flux
@@ -1831,11 +1830,12 @@ contains
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
-            call MPI_Reduce(MPI_IN_PLACE,File_I(iFile)%Buffer_II(1,nDataLine),&
+            call MPI_Reduce(MPI_IN_PLACE, &
+                 File_I(iFile) % Buffer_II(1,nDataLine), &
                  nFluxVar, MPI_REAL, MPI_Sum, 0, iComm, iError)
          else
-            call MPI_Reduce(File_I(iFile)%Buffer_II(1,nDataLine), &
-                 File_I(iFile)%Buffer_II(1,nDataLine),&
+            call MPI_Reduce(File_I(iFile) % Buffer_II(1,nDataLine), &
+                 File_I(iFile) % Buffer_II(1,nDataLine), &
                  nFluxVar, MPI_REAL, MPI_Sum, 0, iComm, iError)
          end if
       end if
@@ -2012,8 +2012,7 @@ contains
 
     if(present(iLine))then
        call iblock_to_lon_lat(iLine, iLon, iLat)
-       write(NameOut,'(a,i3.3,a,i3.3)') &
-            trim(NameOut)//'_',iLon,'_',iLat
+       write(NameOut,'(a,i3.3,a,i3.3)') trim(NameOut)//'_',iLon,'_',iLat
     end if
 
     if(present(iIter))then

@@ -187,10 +187,9 @@ contains
           end do
        else
           ! Add v (= p*c^2/E_total in the relativistic case) and p^(1/3)
-          DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)     &
+          DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)  &
                *SpeedSi_I(iP)*Momentum_I(iP)**(1.0/3)
-
-          DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX),    &
+          DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX), &
                DiffCoeffMinSi/DOuterSi_I(1:nX))
        end if
        ! Now, we solve the matrix equation
