@@ -157,32 +157,27 @@ contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
-    character(len=*), intent(in):: NameCommand ! From PARAM.in
-    ! Misc
-    integer :: nParticleCheck, nLonCheck, nLatCheck
+    character(len=*), intent(in):: NameCommand        ! From PARAM.in
+    integer :: nParticleCheck, nLonCheck, nLatCheck   ! Misc
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#CHECKGRIDSIZE')
-       call read_var('nVertexMax',nParticleCheck)
-       call read_var('nLon',     nLonCheck)
-       call read_var('nLat',     nLatCheck)
-       if(iProc==0.and.any(&
-            [nLon,     nLat] /= &
-            [nLonCheck,nLatCheck])&
-            )write(*,'(a,2I5)') 'nLon,nLat are reset to ',&
-            nLonCheck, nLatCheck
+       call read_var('nVertexMax', nParticleCheck)
+       call read_var('nLon',       nLonCheck)
+       call read_var('nLat',       nLatCheck)
+       if(iProc==0 .and. any([nLon, nLat] /= [nLonCheck,nLatCheck])) &
+          write(*,'(a,2I5)') 'nLon,nLat are reset to ', nLonCheck, nLatCheck
        nLon = nLonCheck
        nLat = nLatCheck
        nLineAll = nLon*nLat
        if(nParticleCheck > nVertexMax)then
-          if(iProc==0)write(*,*)&
-               'nVertexMax is too small, use ./Config.pl -g=',nParticleCheck
+          if(iProc==0) write(*,*) &
+               'nVertexMax is too small, use ./Config.pl -g=', nParticleCheck
           call CON_stop('Code stopped')
        end if
     case('#COORDSYSTEM','#COORDINATESYSTEM')
-       call read_var('TypeCoordSystem', TypeCoordSystem, &
-            IsUpperCase=.true.)
+       call read_var('TypeCoordSystem', TypeCoordSystem, IsUpperCase=.true.)
        ! case('#DOSMOOTH')
        ! call read_var('DoSmooth', DoSmooth)
        ! if(DoSmooth)then
@@ -191,8 +186,8 @@ contains
        ! call CON_stop(NameSub//': Invalid setting for line smoothing')
        ! end if
     case('#GRIDNODE')
-       call read_var('nLat',  nLat)
-       call read_var('nLon',  nLon)
+       call read_var('nLat', nLat)
+       call read_var('nLon', nLon)
        nLineAll = nLat * nLon
     case('#TESTPOS')
        call read_var('iNodeTest',     iNodeTest)
@@ -294,12 +289,9 @@ contains
        if(.not.Used_B(iLine))CYCLE
        iEnd = nVertex_B(iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
-       State_VIB(RhoOld_, 1:iEnd, iLine) = &
-            MhData_VIB(Rho_, 1:iEnd, iLine)
-       State_VIB(UOld_, 1:iEnd, iLine) = &
-            State_VIB(U_, 1:iEnd, iLine)
-       State_VIB(BOld_, 1:iEnd, iLine) = &
-            State_VIB(B_, 1:iEnd, iLine)
+       State_VIB(RhoOld_, 1:iEnd, iLine) = MhData_VIB(Rho_, 1:iEnd, iLine)
+       State_VIB(UOld_, 1:iEnd, iLine) = State_VIB(U_, 1:iEnd, iLine)
+       State_VIB(BOld_, 1:iEnd, iLine) = State_VIB(B_, 1:iEnd, iLine)
        ! reset variables read from file or received via coupler
        MhData_VIB(1:nMhData, 1:iEnd, iLine) = 0.0
     end do
@@ -404,7 +396,7 @@ contains
        iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
        iShockMax = nVertex_B(iLine) - nWidth - 1
        iShockCandidate = iShockMin - 1 + maxloc(&
-            DLogRho_I(   iShockMin:iShockMax),1, MASK = &
+            DLogRho_I(   iShockMin:iShockMax), 1, MASK = &
             State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
             DLogRho_I(   iShockMin:iShockMax)       > dLogRhoThreshold)
        if(iShockCandidate >= iShockMin)&

@@ -29,7 +29,7 @@ module SP_ModUnit
   character(len=*), public, parameter :: NameParticle = 'proton'
 
   ! unit of SEP energy, also applicable for ion kinetic temperature
-  character(len=3), public :: NameEnergyUnit = 'kev'
+  character(len=3), public            :: NameEnergyUnit = 'kev'
 
   ! Integral flux unit is SI
   character(len=6), public, parameter :: NameFluxUnit = 'p.f.u.'
@@ -41,8 +41,7 @@ module SP_ModUnit
   character(len=12),public, allocatable :: NameFluxUnit_I(:)
 
   ! Unit conversions
-  integer, public, parameter:: &
-       UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3
+  integer, public, parameter :: UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3
   real, public, dimension(UnitX_:UnitFlux_) :: Io2Si_V, Si2Io_V
 
   ! Unit for all the state variables:
@@ -86,7 +85,7 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#PARTICLEENERGYUNIT')
-       ! Read unit to be used for particle energy: keV, MeV, GeV
+       ! Read unit to be used for particle energy: eV, keV, MeV, GeV, TeV
        call read_var('ParticleEnergyUnit', NameEnergyUnit)
 
        call lower_case(NameEnergyUnit)
@@ -103,12 +102,12 @@ contains
     !--------------------------------------------------------------------------
     if(.not.DoInit)RETURN
 
-    ! unit conversion
+    ! unit conversion: IO to Si
     Io2Si_V(UnitX_)      = Rsun
     Io2Si_V(UnitEnergy_) = energy_in(NameEnergyUnit)
     Io2Si_V(UnitFlux_)   = UnitParticleFluxSi
-    ! Io2Si_V(UnitEFlux_)  = IO2Si_V(UnitEnergy_) * IO2Si_V(UnitFlux_)
 
+    ! unit conversion: Si to IO
     Si2Io_V = 1.0 / Io2Si_V
 
     DoInit = .false.

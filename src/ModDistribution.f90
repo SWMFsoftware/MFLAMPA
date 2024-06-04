@@ -56,7 +56,7 @@ module SP_ModDistribution
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_ = 0
-  integer, parameter, public :: FluxFirst_ =1  ! The first channel
+  integer, parameter, public :: FluxFirst_ = 1 ! The first channel
   integer, public :: nFluxChannel = 6          ! GOES by default, 6 channels
   integer, public :: FluxLast_ = 6             ! The last channel
   integer, public :: EFlux_    = 7             ! Total integral energy flux
@@ -112,7 +112,6 @@ contains
     ! convert energies to momenta
     MomentumInjSi= kinetic_energy_to_momentum(EnergyInjIo*Io2Si_V(UnitEnergy_))
     MomentumMaxSi= kinetic_energy_to_momentum(EnergyMaxIo*Io2Si_V(UnitEnergy_))
-
     ! grid size in the log momentum space
     dLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
@@ -125,7 +124,7 @@ contains
        Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*dLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
        ! Normalize kinetic energy per Unit of energy in SI unit:
-       KinEnergyIo_I(iP)   = momentum_to_kinetic_energy(Momentum_I(iP)) &
+       KinEnergyIo_I(iP) = momentum_to_kinetic_energy(Momentum_I(iP)) &
             *Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
        Momentum_I(iP)    = Momentum_I(iP)/MomentumInjSi
@@ -161,36 +160,40 @@ contains
     ! GOES by default
     if(.not. allocated(NameFluxChannel_I)) then
        nFluxChannel = 6
-       allocate(character(LEN=13) :: NameFluxChannel_I(0:nFluxChannel+1))
+       FluxLast_ = nFluxChannel
+       EFlux_    = FluxLast_ + 1
+       FluxMax_  = EFlux_
+       allocate(character(LEN=13) :: NameFluxChannel_I(Flux0_:FluxMax_))
        NameFluxChannel_I = ['flux_total   ', 'flux_00000005', 'flux_00000010',&
             'flux_00000030', 'flux_00000050', 'flux_00000060', &
             'flux_00000100', 'eflux        ']
-       allocate (EChannelIo_I(nFluxChannel))
+       allocate(EChannelIo_I(FluxFirst_:FluxLast_))
        EChannelIo_I = [5,10,30,50,60,100]  ! in MeV!
     end if
+    ! assign the energy channel and flux unit
     EChannelIo_I  = EChannelIo_I & ! In MeV Now!!
          *cMeV                   & ! in SI
          *Si2Io_V(UnitEnergy_)     ! in NameUnitEnergy
     if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
-    allocate(NameFluxUnit_I(0:nFluxChannel+1))
-    NameFluxUnit_I(0:nFluxChannel) = NameFluxUnit
-    NameFluxUnit_I(1+nFluxChannel) = NameEnergyFluxUnit
+    allocate(NameFluxUnit_I(Flux0_:FluxMax_))
+    NameFluxUnit_I(Flux0_:FluxLast_) = NameFluxUnit
+    NameFluxUnit_I(EFlux_) = NameEnergyFluxUnit
 
     if(.not. allocated(Flux_VIB)) then
-       allocate(Flux_VIB(Flux0_:FluxMax_,1:nVertexMax,nLine), &
-            stat=iError); call check_allocate(iError, 'Flux_VIB')
+       allocate(Flux_VIB(Flux0_:FluxMax_,1:nVertexMax,nLine), stat=iError)
+       call check_allocate(iError, 'Flux_VIB')
        Flux_VIB = -1.0
     else
        call CON_stop(NameSub//' Flux_VIB already allocated')
     end if
 
     ! fill initial values of flux in energy channels
-    allocate(FluxChannelInit_V(0:nFluxChannel+1))
+    allocate(FluxChannelInit_V(Flux0_:FluxMax_))
     ! for the assumed initial distribution (~1/p^2)
-    FluxChannelInit_V(0) = FluxInitIo
-    FluxChannelInit_V(1:nFluxChannel) = FluxInitIo * &
+    FluxChannelInit_V(Flux0_) = FluxInitIo
+    FluxChannelInit_V(FluxFirst_:FluxLast_) = FluxInitIo * &
          (EnergyMaxIo - EChannelIo_I) / (EnergyMaxIo - EnergyInjIo)
-    FluxChannelInit_V(1+nFluxChannel) = FluxInitIo * &
+    FluxChannelInit_V(EFlux_) = FluxInitIo * &
          0.5 * (EnergyMaxIo + EnergyInjIo)
   end subroutine init
   !============================================================================
@@ -205,7 +208,7 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#MOMENTUMGRID')
-       ! Read unit to be used for particle energy: eV, keV, GeV
+       ! Read energy range for particles, in the unit of NameEnergyUnit
        call read_var('EnergyMin', EnergyInjIo)
        call read_var('EnergyMax', EnergyMaxIo)
        call read_var('nP',        nPCheck    )
@@ -233,17 +236,17 @@ contains
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
 
-       if (allocated(EChannelIo_I)) deallocate(EChannelIo_I)
-       allocate(EChannelIo_I(nFluxChannel))
-       if (allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(character(LEN=13) :: NameFluxChannel_I(0:FluxMax_))
+       if(allocated(EChannelIo_I)) deallocate(EChannelIo_I)
+       allocate(EChannelIo_I(FluxFirst_:FluxLast_))
+       if(allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
+       allocate(character(LEN=13) :: NameFluxChannel_I(Flux0_:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
-       allocate(NameFluxUnit_I(0:FluxMax_))
+       allocate(NameFluxUnit_I(Flux0_:FluxMax_))
 
-       NameFluxChannel_I(0)              = 'flux_total'
-       NameFluxChannel_I(nFluxChannel+1) = 'eflux'
+       NameFluxChannel_I(Flux0_) = 'flux_total'
+       NameFluxChannel_I(EFlux_) = 'eflux     '
 
-       do iFluxChannel = 1, nFluxChannel
+       do iFluxChannel = FluxFirst_, FluxLast_
           call read_var('EChannelIo_I [MeV]', EChannelIo_I(iFluxChannel))
           write(NameFluxChannel,'(I8.8)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
@@ -283,9 +286,8 @@ contains
        State_VIB([RhoOld_, BOld_], 1, iLine) = &
             (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iLine) &
             -Alpha     * State_VIB([RhoOld_, BOld_], 3, iLine)
-       Distribution_CB(:,:,1,iLine) = Distribution_CB(:,:,2,iLine) + &
-            Alpha*(Distribution_CB(:,:,2,iLine) - &
-            Distribution_CB(:,:,3,iLine))
+       Distribution_CB(:,:,1,iLine) = Distribution_CB(:,:,2,iLine) + Alpha* &
+            (Distribution_CB(:,:,2,iLine) - Distribution_CB(:,:,3,iLine))
        ! extrapolation may introduced negative values
        ! for strictly positive quantities; such occurences need fixing
        where(State_VIB([RhoOld_,BOld_],1,iLine) <= 0.0)
@@ -332,13 +334,13 @@ contains
           DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_I(1:nP)
           ! Increment of particle and energy fluxes
           ! Integration loop with midpoint rule
-          dFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))*  &
+          dFlux_I  = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))* &
                (DistTimesP2_I(1:nP-1) + DistTimesP2_I(2:nP))
           dEFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))* &
                (DistTimesP2E_I(1:nP-1) + DistTimesP2E_I(2:nP))
 
           ! Calculate and store the total particle and energy fluxes
-          Flux_VIB(Flux0_, iVertex, iLine) = sum(dFlux_I)*Si2Io_V(UnitFlux_)
+          Flux_VIB(Flux0_, iVertex, iLine) = sum(dFlux_I )*Si2Io_V(UnitFlux_)
           Flux_VIB(EFlux_, iVertex, iLine) = sum(dEFlux_I)*Si2Io_V(UnitFlux_)
 
           ! Reset values
