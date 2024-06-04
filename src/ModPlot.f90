@@ -815,8 +815,7 @@ contains
          iLast  = nVertex_B(iLine)
          ! fill the output buffer
          if(nMhdVar>0)File_I(iFile) % Buffer_II(1:nMhdVar, 1:iLast) = &
-              MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), &
-              1:iLast, iLine)
+              MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), 1:iLast, iLine)
          if(nExtraVar>0)File_I(iFile) % Buffer_II(nMhdVar+1:nMhdVar+nExtraVar,&
               1:iLast) = State_VIB(File_I(iFile) % iVarExtra_V(1:nExtraVar), &
               1:iLast, iLine)

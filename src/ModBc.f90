@@ -9,7 +9,7 @@ module SP_ModBc
        TypeLisBc, UseModulationPot, ModulationPot
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, Momentum_I, &
        MomentumInjSi
-  use SP_ModGrid,         ONLY: MHData_VIB, NoShock_, nWidth, T_, x_, z_
+  use SP_ModGrid,         ONLY: MhData_VIB, NoShock_, nWidth, T_, X_, Z_
   use SP_ModUnit,         ONLY: kinetic_energy_to_momentum,           &
        UnitEnergy_, UnitX_, Io2Si_V
   use ModUtilities,       ONLY: CON_stop
@@ -91,14 +91,14 @@ contains
        ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
        CoefInjLocal = CoefInjTiny
        MomentumSi   = kinetic_energy_to_momentum(  &
-            MHData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
+            MhData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
        DistributionBc = (SpectralIndex-3)/(4*cPi)        &
             * MomentumInjSi**2*Io2Si_V(UnitEnergy_)      &
             * nSi_I(iVertex)/MomentumSi**3               &
             * (MomentumSi/MomentumInjSi)**SpectralIndex
 
-       if (iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
+       if(iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
             iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
 
        Distribution_CB(0,:,iVertex,iLine) = DistributionBc*CoefInjLocal
@@ -120,7 +120,7 @@ contains
     case('escape')
        UpperEndBc_I = Background_I(1:nP)
     case('lism')
-       XyzSi_D = MhData_VIB(x_:z_,iEnd,iLine)*Io2Si_V(UnitX_)
+       XyzSi_D = MhData_VIB(X_:Z_,iEnd,iLine)*Io2Si_V(UnitX_)
        call local_interstellar_spectrum(&
             nP = nP,                         &  ! # of grid points
             MomentumSi_I = Momentum_I(1:nP)* &

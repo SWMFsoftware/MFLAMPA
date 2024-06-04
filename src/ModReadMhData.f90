@@ -5,7 +5,7 @@ module SP_ModReadMhData
 
   ! This module contains methods for reading input MH data
   use SP_ModGrid,   ONLY: iblock_to_lon_lat, get_other_state_var, nMhData, &
-       nLine, Z_, Used_B, FootPoint_VB, nVertex_B, MhData_VIB, LagrID_
+       nLine, Z_, Used_B, FootPoint_VB, nVertex_B, MhData_VIB, LagrID_, T_
   use SP_ModTime,   ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
   use ModPlotFile,  ONLY: read_plot_file
@@ -79,7 +79,7 @@ contains
   !============================================================================
   subroutine init
 
-    use SP_ModPLot, ONLY: nTag
+    use SP_ModPlot, ONLY: nTag
     ! initialize by setting the time and interation index of input files
     integer:: iTag
     character(len=50):: StringAux
@@ -115,7 +115,9 @@ contains
   !============================================================================
   subroutine read_mh_data(DoOffsetIn)
 
+    use ModConst,   ONLY: cKeV
     use SP_ModPlot, ONLY: NameMHData
+    use SP_ModUnit, ONLY: Si2Io_V, UnitEnergy_
 
     logical, optional, intent(in):: DoOffsetIn
     ! read 1D MH data, which are produced by write_mh_1d n ModWrite
@@ -201,8 +203,12 @@ contains
        ! read MH data
        call read_plot_file(NameFile    ,  &
             TypeFileIn = TypeMhDataFile,  &
-            Coord1Out_I= MhData_VIB(LagrID_,1:nVertex_B(iLine),iLine),&
-            VarOut_VI  = MhData_VIB(1:nMhData,1:nVertex_B(iLine),iLine))
+            Coord1Out_I= MhData_VIB(LagrID_, 1:nVertex_B(iLine), iLine),&
+            VarOut_VI  = MhData_VIB(1:nMhData, 1:nVertex_B(iLine), iLine))
+       MhData_VIB(T_, 1:nVertex_B(iLine), iLine) =    &
+            MhData_VIB(T_, 1:nVertex_B(iLine), iLine) &  ! default: in KeV
+            * cKeV                                    &  ! KeV to Si unit
+            * Si2Io_V(UnitEnergy_)                       ! Si to Io unit
        ! apply offset
        call offset(iLine, iOffset)
     end do line

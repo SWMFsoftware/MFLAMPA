@@ -28,6 +28,14 @@ T			UseDiffusion
 #POISSONBRACKET
 T			UsePoissonBracket
 
+#PARTICLEENERGYUNIT
+keV			ParticleEnergyUnit
+
+#MOMENTUMGRID
+1.0E+1			EnergyMin
+1.0E+7			EnergyMax
+100			nP
+
 #FLUXCHANNEL
 6			nFluxChannel
 5			EChannelIo_I [MeV]

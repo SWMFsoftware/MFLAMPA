@@ -347,7 +347,7 @@ contains
           do iFlux = 1, nFluxChannel
              do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
-                if(KinEnergyIo_I(iP+1) < EChannelIo_I(iFlux)) CYCLE
+                if(KinEnergyIo_I(iP+1) <= EChannelIo_I(iFlux)) CYCLE
                 if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux)) then
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increment
