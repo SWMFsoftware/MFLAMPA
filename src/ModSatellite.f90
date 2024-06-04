@@ -5,6 +5,7 @@ module SP_ModSatellite
 
   use ModUtilities,   ONLY: open_file, close_file, CON_stop
   use SP_ModProc,     ONLY: iProc, iComm
+  use SP_ModSize,     ONLY: nDim
   use SP_ModTime,     ONLY: StartTime
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
 
@@ -32,7 +33,7 @@ module SP_ModSatellite
   character(len=3), public :: TypeCoordPlot_I(MaxSat) ! Coord for plotting
 
   ! Current positions
-  real, public:: XyzSat_DI(3, MaxSat)
+  real, public:: XyzSat_DI(nDim, MaxSat)
 
   ! variables to record tracked and current satellite position indices
   logical, public:: UseSatellite               = .false.
@@ -105,15 +106,13 @@ contains
     use ModMpi
     use SP_ModTime,     ONLY: StartTime
 
-    integer, parameter :: MaxDim = 3
-    integer            :: iError, i, iSat, nPoint
-
     ! One line of input
     character(len=100) :: StringLine
 
     ! Local VARs
+    integer            :: iError, i, iSat, nPoint
     integer            :: iTime_I(7)
-    real               :: Xyz_D(MaxDim)
+    real               :: Xyz_D(nDim)
     real(Real8_)       :: DateTime
     integer            :: MaxPoint
     real, allocatable  :: Time_I(:), Xyz_DI(:,:)
@@ -143,7 +142,7 @@ contains
              if(index(StringLine, '#START')>0) then
                 READPOINTS1: do
                    read(UnitTmp_, *, iostat=iError) iTime_I, Xyz_D
-                   if (iError /= 0) EXIT READFILE1
+                   if(iError /= 0) EXIT READFILE1
                    ! Add new point
                    nPoint = nPoint + 1
                 end do READPOINTS1
@@ -159,8 +158,8 @@ contains
     call MPI_Bcast(MaxPoint, 1, MPI_INTEGER, 0, iComm, iError)
 
     ! allocate arrays depending on number of points
-    allocate(Time_I(MaxPoint), Xyz_DI(MaxDim, MaxPoint))
-    allocate(XyzSat_DII(MaxDim, MaxPoint, nSat))
+    allocate(Time_I(MaxPoint), Xyz_DI(nDim, MaxPoint))
+    allocate(XyzSat_DII(nDim, MaxPoint, nSat))
     allocate(TimeSat_II(MaxPoint, nSat))
 
     ! Read the trajectories
@@ -222,7 +221,7 @@ contains
        call MPI_Bcast(Time_I, nPoint, MPI_REAL, 0, iComm, iError)
 
        ! Tell the other processors the coordinates
-       call MPI_Bcast(Xyz_DI, MaxDim*nPoint, MPI_REAL, 0, iComm, iError)
+       call MPI_Bcast(Xyz_DI, nDim*nPoint, MPI_REAL, 0, iComm, iError)
 
        ! Store time and positions for satellite iSat on all PE-s
        TimeSat_II(1:nPoint, iSat) = Time_I(1:nPoint)
@@ -245,8 +244,8 @@ contains
   !============================================================================
   subroutine set_satellite_positions(iSat)
 
-    use ModNumConst
-    use SP_ModTime, ONLY: tSimulation => SPTime
+    use ModNumConst, ONLY: cTiny
+    use SP_ModTime,  ONLY: tSimulation => SPTime
 
     integer, intent(in) :: iSat
     integer :: i, nPoint
@@ -284,7 +283,7 @@ contains
 
        if(DoTest) then
           write(*,*) NameSub, ' DoTrackSat =', DoTrackSatellite_I(iSat)
-          write(*,*) NameSub, ' XyzSat     =', XyzSat_DI(:,iSat)
+          write(*,*) NameSub, ' XyzSat     =', XyzSat_DI(:, iSat)
        end if
 
     end if

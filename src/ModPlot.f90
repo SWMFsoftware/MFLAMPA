@@ -16,7 +16,7 @@ module SP_ModPlot
        X_, Y_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
   use SP_ModGrid, ONLY: iblock_to_lon_lat, Used_B
   use SP_ModProc, ONLY: iProc
-  use SP_ModSize, ONLY: nVertexMax
+  use SP_ModSize, ONLY: nVertexMax, nDim
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
   use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
@@ -503,7 +503,7 @@ contains
       File_I(iFile)%DoPlotSpread = .false.
 
       ! for MH1D_ minimal set of variables is printed
-      if(File_I(iFile)%iKindData == MH1D_)then
+      if(File_I(iFile) % iKindData == MH1D_)then
          ! for MH1D_ minimal set of variables is printed
          File_I(iFile) % DoPlot_V(1:nMHData) = .true.
       else
@@ -852,7 +852,7 @@ contains
       ! index of particle just above the radius
       integer:: iAbove
       ! xyz coordinate of intersection point or average direction
-      real:: Xyz_D(3)
+      real:: Xyz_D(nDim)
       ! longitude and latitude intersection point
       real:: LonPoint, LatPoint
       ! interpolation weight
@@ -915,7 +915,7 @@ contains
          iLineAll = iLineAll0 + iLine
 
          ! find the particle just above the given radius
-         call search_line(iLine, File_I(iFile)%Radius,&
+         call search_line(iLine, File_I(iFile)%Radius, &
               iAbove, DoPrint_I(iLineAll), Weight)
          DoPrint_I(iLineAll) = DoPrint_I(iLineAll) .and. iAbove /= 1
 
@@ -979,7 +979,7 @@ contains
       if(File_I(iFile) % DoPlotSpread)then
          ! average direction (not normalized)
          Xyz_D = sum(File_I(iFile) % Buffer_II(X_:Z_,:), DIM=2, &
-              MASK=spread(DoPrint_I, 1, 3))
+              MASK=spread(DoPrint_I, 1, nDim))
          call xyz_to_rlonlat(Xyz_D, Aux, Param_I(LonAv_), Param_I(LatAv_))
          ! angular spread/variance
          Param_I(AngleSpread_) = sqrt(sum(acos(min(1.0, max(-1.0, &
@@ -1088,12 +1088,12 @@ contains
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present
       do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
+         if(.not.Used_B(iLine)) CYCLE
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
 
          ! find the particle just above the given radius
-         call search_line(iLine,File_I(iFile)%Radius,iAbove,DoPrint,Weight)
+         call search_line(iLine, File_I(iFile)%Radius, iAbove, DoPrint, Weight)
          DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
@@ -1110,8 +1110,7 @@ contains
          ! if file already exists -> read its content
          nDataLine = 0
          inquire(FILE=NameFile, EXIST=IsPresent)
-         if(IsPresent)then
-
+         if(IsPresent) then
             ! first, determine its size
             call read_plot_file(&
                  NameFile   = NameFile, &
