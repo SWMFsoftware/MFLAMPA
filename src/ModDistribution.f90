@@ -358,7 +358,7 @@ contains
                         +EChannelIo_I(iFlux)))*DistTimesP2_I(iP)      &
                         -0.5*(KinEnergyIo_I(iP)-EChannelIo_I(iFlux))* &
                         DistTimesP2_I(iP+1))*                         &
-                        (KinEnergyIo_I(iP)-EChannelIo_I(iFlux))/      &
+                        (KinEnergyIo_I(iP+1)-EChannelIo_I(iFlux))/    &
                         (KinEnergyIo_I(iP+1)-KinEnergyIo_I(iP))
                    Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
                 else
