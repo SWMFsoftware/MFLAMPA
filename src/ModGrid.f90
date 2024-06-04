@@ -16,9 +16,11 @@ module SP_ModGrid
   use SP_ModProc,   ONLY: iProc
 
   implicit none
+
   SAVE
 
   PRIVATE ! except
+
   ! Public members:
   public:: read_param          ! read parameters related to grid
   public:: init                ! Initialize arrays on the grid
@@ -103,7 +105,7 @@ module SP_ModGrid
        Bz_         =11, & !                                   |from
        Wave1_      =12, & !                                   |coupler
        Wave2_      =13, & !-Alfven wave turbulence            v
-       !-
+                                !-
        R_          =14, & ! Heliocentric distance          ^derived from
        D_          =15, & ! Distance to the next particle  |MHdata in
        S_          =16, & ! Distance from the foot point   |get_other_
@@ -167,7 +169,7 @@ contains
        call read_var('nLon',       nLonCheck)
        call read_var('nLat',       nLatCheck)
        if(iProc==0 .and. any([nLon, nLat] /= [nLonCheck,nLatCheck])) &
-          write(*,'(a,2I5)') 'nLon,nLat are reset to ', nLonCheck, nLatCheck
+            write(*,'(a,2I5)') 'nLon,nLat are reset to ', nLonCheck, nLatCheck
        nLon = nLonCheck
        nLat = nLatCheck
        nLineAll = nLon*nLat
@@ -390,7 +392,7 @@ contains
        ! divergence of plasma velocity propto dLogRho
        iEnd = nVertex_B(iLine)
        dLogRho_I(1:iEnd) = log(MhData_VIB(Rho_,1:iEnd,iLine)/&
-               State_VIB(RhoOld_,1:iEnd,iLine))
+            State_VIB(RhoOld_,1:iEnd,iLine))
 
        ! shock never moves back
        iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
@@ -440,9 +442,9 @@ contains
     ! get interpolation weight is necessary
     if(present(Weight))then
        if(iParticleOut > 1)then
-          Weight = (Radius - State_VIB(R_,iParticleOut-1, iLine)) / (&
-               State_VIB(R_,iParticleOut,  iLine) - &
-               State_VIB(R_,iParticleOut-1,iLine))
+          Weight = (Radius - State_VIB(R_, iParticleOut-1, iLine)) / &
+               (State_VIB(R_, iParticleOut,  iLine) - &
+               State_VIB(R_, iParticleOut-1, iLine))
        else
           Weight = 1.0
        end if

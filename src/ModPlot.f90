@@ -18,8 +18,7 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I,      &
-       UnitEnergy_, NameEnergyUnit
+  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
@@ -82,41 +81,28 @@ module SP_ModPlot
      ! Full set of information, for each plot
      !
      ! General information---------------
-     !
      ! kind of data printed to a file
      !=MH1D_or MH2D_ or MHTime_ or Distr1D_ or Flux2D_ or FluxTime_
      integer:: iKindData
-     !
-     ! file name extension
-     !.out or .tec etc
+     ! file name extension: .out or .tec, etc.
      character(len=4 ):: NameFileExtension
-     !
-     ! file type
-     ! tec, idl, ascii, real8
+     ! file type: tec, idl, ascii, real8
      character(len=20):: TypeFile
-     !
      ! additional info to put into header
      character(len=300):: StringHeaderAux
-     !
-     ! plot-dependent logical, to store
-     ! whether it is the first call for the given plot
-     ! USED ONLY IN write_mh_time  FOR NOW!!!
+     ! plot-dependent logical, to store whether it is the first call
+     ! for the given plot; USED ONLY IN write_mh_time  FOR NOW!!!
      logical:: IsFirstCall
-     !
      ! names of variables to be written
      character(len=300):: NameVarPlot
-     !
      ! names of auxilary parameters
      character(len=300):: NameAuxPlot
-     !
      ! output buffer
      real, pointer:: Buffer_II(:,:)
      !
      ! MH data  -------------------------------
-     !
      ! variables from the state vector to be written
      logical:: DoPlot_V(X_:nVar)
-     !
      ! whether fluxes are to be written
      logical:: DoPlotFlux
      ! total numbers of variables to be written
@@ -125,23 +111,18 @@ module SP_ModPlot
      integer, pointer:: iVarMhd_V(:), iVarExtra_V(:)
      !
      ! Distribution -----------------------------
-     !
      ! Momentum or energy axis to use for distribution plots
      integer:: iScale      ! =Momentum_ or Energy_
      ! type out output (CDF or differential energy flow)
      integer:: iTypeDistr  ! =CDF_ or DEF_
      ! type of the satellite saved for VDF along trajectory
      integer:: iSatellite
-     !
      ! Data on the sphere
-     !
      ! radius of the sphere the data to be written at
      real:: Radius
      ! whether to compute and ouput average position and angular spread
      logical:: DoPlotSpread
-     !
      ! Flux through sphere
-     !
      ! angular coords of point where output is requested
      real :: Lon, Lat
      ! spread of flux of an individual line over grid
@@ -238,18 +219,16 @@ contains
        case(DisTraj_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1))
        case(Flux2D_)
-          if(.not.IsReadySpreadGrid) &
-               call CON_stop(NameSub//&
-               ": Angular spread parameters haven't been set;"&
+          if(.not.IsReadySpreadGrid) call CON_stop(NameSub//   &
+               ": Angular spread parameters haven't been set;" &
                //" use #SPREADGRID and #SPREADSOLIDANGLE in PARAM.in")
           allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
           ! extra space is reserved for sum of spreads
           allocate(File_I(iFile) % Buffer_II(&
                File_I(iFile)%nFluxVar * nSpreadLon, nSpreadLat))
        case(FluxTime_)
-          if(.not.IsReadySpreadPoint) &
-               call CON_stop(NameSub//&
-               ": Angular spread parameters haven't been set;"&
+          if(.not.IsReadySpreadPoint) call CON_stop(NameSub//  &
+               ": Angular spread parameters haven't been set;" &
                //" use #SPREADSOLIDANGLE in PARAM.in")
           ! extra space reserved for time of the output
           allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1))
@@ -306,8 +285,7 @@ contains
     case("#SAVEPLOT")
        ! initialize auxilary arrays, used to write data on a sphere
        ! contains integers 1:nLineAll
-       if (.not. allocated(iNodeIndex_I)) &
-            allocate(iNodeIndex_I(nLineAll))
+       if(.not. allocated(iNodeIndex_I)) allocate(iNodeIndex_I(nLineAll))
        do iLineAll = 1, nLineAll
           iNodeIndex_I(iLineAll) = iLineAll
        end do
@@ -412,7 +390,7 @@ contains
              call process_mh
              ! add line index, lon and lat to variable names
              select case(File_I(iFile) % TypeFile)
-             case('tec','tcp')
+             case('tec', 'tcp')
                 File_I(iFile) % NameVarPlot = &
                      'LineIndex '//trim(File_I(iFile) % NameVarPlot)//&
                      ' Longitude_[deg] Latitude_[deg]'
@@ -459,11 +437,9 @@ contains
              ! add longitude and latitude with units to variable names
              select case(File_I(iFile) % TypeFile)
              case('tec','tcp')
-                File_I(iFile) % NameVarPlot = &
-                     'Longitude_[deg] Latitude_[deg]'
+                File_I(iFile) % NameVarPlot = 'Longitude_[deg] Latitude_[deg]'
              case default
-                File_I(iFile) % NameVarPlot = &
-                     'Longitude Latitude '
+                File_I(iFile) % NameVarPlot = 'Longitude Latitude '
                 File_I(iFile) % StringHeaderAux = &
                      trim(File_I(iFile)%StringHeaderAux)//' deg deg'
              end select
@@ -507,8 +483,7 @@ contains
     case('#NTAG')
        call read_var('nTag', nTag)
     case default
-       call CON_stop('Unknown command '//NameCommand//' in '//&
-            NameSub)
+       call CON_stop('Unknown command '//NameCommand//' in '//NameSub)
     end select
 
   contains
@@ -520,9 +495,9 @@ contains
       !       Rho_, T_, Ux_:Uz_, Bx_:Bz_, Wave1_, Wave2_
       integer:: iVar, iVarMhd, iVarExtra, iStringPlot
       character(len=10) :: NameVarLowerCase
+      !------------------------------------------------------------------------
 
       ! reset
-      !------------------------------------------------------------------------
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
       File_I(iFile)%DoPlotSpread = .false.
@@ -555,22 +530,21 @@ contains
          end do
 
          ! for data on a sphere compute and output average position and spread
-         if(trim(StringPlot_I(iStringPlot)) == 'spread' .and.&
+         if(trim(StringPlot_I(iStringPlot)) == 'spread' .and.  &
               File_I(iFile)%iKindData == MH2D_ .and. nLineAll > 1)then
             File_I(iFile)%DoPlotSpread = .true.
             CYCLE
          end if
-
       end do ! iStringPlot
 
       File_I(iFile)%nMhdVar   = count(File_I(iFile)%DoPlot_V(1:nMhData))
       File_I(iFile)%nExtraVar = count(File_I(iFile)%DoPlot_V(1+nMhData:nVar))
 
       ! indices in the state vectors
-      if(File_I(iFile)%nMhdVar>0)allocate(File_I(iFile)%iVarMhd_V(&
-           File_I(iFile)%nMhdVar)   )
-      if(File_I(iFile)%nExtraVar>0)allocate(File_I(iFile)%iVarExtra_V(&
-           File_I(iFile)%nExtraVar)   )
+      if(File_I(iFile)%nMhdVar>0) allocate(File_I(iFile)%iVarMhd_V( &
+           File_I(iFile)%nMhdVar))
+      if(File_I(iFile)%nExtraVar>0) allocate(File_I(iFile)%iVarExtra_V( &
+           File_I(iFile)%nExtraVar))
       ! determine indices and names of variables
       iVarMhd = 0; iVarExtra = 0
       do iVar = 1, nVar
@@ -595,7 +569,7 @@ contains
             iVarMhd = iVarMhd + 1
             File_I(iFile)%iVarMhd_V(iVarMhd) = iVar
          end if
-      end do
+      end do ! iVar
 
     end subroutine process_mh
     !==========================================================================
@@ -745,7 +719,7 @@ contains
     !==========================================================================
     subroutine write_mh_1d
 
-      use SP_ModGrid,    ONLY: FootPoint_VB, NoShock_
+      use SP_ModGrid, ONLY: FootPoint_VB, NoShock_
 
       ! write output with 1D MH data in the format to be read by
       ! IDL/TECPLOT; separate file is created for each field line,
@@ -812,7 +786,7 @@ contains
               NameOut       = NameFile)
 
          ! get min and max particle indexes on this field line
-         iLast  = nVertex_B(iLine)
+         iLast = nVertex_B(iLine)
          ! fill the output buffer
          if(nMhdVar>0)File_I(iFile) % Buffer_II(1:nMhdVar, 1:iLast) = &
               MHData_VIB(File_I(iFile) % iVarMhd_V(1:nMhdVar), 1:iLast, iLine)
@@ -937,7 +911,7 @@ contains
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
       do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
+         if(.not.Used_B(iLine)) CYCLE
          iLineAll = iLineAll0 + iLine
 
          ! find the particle just above the given radius
@@ -973,7 +947,7 @@ contains
          if(File_I(iFile) % DoPlotFlux)&
               File_I(iFile)%Buffer_II(1 + iVarLat:nFluxVar + iVarLat,iLineAll)&
               = Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) +     &
-              Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
+              Flux_VIB(  Flux0_:FluxMax_, iAbove,   iLine) *    Weight
       end do !  iLine
 
       ! gather interpolated data on the source processor
@@ -1129,7 +1103,7 @@ contains
          call make_file_name(&
               StringBase    = NameMHData,                     &
               Radius        = File_I(iFile) % Radius,         &
-              iLine        = iLine,                         &
+              iLine         = iLine,                          &
               NameExtension = File_I(iFile)%NameFileExtension,&
               NameOut       = NameFile)
 
@@ -1153,11 +1127,11 @@ contains
 
             ! read the data itself
             call read_plot_file(&
-                 NameFile   = NameFile, &
-                 TypeFileIn = File_I(iFile)%TypeFile,&
-                 Coord1Out_I= File_I(iFile)%Buffer_II(&
-                 1 + nMhdVar + nExtraVar + nFluxVar,:),&
-                 VarOut_VI  = File_I(iFile)%Buffer_II(&
+                 NameFile   = NameFile,                  &
+                 TypeFileIn = File_I(iFile)%TypeFile,    &
+                 Coord1Out_I= File_I(iFile)%Buffer_II(   &
+                 1 + nMhdVar + nExtraVar + nFluxVar,:),  &
+                 VarOut_VI  = File_I(iFile)%Buffer_II(   &
                  1:nMhdVar + nExtraVar + nFluxVar,:))
          end if
 
@@ -1181,8 +1155,8 @@ contains
                  State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile)%Buffer_II(1 + nMhdVar + nExtraVar:nFluxVar + &
-              nMhdVar + nExtraVar, nDataLine)=&
+              File_I(iFile)%Buffer_II(1 + nMhdVar + nExtraVar: &
+              nFluxVar + nMhdVar + nExtraVar, nDataLine) =     &
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
               Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
 
@@ -1250,7 +1224,7 @@ contains
       end select
 
       do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
+         if(.not.Used_B(iLine)) CYCLE
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
          ! set the file name
@@ -1512,7 +1486,7 @@ contains
                  iList_I, iPointer_I, iEnd_I, iError)
             if(iError /= 0) then
                write(*,*) NameSub//': Triangilation failed of ', &
-                  trim(NameSat_I(iSat)), ' at Iteration=', iIter
+                    trim(NameSat_I(iSat)), ' at Iteration=', iIter
                EXIT TRI_INTERPOLATE
             end if
 
@@ -1534,8 +1508,8 @@ contains
             end if
             if(.not.IsTriangleFound) then
                write(*,*) NameSub, ' WARNING: Interpolation fails on the', &
-                     'triangulated sphere, at the location of x,y,z=',     &
-                     XyzSat_DI(:, iSat), ' of ', trim(NameSat_I(iSat))
+                    'triangulated sphere, at the location of x,y,z=',     &
+                    XyzSat_DI(:, iSat), ' of ', trim(NameSat_I(iSat))
                EXIT TRI_INTERPOLATE
             end if
 
@@ -1594,7 +1568,7 @@ contains
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_I       = File_I(iFile) % Buffer_II(:, nMu))
-      end do
+      end do ! iSat
 
     end subroutine write_distraj
     !==========================================================================
@@ -1635,8 +1609,8 @@ contains
 
       ! header for the output file
       StringHeader = &
-           'MFLAMPA: flux data on a sphere at fixed heliocentric distance; '//&
-           'Coordindate system: '//trim(TypeCoordSystem)//'; '&
+           'MFLAMPA: flux data on a sphere at fixed heliocentric distance;'//&
+           ' Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
 
       ! set the file name
@@ -1671,9 +1645,9 @@ contains
 
          ! apply spread to excess fluxes above background/initial flux
          do iFlux = 1, nFlux
-            File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:) =    &
-                 File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:)+&
-                 File_I(iFile)%Spread_II(:,:) * (                            &
+            File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :) =    &
+                 File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :) &
+                 + File_I(iFile) % Spread_II(:, :) * (                      &
                  Flux_VIB(Flux0_+iFlux-1, iAbove-1, iLine) * (1-Weight) +   &
                  Flux_VIB(Flux0_+iFlux-1, iAbove,   iLine) *    Weight  -   &
                  FluxChannelInit_V(Flux0_+iFlux-1))
@@ -1800,7 +1774,6 @@ contains
          ! if file already exists -> read its content
          inquire(FILE=NameFile, EXIST=IsPresent)
          if(IsPresent)then
-
             ! first, determine its size
             call read_plot_file(&
                  NameFile   = NameFile, &
@@ -1869,7 +1842,6 @@ contains
       end if
 
       if(iProc==0)then
-
          ! add background/initial flux back
          File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) = &
               File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) + &
@@ -2003,13 +1975,10 @@ contains
     integer:: iLon, iLat
 
     !--------------------------------------------------------------------------
-    write(NameOut,'(a)')trim(NamePlotDir)//trim(StringBase)
+    write(NameOut,'(a)') trim(NamePlotDir)//trim(StringBase)
 
-    if(present(Radius))then
-       write(NameOut,'(a,i4.4,f0.2)')   &
-            trim(NameOut)//'_R=',     &
-            int(Radius), Radius - int(Radius)
-    end if
+    if(present(Radius)) write(NameOut,'(a,i4.4,f0.2)')   &
+         trim(NameOut)//'_R=', int(Radius), Radius - int(Radius)
 
     if(present(Longitude) .and. present(Latitude))then
        ! avoid rounding issue due to conversion from degree to radians and back
@@ -2040,7 +2009,6 @@ contains
                trim(NameOut)//'_Lat=', int(Latitude*cRadToDeg),&
                abs(Latitude*cRadToDeg - int(Latitude*cRadToDeg))
        end if
-
     end if
 
     if(present(iLine))then

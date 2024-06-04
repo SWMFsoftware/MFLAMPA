@@ -57,7 +57,7 @@ program MFLAMPA
      call read_init('  ', iSessionIn=iSession)
 
      if(iProc==0)&
-         write(*,*)'----- Starting Session ',iSession,' ------'
+          write(*,*)'----- Starting Session ',iSession,' ------'
 
      ! Set and check input parameters for this session
      call SP_read_param  ! Identical to SP_set_param('READ')

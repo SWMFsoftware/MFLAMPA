@@ -23,7 +23,7 @@ module SP_ModAngularSpread
   interface get_normalized_spread
      module procedure get_normalized_spread_grid
      module procedure get_normalized_spread_point
-  end interface
+  end interface get_normalized_spread
 
   ! Module contains data and methods used primarily to create flux output
   ! on a sphere (see SP_ModWrite);
@@ -140,8 +140,7 @@ contains
     real:: DLon, DLat, AuxLon, AuxLat
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
-    if(.not.IsReadySpreadPoint) &
-         RETURN
+    if(.not.IsReadySpreadPoint) RETURN
 
     ! compute characterisitc spreads for lines and corresponding normalizations
     allocate(Sigma_B(nLine))
@@ -171,8 +170,7 @@ contains
     end do
 
     ! initialize and fill angular grid
-    if(.not.IsReadySpreadGrid)&
-         RETURN
+    if(.not.IsReadySpreadGrid) RETURN
 
     allocate(SpreadLon_I(nSpreadLon))
     allocate(SpreadLat_I(nSpreadLat))
@@ -199,7 +197,7 @@ contains
 
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
-       if(.not.Used_B(iLine))CYCLE
+       if(.not.Used_B(iLine)) CYCLE
        call search_line(iLine, RadiusRef, iRef, IsFoundRef, Weight)
        if(IsFoundRef .and. iRef > 1)then
           Xyz_D = &
@@ -288,11 +286,11 @@ contains
     ! value of normalized angular spread function:
     ! equal to probability of particle deviation to be within some solid angle
     ! centered around LonPoint, LatPoint
-    integer,         intent(in) :: iLine  ! line index on processor
-    real,            intent(in) :: Radius  ! heliocentric radius
-    real,            intent(in) :: LonPoint! longitude of location
-    real,            intent(in) :: LatPoint! latitude of location
-    real,            intent(out):: Spread  ! result
+    integer, intent(in) :: iLine   ! line index on processor
+    real,    intent(in) :: Radius  ! heliocentric radius
+    real,    intent(in) :: LonPoint! longitude of location
+    real,    intent(in) :: LatPoint! latitude of location
+    real,    intent(out):: Spread  ! result
 
     ! whether to perfrom full computation or reuse result of previous call
     logical:: DoReset
@@ -365,7 +363,7 @@ contains
     ! defined by SpreadLon_I and SpreadLat_I;
     integer, intent(in) :: iLine
     real,    intent(in) :: Radius
-    real,    intent(out):: Spread_II(nSpreadLon,nSpreadLat)
+    real,    intent(out):: Spread_II(nSpreadLon, nSpreadLat)
 
     integer:: iLon, iLat
     !--------------------------------------------------------------------------

@@ -10,13 +10,11 @@ module SP_ModDistribution
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use ModConst,    ONLY: cLightSpeed, cMeV
-  use SP_ModSize,  ONLY: nVertexMax, nP => nMomentum, &
+  use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
-  use SP_ModUnit,  ONLY: NameFluxUnit, NameEnergyFluxUnit,&
-       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_, &
-       kinetic_energy_to_momentum, momentum_to_energy
-  use SP_ModGrid,  ONLY: nLine, nVertex_B, Used_B
+  use SP_ModUnit,   ONLY: NameFluxUnit, NameEnergyFluxUnit, &
+       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_ 
+  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
 
   implicit none
 
@@ -97,8 +95,10 @@ contains
   !============================================================================
   subroutine init
 
-    use SP_ModUnit,   ONLY: momentum_to_kinetic_energy
+    use ModConst,     ONLY: cLightSpeed, cMeV
     use ModUtilities, ONLY: check_allocate
+    use SP_ModUnit,   ONLY: kinetic_energy_to_momentum, &
+         momentum_to_kinetic_energy, momentum_to_energy
     ! loop variables
     integer:: iLine, iVertex, iP, iError, iMu
     ! maximal momentum
@@ -137,7 +137,7 @@ contains
     do iMu = 0, nMu
        MuFace_I(iMu) = -1.0 + real(iMu)*DeltaMu
     end do
-    Mu_I = (MuFace_I(0:nMu-1) + MuFace_I(1:nMu))*0.5
+    Mu_I = 0.5*(MuFace_I(0:nMu-1) + MuFace_I(1:nMu))
 
     ! Distribution function
     allocate(Distribution_CB(0:nP+1,nMu,nVertexMax,nLine), stat=iError)
@@ -164,9 +164,9 @@ contains
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
        allocate(character(LEN=13) :: NameFluxChannel_I(Flux0_:FluxMax_))
-       NameFluxChannel_I = ['flux_total   ', 'flux_00000005', 'flux_00000010',&
-            'flux_00000030', 'flux_00000050', 'flux_00000060', &
-            'flux_00000100', 'eflux        ']
+       NameFluxChannel_I = [ 'flux_total   ', 'flux_00000005', &
+            'flux_00000010', 'flux_00000030', 'flux_00000050', &
+            'flux_00000060', 'flux_00000100', 'eflux        ']
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
        EChannelIo_I = [5,10,30,50,60,100]  ! in MeV!
     end if
@@ -193,8 +193,7 @@ contains
     FluxChannelInit_V(Flux0_) = FluxInitIo
     FluxChannelInit_V(FluxFirst_:FluxLast_) = FluxInitIo * &
          (EnergyMaxIo - EChannelIo_I) / (EnergyMaxIo - EnergyInjIo)
-    FluxChannelInit_V(EFlux_) = FluxInitIo * &
-         0.5 * (EnergyMaxIo + EnergyInjIo)
+    FluxChannelInit_V(EFlux_) = FluxInitIo*0.5*(EnergyMaxIo + EnergyInjIo)
   end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
@@ -243,8 +242,8 @@ contains
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(Flux0_:FluxMax_))
 
-       NameFluxChannel_I(Flux0_) = 'flux_total'
-       NameFluxChannel_I(EFlux_) = 'eflux     '
+       NameFluxChannel_I(Flux0_) = 'flux_total   '
+       NameFluxChannel_I(EFlux_) = 'eflux        '
 
        do iFluxChannel = FluxFirst_, FluxLast_
           call read_var('EChannelIo_I [MeV]', EChannelIo_I(iFluxChannel))
@@ -326,7 +325,7 @@ contains
     !--------------------------------------------------------------------------
 
     do iLine = 1, nLine
-       if(.not.Used_B(iLine))CYCLE
+       if(.not.Used_B(iLine)) CYCLE
        do iVertex = 1, nVertex_B(iLine)
           ! Calculate intermediate variables
           DistTimesP2_I = Distribution_CB(1:nP, nMu, iVertex, iLine)* &
@@ -368,7 +367,7 @@ contains
              end do
           end do
           ! Store the results for specified energy channels
-          Flux_VIB(FluxFirst_:FluxLast_,iVertex, iLine) = &
+          Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
                Flux_I * Si2Io_V(UnitFlux_)
        end do
     end do
@@ -387,10 +386,10 @@ contains
        Used_B(iLine) = .false.
        nVertex_B(iLine) = 0
        IsDistNeg = .true.
-       ! For Poisson bracket scheme: should stop here
-       if((index(NameSub, 'poisson')>0) .or. (index(NameSub, 'Poisson')>0) &
-          .or. (index(NameSub, 'POISSON')>0)) &
-          call CON_stop(NameSub//': Distribution_CB < 0')
+       ! With negative values in the Poisson bracket scheme: should stop here
+       if( index(NameSub, 'poisson')>0 .or. index(NameSub, 'Poisson')>0 &
+            .or. index(NameSub, 'POISSON')>0 ) &
+            call CON_stop(NameSub//': Distribution_CB < 0')
     end if
   end subroutine check_dist_neg
   !============================================================================

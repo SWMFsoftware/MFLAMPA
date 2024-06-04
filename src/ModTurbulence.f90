@@ -1,24 +1,23 @@
 !  Copyright (C) 2002 Regents of the University of Michigan,
-!  portions used
-!  with permission
+!  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTurbulence
 
   use ModConst
   use SP_ModDistribution, ONLY: nP
   use SP_ModGrid,         ONLY: iPTest, iParticleTest
+
   implicit none
+
   SAVE
 
   private
 
-  public :: init, finalize, UseTurbulentSpectrum, set_dxx, &
-       read_param, dxx
+  public :: init, finalize, UseTurbulentSpectrum, set_dxx, read_param, dxx
 
-  logical:: UseTurbulentSpectrum        = .false.
-
+  logical:: UseTurbulentSpectrum = .false.
   integer, parameter :: nK = nP
-  real    :: dLogK
+  real   :: dLogK
 
   real, allocatable :: Gamma_I(:,:)
   real, allocatable :: IPlusSi_IX(:,:),IMinusSi_IX(:,:),ICSi_X(:)
@@ -37,15 +36,14 @@ module SP_ModTurbulence
   ! This is the ratio of densities powered 3/2
   real, allocatable:: RhoCompression_I(:)
 
-  !------------------------------------------------------------------------!
-  !          Grid in the momentum space                                    !
-  ! iP     0     1                         nP   nP+1                       !
-  !       |     |    ....                 |     |                          !
-  ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))  !
-  !             |    Grid in k-space      |     |                          !
-  ! K/B         KMax                      KMin                             !
-  ! ik     0     1                         nP   nP+1                       !
-  !------------------------------------------------------------------------!
+  !-----------------Grid in the momentum space---------------------------------
+  ! iP     0     1                         nP   nP+1
+  !        |     |    ....                 |     |
+  ! P     P_inj P_inj*exp(dLogP)          P_Max P_Max*exp(dLogP)
+  !--------|--------Grid in k-space--------|-----|-----------------------------
+  ! K/B   KMax                            KMin
+  ! ik     0     1                         nP   nP+1
+  !----------------------------------------------------------------------------
 
   real,allocatable,private:: AK_II(:,:)
   real,allocatable,private:: BK_II(:,:)
@@ -141,15 +139,15 @@ contains
 
     integer :: iVertex,iK
     real    :: ICOldSi, kSi
-    real    :: rSi , rShockSi
+    real    :: rSi, rShockSi
 
-    !          Grid in the momentum space                                     !
-    ! iP     0     1                         nP   nP+1                         !
-    !       |     |    ....                 |     |                           !
-    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
-    !             |    Grid in k-space      |     |                           !
-    ! K/B         KMax                      KMin                               !
-    ! ik     0     1                         nP   nP+1                         !
+    !-----------------Grid in the momentum space-------------------------------
+    ! iP     0     1                         nP   nP+1
+    !        |     |    ....                 |     |
+    ! P     P_inj P_inj*exp(dLogP)          P_Max P_Max*exp(dLogP)
+    !--------|--------Grid in k-space--------|-----|---------------------------
+    ! K/B   KMax                            KMin
+    ! ik     0     1                         nP   nP+1
     !--------------------------------------------------------------------------
 
     ! k = e*B/p => dlog(k) = - dlog(p)
@@ -170,9 +168,9 @@ contains
     integer,intent(in) :: iEnd,nP
     real,intent(in)    :: BSi_I(iEnd)
 
-    integer:: iVertex,iK
-    real :: F01,F02,F11,F12
-    real :: k0Si,k1Si
+    integer:: iVertex, iK
+    real :: F01, F02, F11, F12
+    real :: k0Si, k1Si
     real :: SpectralIndexAtKMax, ISumSi
 
     logical :: DoTestMe = .false.
@@ -184,16 +182,16 @@ contains
     ! where AK_I=\int_{k_{res}}^\infty{d(\log k)/(k^2*(I_{+}(k) + I_{-}(k) )) }
     ! and   BK_I=\int_{k_{res}}^\infty{d(\log k)/(k^4*(I_{+}(k) + I_{-}(k) )) }
 
-    !          Grid in the momentum space                                     !
-    ! iP     0     1                         nP   nP+1                         !
-    !       |     |    ....                 |     |                           !
-    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
-    !             |    Grid in k-space      |     |                           !
-    ! K/B         kMax(k0)                  kMin                               !
-    ! ik     0     1                         nP   nP+1                         !
+    !-----------------Grid in the momentum space-------------------------------
+    ! iP     0     1                         nP   nP+1
+    !        |     |    ....                 |     |
+    ! P     P_inj P_inj*exp(dLogP)          P_Max P_Max*exp(dLogP)
+    !--------|--------Grid in k-space--------|-----|---------------------------
+    ! K/B   KMax                            KMin
+    ! ik     0     1                         nP   nP+1
     !--------------------------------------------------------------------------
 
-    do iVertex=1,iEnd
+    do iVertex=1, iEnd
        select case(CorrectionMode_X(iVertex))
        case(1)
           SpectralIndexAtKMax = 5.0/3
@@ -216,8 +214,8 @@ contains
        ! As the starting values for AK_I and BK_I at the minimum momentum,
        ! solve the integrals from K_{max} up to \infty, assuming the
        ! power law spectrum of turbulence at K>K_{max}
-       AK_II(1,iVertex)=F01/(2.0-SpectralIndexAtKMax)
-       BK_II(1,iVertex)=F02/(4.0-SpectralIndexAtKMax)
+       AK_II(1,iVertex) = F01/(2.0-SpectralIndexAtKMax)
+       BK_II(1,iVertex) = F02/(4.0-SpectralIndexAtKMax)
 
        do iK=2,nP
           ! We calculate the partial sums for a set of the wave number values.
@@ -236,13 +234,12 @@ contains
           F12 = 1.0/(k1Si**4)/ ISumSi
 
           ! Calculate the new partial sums
-
-          AK_II(iK,iVertex)=AK_II(iK-1,iVertex)+0.5*(F01+F11)*dLogK
-          BK_II(iK,iVertex)=BK_II(iK-1,iVertex)+0.5*(F02+F12)*dLogK
+          AK_II(iK,iVertex) = AK_II(iK-1,iVertex) + 0.5*(F01+F11)*dLogK
+          BK_II(iK,iVertex) = BK_II(iK-1,iVertex) + 0.5*(F02+F12)*dLogK
 
           ! current values saved as the initial values for the next step in
           ! the loop
-          k0Si = k1Si; F01=F11; F02=F12
+          k0Si = k1Si; F01 = F11; F02 = F12
        end do
     end do
   end subroutine set_dxx
@@ -252,16 +249,15 @@ contains
     real,   intent(in) :: MomentumSi, SpeedSi, BSi
 
     real    :: kRSi
-
     logical :: DoTestMe =.false.
 
-    !          Grid in the momentum space                                     !
-    ! iP     0     1                         nP   nP+1                         !
-    !       |     |    ....                 |     |                           !
-    ! P      P_inj P_inj*exp(\Delta (Ln P))  P_Max P_Max*exp(\Delta (Ln P))    !
-    !             |    Grid in k-space      |     |                           !
-    ! K/B         KMax                      KMin                               !
-    ! ik     0     1                         nP   nP+1                         !
+    !-----------------Grid in the momentum space-------------------------------
+    ! iP     0     1                         nP   nP+1
+    !        |     |    ....                 |     |
+    ! P     P_inj P_inj*exp(dLogP)          P_Max P_Max*exp(dLogP)
+    !--------|--------Grid in k-space--------|-----|---------------------------
+    ! K/B   KMax                            KMin
+    ! ik     0     1                         nP   nP+1
     !--------------------------------------------------------------------------
 
     ! The coefficient of a spatial diffusion along the magnetic field is

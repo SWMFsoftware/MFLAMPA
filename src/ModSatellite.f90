@@ -9,7 +9,9 @@ module SP_ModSatellite
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
 
   implicit none
+
   save
+
   private ! Except
 
   public:: read_param                 ! read satellite file input parameters
@@ -169,7 +171,7 @@ contains
 
           NameFile = NameFileSat_I(iSat)
           if(lVerbose > 0) &
-             write(STDOUT_, *) NameSub, " reading: ", trim(NameFile)
+               write(STDOUT_, *) NameSub, " reading: ", trim(NameFile)
 
           call open_file(file=NameFile, status="old")
           nPoint = 0

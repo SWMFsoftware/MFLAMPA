@@ -4,6 +4,7 @@
 module SP_ModRestart
 
   ! This module contains methods for writing output files
+
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModGrid,   ONLY: iblock_to_lon_lat, nLine, &
        MhData_VIB, iShock_IB, Used_B, FootPoint_VB, &
@@ -24,15 +25,15 @@ module SP_ModRestart
   public:: NameRestartInDir, NameRestartOutDir, stand_alone_final_restart
 
   ! the restart directory
-  character (len=100) :: NameRestartOutDir="SP/restartOUT/"
-  character (len=100) :: NameRestartInDir ="SP/restartIN/"
+  character (len=100) :: NameRestartOutDir = "SP/restartOUT/"
+  character (len=100) :: NameRestartInDir  = "SP/restartIN/"
   ! name of the header file
-  character (len=100) :: NameHeaderFile   ="restart.H"
+  character (len=100) :: NameHeaderFile    = "restart.H"
 
   ! Whether and when to save the restart file (STAND ALONE ONLY)
-  logical:: DoSaveRestart=.false.
-  integer:: DnSaveRestart=-1,  nIterSinceRestart = 0
-  real   :: DtSaveRestart=-1.0, TimeSinceRestart = 0.0
+  logical:: DoSaveRestart = .false.
+  integer:: DnSaveRestart = -1,  nIterSinceRestart = 0
+  real   :: DtSaveRestart = -1.0, TimeSinceRestart = 0.0
 
 contains
   !============================================================================
@@ -57,7 +58,7 @@ contains
     nIterSinceRestart = nIterSinceRestart + 1
     TimeSinceRestart  = TimeSinceRestart  + Dt
     if(  DtSaveRestart > 0.0 .and.  TimeSinceRestart >= DtSaveRestart .or. &
-         DnSaveRestart > 0   .and. nIterSinceRestart == DnSaveRestart)then
+         DnSaveRestart > 0   .and. nIterSinceRestart == DnSaveRestart) then
        call save_restart
        if(DtSaveRestart > 0.0)then
           TimeSinceRestart  = modulo(TimeSinceRestart, DtSaveRestart)
@@ -127,21 +128,20 @@ contains
        call iBlock_to_lon_lat(iLine, iLon, iLat)
        ! set the file name
        write(NameFile,'(a,i3.3,a,i3.3,a)') &
-            trim(NameRestartInDir)//'data_',iLon,'_',iLat,&
-            '.rst'
+            trim(NameRestartInDir)//'data_',iLon,'_',iLat,'.rst'
        ! inquire(file=NameFile,exist=Used_B(iLine))
        call open_file(file=NameFile, status='old',&
             form='UNFORMATTED', NameCaller=NameSub, iErrorOut=iError)
        Used_B(iLine) = iError==0
        if(.not.Used_B(iLine))then
-          write(*,'(a)')NameSub//': the restart file '//NameFile//' lacks'
-          write(*,'(a)')NameSub//': line is marked as unused'
+          write(*,'(a)') NameSub//': the restart file '//NameFile//' lacks'
+          write(*,'(a)') NameSub//': line is marked as unused'
           nVertex_B(iLine) = 0
           CYCLE
        end if
        read(UnitTmp_,iostat = iError)Aux, Aux_I
        if(iError>0)then
-          write(*,*)'Error in reading nPoint in line=', iLine
+          write(*,*) 'Error in reading nPoint in line=', iLine
           call close_file
           call CON_stop('Run stops')
        end if
@@ -149,10 +149,9 @@ contains
        nVertex_B(iLine) = nint(Aux)
        ! general parameters
        iShock_IB(:, iLine) = nint(Aux_I)
-       read(UnitTmp_, iostat = iError) &
-            FootPoint_VB(:, iLine),&
-            MhData_VIB(:,1:nVertex_B(iLine), iLine),&
-            Distribution_CB(:,:,1:nVertex_B(iLine), iLine)
+       read(UnitTmp_, iostat=iError) FootPoint_VB(:, iLine), &
+            MhData_VIB(:, 1:nVertex_B(iLine), iLine), &
+            Distribution_CB(:, :, 1:nVertex_B(iLine), iLine)
        if(iError>0)then
           write(*,*)'Error in reading nPoint in line=', iLine
           call close_file

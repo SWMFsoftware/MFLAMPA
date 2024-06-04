@@ -2,6 +2,7 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModTime
+
   use ModTimeConvert, ONLY: time_int_to_julian, time_real_to_julian
   use ModKind,        ONLY: Real8_
   use ModUtilities,   ONLY: CON_stop
@@ -82,23 +83,23 @@ contains
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-       case('#NSTEP')
-          call read_var('nStep',iIter)
-       case('#TIMESIMULATION')
-          call read_var('SPTime',SPTime)
-          ! The last time input occurred the same time
-          DataInputTime = SPTime
-       case("#STARTTIME", "#SETREALTIME")
-          call read_var('iYear'  ,iStartTime_I(1))
-          call read_var('iMonth' ,iStartTime_I(2))
-          call read_var('iDay'   ,iStartTime_I(3))
-          call read_var('iHour'  ,iStartTime_I(4))
-          call read_var('iMinute',iStartTime_I(5))
-          call read_var('iSecond',iStartTime_I(6))
-          iStartTime_I(7) = 0
-       case("#TIMEACCURATE")
-          call read_var('DoTimeAccurate', DoTimeAccurate)
-          IsSteadyState = .not. DoTimeAccurate
+    case('#NSTEP')
+       call read_var('nStep',iIter)
+    case('#TIMESIMULATION')
+       call read_var('SPTime',SPTime)
+       ! The last time input occurred the same time
+       DataInputTime = SPTime
+    case("#STARTTIME", "#SETREALTIME")
+       call read_var('iYear'  ,iStartTime_I(1))
+       call read_var('iMonth' ,iStartTime_I(2))
+       call read_var('iDay'   ,iStartTime_I(3))
+       call read_var('iHour'  ,iStartTime_I(4))
+       call read_var('iMinute',iStartTime_I(5))
+       call read_var('iSecond',iStartTime_I(6))
+       iStartTime_I(7) = 0
+    case("#TIMEACCURATE")
+       call read_var('DoTimeAccurate', DoTimeAccurate)
+       IsSteadyState = .not. DoTimeAccurate
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select

@@ -2,9 +2,11 @@
 !  portions used with permission
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModUnit
+
   ! Unit for particle energy,  energy to momentum conversion
   ! for proton, names for all units
   ! Dec.24 2017 Sokolov & Borovikov.
+
   use SP_ModGrid, ONLY: nVar, LagrID_
   use ModConst,   ONLY: Rsun, energy_in,                        &
        gen_kin_energy_to_momentum => kinetic_energy_to_momentum,&
@@ -15,6 +17,7 @@ module SP_ModUnit
   implicit none
 
   SAVE
+
   private ! Except
 
   ! Public routines

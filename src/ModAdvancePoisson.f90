@@ -244,9 +244,9 @@ contains
        else
           call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
                nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
-       ! Check if the VDF includes negative values after diffusion
-       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-       if(IsDistNeg)RETURN
+          ! Check if the VDF includes negative values after diffusion
+          call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+          if(IsDistNeg)RETURN
        end if
     end if
 
