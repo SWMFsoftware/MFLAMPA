@@ -316,13 +316,13 @@ contains
 
     use SP_ModGrid,  ONLY: Used_B
     ! compute the total (simulated) integral flux of particles as well as
-    ! particle flux in the 6 GOES channels; also compute total energy flux
+    ! particle flux in specified channels; also compute total energy flux
 
     integer:: iLine, iVertex, iP, iFlux ! loop variables
     real   :: DistTimesP2_I(1:nP), DistTimesP2E_I(1:nP) ! f*p**2, f*p**2*Ek
     real   :: dFlux_I(1:nP-1), dEFlux_I(1:nP-1) ! increments of each bin
-    real   :: dFlux1       ! increments of the bin where channel falls in
-    real   :: Flux_I(nFluxChannel)      ! energy limits of GOES channels
+    real   :: dFluxChannel ! increments of the bin where the channel falls in
+    real   :: Flux_I(nFluxChannel)      ! particle flux of energy channels
     !--------------------------------------------------------------------------
 
     do iLine = 1, nLine
@@ -345,22 +345,21 @@ contains
 
           ! Reset values
           Flux_I = 0.0
-          ! Calculate GOES channels' fluxes
+          ! Calculate the particle fluxes for all energy channels
           do iFlux = 1, nFluxChannel
              do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
                 if(KinEnergyIo_I(iP+1) <= EChannelIo_I(iFlux)) CYCLE
                 if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux)) then
                    ! channel cutoff level is often in the middle of a bin;
-                   ! compute partial flux increment
-                   dFlux1 = ( &
-                        (KinEnergyIo_I(iP+1) - 0.5*(KinEnergyIo_I(iP) &
-                        +EChannelIo_I(iFlux)))*DistTimesP2_I(iP)      &
-                        -0.5*(KinEnergyIo_I(iP)-EChannelIo_I(iFlux))* &
-                        DistTimesP2_I(iP+1))*                         &
-                        (KinEnergyIo_I(iP+1)-EChannelIo_I(iFlux))/    &
-                        (KinEnergyIo_I(iP+1)-KinEnergyIo_I(iP))
-                   Flux_I(iFlux) = Flux_I(iFlux) + dFlux1
+                   ! compute partial flux increments
+                   dFluxChannel = 0.5*( (KinEnergyIo_I(iP+1) -        &
+                        EChannelIo_I(iFlux))*DistTimesP2_I(iP)        &
+                        + (KinEnergyIo_I(iP+1) + EChannelIo_I(iFlux)  &
+                        - 2.0*KinEnergyIo_I(iP))*DistTimesP2_I(iP+1) )&
+                        /(KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP))    &
+                        *(KinEnergyIo_I(iP+1) - EChannelIo_I(iFlux))
+                   Flux_I(iFlux) = Flux_I(iFlux) + dFluxChannel
                 else
                    ! for the rest bins: make a summation
                    Flux_I(iFlux) = Flux_I(iFlux) + sum(dFlux_I(iP:nP-1))
