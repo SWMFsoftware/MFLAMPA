@@ -352,12 +352,18 @@ contains
                 if(KinEnergyIo_I(iP) < EChannelIo_I(iFlux)) then
                    ! channel cutoff level is often in the middle of a bin;
                    ! compute partial flux increments
-                   dFluxChannel = 0.5*( (KinEnergyIo_I(iP+1) -        &
-                        EChannelIo_I(iFlux))*DistTimesP2_I(iP)        &
-                        + (KinEnergyIo_I(iP+1) + EChannelIo_I(iFlux)  &
-                        - 2.0*KinEnergyIo_I(iP))*DistTimesP2_I(iP+1) )&
-                        /(KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP))    &
-                        *(KinEnergyIo_I(iP+1) - EChannelIo_I(iFlux))
+                   !
+                   ! The contrubution to integral equals:
+                   dFluxChannel = &
+                        (KinEnergyIo_I(iP+1) - EChannelIo_I(iFlux))&! Span
+                        *0.5*(                & ! times a half of sum of
+                        DistTimesP2_I(iP+1) + & ! the right boundary value +
+                        ((KinEnergyIo_I(iP+1) -&! interpolation to E_Channel: 
+                        EChannelIo_I(iFlux))*DistTimesP2_I(iP) & ! from iP
+                        + (EChannelIo_I(iFlux) - KinEnergyIo_I(iP))* &
+                        DistTimesP2_I(iP+1))                   & ! from iP+1
+                        / & ! per the total of interpolation weghts:
+                        (KinEnergyIo_I(iP+1) - KinEnergyIo_I(iP)) )
                    Flux_I(iFlux) = Flux_I(iFlux) + dFluxChannel
                 else
                    ! for the rest bins: make a summation
