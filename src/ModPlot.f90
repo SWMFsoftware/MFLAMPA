@@ -1604,7 +1604,7 @@ contains
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_flux_2d'
       !------------------------------------------------------------------------
-      nFlux   = File_I(iFile) % nFluxVar
+      nFlux = File_I(iFile) % nFluxVar
 
       ! header for the output file
       StringHeader = &
@@ -1631,7 +1631,7 @@ contains
          DoPrint = .true.
 
          ! find the particle just above the given radius
-         call search_line(iLine,File_I(iFile)%Radius,iAbove,DoPrint,Weight)
+         call search_line(iLine, File_I(iFile)%Radius, iAbove, DoPrint, Weight)
          DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
@@ -1669,8 +1669,8 @@ contains
 
       ! add background/initial flux back
       do iFlux = 1, nFlux
-         File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:) =    &
-              File_I(iFile) % Buffer_II(iFlux: nFlux*nSpreadLon :nFlux,:)+&
+         File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :) =      &
+              File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :) + &
               FluxChannelInit_V(Flux0_+iFlux-1)
       end do
 
@@ -1804,12 +1804,12 @@ contains
       ! go over all lines on the processor and find the point of intersection
       ! with output sphere if present and compute contribution to fluxes
       do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
+         if(.not.Used_B(iLine)) CYCLE
          ! reset, the field line contrubtes unless fail to reach output sphere
          DoPrint = .true.
 
          ! find the particle just above the given radius
-         call search_line(iLine,File_I(iFile)%Radius,iAbove,DoPrint, Weight)
+         call search_line(iLine, File_I(iFile)%Radius, iAbove, DoPrint, Weight)
          DoPrint = DoPrint .and. iAbove /= 1
 
          ! if no intersection found -> proceed to the next line
@@ -1886,11 +1886,11 @@ contains
 
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
-    if(.not.DoWriteHeader)RETURN
+    if(.not.DoWriteHeader) RETURN
     ! performed on root proc only
-    if (iProc/=0) RETURN
+    if(iProc/=0) RETURN
     ! write the header file
-    call open_file(file= trim(NamePlotDir)//trim(NameHeaderFile),&
+    call open_file(file=trim(NamePlotDir)//trim(NameHeaderFile),&
          NameCaller=NameSub)
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
@@ -1967,9 +1967,9 @@ contains
     character(len=100), intent(out):: NameOut
 
     ! timetag
-    character(len=15):: StringTime
+    character(len=15)  :: StringTime
     ! write format
-    character(len=100)::StringFmt
+    character(len=100) :: StringFmt
     ! lon, lat indexes corresponding to iLineAll
     integer:: iLon, iLat
 

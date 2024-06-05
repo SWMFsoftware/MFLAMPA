@@ -158,6 +158,7 @@ module SP_ModGrid
 contains
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand        ! From PARAM.in
     integer :: nParticleCheck, nLonCheck, nLatCheck   ! Misc
@@ -204,8 +205,8 @@ contains
   subroutine init
 
     ! allocate the grid used in this model
-    use ModUtilities,      ONLY: check_allocate
-    use SP_ModProc,        ONLY: nProc
+    use ModUtilities, ONLY: check_allocate
+    use SP_ModProc,   ONLY: nProc
 
     integer:: iError
     integer:: iNodeLast
@@ -240,7 +241,6 @@ contains
   subroutine init_stand_alone
 
     ! allocate the grid used in this model
-    use ModUtilities,      ONLY: check_allocate
     integer :: iVertex, iError
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
@@ -248,7 +248,7 @@ contains
     allocate(MhData_VIB(LagrID_:nMhData, 1:nVertexMax, nLine))
 
     ! initialize MhData
-    MhData_VIB(1:nMhData,:,:) = 0.0
+    MhData_VIB(1:nMhData, :, :) = 0.0
 
     ! reset lagrangian ids
     do iVertex = 1, nVertexMax
@@ -308,7 +308,7 @@ contains
     character(len=*), parameter:: NameSub = 'get_other_state_var'
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
-       if(.not.Used_B(iLine))CYCLE
+       if(.not.Used_B(iLine)) CYCLE
        iEnd = nVertex_B(iLine)
        do iVertex = 1, iEnd
           ! magnetic field
@@ -320,8 +320,8 @@ contains
           ! if(.not.DoSmooth)then
           if(iVertex /=nVertex_B(iLine))then
              State_VIB(D_, iVertex, iLine) = norm2(&
-                  MhData_VIB(X_:Z_, iVertex    , iLine) - &
-                  MhData_VIB(X_:Z_, iVertex + 1, iLine))
+                  MhData_VIB(X_:Z_, iVertex  , iLine) - &
+                  MhData_VIB(X_:Z_, iVertex+1, iLine))
              ! plasma velocity projection onto the direction of
              ! vector from X_:Z_(iVertex) to X_:Z_(iVertex+1)
              ! which is the direction of the magnetic field at the face
@@ -432,12 +432,8 @@ contains
     ! line reaches given radial distance
     IsFound = .true.
     ! find index of first particle above Radius
-    do iVertex = 1, nVertex_B(iLine)
-       if(State_VIB(R_, iVertex, iLine) > Radius)then
-          iParticleOut = iVertex
-          EXIT
-       end if
-    end do
+    iParticleOut = minloc(State_VIB(R_, 1:nVertex_B(iLine), iLine), &
+       DIM=1, MASK=State_VIB(R_, 1:nVertex_B(iLine), iLine) > Radius)
 
     ! get interpolation weight is necessary
     if(present(Weight))then
