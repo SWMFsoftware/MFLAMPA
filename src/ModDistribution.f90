@@ -140,22 +140,18 @@ contains
     Mu_I = 0.5*(MuFace_I(0:nMu-1) + MuFace_I(1:nMu))
 
     ! Distribution function
-    allocate(Distribution_CB(0:nP+1,nMu,nVertexMax,nLine), stat=iError)
+    allocate(Distribution_CB(0:nP+1, nMu, nVertexMax, nLine), stat=iError)
     call check_allocate(iError, 'Distribution_CB')
 
     ! initialization depends on momentum, however, this corresponds
     ! to a constant differential flux (intensity), thus ensuring
     ! uniform backgound while visualizing this quantity
-    do iLine = 1, nLine
-       do iVertex = 1, nVertexMax
-          do iMu = 1, nMu
-             ! Overall density of the fast particles is of the order
-             ! of 10^-6 m^-3. Integral flux is less than 100 per
-             ! (m^2 ster s). Differential background flux is constant.
-             Distribution_CB(:,iMu,iVertex,iLine) = Background_I
-          end do
-       end do
-    end do
+    Distribution_CB = reshape(spread(Background_I, DIM=2, &
+          NCOPIES=nMu*nVertexMax*nLine), [nP+2, nMu, nVertexMax, nLine])
+    ! (0:nP+1, nMu*nVertexMax*nLine) -> (0:nP+1, 1:nMu, 1:nVertexMax, 1:nLine)
+    ! Overall density of the fast particles is of the order
+    ! of 10^-6 m^-3. Integral flux is less than 100 per
+    ! (m^2 ster s). Differential background flux is constant.
 
     ! GOES by default
     if(.not. allocated(NameFluxChannel_I)) then
@@ -180,7 +176,7 @@ contains
     NameFluxUnit_I(EFlux_) = NameEnergyFluxUnit
 
     if(.not. allocated(Flux_VIB)) then
-       allocate(Flux_VIB(Flux0_:FluxMax_,1:nVertexMax,nLine), stat=iError)
+       allocate(Flux_VIB(Flux0_:FluxMax_, 1:nVertexMax, nLine), stat=iError)
        call check_allocate(iError, 'Flux_VIB')
        Flux_VIB = -1.0
     else

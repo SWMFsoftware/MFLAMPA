@@ -6,6 +6,7 @@ module SP_ModAdvancePoisson
   ! High resolution finite volume method for kinetic equations
   ! with Poisson brackets (Sokolov et al., 2023)
   ! See https://doi.org/10.1016/j.jcp.2023.111923
+
   use SP_ModSize,         ONLY: nVertexMax
   use SP_ModGrid,         ONLY: nLine
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, &
@@ -88,26 +89,24 @@ contains
     ! Time derivative
     dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)/tFinal
     ! Total control volume: initial and time derivative
-    do iX = 0, nX+1
-       Volume_G(:,iX)    = VolumeP_I*VolumeXStart_I(iX)
-       dVolumeDt_G(:,iX) = VolumeP_I*dVolumeXDt_I(iX)
-    end do
+    Volume_G             = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+         spread(VolumeXStart_I, DIM=1, NCOPIES=nP+2)
+    dVolumeDt_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+         spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+2)
     ! calculate: dHamiltonian/dVolumeSubX
-    do iX = 0, nX+1
-       dHamiltonian01_FX(:,iX) = -Momentum3_I*dVolumeXDt_I(iX)
-    end do
-    ! Time initialization
+    dHamiltonian01_FX    = -spread(Momentum3_I, DIM=2, NCOPIES=nX+2)* &
+         spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
     Time   = 0.0
     ! Trial timestep
     DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
          max(VolumeXEnd_I, VolumeXStart_I))/(3*dLogP)
 
+    ! Update Bc for VDF at minimal energy, at nP = 0
+    call set_momentum_bc(iLine, nX, nSi_I, iShock)
     ! Advection by Poisson bracket scheme
     do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time)
-       ! Update Bc for VDF at minimal energy, at nP = 0
-       call set_momentum_bc(iLine, nX, nSi_I, iShock)
        call set_VDF(iLine, nX, VDF_G)
        ! Volume Updates
        VolumeOld_G = Volume_G
@@ -198,9 +197,8 @@ contains
     VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
     VolumeX_I(nX+1)   = VolumeX_I(nX)
     ! Phase volume: initial values
-    do iX = 0, nX+1
-       Volume_G(:,iX) = VolumeP_I*VolumeX_I(iX)
-    end do
+    Volume_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+         spread(VolumeX_I, DIM=1, NCOPIES=nP+2)
 
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|^2 at cell face
     ! u/B with the index of "i" is the value at the face between
@@ -217,9 +215,8 @@ contains
     uOverBNodeSi_I(nX+1)   = uOverBNodeSi_I(nX)
 
     ! Hamiltonian = -(u/B)*(p**3/3) at cell face, for {s_L, p^3/3}
-    do iX = -1, nX+1
-       Hamiltonian_N(:, iX) = -uOverBNodeSi_I(iX)*Momentum3_I
-    end do
+    Hamiltonian_N          = -spread(Momentum3_I, DIM=2, NCOPIES=nX+3)* &
+         spread(uOverBNodeSi_I, DIM=1, NCOPIES=nP+3)
 
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -302,9 +299,8 @@ contains
 
     ! Calculate time derivative of total control volume
     do iX = 1, nX
-       do iMu = 0, nMu+1
-          dVolumeDt_G(:, iMu, iX) = dDeltaSOverBDt_C(iX)*DeltaMu*VolumeP_I
-       end do
+       dVolumeDt_G(:, :, iX) = dDeltaSOverBDt_C(iX)*DeltaMu* &
+            spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
     end do
     ! BCs of the time derivative of total control volume
     dVolumeDt_G(:, :,    0) = dVolumeDt_G(:, :,  1)
@@ -347,20 +343,18 @@ contains
           call update_states(iLine, nX, Time)
           ! Calculate the total control volume
           do iX = 1, nX
-             Volume_G(:, 0, iX) = DeltaSOverB_C(iX)*DeltaMu*VolumeP_I
-             do iMu = 1, nMu+1
-                Volume_G(:, iMu, iX) = Volume_G(:, 0, iX)
-             end do
+             Volume_G(:, :, iX) = DeltaSOverB_C(iX)*DeltaMu* &
+                  spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
           end do
 
           ! Update VDF_G to CURRENT time: no BCs for (1:nQ, 1:nP, 1;nR)
-          Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =        &
-               Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) +   &
+          Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =       &
+               Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) +  &
                Source_C/Volume_G(1:nP, 1:nMu, 1:nX)
        end if
        ! Check if the VDF includes negative values
        call check_dist_neg(NameSub, 1, nX, iLine)
-       if(IsDistNeg)RETURN
+       if(IsDistNeg) RETURN
 
        ! ------------ Future Work ------------
        ! This is the first version of draft implementing multi-Poisson-bracket
@@ -405,10 +399,8 @@ contains
 
       ! Calculate the total control volume
       do iX = 1, nX
-         Volume_G(:, 0, iX) = DeltaSOverB_C(iX)*DeltaMu*VolumeP_I
-         do iMu = 1, nMu+1
-            Volume_G(:, iMu, iX) = Volume_G(:, 0, iX)
-         end do
+         Volume_G(:, :, iX) = DeltaSOverB_C(iX)*DeltaMu* &
+              spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
       end do
 
       ! Boundary conditions for total control volume
@@ -545,9 +537,8 @@ contains
     !--------------------------------------------------------------------------
 
     do iX = 1, nX
-       do iMu = 0, nMu+1
-          dHamiltonian01_FX(:, iMu, iX) = -Momentum3_I*dDeltaSOverBDt_C(iX)
-       end do
+       dHamiltonian01_FX(:, :, iX) = -dDeltaSOverBDt_C(iX)* &
+            spread(Momentum3_I, DIM=2, NCOPIES=nMu+2)
     end do
 
     ! Calculate the Hamiltonian function used actually：\tilde\deltaH

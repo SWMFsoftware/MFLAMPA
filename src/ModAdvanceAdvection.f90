@@ -61,9 +61,9 @@ contains
     Dt = DtProgress/nStep
     FermiFirst_I = FermiFirst_I/nStep
 
+    ! update bc for advection, at nP = 0
+    call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
     STEP:do iStep = 1, nStep
-       ! update bc for advection, at nP = 0
-       call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! advection in the momentum space
        do iVertex = 1, nX
           ! first check if the VDF includes negative values
