@@ -147,6 +147,8 @@ contains
           iShock = iShockOld + iProgress
           if(iShock < iEnd-nWidth .and. iShock > nWidth  &
                .and. DoTraceShock) call steepen_shock(iEnd)
+          ! Store the old density before any possible CYCLE LINE
+          nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
 
           ! Advection (2 different schemes) and Diffusion
           ! First, set the diffusion coefficient, from the
@@ -167,8 +169,6 @@ contains
                 call advect_via_multi_poisson(iLine, iEnd, iShock, &
                      Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
-             ! Store density array at the end of this time step
-             nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
           else
              ! No Poisson bracket scheme, use the default algorithm
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &

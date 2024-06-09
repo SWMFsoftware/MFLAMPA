@@ -322,7 +322,7 @@ contains
           case('mh2d')
              File_I(iFile) % iKindData = MH2D_
           case('mhtime')
-             if(IsSteadySTate)call CON_stop(NameSub//&
+             if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = MHTime_
           case('distr1d')
@@ -332,7 +332,7 @@ contains
           case('flux2d')
              File_I(iFile) % iKindData = Flux2D_
           case('fluxtime')
-             if(IsSteadySTate)call CON_stop(NameSub//&
+             if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
           case default
@@ -682,7 +682,7 @@ contains
     elseif(nOutput > 0)then
        ! Output if iIter is a multiple of nOutput
        if(mod(iIter,nOutput)/=0)RETURN
-    elseif(DtOutput > 0.0.and..not.IsSteadyState)then
+    elseif(DtOutput > 0.0 .and. .not.IsSteadyState)then
        iTimeOutputNew = int(SPTime/DtOutput)
        if(iTimeOutputNew > iTimeOutput)then
           iTimeOutput = iTimeOutputNew
