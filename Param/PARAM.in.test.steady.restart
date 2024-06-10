@@ -35,7 +35,8 @@ SP/restartIN/restart.H
 #SAVEINITIAL
 F			DoSaveInitial
 
-#UPPERENDBC
+#ENDBC
+T			UseLowerEndBc
 T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc

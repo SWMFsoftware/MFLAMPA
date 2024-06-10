@@ -32,6 +32,10 @@ MH_data_e20120123/MH_data.H
 T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
+#ENDBC
+F			UseLowerEndBc
+F			UseUpperEndBc
+
 #SAVEPLOT
 3			nFileOut
 mh1d flux ascii		StringPlot

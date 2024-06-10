@@ -13,7 +13,7 @@ module SP_ModDiffusion
   use ModNumConst,  ONLY: cPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: MomentumInjSi
+  use SP_ModDistribution, ONLY: MomentumInjSi, nP
   use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, D_, R_, Wave1_, Wave2_
   use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
@@ -80,7 +80,6 @@ contains
   subroutine diffuse_distribution_s(iLine, nX, iShock, Dt, &
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! diffuse the distribution function with scalar/global Dt
-    use SP_ModDistribution, ONLY: nP
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -102,8 +101,8 @@ contains
   subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocalIn_II,  &
        nSi_I, BSi_I, LowerEndSpectrum_I, UpperEndSpectrum_I)
     ! diffuse the distribution function with vector/local Dt
-    use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, Distribution_CB
-    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+    use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, Distribution_CB
+    use SP_ModTurbulence,   ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -263,6 +262,8 @@ contains
   !============================================================================
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
     ! set diffusion coefficient for the current line
+    use SP_ModBc,           ONLY: SpectralIndex
+    use SP_ModDistribution, ONLY: Momentum_I, Distribution_CB
 
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in)    :: BSI_I(1:nX)
