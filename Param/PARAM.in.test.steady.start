@@ -40,7 +40,8 @@ MH_data_e20120123/MH_data.H
 T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
-#UPPERENDBC
+#ENDBC
+T			UseLowerEndBc
 T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
