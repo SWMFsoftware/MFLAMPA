@@ -147,8 +147,6 @@ contains
           iShock = iShockOld + iProgress
           if(iShock < iEnd-nWidth .and. iShock > nWidth  &
                .and. DoTraceShock) call steepen_shock(iEnd)
-          ! Store the old density before any possible CYCLE LINE
-          nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
 
           ! Advection (2 different schemes) and Diffusion
           ! First, set the diffusion coefficient, from the
@@ -175,6 +173,8 @@ contains
                   dLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              if(IsDistNeg) CYCLE LINE
           end if
+          ! Store the old density
+          nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
        end do PROGRESS
     end do LINE
 
