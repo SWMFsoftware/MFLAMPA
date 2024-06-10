@@ -135,7 +135,7 @@ contains
 
           ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
-          nSI_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine) + Alpha* &
+          nSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine) + Alpha* &
                (MhData_VIB( Rho_, 1:iEnd, iLine) - &
                State_VIB(RhoOld_, 1:iEnd, iLine))
           BSi_I(1:iEnd) = State_VIB(  BOld_, 1:iEnd, iLine) + Alpha* &
@@ -162,7 +162,7 @@ contains
              else
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See the descriptions for development in ModAdvancePoisson.f90
-                Time = Alpha*DtProgress*DtFull - DtProgress ! Tstart this step
+                Time = Alpha*DtFull - DtProgress            ! Tstart this step
                 call init_data_states(iLine, iEnd, DtFull)  ! Inital states
                 call advect_via_multi_poisson(iLine, iEnd, iShock, &
                      Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
