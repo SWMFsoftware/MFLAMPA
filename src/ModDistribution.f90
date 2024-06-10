@@ -13,7 +13,7 @@ module SP_ModDistribution
   use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
   use SP_ModUnit,   ONLY: NameFluxUnit, NameEnergyFluxUnit, &
-       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_ 
+       Io2Si_V, Si2Io_V, NameFluxUnit_I, UnitEnergy_, UnitFlux_
   use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
 
   implicit none
@@ -354,7 +354,7 @@ contains
                         (KinEnergyIo_I(iP+1) - EChannelIo_I(iFlux))&! Span
                         *0.5*(                & ! times a half of sum of
                         DistTimesP2_I(iP+1) + & ! the right boundary value +
-                        ((KinEnergyIo_I(iP+1) -&! interpolation to E_Channel: 
+                        ((KinEnergyIo_I(iP+1) -&! interpolation to E_Channel:
                         EChannelIo_I(iFlux))*DistTimesP2_I(iP) & ! from iP
                         + (EChannelIo_I(iFlux) - KinEnergyIo_I(iP))* &
                         DistTimesP2_I(iP+1))                   & ! from iP+1

@@ -114,9 +114,9 @@ contains
        if(iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
             iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
 
-       Distribution_CB(0,:,iVertex,iLine) = DistributionBc*CoefInjLocal
+       Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
     end do
-    ! set the left boundary condition for diffusion (when using LowerEndBc)
+    ! set the left BC for diffusion (when not using LowerEndBc)
     if(.not. UseLowerEndBc) &
          Distribution_CB(1:nP+1, 1, 1, iLine) = max(Background_I(1:nP+1), &
          Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex)
