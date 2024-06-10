@@ -8,7 +8,7 @@ module SP_ModBc
   use ModCosmicRay,       ONLY: local_interstellar_spectrum,          &
        TypeLisBc, UseModulationPot, ModulationPot
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, Momentum_I, &
-       MomentumInjSi
+       MomentumInjSi, Background_I
   use SP_ModGrid,         ONLY: MhData_VIB, NoShock_, nWidth, T_, X_, Z_
   use SP_ModUnit,         ONLY: kinetic_energy_to_momentum,           &
        UnitEnergy_, UnitX_, Io2Si_V
@@ -27,9 +27,14 @@ module SP_ModBc
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
   real, public     :: CoefInj = 0.25, SpectralIndex = 5.0
-  real, parameter  :: CoefInjTiny = 2.5E-11
+  real, parameter  :: CoefInjTiny = 1.0E-12 ! Before Nov 2023: set to be 0.0
+  ! Lower end BC, solve from the first or second point along the field line
+  logical, public  :: UseLowerEndBc = .false.
   ! Upper end BC, set at the last point along the field line
   logical, public  :: UseUpperEndBc = .false.
+  ! Lower index when solving the advection and diffusion terms
+  integer          :: iUseLeft_ = 1, iNoLeft_ = 2
+  integer, public  :: iStart = 2
   ! Type of upper end BC: float, lism, escape
   character(LEN=6) :: TypeUpperEndBc = 'none'
   real, public     :: UpperEndBc_I(1:nP)
@@ -45,7 +50,15 @@ contains
     case('#INJECTION')
        call read_var('SpectralIndex', SpectralIndex)
        call read_var('Efficiency',    CoefInj)
-    case('#UPPERENDBC')
+    case('#ENDBC')
+       ! Read whether to use UpperLowBc
+       call read_var('UseLowerEndBc', UseLowerEndBc)
+       if(UseLowerEndBc) then
+          iStart = iUseLeft_
+       else
+          iStart = iNoLeft_
+       end if
+
        ! Read whether to use UpperEndBc
        call read_var('UseUpperEndBc', UseUpperEndBc)
        if(UseUpperEndBc) then
@@ -103,6 +116,10 @@ contains
 
        Distribution_CB(0,:,iVertex,iLine) = DistributionBc*CoefInjLocal
     end do
+    ! set the left boundary condition for diffusion (when using LowerEndBc)
+    if(.not. UseLowerEndBc) &
+         Distribution_CB(1:nP+1, 1, 1, iLine) = max(Background_I(1:nP+1), &
+         Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex)
 
   end subroutine set_momentum_bc
   !============================================================================
