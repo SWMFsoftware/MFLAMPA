@@ -33,7 +33,7 @@ T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
 #ENDBC
-F			UseLowerEndBc
+T			UseLowerEndBc
 F			UseUpperEndBc
 
 #SAVEPLOT

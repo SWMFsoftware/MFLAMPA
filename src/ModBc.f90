@@ -26,18 +26,18 @@ module SP_ModBc
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
-  real, public     :: CoefInj = 0.25, SpectralIndex = 5.0
-  real, parameter  :: CoefInjTiny = 1.0E-12 ! Before Nov 2023: set to be 0.0
+  real, public      :: CoefInj = 0.25, SpectralIndex = 5.0
+  real, parameter   :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
   ! Lower end BC, solve from the first or second point along the field line
-  logical, public  :: UseLowerEndBc = .false.
+  logical, public   :: UseLowerEndBc = .true.
   ! Upper end BC, set at the last point along the field line
-  logical, public  :: UseUpperEndBc = .false.
+  logical, public   :: UseUpperEndBc = .false.
   ! Lower index when solving the advection and diffusion terms
-  integer          :: iUseLeft_ = 1, iNoLeft_ = 2
-  integer, public  :: iStart = 2
+  integer, parameter:: iUseLeft_ = 1, iNoLeft_ = 2
+  integer, public   :: iStart = 1
   ! Type of upper end BC: float, lism, escape
-  character(LEN=6) :: TypeUpperEndBc = 'none'
-  real, public     :: UpperEndBc_I(1:nP)
+  character(LEN=6)  :: TypeUpperEndBc = 'none'
+  real, public      :: UpperEndBc_I(1:nP)
 contains
   !============================================================================
   subroutine read_param(NameCommand)

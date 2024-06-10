@@ -412,7 +412,8 @@ particle flux is integrated over energy as the output.
 
 <commandgroup name="ENDBC">
 
-<command name="UPPERENDBC">
+<command name="ENDBC">
+  <parameter name="UseLowerEndBc" type="logical" default="T"/>
   <parameter name="UseUpperEndBc" type="logical" default="F"/>
   <parameter name="TypeUpperEndBc" type="string" input="select">
     <option name="lism" default="T"/>
@@ -428,25 +429,28 @@ particle flux is integrated over energy as the output.
   <parameter name="UseModulationPot" type="logical" default="F"/>
   <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
 
-#UPPERENDBC
+#ENDBC
+T			UseLowerEndBc
 F			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
 F			UseModulationPot
 600.0			ModulationPot
 
-To determine whether we set the upper boundary condition. If so, 
-we turn UseUpperEndBc and have UpperEndSpectrum_I in diffusion.
-At this time, we need to determine the type of UpperEndBc, LISM
-is the nominal one for use. For LISM, there are various models
-fitting or simulating the spectrum, read as TypeLisBc. Here we
-set Eq.(2) in Usoskin et al. 2005 as default. Then, we also need
-to determine whether we use LISM or the GCR spectrum at ~1 AU.
-For the latter, we also need the modulation potential (denoted
-as "phi" in Usoskin et al. 2005), which is temporal and spatial
-(and even energy) dependent. We stick to the one derived by Oulu
-neutron monitor and published in the "Dataset 1" on
-https://cosmicrays.oulu.fi/phi/phi.html.
+To determine whether we set the lower/upper boundary conditions. If so,
+we turn UseLowerEndBc and/or UseUpperEndBc, respectively, and will have
+LowerEndSpectrum_I and UpperEndSpectrum_I in diffusion. In particular,
+for LowerEndSpectrum_I, it is the spectral extrapolation following the
+power law of SpectralIndex at the lower boundary when iVertex=1; for
+UpperEndSpectrum_I, we need to determine the type of UpperEndBc at this
+time, where LISM is the nominal one for use. For LISM, there are various
+models fitting or simulating the spectrum, read as TypeLisBc. Here we
+set Eq.(2) in Usoskin et al. 2005 as default. Then, we also need to
+determine whether we use LISM or the GCR spectrum at ~1 AU. For the
+latter one, we also need the modulation potential (denoted as "phi" in
+Usoskin et al. 2005), which is temporal- and spatial- (and even energy-)
+dependent. We stick to the one derived by Oulu neutron monitor and
+published in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
 </command>
 
 </commandgroup>
@@ -514,8 +518,8 @@ The default value is true.
 #DORUN
 T			DoRun
 
-If DoRun is False, only magnetic field lines are extracted, but the particle
-distribution function is not solved.
+If DoRun is False, only magnetic field lines are extracted, but the
+particle distribution function is not solved.
 
 The default value is true.
 </command>
@@ -783,10 +787,17 @@ Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
 As an example, "mh1d" means to save 1D plot (for each magnetic field line)
 including coordinates and MHD variables; "R" means radial coordinate (R) plus
-fluxes; "idl" means to save the data in the idl format. In StringPlot, the
-first identifier is always a type of plot, the last identifier is a type of
-file, and the string variables in between denote the list of plot variables
-extra to the MHD ones.
+fluxes; "idl" means to save the data in the idl format. Particularly, the "mh1d",
+"mh2d", "mhtime", "flux2d", and "fluxtime" save the integral particle flux in
+the unit of p.f.u. For the differential particle flux in the unit of p.f.u. per
+energy unit, "distr1d" can save all the values of the VDF (each momentum, at
+each coordinate along each fieldline), and "distraj" can save only the values
+interpolated to the specified trajectories. For "distr1d", "cdf" means the
+canonical distribution function, and "def" means the distribution energy function.
+If using "distraj", one should also specify "#SATELLITE" before these lines.
+In StringPlot, the first identifier is always a type of plot, the last
+identifier is a type of file, and the string variables in between denote
+the list of plot variables extra to the MHD ones.
 
 Please send an email to Igor Sokolov for more information on this command.
 </command>

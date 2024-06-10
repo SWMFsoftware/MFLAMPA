@@ -173,7 +173,7 @@ contains
                   dLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              if(IsDistNeg) CYCLE LINE
           end if
-          ! Store the old density
+          ! Store the old density at the end of each iProgress
           nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
        end do PROGRESS
     end do LINE
