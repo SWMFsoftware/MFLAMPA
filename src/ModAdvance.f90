@@ -171,8 +171,10 @@ contains
              ! No Poisson bracket scheme, use the default algorithm
              call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
                   dLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
-             if(IsDistNeg) CYCLE LINE
           end if
+
+          ! For any scheme, check if any VDF along this line is negative
+          if(IsDistNeg) CYCLE LINE
           ! Store the old density at the end of each iProgress
           nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
        end do PROGRESS
@@ -227,6 +229,7 @@ contains
     use SP_ModGrid,           ONLY: Rho_, B_
     use SP_ModAdvancePoisson, ONLY: iterate_poisson
     use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
+    use SP_ModDistribution,   ONLY: IsDistNeg
 
     ! Loop variable
     integer :: iLine
@@ -237,7 +240,7 @@ contains
     ! go line by line and iterate the solution
     !--------------------------------------------------------------------------
 
-    do iLine = 1, nLine
+    LINE:do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE
        ! the active particles on the line
        iEnd = nVertex_B(iLine)
@@ -257,7 +260,10 @@ contains
        ! Poisson bracket scheme: particle-number-conservative
        call iterate_poisson(iLine, iEnd, iShock, Cfl, BSi_I(1:iEnd), &
             nSi_I(1:iEnd))
-    end do
+
+       ! For any scheme, check if any VDF along this line is negative
+       if(IsDistNeg) CYCLE LINE
+    end do LINE
 
   end subroutine iterate_steady_state
   !============================================================================

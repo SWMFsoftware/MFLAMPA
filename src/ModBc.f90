@@ -106,9 +106,9 @@ contains
        MomentumSi   = kinetic_energy_to_momentum(  &
             MhData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
-       DistributionBc = (SpectralIndex-3)/(4*cPi)        &
-            * MomentumInjSi**2*Io2Si_V(UnitEnergy_)      &
-            * nSi_I(iVertex)/MomentumSi**3               &
+       DistributionBc = (SpectralIndex-3)/(4*cPi)     &
+            * MomentumInjSi**2*Io2Si_V(UnitEnergy_)   &
+            * nSi_I(iVertex)/MomentumSi**3            &
             * (MomentumSi/MomentumInjSi)**SpectralIndex
 
        if(iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &

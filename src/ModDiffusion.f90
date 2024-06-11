@@ -10,7 +10,7 @@ module SP_ModDiffusion
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
 
-  use ModNumConst,  ONLY: cPi, cTiny
+  use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModDistribution, ONLY: MomentumInjSi, nP
@@ -24,20 +24,20 @@ module SP_ModDiffusion
 
   PRIVATE
   logical, public :: UseDiffusion = .true.
-  real, public :: DOuterSi_I(1:nVertexMax), CoefDInnerSi_I(1:nVertexMax)
+  real,    public :: DOuterSi_I(1:nVertexMax), CoefDInnerSi_I(1:nVertexMax)
   ! Local parameters!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMeanFreePathUpstream = .false.
-  real    :: MeanFreePath0InAu = 1.0
+  real            :: MeanFreePath0InAu = 1.0
 
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
-  real :: ScaleTurbulenceSi = 0.03*cAu
+  real            :: ScaleTurbulenceSi = 0.03*cAu
   integer, parameter :: Const_ = 0, Linear_ = 1
-  integer :: iScaleTurbulenceType = Const_
+  integer         :: iScaleTurbulenceType = Const_
 
   ! Public members:
-  public :: read_param, diffuse_distribution, set_diffusion_coef
+  public          :: read_param, diffuse_distribution, set_diffusion_coef
   interface diffuse_distribution
      module procedure diffuse_distribution_s    ! Global time step Dt
      module procedure diffuse_distribution_arr  ! DtLocal_I array
@@ -268,7 +268,7 @@ contains
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in)    :: BSI_I(1:nX)
     real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
-    real, parameter     :: cCoef = 81.0/7/cPi/(2*cPi)**(2.0/3)
+    real, parameter     :: cCoef = 81.0/7/cPi/cTwoPi**(2.0/3)
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
     RadiusSi_I(1:nX) = State_VIB(R_,1:nX,iLine)*Io2Si_V(UnitX_)

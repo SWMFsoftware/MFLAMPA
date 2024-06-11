@@ -466,8 +466,7 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           end select
        end do ! iPlot
-       ! Check consistency
-       ! only 1 MH1D file can be requested
+       ! Check consistency: only 1 MH1D file can be requested
        if(count(File_I(1:nFileOut)%iKindData == MH1D_,1) > 1)&
             call CON_stop(NameSub//&
             ": only one MH1D output file can be requested")
@@ -743,7 +742,7 @@ contains
       real :: Param_I(LagrID_:StartJulian_)
       ! timetag
       character(len=15) :: StringTime
-      character(len=*), parameter :: NameSub = 'write_mh_1d'
+      character(len=*), parameter:: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
       !  Update number of time tags and write to tag l ist file
       if(iProc==0)then
@@ -834,12 +833,12 @@ contains
     !==========================================================================
     subroutine write_mh_2d
 
-      use SP_ModProc, ONLY: iComm, nProc
-      use ModMpi
-
       ! write output with 2D MH data in the format to be read by IDL/TECPLOT;
       ! single file is created for all field lines, name format is
       ! MH_data_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
+
+      use SP_ModProc, ONLY: iComm, nProc
+      use ModMpi
 
       ! name of the output file
       character(len=100):: NameFile

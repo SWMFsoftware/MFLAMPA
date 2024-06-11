@@ -3,13 +3,14 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModAdvanceAdvection
 
+  ! Revision history
+  ! Prototype: Sokolov & Roussev, FLAMPA code, 2004
+  ! Version: Sokolov & Roussev, Jan, 2008, SP/FLAMPA/src/ModLogAdvection.f90
+
   use ModUtilities,       ONLY: CON_stop
   use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, &
        dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
-  ! Revision history
-  ! Prototype: Sokolov&Roussev, FLAMPA code, 2004
-  ! Version: Sokolov& Roussev, Jan,2008, SP/FLAMPA/src/ModLogAdvection.f90
 
   SAVE
 
@@ -38,17 +39,16 @@ contains
     real,    intent(in):: dLogRho_I(1:nX)
     ! Density and magnetic field at the upper level
     real,    intent(in):: nSI_I(1:nX), BSI_I(1:nX)
-    ! local variables, declared in this subroutine
-    integer  :: iStep, iVertex      ! loop variables
-    ! time step is split for nStep intervals,  so short that the CFL for
+    ! LOCAL VARs:
+    integer  :: iStep, iVertex   ! loop variables
+    ! time step is split for nStep intervals, so short that the CFL for
     ! (explicit) advection operator is less that CFL declared above.
     integer  :: nStep
     ! Time step in the STEP Loop, DtProgress/nStep
     real     :: Dt
-    ! Lagrangian derivatives
+    ! Lagrangian derivatives, accounting for 1st order Fermi acceleration,
+    ! which is responsible for advection in momentum space
     real     :: FermiFirst_I(1:nX)
-    ! 1st order Fermi acceleration is responsible for advection
-    ! in momentum space
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
