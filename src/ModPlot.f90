@@ -651,6 +651,7 @@ contains
 
     use SP_ModDistribution, ONLY: get_integral_flux, nMu
     use SP_ModTime,         ONLY: IsSteadyState, iIter, SPTime
+    use SP_ModUnit,         ONLY: Si2Io_V, UnitFlux_
 
     logical, intent(in), optional:: IsInitialOutputIn
 
@@ -1248,17 +1249,16 @@ contains
                File_I(iFile) % Buffer_II(:,iVertex) = 0.0
                CYCLE
             end if
-            ! the actual distribution
-            File_I(iFile) % Buffer_II(:,iVertex) = &
-                 log10(Distribution_CB(0:nP+1,nMu,iVertex,iLine))
+            ! the actual distribution, in the unit of log10(pfu/[energy unit])
+            File_I(iFile) % Buffer_II(:,iVertex) = log10(Si2Io_V(UnitFlux_)* &
+                 Distribution_CB(0:nP+1, nMu, iVertex, iLine))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
                ! do nothing
             case(DEF_)
                File_I(iFile) % Buffer_II(:,iVertex) = &
-                    File_I(iFile) % Buffer_II(:,iVertex) + &
-                    2*Log10Momentum_I
+                    File_I(iFile) % Buffer_II(:,iVertex) + 2*Log10Momentum_I
             end select
          end do
 
@@ -1398,9 +1398,9 @@ contains
                ! Found intersection -> get data at that location and log10(f)
                ! Find coordinates and log(Distribution) at intersection
                Xyz_DI(:, iLineAll) = ( &
-                    MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) + &
+                    MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) +  &
                     MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight )/rSat
-               Log10DistR_IIB(:, :, iLineAll) = ( &
+               Log10DistR_IIB(:, :, iLineAll) = Si2Io_V(UnitFlux_)*( &
                     log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
                     log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
             end do
