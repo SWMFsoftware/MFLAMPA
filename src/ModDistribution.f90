@@ -147,7 +147,7 @@ contains
     ! to a constant differential flux (intensity), thus ensuring
     ! uniform backgound while visualizing this quantity
     Distribution_CB = reshape(spread(Background_I, DIM=2, &
-          NCOPIES=nMu*nVertexMax*nLine), [nP+2, nMu, nVertexMax, nLine])
+         NCOPIES=nMu*nVertexMax*nLine), [nP+2, nMu, nVertexMax, nLine])
     ! (0:nP+1, nMu*nVertexMax*nLine) -> (0:nP+1, 1:nMu, 1:nVertexMax, 1:nLine)
     ! Overall density of the fast particles is of the order
     ! of 10^-6 m^-3. Integral flux is less than 100 per
@@ -317,7 +317,7 @@ contains
     real   :: DistTimesP2_I(1:nP), DistTimesP2E_I(1:nP) ! f*p**2, f*p**2*Ek
     real   :: dFlux_I(1:nP-1), dEFlux_I(1:nP-1) ! increments of each bin
     real   :: dFluxChannel ! increments of the bin where the channel falls in
-    real   :: Flux_I(nFluxChannel)      ! particle flux of energy channels
+    real   :: Flux_I(FluxFirst_:FluxLast_) ! particle flux of energy channels
     !--------------------------------------------------------------------------
 
     do iLine = 1, nLine
@@ -341,7 +341,7 @@ contains
           ! Reset values
           Flux_I = 0.0
           ! Calculate the particle fluxes for all energy channels
-          do iFlux = 1, nFluxChannel
+          do iFlux = FluxFirst_, FluxLast_
              do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
                 if(KinEnergyIo_I(iP+1) <= EChannelIo_I(iFlux)) CYCLE
