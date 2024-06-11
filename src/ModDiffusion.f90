@@ -114,7 +114,7 @@ contains
     ! Given spectrum of particles at upper end (GCRs)
     real, intent(in), optional :: UpperEndSpectrum_I(nP)
     ! Variables declared in this subroutine
-    integer :: iP, iVertex              ! loop variables
+    integer :: iP                ! loop variables
     ! For an optimized loop, we need to change the (nP, nX) into (nX, nP)
     ! for the two-dimensional local time step DtLocal_II array
     real  :: DtLocal_II(nX, nP)  ! Local time step for diffusion
@@ -122,7 +122,7 @@ contains
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
-    real  :: DInnerSi_I(1:nX)
+    real  :: DInnerSi_II(nX, nP) ! Calculate once and use later
     ! Lower limit to floor the spatial diffusion coefficient For a
     ! given spatial and temporal resolution, the value of the
     ! diffusion coefficient should be artificially increased to get
@@ -139,7 +139,8 @@ contains
     real   :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
     real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
-    real   :: Aux1, Aux2
+    ! Auxiliary arrays for the tri-diagonal arrays
+    real   :: Aux1_I(nX), Aux2_I(nX)
     !--------------------------------------------------------------------------
     ! diffusion along the field line
     ! Set up the local time step: the reason is that, we loop through
@@ -148,9 +149,8 @@ contains
     ! visit and put the data in cache that are stored adjacently.
     DtLocal_II = transpose(DtLocalIn_II)
 
-    ! if using turbulent spectrum:
-    ! set_dxx for diffusion along the field line
-    if(UseTurbulentSpectrum) call set_dxx(nX, nP, BSi_I(1:nX))
+    ! if using turbulent spectrum: set_dxx for diffusion along the field line
+    if(UseTurbulentSpectrum) call set_dxx(nX, BSi_I(1:nX))
 
     ! In M-FLAMPA DsMesh_I(i) is the distance between centers of meshes
     ! i-1 and i. Therefore,
@@ -175,22 +175,21 @@ contains
     !  The multiplier, DsFace_i/B_i, is denoted as DsFace_i/DOuter_i
     !  The face-centered combination,
 
+    ! For each momentum, the dependence of the diffusion coefficient
+    ! on momentum is D \propto r_L*v \propto Momentum**2/TotalEnergy
+    if(UseTurbulentSpectrum) then
+       DInnerSi_II = Dxx(nX, BSi_I(1:nX))/ &
+            spread(BSi_I(1:nX), DIM=2, NCOPIES=nP)
+    else
+       ! Add v (= p*c^2/E_total in the relativistic case) and p^(1/3)
+       DInnerSi_II = spread(CoefDInnerSi_I(1:nX), DIM=2, NCOPIES=NP) &
+            * spread(SpeedSi_I(1:nP)*Momentum_I(1:nP)**(1.0/3),      &
+            DIM=1, NCOPIES=NX)
+       DInnerSi_II = max(DInnerSi_II, &
+            DiffCoeffMinSi/spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=NP))
+    end if
+
     MOMENTUM:do iP = 1, nP
-       ! For each momentum, the dependence of the diffusion coefficient
-       ! on momentum is D \propto r_L*v \propto Momentum**2/TotalEnergy
-       if(UseTurbulentSpectrum) then
-          do iVertex = 1, nX
-             DInnerSi_I(iVertex) = Dxx(iVertex, iP,            &
-                  Momentum_I(iP)*MomentumInjSi, SpeedSi_I(iP), &
-                  BSi_I(iVertex)) / BSi_I(iVertex)
-          end do
-       else
-          ! Add v (= p*c^2/E_total in the relativistic case) and p^(1/3)
-          DInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)  &
-               *SpeedSi_I(iP)*Momentum_I(iP)**(1.0/3)
-          DInnerSi_I(1:nX) = max(DInnerSi_I(1:nX), &
-               DiffCoeffMinSi/DOuterSi_I(1:nX))
-       end if
        ! Now, we solve the matrix equation
        ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
        !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
@@ -199,37 +198,37 @@ contains
        Res_I = Distribution_CB(iP, 1, 1:nX, iLine)
        ! Set elements of tri-diagonal matrix in the LHS
        Main_I = 1.0; Lower_I = 0.0; Upper_I = 0.0
+
        ! For i=1:
-       Aux1 = DtLocal_II(1,iP)*DOuterSi_I(1)*   &
-            0.5*(DInnerSi_I(1) + DInnerSi_I(2))/DsMesh_I(2)**2
-       Main_I(1) = Main_I(1) + Aux1
-       Upper_I(1) = -Aux1
+       Aux1_I(1)  = DtLocal_II(1,iP)*DOuterSi_I(1)*   &
+            0.5*(DInnerSi_II(1,iP) + DInnerSi_II(2,iP))/DsMesh_I(2)**2
+       Main_I(1)  = Main_I(1) + Aux1_I(1)
+       Upper_I(1) = -Aux1_I(1)
        if(present(LowerEndSpectrum_I)) then
           ! With the given value for f_0 behind the boundary,
           ! the above scheme reads:
           ! f^(n+1)_1-Dt*DOuter_I/DsFace_I*(&
           !     DInner_(3/2)*(f^(n+1)_2-f^(n+1)_1)/DsMesh_(2)-&
           !     DInner_(1/2)*(f^(n+1)_1 -f_0/DsMesh_(1))=f^n_1
-          Aux2 = DtLocal_II(1,iP)*DOuterSi_I(1)*DInnerSi_I(1)/DsMesh_I(2)**2
+          Aux2_I(1) = DtLocal_II(1,iP)*DOuterSi_I(1)  &
+               *DInnerSi_II(1,iP)/DsMesh_I(2)**2
           ! With these regards, Aux2 is added to Main_I(1)...
-          Main_I(1) = Main_I(1) + Aux2
+          Main_I(1) = Main_I(1) + Aux2_I(1)
           ! ...while the given Aux2*f_0 should moved to the RHS and summed up
           ! with the source:
-          Res_I(1) = Res_I(1) + Aux2*LowerEndSpectrum_I(iP)
+          Res_I(1)  = Res_I(1) + Aux2_I(1)*LowerEndSpectrum_I(iP)
        end if
 
        ! For i=2, n-1:
-       do iVertex = 2, nX-1
-          Aux1 = DtLocal_II(iVertex,iP)*DOuterSi_I(iVertex)*         &
-               0.5*(DInnerSi_I(iVertex  ) + DInnerSi_I(iVertex+1))/  &
-               (DsMesh_I(iVertex+1)*DsFace_I(iVertex))
-          Aux2 = DtLocal_II(iVertex,iP)*DOuterSi_I(iVertex)*         &
-               0.5*(DInnerSi_I(iVertex-1) + DInnerSi_I(iVertex  ))/  &
-               (DsMesh_I(iVertex)*DsFace_I(iVertex))
-          Main_I(iVertex)  = Main_I(iVertex) + Aux1 + Aux2
-          Upper_I(iVertex) = -Aux1
-          Lower_I(iVertex) = -Aux2
-       end do
+       Aux1_I(2:nX-1) = DtLocal_II(2:nX-1,iP)*DOuterSi_I(2:nX-1)* &
+            0.5*(DInnerSi_II(2:nX-1,iP) + DInnerSi_II(3:nX, iP))/ &
+            (DsMesh_I(3:nX)*DsFace_I(2:nX-1))
+       Aux2_I(2:nX-1) = DtLocal_II(2:nX-1,iP)*DOuterSi_I(2:nX-1)* &
+            0.5*(DInnerSi_II(1:nX-2,iP) + DInnerSi_II(2:nX-1,iP))/&
+            (DsMesh_I(2:nX-1)*DsFace_I(2:nX-1))
+       Main_I(2:nX-1)  = Main_I(2:nX-1) + Aux1_I(2:nX-1) + Aux2_I(2:nX-1)
+       Upper_I(2:nX-1) = -Aux1_I(2:nX-1)
+       Lower_I(2:nX-1) = -Aux2_I(2:nX-1)
 
        ! For i=n:
        ! Version before Nov. 2023:
@@ -237,7 +236,7 @@ contains
        !     DsMesh_I(n)**2
        !
        ! After Nov. 2023: set free escaping at outer boundary for now
-       ! Aux2=0.
+       ! Aux2 = 0.0
        ! In both these versions:
        ! Main_I( n) = Main_I(n) + Aux2
        ! Lower_I(n) = -Aux2
@@ -245,17 +244,18 @@ contains
        ! Main_I(n) = 1; Lower_I(n) = 0 (equivalently to doing nothing)
        ! For backward compatibility, keep this option for UseUpperEndBc=.false.
        if(present(UpperEndSpectrum_I)) then
-          Aux2 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*                &
-               0.5*(DInnerSi_I(nX-1) + DInnerSi_I(nX))/DsMesh_I(nX)**2
-          Main_I( nX) = Main_I(nX) + Aux2
-          Lower_I(nX) = -Aux2
-          Aux1 = DtLocal_II(nX,iP)*DOuterSi_I(nX)*DInnerSi_I(nX)/ &
-               DsMesh_I(nX)**2
-          Main_I(nX) = Main_I(nX) + Aux1
-          Res_I(nX) = Res_I(nX) + Aux1*UpperEndSpectrum_I(iP)
+          Aux2_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)* &
+               0.5*(DInnerSi_II(nX-1,iP) + DInnerSi_II(nX,iP))/DsMesh_I(nX)**2
+          Main_I( nX) = Main_I(nX) + Aux2_I(nX)
+          Lower_I(nX) = -Aux2_I(nX)
+          Aux1_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)* &
+               DInnerSi_II(nX,iP)/DsMesh_I(nX)**2
+          Main_I(nX)  = Main_I(nX) + Aux1_I(nX)
+          Res_I(nX)   = Res_I(nX) + Aux1_I(nX)*UpperEndSpectrum_I(iP)
        end if
+
        ! Update the solution from f^(n) to f^(n+1):
-       call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I,   &
+       call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I, &
             Distribution_CB(iP, 1, 1:nX, iLine))
     end do MOMENTUM
   end subroutine diffuse_distribution_arr
