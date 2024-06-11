@@ -378,19 +378,20 @@ how many intervals in the range of [-1, 1] for pitch angle.
 </command>
 
 <command name="FLUXINITIAL">
-  <parameter name="FluxInitIo" type="real" min="0.0" default="0.01" />
+  <parameter name="FluxInit [pfu]" type="real" min="0.0" default="0.01" />
 
 #FLUXINITIAL
-0.01			FluxInitIo
+0.01			FluxInit [pfu]
 
 Distribution is initialized to have integral flux: 
-default value is set as 0.01 [pfu].
+default value is set as 0.01 [pfu]. One can set this
+to a lower order of magnitude, e.g., 1.0e-5 pfu.
 </command>
 
 <command name="FLUXCHANNEL">
   <parameter name="nFluxChannel" type="integer" min="1" default="6" />
   <for name="iFluxChannel" from="1" to="$nFluxChannel">
-      <parameter name="EChannelIo_I" type="real" min="0.0" />
+      <parameter name="EChannelIo_I [MeV]" type="real" min="0.0" />
   </for>
 
 #FLUXCHANNEL

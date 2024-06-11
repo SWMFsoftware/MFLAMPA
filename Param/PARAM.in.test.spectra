@@ -36,6 +36,12 @@ keV			ParticleEnergyUnit
 1.0E+7			EnergyMax
 100			nP
 
+#PITCHANGLEGRID
+1			nMu
+
+#FLUXINITIAL
+0.01			FluxInit [pfu]
+
 #FLUXCHANNEL
 6			nFluxChannel
 5			EChannelIo_I [MeV]
