@@ -18,7 +18,7 @@ program MFLAMPA
        SP_finalize   => finalize
   use SP_ModGrid,   ONLY: init_stand_alone, init_grid => init
   use ModReadParam, ONLY: read_file, read_init
-  use CON_planet, ONLY: init_planet_const, set_planet_defaults
+  use CON_planet,   ONLY: init_planet_const, set_planet_defaults
   use ModMpi
 
   implicit none
@@ -133,8 +133,8 @@ contains
     !--------------------------------------------------------------------------
     IsStopCondition = .false.
 
-    if(nIterMax >= 0  .and.iIter >=nIterMax) IsStopCondition = .true.
-    if( TimeMax >  0.0.and. SPTime >= TimeMax) IsStopCondition = .true.
+    if(nIterMax >= 0   .and.  iIter >=nIterMax) IsStopCondition = .true.
+    if( TimeMax >  0.0 .and. SPTime >= TimeMax) IsStopCondition = .true.
 
   end function stop_condition_true
   !============================================================================

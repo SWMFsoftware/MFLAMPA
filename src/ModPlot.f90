@@ -86,7 +86,7 @@ module SP_ModPlot
      integer:: iKindData
      ! file name extension: .out or .tec, etc.
      character(len=4 ):: NameFileExtension
-     ! file type: tec, idl, ascii, real8
+     ! file type: tec, tcp, idl, ascii, real8
      character(len=20):: TypeFile
      ! additional info to put into header
      character(len=300):: StringHeaderAux
@@ -494,9 +494,9 @@ contains
       !       Rho_, T_, Ux_:Uz_, Bx_:Bz_, Wave1_, Wave2_
       integer:: iVar, iVarMhd, iVarExtra, iStringPlot
       character(len=10) :: NameVarLowerCase
-      !------------------------------------------------------------------------
 
       ! reset
+      !------------------------------------------------------------------------
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
       File_I(iFile)%DoPlotSpread = .false.
@@ -514,7 +514,7 @@ contains
       ! skip first and last
       do iStringPlot = 2, nStringPlot - 1
          ! if the string is flux, then save ALL the fluxes
-         if (trim(StringPlot_I(iStringPlot)) == 'flux') then
+         if(trim(StringPlot_I(iStringPlot)) == 'flux') then
             File_I(iFile)%DoPlotFlux = .true.
             CYCLE
          end if
@@ -581,7 +581,13 @@ contains
 
       ! only 1 variable is printed
       !------------------------------------------------------------------------
-      File_I(iFile) % nMhdVar = 1; File_I(iFile) % nExtraVar = 0
+      File_I(iFile) % nMhdVar = 1
+      File_I(iFile) % nExtraVar = 0
+      ! reset
+      File_I(iFile) % DoPlot_V   = .false.
+      File_I(iFile) % DoPlotFlux = .false.
+      File_I(iFile)%DoPlotSpread = .false.
+
       ! reset string with variables' names and put defaults
       NameScale = 'Log10Momentum'
       NameVar   = 'Log10DiffEnergyFlux'
@@ -609,7 +615,7 @@ contains
       end do
 
       ! form the name with variables' names
-      if (DoSaveTrj) then
+      if(DoSaveTrj) then
          File_I(iFile) % NameVarPlot = &
               trim(NameScale) // ' ' // trim(NameVar)
       else
@@ -628,7 +634,7 @@ contains
               trim(File_I(iFile)%StringHeaderAux)// &
               ' log10[' // NameEnergyUnit // ']'
       end select
-      if (.not.DoSaveTrj) File_I(iFile) % StringHeaderAux = &
+      if(.not.DoSaveTrj) File_I(iFile) % StringHeaderAux = &
            trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
@@ -668,7 +674,7 @@ contains
     else
        IsInitialOutput = .false.
     end if
-    if(nFileOut == 0) RETURN
+    if(nFileOut == 0)RETURN
     ! check whether this is a call for initial output
     if(IsInitialOutput)then
        if(.not.DoSaveInitial)RETURN
@@ -1187,9 +1193,9 @@ contains
     !==========================================================================
     subroutine write_distr_1d
 
-      ! write output with 1D MH data in the format to be read by IDL/TECPLOT;
-      ! separate file is created for each field line, and the name format is:
-      ! MH_data_<iLon>_<iLat>_n<ddhhmmss>_n<iIter>.{out/dat}
+      ! Write output with 1D MH data in the format to be read by IDL/TECPLOT.
+      ! Separate file is created for each field line, and the name format is:
+      ! Distribution_<cdf/def>_<iLon>_<iLat>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use SP_ModGrid, ONLY: S_
 
@@ -1282,13 +1288,15 @@ contains
     !==========================================================================
     subroutine write_distraj
 
-      ! Write the Distribution function along given spacecraft trajectories
+      ! Write the Distribution function along given spacecraft trajectories.
       ! There are a few steps taken to achieve this:
       !     1. Search the TRAJECTORY and read the satellite locations
       !     2. Set up the TRIANGULATIONs as a mesh for interpolation
       !     3. Find the cell of the satellite location and the weights
       !     4. INTERPOLATE log(distribution) on the triangular mesh
       !     5. Set the file name and SAVE the results
+      ! Separate file is created for each satellite, and the name format is:
+      ! Distribution_<SatelliteName>_<cdf/def>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use ModMpi
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
@@ -1395,7 +1403,7 @@ contains
                ! if no intersection found -> proceed to the next line
                if(.not.DoReachR_I(iLineAll)) CYCLE
 
-               ! Found intersection -> get data at that location and log10(f)
+               ! Found intersection -> get POS & log10(f[Io]) at that location
                ! Find coordinates and log(Distribution) at intersection
                Xyz_DI(:, iLineAll) = ( &
                     MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) +  &
