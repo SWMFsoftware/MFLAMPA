@@ -2056,7 +2056,7 @@ contains
                trim(NameOut)//'_e'//StringTime//'_n', iIter
        else
           call get_time_string(SPTime, StringTime(1:8))
-          write(NameOut,'(a,i6.6,a)')  &
+          write(NameOut,'(a,i6.6)')  &
                trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
        end if
     end if
