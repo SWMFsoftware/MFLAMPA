@@ -206,7 +206,9 @@ contains
     write(UnitTmp_,'(a)')'#MOMENTUMGRID'
     write(UnitTmp_,'(es22.15,a)')EnergyInjIo, cTab//cTab//'EnergyMin'
     write(UnitTmp_,'(es22.15,a)')EnergyMaxIo, cTab//cTab//'EnergyMax'
-    write(UnitTmp_,'(i8,a)')nP,  cTab//cTab//'nP'
+    write(UnitTmp_,'(i8,a)')nP, cTab//cTab//'nP'
+    write(UnitTmp_,*)
+    write(UnitTmp_,'(a)')'#PITCHANGLEGRID'
     write(UnitTmp_,'(i8,a)')nMu, cTab//cTab//'nMu'
     write(UnitTmp_,*)
     write(UnitTMP_,'(a)')'#END'
