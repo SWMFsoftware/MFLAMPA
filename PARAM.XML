@@ -750,7 +750,10 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
           <option name="BOld"     value="bold"/>
           <option name="energy"   value="energy"/>
           <option name="momentum" value="momentum"/>
-          <option name="distribution function of energy" value="def"/>
+          <option name="distribution function of energy [#/cm^2/s/sr/energy unit]"
+              value="def"/>
+          <option name="distribution function of energy [#/m^2/s/sr/energy unit]"
+              value="DEF"/>
           <option name="canonical distribution function" value="cdf"/>
         </part>
       </parameter>
@@ -794,7 +797,9 @@ the unit of p.f.u. For the differential particle flux in the unit of p.f.u. per
 energy unit, "distr1d" can save all the values of the VDF (each momentum, at
 each coordinate along each fieldline), and "distraj" can save only the values
 interpolated to the specified trajectories. For "distr1d", "cdf" means the
-canonical distribution function, and "def" means the distribution energy function.
+canonical distribution function, "def" means the differential intensity, saved
+in the unit of [#/cm^2/s/sr/energy unit], i.e., [pfu/energy unit], and "DEF" is
+to save the differential intensity in the unit of [#/m^2/s/sr/energy unit].
 If using "distraj", one should also specify "#SATELLITE" before these lines.
 In StringPlot, the first identifier is always a type of plot, the last
 identifier is a type of file, and the string variables in between denote

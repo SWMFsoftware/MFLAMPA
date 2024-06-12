@@ -18,7 +18,8 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax, nDim
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameVarUnit_V, NameFluxUnit_I, NameEnergyUnit
+  use SP_ModUnit, ONLY: Si2Io_V, UnitFlux_, NameVarUnit_V,  &
+       NameFluxUnit_I, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
@@ -75,7 +76,8 @@ module SP_ModPlot
   ! Plot types for distribution function
   integer, parameter:: &
        CDF_       = 1, &
-       DEF_       = 2
+       DEFIo_     = 2, & ! Distribution*Momentum**2 [#/cm^2/s/sr/energy unit]
+       DEFSi_     = 3    ! Distribution*Momentum**2 [#/m^2/s/sr/energy unit]
 
   type TypePlotFile
      ! Full set of information, for each plot
@@ -112,9 +114,9 @@ module SP_ModPlot
      !
      ! Distribution -----------------------------
      ! Momentum or energy axis to use for distribution plots
-     integer:: iScale      ! =Momentum_ or Energy_
+     integer:: iScale      ! = Momentum_ or Energy_
      ! type out output (CDF or differential energy flow)
-     integer:: iTypeDistr  ! =CDF_ or DEF_
+     integer:: iTypeDistr  ! = CDF_, DEFIo_, or DEFSi_
      ! type of the satellite saved for VDF along trajectory
      integer:: iSatellite
      ! Data on the sphere
@@ -134,6 +136,7 @@ module SP_ModPlot
 
   ! Arrays used to visualize the distribution function
   real :: Log10Momentum_I(0:nP+1), Log10KinEnergyIo_I(0:nP+1)
+  real :: Log10Si2IoFlux
 
   ! auxilary array, used to write data on a sphere
   ! contains integers 1:nLineAll
@@ -174,6 +177,7 @@ contains
     ! Array for plotting distribution function
     Log10Momentum_I    = log10(Momentum_I)
     Log10KinEnergyIo_I = log10(KinEnergyIo_I)
+    Log10Si2IoFlux     = log10(Si2Io_V(UnitFlux_))
 
     ! Finalize setting output files:
     ! number and names of flux channels are known at this point;
@@ -278,6 +282,7 @@ contains
     integer:: iFile, iLineAll, iVar
     integer:: nStringPlot
     character(len=20):: TypeFile, KindData, StringPlot_I(2*nVar)
+    logical:: IsDEFSi = .false.
 
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
@@ -307,6 +312,9 @@ contains
           StringPlot = ''
           call read_var('StringPlot', StringPlot)
 
+          ! identify DEF before lower_case(StringPlot)
+          if(index(StringPlot, 'DEF')>0 .and. (index(StringPlot, 'distr1d')>0 &
+               .or. index(StringPlot, 'distraj')>0)) IsDEFSi = .true.
           ! make comparison case insensitive: convert strings to lower case
           call lower_case(StringPlot)
 
@@ -592,10 +600,10 @@ contains
       NameScale = 'Log10Momentum'
       NameVar   = 'Log10DiffEnergyFlux'
       File_I(iFile) % iScale     = Momentum_
-      File_I(iFile) % iTypeDistr = DEF_
+      File_I(iFile) % iTypeDistr = DEFIo_
       do iStringPlot = 2, nStringPlot - 1
          ! may contain type of output scale (momentum/energy)
-         ! or utput variable (canonical distr func/differential energy flux)
+         ! and output flux (canonical distr func/differential energy flux)
          select case(StringPlot_I(iStringPlot))
          case('momentum')
             File_I(iFile) % iScale = Momentum_
@@ -608,8 +616,13 @@ contains
             File_I(iFile) % iTypeDistr = CDF_
             NameVar = 'Log10Distribution'
          case('def')
-            ! differential flux
-            File_I(iFile) % iTypeDistr = DEF_
+            if(IsDEFSi) then
+               ! differential flux, in the unit of [#/m^2/s/sr/energy unit]
+               File_I(iFile) % iTypeDistr = DEFSi_
+            else
+               ! differential flux, in the unit of [#/cm^2/s/sr/energy unit]
+               File_I(iFile) % iTypeDistr = DEFIo_
+            end if
             NameVar = 'Log10DiffEnergyFlux'
          end select
       end do
@@ -623,7 +636,7 @@ contains
               trim(NameScale)//' Distance '//trim(NameVar)
       end if
 
-      ! header: [Momentum/Energy unit], [Rs], [CDF or DEF unit]
+      ! header: [Momentum/Energy unit], [Rs], [CDF or def/DEF unit]
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          File_I(iFile) % StringHeaderAux = &
@@ -641,10 +654,14 @@ contains
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
               ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
-      case(DEF_)
+      case(DEFIo_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
               ' log10[p.f.u/' // NameEnergyUnit // ']'
+      case(DEFSi_)
+         File_I(iFile) % StringHeaderAux = &
+              trim(File_I(iFile)%StringHeaderAux)// &
+              ' log10[#/m^2/s/sr/' // NameEnergyUnit // ']'
       end select
 
     end subroutine process_distr
@@ -657,7 +674,6 @@ contains
 
     use SP_ModDistribution, ONLY: get_integral_flux, nMu
     use SP_ModTime,         ONLY: IsSteadyState, iIter, SPTime
-    use SP_ModUnit,         ONLY: Si2Io_V, UnitFlux_
 
     logical, intent(in), optional:: IsInitialOutputIn
 
@@ -1195,7 +1211,7 @@ contains
 
       ! Write output with 1D MH data in the format to be read by IDL/TECPLOT.
       ! Separate file is created for each field line, and the name format is:
-      ! Distribution_<cdf/def>_<iLon>_<iLat>_e<ddhhmmss>_n<iIter>.{out/dat}
+      ! Distribution_<cdf/def/DEF>_<iLon>_<iLat>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use SP_ModGrid, ONLY: S_
 
@@ -1236,8 +1252,10 @@ contains
          select case(File_I(iFile) % iTypeDistr)
          case(CDF_)
             TypeDistr = 'cdf'
-         case(DEF_)
+         case(DEFIo_)
             TypeDistr = 'def'
+         case(DEFSi_)
+            TypeDistr = 'DEF'
          end select
          call make_file_name(&
               StringBase    = 'Distribution_' // TypeDistr ,  &
@@ -1255,14 +1273,17 @@ contains
                File_I(iFile) % Buffer_II(:,iVertex) = 0.0
                CYCLE
             end if
-            ! the actual distribution, in the unit of log10(pfu/[energy unit])
-            File_I(iFile) % Buffer_II(:,iVertex) = log10(Si2Io_V(UnitFlux_)* &
+            ! the actual distribution, in logarithm
+            File_I(iFile) % Buffer_II(:,iVertex) = log10( &
                  Distribution_CB(0:nP+1, nMu, iVertex, iLine))
             ! account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
                ! do nothing
-            case(DEF_)
+            case(DEFIo_)
+               File_I(iFile) % Buffer_II(:,iVertex) = Log10Si2IoFlux + &
+                    File_I(iFile) % Buffer_II(:,iVertex) + 2*Log10Momentum_I
+            case(DEFSi_)
                File_I(iFile) % Buffer_II(:,iVertex) = &
                     File_I(iFile) % Buffer_II(:,iVertex) + 2*Log10Momentum_I
             end select
@@ -1296,7 +1317,7 @@ contains
       !     4. INTERPOLATE log(distribution) on the triangular mesh
       !     5. Set the file name and SAVE the results
       ! Separate file is created for each satellite, and the name format is:
-      ! Distribution_<SatelliteName>_<cdf/def>_e<ddhhmmss>_n<iIter>.{out/dat}
+      ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use ModMpi
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
@@ -1347,8 +1368,10 @@ contains
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
          TypeDistr = '_cdf'
-      case(DEF_)
+      case(DEFIo_)
          TypeDistr = '_def'
+      case(DEFSi_)
+         TypeDistr = '_DEF'
       end select
 
       ! Determine the saved distribution function (f or f*p^2)
@@ -1408,7 +1431,7 @@ contains
                Xyz_DI(:, iLineAll) = ( &
                     MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) +  &
                     MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight )/rSat
-               Log10DistR_IIB(:, :, iLineAll) = Si2Io_V(UnitFlux_)*( &
+               Log10DistR_IIB(:, :, iLineAll) = ( &
                     log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
                     log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
             end do
@@ -1546,16 +1569,20 @@ contains
             end if
             ! Interpolate the log10(distribution) at satellite as outputs
             do i = 1, 3
-               File_I(iFile) % Buffer_II = File_I(iFile) % Buffer_II +  &
+               File_I(iFile) % Buffer_II = File_I(iFile) % Buffer_II + &
                     Log10DistReachR_IIB(:, :, iStencil_I(i))*Weight_I(i)
             end do
             ! Account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
                ! Do nothing
-            case(DEF_)
+            case(DEFIo_)
                ! nMu == 1
-               File_I(iFile) % Buffer_II(:, 1) =   &
+               File_I(iFile) % Buffer_II(:, 1) = Log10Si2IoFlux + &
+                    File_I(iFile) % Buffer_II(:, 1) + 2*Log10Momentum_I
+            case(DEFSi_)
+               ! nMu == 1
+               File_I(iFile) % Buffer_II(:, 1) = Log10Si2IoFlux + &
                     File_I(iFile) % Buffer_II(:, 1) + 2*Log10Momentum_I
             end select
 
