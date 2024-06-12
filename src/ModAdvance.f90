@@ -101,7 +101,7 @@ contains
     ! go line by line and advance the solution
 
     LINE:do iLine = 1, nLine
-       if(.not.Used_B(iLine)) CYCLE line
+       if(.not.Used_B(iLine)) CYCLE LINE
        ! the active particles on the line
        iEnd = nVertex_B(iLine)
 
@@ -146,7 +146,7 @@ contains
           ! trace shock position and steepen the shock
           iShock = iShockOld + iProgress
           if(iShock < iEnd-nWidth .and. iShock > nWidth  &
-               .and. DoTraceShock) call steepen_shock(iEnd)
+               .and. DoTraceShock) call steepen_shock
 
           ! Advection (2 different schemes) and Diffusion
           ! First, set the diffusion coefficient, from the
@@ -182,12 +182,11 @@ contains
 
   contains
     !==========================================================================
-    subroutine steepen_shock(iEnd)
+    subroutine steepen_shock
 
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
       use SP_ModGrid, ONLY: dLogRhoThreshold
-      integer, intent(in) :: iEnd
       real   :: DsSi_I(1:iEnd-1)
       real   :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real   :: dLogRhoExcessIntegral
@@ -241,7 +240,7 @@ contains
     !--------------------------------------------------------------------------
 
     LINE:do iLine = 1, nLine
-       if(.not.Used_B(iLine)) CYCLE
+       if(.not.Used_B(iLine)) CYCLE LINE
        ! the active particles on the line
        iEnd = nVertex_B(iLine)
 
