@@ -121,7 +121,7 @@ contains
     use SP_ModUnit, ONLY: Si2Io_V, UnitEnergy_
 
     logical, optional, intent(in):: DoOffsetIn
-    ! read 1D MH data, which are produced by write_mh_1d n ModWrite
+    ! read 1D MH data, which are produced by write_mh_1d in SP_ModPlot
     ! separate file is read for each field line, name format is
     ! (usually)MH_data_<iLon>_<iLat>_t<ddhhmmss>_n<iIter>.{out/dat}
     ! name of the input file

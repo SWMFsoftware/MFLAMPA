@@ -26,7 +26,7 @@ module SP_ModAngularSpread
   end interface get_normalized_spread
 
   ! Module contains data and methods used primarily to create flux output
-  ! on a sphere (see SP_ModWrite);
+  ! on a sphere (see SP_ModPlot);
   ! ---------------------------------------------------------------------
   ! flux associated with each line is spread over a sphere as follows:
   !  Probability of particle to deviate into a solid angle \Omega is
