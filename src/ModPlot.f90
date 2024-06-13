@@ -32,13 +32,13 @@ module SP_ModPlot
 
   private ! except
 
-  public:: init         ! Initialize module parameters
-  public:: read_param   ! Read module parameters
-  public:: save_plot_all! Save output (plot) files
-  public:: finalize     ! Save final list
+  public:: init          ! Initialize module parameters
+  public:: read_param    ! Read module parameters
+  public:: save_plot_all ! Save output (plot) files
+  public:: finalize      ! Save final list
 
   ! the output directory
-  character(len=*), public, parameter :: NamePlotDir="SP/IO2/"
+  character(len=*), public, parameter :: NamePlotDir = "SP/IO2/"
 
   ! If true the time tag format is YYYYMMDDHHMMSS
   logical, public:: UseDateTime = .false.
@@ -84,9 +84,9 @@ module SP_ModPlot
      !
      ! General information---------------
      ! kind of data printed to a file
-     !=MH1D_or MH2D_ or MHTime_ or Distr1D_ or Flux2D_ or FluxTime_
+     ! = MH1D_ or MH2D_ or MHTime_ or Distr1D_ or Flux2D_ or FluxTime_
      integer:: iKindData
-     ! file name extension: .out or .tec, etc.
+     ! file name extension: .dat or .out
      character(len=4 ):: NameFileExtension
      ! file type: tec, tcp, idl, ascii, real8
      character(len=20):: TypeFile
@@ -117,8 +117,6 @@ module SP_ModPlot
      integer:: iScale      ! = Momentum_ or Energy_
      ! type out output (CDF or differential energy flow)
      integer:: iTypeDistr  ! = CDF_, DEFIo_, or DEFSi_
-     ! type of the satellite saved for VDF along trajectory
-     integer:: iSatellite
      ! Data on the sphere
      ! radius of the sphere the data to be written at
      real:: Radius
@@ -1237,7 +1235,7 @@ contains
       StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
            //trim(File_I(iFile)%StringHeaderAux)
 
-      select case(File_I(iFile)%iScale)
+      select case(File_I(iFile) % iScale)
       case(Momentum_)
          Scale_I = Log10Momentum_I
       case(Energy_)
