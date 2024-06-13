@@ -76,8 +76,8 @@ module SP_ModPlot
   ! Plot types for distribution function
   integer, parameter:: &
        CDF_       = 1, &
-       DEFIo_     = 2, & ! Distribution*Momentum**2 [#/cm^2/s/sr/energy unit]
-       DEFSi_     = 3    ! Distribution*Momentum**2 [#/m^2/s/sr/energy unit]
+       DEFIo_     = 2, & ! Distribution*Momentum**2 [#/cm**2/s/sr/energy unit]
+       DEFSi_     = 3    ! Distribution*Momentum**2 [#/m**2/s/sr/energy unit]
 
   type TypePlotFile
      ! Full set of information, for each plot
@@ -617,10 +617,10 @@ contains
             NameVar = 'Log10Distribution'
          case('def')
             if(IsDEFSi) then
-               ! differential flux, in the unit of [#/m^2/s/sr/energy unit]
+               ! differential flux, in the unit of [#/m**2/s/sr/energy unit]
                File_I(iFile) % iTypeDistr = DEFSi_
             else
-               ! differential flux, in the unit of [#/cm^2/s/sr/energy unit]
+               ! differential flux, in the unit of [#/cm**2/s/sr/energy unit]
                File_I(iFile) % iTypeDistr = DEFIo_
             end if
             NameVar = 'Log10DiffEnergyFlux'
@@ -661,7 +661,7 @@ contains
       case(DEFSi_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
-              ' log10[#/m^2/s/sr/' // NameEnergyUnit // ']'
+              ' log10[#/m**2/s/sr/' // NameEnergyUnit // ']'
       end select
 
     end subroutine process_distr
@@ -1374,7 +1374,7 @@ contains
          TypeDistr = '_DEF'
       end select
 
-      ! Determine the saved distribution function (f or f*p^2)
+      ! Determine the saved distribution function (f or f*p**2)
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          Scale_I = Log10Momentum_I
