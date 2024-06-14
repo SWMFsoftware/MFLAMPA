@@ -9,8 +9,8 @@ module SP_ModPlot
        nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I,    &
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModDistribution, ONLY: nP, KinEnergyIo_I,          &
-       Momentum_I, Distribution_CB, FluxChannelInit_V,      &
-       Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I
+       MomentumInjSi, Momentum_I, FluxChannelInit_V,        &
+       Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, Distribution_CB
   use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
        MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
        X_, Y_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
@@ -639,7 +639,7 @@ contains
       case(Momentum_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
-              ' log10[kg*m/s]'
+              ' log10[(p_{INJ}/[Si])*kg*m/s]'
       case(Energy_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
@@ -651,7 +651,8 @@ contains
       case(CDF_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
-              ' log10[p.f.u/' // NameEnergyUnit // '/(kg*m/s)**2]'
+              ' log10[#/m**2/s/sr/' // NameEnergyUnit &
+              // '*(p_{INJ}/(kg*m/s))**2]'
       case(DEFIo_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile)%StringHeaderAux)// &
@@ -1233,7 +1234,7 @@ contains
 
       ! set header
       StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
-           //trim(File_I(iFile)%StringHeaderAux)
+            //trim(File_I(iFile) % StringHeaderAux)
 
       select case(File_I(iFile) % iScale)
       case(Momentum_)
