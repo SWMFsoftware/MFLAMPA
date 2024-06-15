@@ -22,7 +22,8 @@ module SP_ModBc
   ! Public members:
   public:: read_param
   public:: set_momentum_bc  ! Set the boundary condition at min/max energy
-  public:: set_upper_end_bc ! Ste the boundary condition and the far end point
+  public:: set_upper_end_bc ! Set the boundary condition and the far end point
+  public:: set_lower_end_bc ! Set the boundary condition and the near-Sun end
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
@@ -36,8 +37,8 @@ module SP_ModBc
   integer, parameter:: iUseLeft_ = 1, iNoLeft_ = 2
   integer, public   :: iStart = 1
   ! Type of upper end BC: float, lism, escape
-  character(LEN=6)  :: TypeUpperEndBc = 'none'
-  real, public      :: UpperEndBc_I(1:nP)
+  character(LEN=6)  :: TypeUpperEndBc = 'none', TypeLowerEndBc = 'none'
+  real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(1:nP)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -127,7 +128,6 @@ contains
     ! set boundary condition at the last grid point on the given line
     ! assign the calculated BC to UpperEndBc_I
 
-    use SP_ModDistribution, ONLY: Background_I
     integer, intent(in) :: iLine, iEnd
     real :: XyzSi_D(3)                          ! Where to set BC
     !--------------------------------------------------------------------------
@@ -152,6 +152,23 @@ contains
        UpperEndBc_I = (UpperEndBc_I/Momentum_I(1:nP)**2)*Io2Si_V(UnitEnergy_)
     end select
   end subroutine set_upper_end_bc
+  !============================================================================
+  subroutine set_lower_end_bc(iLine)
+    ! set boundary condition at the first grid point on the given line
+    ! assign the calculated BC to LowerEndBc_I
+
+    integer, intent(in) :: iLine
+    !--------------------------------------------------------------------------
+    select case(trim(TypeLowerEndBc))
+    case('float')
+       LowerEndBc_I = Distribution_CB(1:nP,nMu,1,iLine)
+    case('escape')
+       LowerEndBc_I = Background_I(1:nP)
+    case('inject')
+       LowerEndBc_I = Distribution_CB(0, 1, 1, iLine)  &
+                  /Momentum_I(1:nP)**SpectralIndex
+    end select
+  end subroutine set_lower_end_bc
   !============================================================================
 end module SP_ModBc
 !==============================================================================
