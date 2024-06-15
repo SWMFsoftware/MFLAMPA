@@ -85,10 +85,10 @@ mh2d flux ascii		StringPlot
 215.0			Radius
 mhtime flux ascii		StringPlot
 215.0			Radius
-distraj def energy idl		StringPlot
+distr1d def energy ascii		StringPlot
+distraj def energy ascii		StringPlot
 F				UsePoleTriangulation
 T				UsePlanarTriangles
-distr1d def energy idl		StringPlot
 distr1d cdf momentum ascii		StringPlot
 
 #SCALETURBULENCE

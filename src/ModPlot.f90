@@ -867,7 +867,7 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iLine, iVertex, iVarPlot, iVarIndex
+      integer:: iLine, iVarPlot, iVarIndex
       ! indexes of corresponding node, latitude and longitude
       integer:: iLineAll
       ! index of particle just above the radius
@@ -1051,7 +1051,7 @@ contains
       ! name of the output file
       character(len=100):: NameFile
       ! loop variables
-      integer:: iLine, iVertex, iVarPlot, iVarIndex
+      integer:: iLine, iVarPlot, iVarIndex
       ! index of particle just above the radius
       integer:: iAbove
       ! interpolation weight
@@ -1220,7 +1220,7 @@ contains
       character(len=500) :: StringHeader
       character(len=3)   :: TypeDistr
       ! loop variables
-      integer :: iLine, iVertex, iVarPlot
+      integer :: iLine, iVarPlot
       ! indexes of corresponding node, latitude and longitude
       integer :: iLat, iLon
       ! index of the last particle on the field line
@@ -1265,28 +1265,24 @@ contains
 
          ! get max particle indexes on this field line
          iEnd = nVertex_B(iLine)
+         File_I(iFile) % Buffer_II = 0.0
 
-         do iVertex = 1, nVertexMax
-            ! reset values outside the line's range
-            if(iVertex > iEnd)then
-               File_I(iFile) % Buffer_II(:,iVertex) = 0.0
-               CYCLE
-            end if
-            ! the actual distribution, in logarithm
-            File_I(iFile) % Buffer_II(:,iVertex) = log10( &
-                 Distribution_CB(0:nP+1, nMu, iVertex, iLine))
-            ! account for the requested output
-            select case(File_I(iFile) % iTypeDistr)
-            case(CDF_)
-               ! do nothing
-            case(DEFIo_)
-               File_I(iFile) % Buffer_II(:,iVertex) = Log10Si2IoFlux + &
-                    File_I(iFile) % Buffer_II(:,iVertex) + 2*Log10Momentum_I
-            case(DEFSi_)
-               File_I(iFile) % Buffer_II(:,iVertex) = &
-                    File_I(iFile) % Buffer_II(:,iVertex) + 2*Log10Momentum_I
-            end select
-         end do
+         ! the actual distribution, in logarithm
+         File_I(iFile) % Buffer_II(:, 1:iEnd) = log10( &
+               Distribution_CB(0:nP+1, nMu, 1:iEnd, iLine))
+         ! account for the requested output
+         select case(File_I(iFile) % iTypeDistr)
+         case(CDF_)
+            ! do nothing
+         case(DEFIo_)
+            File_I(iFile) % Buffer_II(:, 1:iEnd) = Log10Si2IoFlux + &
+                  File_I(iFile) % Buffer_II(:, 1:iEnd) + &
+                  2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=iEnd)
+         case(DEFSi_)
+            File_I(iFile) % Buffer_II(:, 1:iEnd) = &
+                  File_I(iFile) % Buffer_II(:, 1:iEnd) + &
+                  2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=iEnd)
+         end select
 
          ! print data to file
          call save_plot_file(&
