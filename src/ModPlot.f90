@@ -751,7 +751,7 @@ contains
       ! header for the file
       character(len=500) :: StringHeader
       ! loop variables
-      integer :: iLine, iVarPlot
+      integer :: iLine
       ! index of the last particle on the field line
       integer :: iEnd
       ! for better readability
@@ -1220,7 +1220,7 @@ contains
       character(len=500) :: StringHeader
       character(len=3)   :: TypeDistr
       ! loop variables
-      integer :: iLine, iVarPlot
+      integer :: iLine
       ! indexes of corresponding node, latitude and longitude
       integer :: iLat, iLon
       ! index of the last particle on the field line
