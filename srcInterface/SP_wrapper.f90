@@ -50,7 +50,8 @@ contains
     ! Interface routine to be called from super-structure on all PEs
 
     use CON_comp_info
-    use SP_ModTime,  ONLY: StartTimeJulian, StartTime, time_real_to_julian
+    use SP_ModTime,  ONLY: StartTimeJulian, StartTime, time_real_to_julian, &
+         iStartTime_I
     use SP_ModMain,  ONLY: check, read_param
     use SP_ModGrid,  ONLY: TypeCoordSystem
     use CON_coupler, ONLY: is_proc
@@ -58,6 +59,7 @@ contains
     use SP_ModUnit,  ONLY: Si2Io_V, Io2Si_V, UnitX_, UnitEnergy_
     use CON_physics, ONLY: get_time
     use CON_bline,   ONLY: BL_set_grid
+    use ModTimeConvert, ONLY: time_real_to_int
     type(CompInfoType),intent(inout):: CompInfo
     character(len=*),  intent(in)   :: TypeAction
     real :: UnitX, EnergyCoeff
@@ -85,6 +87,7 @@ contains
        end if
        call get_time(tSimulationOut = SPTime, tStartOut = StartTime)
        call time_real_to_julian(StartTime, StartTimeJulian)
+       call time_real_to_int(StartTime, iStartTime_I)
        DataInputTime = SPTime
        call check
     case('READ')
