@@ -22,23 +22,20 @@ module SP_ModBc
   ! Public members:
   public:: read_param
   public:: set_momentum_bc  ! Set the boundary condition at min/max energy
-  public:: set_upper_end_bc ! Set the boundary condition and the far end point
-  public:: set_lower_end_bc ! Set the boundary condition and the near-Sun end
+  public:: set_upper_end_bc ! Set the boundary condition at the far end point
+  public:: set_lower_end_bc ! Set the boundary condition at the near-Sun end
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
-  ! range k_BT_i< Energy < EnergyInjection, to be read from PARAM.in
-  real, public      :: CoefInj = 0.25, SpectralIndex = 5.0
-  real, parameter   :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
-  ! Lower end BC, solve from the first or second point along the field line
-  logical, public   :: UseLowerEndBc = .true.
+  ! range k_B*T_i < Energy < EnergyInjection, to be read from PARAM.in
+  real, public     :: CoefInj = 0.25, SpectralIndex = 5.0
+  real, parameter  :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
+  ! Type of lower end BC: float, escape, inject
+  character(LEN=6) :: TypeLowerEndBc = 'inject'
   ! Upper end BC, set at the last point along the field line
-  logical, public   :: UseUpperEndBc = .false.
-  ! Lower index when solving the advection and diffusion terms
-  integer, parameter:: iUseLeft_ = 1, iNoLeft_ = 2
-  integer, public   :: iStart = 1
-  ! Type of upper end BC: float, lism, escape
-  character(LEN=6)  :: TypeUpperEndBc = 'none', TypeLowerEndBc = 'none'
-  real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(1:nP)
+  logical, public  :: UseUpperEndBc = .false.
+  ! Type of upper end BC: none, float, escape, lism
+  character(LEN=6) :: TypeUpperEndBc = 'none'
+  real, public     :: UpperEndBc_I(1:nP), LowerEndBc_I(0:nP+1)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -52,18 +49,13 @@ contains
        call read_var('SpectralIndex', SpectralIndex)
        call read_var('Efficiency',    CoefInj)
     case('#ENDBC')
-       ! Read whether to use UpperLowBc
-       call read_var('UseLowerEndBc', UseLowerEndBc)
-       if(UseLowerEndBc) then
-          iStart = iUseLeft_
-       else
-          iStart = iNoLeft_
-       end if
+       ! Read the type of LowerEndBc and Select
+       call read_var('TypeLowerEndBc', TypeLowerEndBc)
 
        ! Read whether to use UpperEndBc
        call read_var('UseUpperEndBc', UseUpperEndBc)
        if(UseUpperEndBc) then
-          ! Read type of UppenEndBc and Select
+          ! Read the type of UppenEndBc and Select
           call read_var('TypeUpperEndBc', TypeUpperEndBc)
           select case(trim(TypeUpperEndBc))
           case('none')
@@ -117,10 +109,6 @@ contains
 
        Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
     end do
-    ! set the left BC for diffusion (when not using LowerEndBc)
-    if(.not. UseLowerEndBc) &
-         Distribution_CB(1:nP+1, 1, 1, iLine) = max(Background_I(1:nP+1), &
-         Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex)
 
   end subroutine set_momentum_bc
   !============================================================================
@@ -158,15 +146,19 @@ contains
     ! assign the calculated BC to LowerEndBc_I
 
     integer, intent(in) :: iLine
+    character(len=*), parameter:: NameSub = 'set_lower_end_bc'
     !--------------------------------------------------------------------------
     select case(trim(TypeLowerEndBc))
     case('float')
-       LowerEndBc_I = Distribution_CB(1:nP,nMu,1,iLine)
+       LowerEndBc_I = Distribution_CB(0:nP+1, nMu, 1, iLine)
     case('escape')
-       LowerEndBc_I = Background_I(1:nP)
+       LowerEndBc_I = Background_I
     case('inject')
        LowerEndBc_I = Distribution_CB(0, 1, 1, iLine)  &
-                  /Momentum_I(1:nP)**SpectralIndex
+                  /Momentum_I(0:nP+1)**SpectralIndex
+    case default
+       call CON_stop(NameSub//&
+           ': Unknown type of lower end BC '//TypeLowerEndBc)
     end select
   end subroutine set_lower_end_bc
   !============================================================================

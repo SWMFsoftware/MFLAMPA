@@ -8,7 +8,7 @@ module SP_ModAdvanceAdvection
   ! Version: Sokolov & Roussev, Jan, 2008, SP/FLAMPA/src/ModLogAdvection.f90
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModDistribution, ONLY: nP, Momentum_I, Distribution_CB, &
+  use SP_ModDistribution, ONLY: nP, Distribution_CB, &
        dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
 
@@ -25,8 +25,8 @@ contains
     ! which is non-conservative, and the diffusion
 
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,        ONLY: set_momentum_bc, SpectralIndex, iStart, &
-         UseLowerEndBc, UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    use SP_ModBc,        ONLY: set_momentum_bc, UseUpperEndBc, &
+         set_upper_end_bc, UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
     use SP_ModGrid,      ONLY: Used_B, nVertex_B
     ! INPUTS:
     ! id of line, particle #, and Shock location
@@ -55,7 +55,7 @@ contains
     ! first order Fermi acceleration for the current line
     FermiFirst_I = dLogRho_I/(3*dLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
-    nStep = 1 + int(maxval(abs(FermiFirst_I(iStart:nX)))/Cfl)
+    nStep = 1 + int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:
     if(nStep < 1)call CON_stop(NameSub//': nStep <= 0????')
     Dt = DtProgress/nStep
@@ -64,8 +64,11 @@ contains
     ! update bc for advection, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
     STEP:do iStep = 1, nStep
+       ! set the lower bc at each reduced time step
+       call set_lower_end_bc(iLine)
+
        ! advection in the momentum space
-       do iVertex = iStart, nX
+       do iVertex = 1, nX
           ! first check if the VDF includes negative values
           call check_dist_neg(NameSub, iVertex, iVertex, iLine)
           if(IsDistNeg)RETURN
@@ -80,20 +83,16 @@ contains
              ! Set and use BC at the upper end, especially for GCR
              call set_upper_end_bc(iLine, nX)
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                  LowerEndSpectrum_I = max(Distribution_CB(0, 1, 1, iLine)  &
-                  /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)),    &
-                  UpperEndSpectrum_I = max(UpperEndBc_I, Background_I(1:nP)))
+                  LowerEndSpectrum_I = max( &
+                  LowerEndBc_I(1:nP), Background_I(1:nP)), &
+                  UpperEndSpectrum_I = max( &
+                  UpperEndBc_I(1:nP), Background_I(1:nP)))
           else
-             if(UseLowerEndBc) then
-                ! With lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, LowerEndSpectrum_I =          &
-                     max(Distribution_CB(0, 1, 1, iLine)         &
-                     /Momentum_I(1:nP)**SpectralIndex, Background_I(1:nP)))
-             else
-                ! With no lower end BC and no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
-             end if
+             ! With lower end BC but no upper end BC
+             call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
+                  LowerEndSpectrum_I = max( &
+                  LowerEndBc_I(1:nP), Background_I(1:nP)))
+  !============================================================================
           end if
           ! Check if the VDF includes negative values after diffusion
           call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)

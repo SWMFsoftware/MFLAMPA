@@ -40,7 +40,7 @@ keV			ParticleEnergyUnit
 1			nMu
 
 #FLUXINITIAL
-0.01			FluxInit [pfu]
+0.01			FluxInitIo [pfu]
 
 #FLUXCHANNEL
 6			nFluxChannel
@@ -63,7 +63,7 @@ T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
 #ENDBC
-T			UseLowerEndBc
+inject			TypeLowerEndBc
 F			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc

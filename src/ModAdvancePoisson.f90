@@ -39,7 +39,7 @@ contains
     use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
     use ModPoissonBracket, ONLY: explicit
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
+    use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc, set_lower_end_bc
     use SP_ModGrid,      ONLY: Used_B, nVertex_B
     ! INPUTS:
     integer, intent(in):: iLine, iShock ! Indices of line and shock
@@ -107,10 +107,11 @@ contains
     do
        ! Time Updates
        Dt = min(DtNext, tFinal - Time)
-       call set_VDF(iLine, nX, VDF_G)
        ! Volume Updates
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
+       ! BC Updates
+       call set_VDF(iLine, nX, VDF_G)
 
        ! Advance by Poisson bracket scheme
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
@@ -423,18 +424,21 @@ contains
     ! to solve the second order scheme. Add solution in physical cells and
     ! in a single layer of the ghost cells along the momentum coordinate.
 
-    use SP_ModDistribution, ONLY: Background_I, Momentum_I
-    use SP_ModBc,           ONLY: SpectralIndex,  &
-         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    use SP_ModDistribution, ONLY: Background_I
+    use SP_ModBc,           ONLY: SpectralIndex, UseUpperEndBc, &
+         set_upper_end_bc, UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
     integer, intent(in):: iLine     ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
     !--------------------------------------------------------------------------
 
     VDF_G(0:nP+1, 1:nX) = Distribution_CB(:, 1, 1:nX, iLine)
-    ! Apply bc along the line coordinate:
-    VDF_G(0:nP+1,    0) = max(Distribution_CB(0, 1, 1, iLine)*    &
-         (Momentum_I(0)/Momentum_I(0:nP+1))**SpectralIndex, Background_I)
+
+    ! Manipulate the LowerEndBc along the line coordinate:
+    call set_lower_end_bc(iLine)
+    VDF_G(0:nP+1,    0) = max(LowerEndBc_I, Background_I)
+
+    ! Manipulate the UpperEndBc along the line coordinate:
     if(UseUpperEndBc) then
        call set_upper_end_bc(iLine, nX)
        VDF_G(1:nP, nX+1) = max(UpperEndBc_I, Background_I(1:nP))
@@ -443,6 +447,7 @@ contains
     else
        VDF_G(0:nP+1, nX+1) = Background_I
     end if
+
     ! Add a second layer of the ghost cells along the line coordinate:
     VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
     VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)

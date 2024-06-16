@@ -378,14 +378,14 @@ how many intervals in the range of [-1, 1] for pitch angle.
 </command>
 
 <command name="FLUXINITIAL">
-  <parameter name="FluxInit [pfu]" type="real" min="0.0" default="0.01" />
+  <parameter name="FluxInitIo [pfu]" type="real" min="0.0" default="0.01" />
 
 #FLUXINITIAL
-0.01			FluxInit [pfu]
+0.01			FluxInitIo [pfu]
 
-Distribution is initialized to have integral flux: 
+Distribution is initialized to have integral flux:
 default value is set as 0.01 [pfu]. One can set this
-to a lower order of magnitude, e.g., 1.0e-5 pfu.
+to a lower order of magnitude, e.g., 1.0E-5 pfu.
 </command>
 
 <command name="FLUXCHANNEL">
@@ -414,7 +414,7 @@ particle flux is integrated over energy as the output.
 <commandgroup name="ENDBC">
 
 <command name="ENDBC">
-  <parameter name="UseLowerEndBc" type="logical" default="T"/>
+  <parameter name="TypeLowerEndBc" type="string" default="inject"/>
   <parameter name="UseUpperEndBc" type="logical" default="F"/>
   <parameter name="TypeUpperEndBc" type="string" input="select">
     <option name="lism" default="T"/>
@@ -431,7 +431,7 @@ particle flux is integrated over energy as the output.
   <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
 
 #ENDBC
-T			UseLowerEndBc
+inject			TypeLowerEndBc
 F			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
@@ -442,16 +442,19 @@ To determine whether we set the lower/upper boundary conditions. If so,
 we turn UseLowerEndBc and/or UseUpperEndBc, respectively, and will have
 LowerEndSpectrum_I and UpperEndSpectrum_I in diffusion. In particular,
 for LowerEndSpectrum_I, it is the spectral extrapolation following the
-power law of SpectralIndex at the lower boundary when iVertex=1; for
-UpperEndSpectrum_I, we need to determine the type of UpperEndBc at this
-time, where LISM is the nominal one for use. For LISM, there are various
-models fitting or simulating the spectrum, read as TypeLisBc. Here we
-set Eq.(2) in Usoskin et al. 2005 as default. Then, we also need to
-determine whether we use LISM or the GCR spectrum at ~1 AU. For the
-latter one, we also need the modulation potential (denoted as "phi" in
-Usoskin et al. 2005), which is temporal- and spatial- (and even energy-)
-dependent. We stick to the one derived by Oulu neutron monitor and
-published in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
+power law of SpectralIndex at the lower boundary when TypeLowerEndBc=
+"inject". Besides, one can set "float" (= current VDF at iVertex=1) and
+"escape" (= Background_I), especially for the steady-state GCR spectrum
+simulations. As for UpperEndSpectrum_I, we need to first determine the
+type of UpperEndBc, where LISM is the nominal one for use. For LISM,
+there are various models fitting or simulating the spectrum, read as
+TypeLisBc. Here we set Eq.(2) in Usoskin et al. 2005 as default. Then,
+we also need to determine whether we use LISM or the GCR spectrum at
+1-2 AU. For the latter one, we also need the modulation potential
+(denoted as "phi" in Usoskin et al. 2005), which is temporal- and
+spatial- (and even energy-) dependent. We stick to the one derived by
+Oulu neutron monitor and published in the "Dataset 1" on
+https://cosmicrays.oulu.fi/phi/phi.html.
 </command>
 
 </commandgroup>

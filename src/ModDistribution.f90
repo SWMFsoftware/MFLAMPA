@@ -222,7 +222,7 @@ contains
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
     case('#FLUXINITIAL')
-       call read_var('FluxInit [pfu]', FluxInitIo)
+       call read_var('FluxInitIo [pfu]', FluxInitIo)
        ! check correctness
        if(FluxInitIo<=0)call CON_stop(NameSub//': flux value must be positive')
     case('#FLUXCHANNEL')

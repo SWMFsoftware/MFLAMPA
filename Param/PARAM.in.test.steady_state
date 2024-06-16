@@ -36,7 +36,7 @@ T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
 #ENDBC
-T			UseLowerEndBc
+inject			TypeLowerEndBc
 T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
@@ -51,6 +51,7 @@ mh2d flux ascii		StringPlot
 
 #NOUTPUT
 10			nOutput
+-1.0			DtOutput
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType
