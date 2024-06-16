@@ -391,7 +391,7 @@ how many intervals in the range of [-1, 1] for pitch angle.
 </command>
 
 <command name="FLUXINITIAL">
-  <parameter name="FluxInitIo [pfu]" type="real" min="0.0" default="0.01" />
+  <parameter name="FluxInitIo" type="real" min="0.0" default="0.01" />
 
 #FLUXINITIAL
 0.01			FluxInitIo [pfu]
@@ -404,7 +404,7 @@ to a lower order of magnitude, e.g., 1.0E-5 pfu.
 <command name="FLUXCHANNEL">
   <parameter name="nFluxChannel" type="integer" min="1" default="6" />
   <for name="iFluxChannel" from="1" to="$nFluxChannel">
-      <parameter name="EChannelIo_I [MeV]" type="real" min="0.0" />
+      <parameter name="EChannelIo_I" type="real" min="0.0" />
   </for>
 
 #FLUXCHANNEL

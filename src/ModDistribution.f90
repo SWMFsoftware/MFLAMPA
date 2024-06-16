@@ -223,7 +223,7 @@ contains
           call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
        end if
     case('#FLUXINITIAL')
-       call read_var('FluxInitIo [pfu]', FluxInitIo)
+       call read_var('FluxInitIo', FluxInitIo)
        ! check correctness
        if(FluxInitIo<=0)call CON_stop(NameSub//': flux value must be positive')
     case('#FLUXCHANNEL')
@@ -243,7 +243,7 @@ contains
        NameFluxChannel_I(EFlux_) = 'eflux        '
 
        do iFluxChannel = FluxFirst_, FluxLast_
-          call read_var('EChannelIo_I [MeV]', EChannelIo_I(iFluxChannel))
+          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel))
           write(NameFluxChannel,'(I8.8)') int(EChannelIo_I(iFluxChannel))
           NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
        end do
