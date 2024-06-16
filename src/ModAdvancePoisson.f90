@@ -36,16 +36,15 @@ contains
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
 
+    use ModPoissonBracket,  ONLY: explicit
     use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
-    use ModPoissonBracket, ONLY: explicit
-    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc, set_lower_end_bc
-    use SP_ModGrid,      ONLY: Used_B, nVertex_B
+    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
     ! INPUTS:
     integer, intent(in):: iLine, iShock ! Indices of line and shock
-    integer, intent(in):: nX        ! Number of meshes along s_L axis
-    real,    intent(in):: tFinal    ! Time interval to advance through
-    real,    intent(in):: CflIn     ! Input CFL number
+    integer, intent(in):: nX            ! Number of meshes along s_L axis
+    real,    intent(in):: tFinal        ! Time interval to advance through
+    real,    intent(in):: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Loop variables
@@ -99,7 +98,7 @@ contains
     Time   = 0.0
     ! Trial timestep
     DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
-         max(VolumeXEnd_I, VolumeXStart_I))/(3*dLogP)
+         max(VolumeXEnd_I, VolumeXStart_I))/(3.0*dLogP)
 
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -155,17 +154,16 @@ contains
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
-    use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
-    use ModNumConst,        ONLY: cTiny
     use ModPoissonBracket,  ONLY: explicit
+    use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
     use SP_ModGrid,         ONLY: State_VIB, D_, U_
     use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
 
     integer, intent(in):: iLine, iShock ! Indices of line and shock
-    integer, intent(in):: nX        ! Number of meshes along s_L axis
-    real,    intent(in):: CflIn     ! Input CFL number
+    integer, intent(in):: nX            ! Number of meshes along s_L axis
+    real,    intent(in):: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in):: BSi_I(nX), nSi_I(nX)
     real               :: uSi_I(nX-1), DsSi_I(nX-1)
@@ -256,10 +254,10 @@ contains
     ! focused transport equation considering pitch angle
     ! diffuse the distribution function at each time step
 
+    use ModPoissonBracket,  ONLY: explicit
     use SP_ModDistribution, ONLY: DeltaMu, VolumeP_I
-    use ModPoissonBracket, ONLY: explicit
-    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,   ONLY: set_momentum_bc, UseUpperEndBc
+    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
 
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
