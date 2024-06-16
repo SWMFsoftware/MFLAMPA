@@ -155,10 +155,10 @@ contains
        LowerEndBc_I = Background_I
     case('inject')
        LowerEndBc_I = Distribution_CB(0, 1, 1, iLine)  &
-                  /Momentum_I(0:nP+1)**SpectralIndex
+            /Momentum_I(0:nP+1)**SpectralIndex
     case default
        call CON_stop(NameSub//&
-           ': Unknown type of lower end BC '//TypeLowerEndBc)
+            ': Unknown type of lower end BC '//TypeLowerEndBc)
     end select
   end subroutine set_lower_end_bc
   !============================================================================

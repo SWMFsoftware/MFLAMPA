@@ -424,14 +424,13 @@ contains
     ! to solve the second order scheme. Add solution in physical cells and
     ! in a single layer of the ghost cells along the momentum coordinate.
 
-    use SP_ModDistribution, ONLY: Background_I
-    use SP_ModBc,           ONLY: SpectralIndex, UseUpperEndBc, &
-         set_upper_end_bc, UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
+    use SP_ModBc, ONLY: UseUpperEndBc, set_upper_end_bc, &
+         UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
     integer, intent(in):: iLine     ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     VDF_G(0:nP+1, 1:nX) = Distribution_CB(:, 1, 1:nX, iLine)
 
     ! Manipulate the LowerEndBc along the line coordinate:

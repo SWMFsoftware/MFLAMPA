@@ -92,7 +92,6 @@ contains
              call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
                   LowerEndSpectrum_I = max( &
                   LowerEndBc_I(1:nP), Background_I(1:nP)))
-  !============================================================================
           end if
           ! Check if the VDF includes negative values after diffusion
           call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
