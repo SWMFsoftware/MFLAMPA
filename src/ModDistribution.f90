@@ -78,8 +78,9 @@ module SP_ModDistribution
   ! Velosity Distribution Function (VDF)
   ! Number of points along the momentum axis is set in ModSize
   ! 1st index - log(momentum)
-  ! 2nd index - particle index along the field line
-  ! 3rd index - local line number
+  ! 2rd index - \mu value = cosine of the pitch angle
+  ! 3rd index - particle index along the field line
+  ! 4th index - local field line number
   real, public, allocatable :: Distribution_CB(:,:,:,:)
 
   ! Check if any Distribution_CB < 0 (.true. for such case)
