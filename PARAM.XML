@@ -142,6 +142,22 @@ Determine whether and when to save the restart file (STAND ALONE ONLY)
 Set default value as: False, -1, and -1.0
 </command>
 
+<command name="INCLUDE">
+  <parameter name="NameIncludeFile" type="string" 
+		default="RESTART.in" length="100" />
+
+#INCLUDE
+RESTART.in			NameIncludeFile
+
+The NameIncludeFile parameter contains the name of the file to be included.
+The file name may be followed with a trailing comment if it
+is separated with at least 3 spaces or one TAB character.
+The #INCLUDE command can be used anywhere in the parameter file,
+even in the sections which contain the component specific parameters.
+For example the information in the run/SP/restartIN/restart.H 
+file or parameters specific to a component can be included.
+</command>
+
 <command name="RUN" if="$_IsStandAlone">
 
 #RUN
@@ -186,9 +202,9 @@ The commands in this group only work in stand alone mode.
 
 This command is only used in stand alone mode.
 
-The nIterMax variable contains the
-maximum number of iterations {\it since the beginning of the current run}
-(in case of a restart, the time steps done before the restart do not count).
+The nIterMax variable contains the maximum number of iterations
+{\it since the beginning of the current run} (in case of a restart,
+the time steps done before the restart do not count).
 If nIteration reaches this value the session is finished.
 The TimeMax variable contains the maximum simulation time
 relative to the initial time determined by the #STARTTIME command.
@@ -208,14 +224,12 @@ T			DoCheckStopFile
 
 This command is only used in stand alone mode.
 
-If DoCheckStopFile is true then the code checks if the
-MFLAMPA.STOP file exists in the run directory. This file is deleted at
-the beginning of the run, so the user must explicitly create the file
-with e.g. the "touch MFLAMPA.STOP" UNIX command.
-If the file is found in the run directory,
-the execution stops in a graceful manner.
-Restart files and plot files are saved as required by the
-appropriate parameters.
+If DoCheckStopFile is true then the code checks if the MFLAMPA.STOP file
+exists in the run directory. This file is deleted at the beginning of the
+run, so the user must explicitly create the file with e.g. the 
+"touch MFLAMPA.STOP" UNIX command. If the file is found in the run
+directory, the execution stops in a graceful manner. Restart files
+and plot files are saved as required by the appropriate parameters.
 
 The default is DoCheckStopFile=.true.
 </command>
@@ -243,10 +257,9 @@ The default is DoEcho=.false.
 This command is only used in stand alone mode.
 
 The CpuTimeMax variable contains the maximum allowed CPU time (wall clock
-time) for the execution of the current run. If the CPU time reaches
-this time, the execution stops in a graceful manner.
-Restart files and plot files are saved as required by the
-appropriate parameters.
+time) for the execution of the current run. If the CPU time reaches this
+time, the execution stops in a graceful manner. Restart files and plot
+files are saved as required by the appropriate parameters.
 This command is very useful when the code is submitted to a batch
 queue with a limited wall clock time.
 
@@ -471,14 +484,14 @@ https://cosmicrays.oulu.fi/phi/phi.html.
 1.0			Efficiency
 
 Set up parameters of the power-law spectrum of suprathermal
-particles at sqrt(2 mp Ti) lt p lt Pinj:
+particles at sqrt(2*mp*Ti) lt p lt Pinj:
 
-F ~ Efficiency * (Spectral index - 3) / p**SpectralIndex
+f(p) propto [Efficiency * (Spectral index - 3) / p**SpectralIndex]
 
 The injection efficiency is the ratio of suprathermal proton
 density to the total proton density. Should not exceed one,
 however, somewhat higher than one values may be of use.
-Default distribution is f(p) ~ 1.0 * 2 / p**5.
+Default distribution is f(p) propto [1.0 * 2 / p**5].
 </command>
 
 <command name="CFL">
@@ -792,6 +805,7 @@ T				UsePlanarTriangles
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
+
 As an example, "mh1d" means to save 1D plot (for each magnetic field line)
 including coordinates and MHD variables; "R" means radial coordinate (R) plus
 fluxes; "idl" means to save the data in the idl format. Particularly, the "mh1d",
@@ -799,14 +813,15 @@ fluxes; "idl" means to save the data in the idl format. Particularly, the "mh1d"
 the unit of p.f.u. For the differential particle flux in the unit of p.f.u. per
 energy unit, "distr1d" can save all the values of the VDF (each momentum, at
 each coordinate along each fieldline), and "distraj" can save only the values
-interpolated to the specified trajectories. For "distr1d", "cdf" means the
-canonical distribution function, "def" means the differential intensity, saved
-in the unit of [#/cm**2/s/sr/energy unit], i.e., [pfu/energy unit], and "DEF"
-is to save the differential intensity in the unit of [#/m**2/s/sr/energy unit].
-If using "distraj", one should also specify "#SATELLITE" before these lines.
-In StringPlot, the first identifier is always a type of plot, the last
-identifier is a type of file, and the string variables in between denote
-the list of plot variables extra to the MHD ones.
+interpolated to the specified trajectories. 
+
+For "distr1d", "cdf" means thecanonical distribution function, "def" means the
+differential intensity, saved in the unit of [#/cm**2/s/sr/energy unit], i.e.,
+[pfu/energy unit], and "DEF" is to save the differential intensity in the unit
+of [#/m**2/s/sr/energy unit]. If using "distraj", one should also specify
+"#SATELLITE" before these lines. In StringPlot, the first identifier is always
+a type of plot, the last identifier is a type of file, and the string variables
+in between denote the list of plot variables extra to the MHD ones.
 
 Please send an email to Igor Sokolov for more information on this command.
 </command>
@@ -819,8 +834,9 @@ Please send an email to Igor Sokolov for more information on this command.
 10				nOutput
 -1.0				DtOutput
 
-Frequency to plot: iteration or simulation time
-
+Frequency to plot: iteration or simulation time. This option is to output
+the results more frequently than the couple time, so the DtOutput is at
+most the couple time in SWMF runs.
 </command>
 </commandgroup>
 
