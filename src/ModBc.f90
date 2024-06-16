@@ -51,12 +51,14 @@ contains
     case('#ENDBC')
        ! Read the type of LowerEndBc and Select
        call read_var('TypeLowerEndBc', TypeLowerEndBc)
+       call lower_case(TypeLowerEndBc)
 
        ! Read whether to use UpperEndBc
        call read_var('UseUpperEndBc', UseUpperEndBc)
        if(UseUpperEndBc) then
           ! Read the type of UppenEndBc and Select
           call read_var('TypeUpperEndBc', TypeUpperEndBc)
+          call lower_case(TypeUpperEndBc)
           select case(trim(TypeUpperEndBc))
           case('none')
              ! Reset UseUpperEndBc
