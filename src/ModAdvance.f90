@@ -5,9 +5,8 @@ module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, iShock_IB, D_,   &
+  use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, iShock_IB, &
        Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
-  use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -67,7 +66,7 @@ contains
     ! and (3) new steepen_shock
 
     use SP_ModTime,             ONLY: SPTime
-    use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_, U_
+    use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson, &
          init_data_states, advect_via_multi_poisson
@@ -186,7 +185,8 @@ contains
 
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
-      use SP_ModGrid, ONLY: dLogRhoThreshold
+      use SP_ModGrid, ONLY: D_, dLogRhoThreshold
+      use SP_ModUnit, ONLY: UnitX_, Io2Si_V
       real   :: DsSi_I(1:iEnd-1)
       real   :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real   :: dLogRhoExcessIntegral
