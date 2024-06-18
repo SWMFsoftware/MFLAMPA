@@ -415,7 +415,7 @@ contains
                   trim(File_I(iFile) % NameAuxPlot) //&
                   ' LonAverage LatAverage AngleSpread'
              ! get radius
-             call read_var('Radius [Rs]', File_I(iFile) % Radius)
+             call read_var('Radius', File_I(iFile) % Radius)
           case(MHTime_)
              call process_mh
              ! add time interval index to variable names

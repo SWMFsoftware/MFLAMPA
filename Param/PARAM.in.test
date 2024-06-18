@@ -42,7 +42,7 @@ mhtime flux ascii		StringPlot
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType
-0.2402397832		ScaleTurbulence [AU] at 1 AU
+0.2402397832		ScaleTurbulence1AU [AU]
 
 #STOP
 -1			nIterMax

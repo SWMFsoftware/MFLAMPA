@@ -57,7 +57,7 @@ contains
             UseFixedMeanFreePathUpstream)
        if(UseFixedMeanFreePathUpstream)then
           ! see Li et al. (2003), doi:10.1029/2002JA009666
-          call read_var('MeanFreePath0 [AU]', MeanFreePath0InAu)
+          call read_var('MeanFreePath0InAu', MeanFreePath0InAu)
        end if
     case('#SCALETURBULENCE')
        ! cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
@@ -70,7 +70,7 @@ contains
        case default
           call CON_stop(NameSub//": unknown scale turbulence type")
        end select
-       call read_var('ScaleTurbulence [AU] at 1 AU', ScaleTurbulenceSi)
+       call read_var('ScaleTurbulence1AU', ScaleTurbulenceSi)
        ScaleTurbulenceSi = ScaleTurbulenceSi * cAu
     case('#DIFFUSION')
        call read_var('UseDiffusion', UseDiffusion)
