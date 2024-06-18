@@ -429,7 +429,6 @@ particle flux is integrated over energy as the output.
 
 <command name="ENDBC">
   <parameter name="TypeLowerEndBc" type="string" default="inject"/>
-  <parameter name="UseUpperEndBc" type="logical" default="F"/>
   <parameter name="TypeUpperEndBc" type="string" input="select">
     <option name="lism" default="T"/>
     <option name="none"/>
@@ -446,29 +445,34 @@ particle flux is integrated over energy as the output.
 
 #ENDBC
 inject			TypeLowerEndBc
-F			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
 F			UseModulationPot
 600.0			ModulationPot
 
-To determine whether we set the lower/upper boundary conditions. If so,
-we turn UseLowerEndBc and/or UseUpperEndBc, respectively, and will have
-LowerEndSpectrum_I and UpperEndSpectrum_I in diffusion. In particular,
-for LowerEndSpectrum_I, it is the spectral extrapolation following the
-power law of SpectralIndex at the lower boundary when TypeLowerEndBc=
-"inject". Besides, one can set "float" (= current VDF at iVertex=1) and
-"escape" (= Background_I), especially for the steady-state GCR spectrum
-simulations. As for UpperEndSpectrum_I, we need to first determine the
-type of UpperEndBc, where LISM is the nominal one for use. For LISM,
-there are various models fitting or simulating the spectrum, read as
-TypeLisBc. Here we set Eq.(2) in Usoskin et al. 2005 as default. Then,
-we also need to determine whether we use LISM or the GCR spectrum at
-1-2 AU. For the latter one, we also need the modulation potential
-(denoted as "phi" in Usoskin et al. 2005), which is temporal- and
-spatial- (and even energy-) dependent. We stick to the one derived by
-Oulu neutron monitor and published in the "Dataset 1" on
-https://cosmicrays.oulu.fi/phi/phi.html.
+To determine whether or which type we set the lower/upper boundary
+conditions. If so, we turn UseUpperEndBc, or choose different cases
+of TypeLowerEndBc and/or TypeUpperEndBc respectively, and will have
+different LowerEndSpectrum_I and UpperEndSpectrum_I in diffusion.
+
+In particular, for LowerEndSpectrum_I, it is the spectral extrapolation
+following the power law of SpectralIndex at the lower boundary when
+TypeLowerEndBc="inject". Besides, one can set "float" (= current VDF
+at iVertex=1) and "escape" (= Background_I), especially for the
+steady-state GCR spectrum simulations. 
+
+As for UpperEndSpectrum_I, we need to first determine the type of
+UpperEndBc, where LISM is the nominal one for use. If one wants to
+turn off the UpperEndSpectrum_I, TypeUpperEndBc should be set to
+"none", or "f", or "false" with no differences in lower and upper
+cases. For LISM, there are various models fitting or simulating
+the spectrum, read as TypeLisBc. Here we set Eq.(2) in Usoskin et
+al. 2005 as default. Then, we also need to determine whether we use
+LISM or the GCR spectrum at 1-2 AU. For the latter one, we also need
+the modulation potential (denoted as "phi" in Usoskin et al. 2005),
+which is temporal- and spatial- (and even energy-) dependent. We
+stick to the one derived by Oulu neutron monitor and published
+in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
 </command>
 
 </commandgroup>
@@ -562,10 +566,11 @@ The default value is true.
 F			UseFixedMeanFreePathUpstream
 0.3			MeanFreePath0InAu
 
-Determine whether we set the mean free path, 
-see Li et al. (2003), doi:10.1029/2002JA009666.
-The default value for UseFixedMeanFreePathUpstream
-is set as false, and that for MeanFreePath0InAu is 0.3
+Determine whether we set the mean free path, see
+Li et al. (2003), doi: 10.1029/2002JA009666.
+The default value for UseFixedMeanFreePathUpstream is set as
+as false, and that for MeanFreePath0InAu is 0.3 [AU], one can
+also see Chen et al. (2024), doi: 10.3847/1538-4357/ad33c3.
 </command>
 
 
@@ -585,15 +590,15 @@ The default value is true.
 
 <command name="#SCALETURBULENCE">
   <parameter name="ScaleTurbulenceType" type="string" default="const" />
-  <parameter name="ScaleTurbulence" type="real" min="0.0" default="0.3" />
+  <parameter name="ScaleTurbulence1AU" type="real" min="0.0" default="0.3" />
 
 #SCALETURBULENCE
 const			ScaleTurbulenceType
-0.3			ScaleTurbulence [AU] at 1 AU
+0.3			ScaleTurbulence1AU [AU]
 
-cut-off wavenumber of turbulence spectrum: k0 = 2*cPi/Scale
-The default value is set as const (or constant), i.e.,
-the value (e.g., 0.3 AU) of "ScaleTurbulence [AU] at 1 AU".
+The cut-off wavenumber of turbulence spectrum is k0 = 2*cPi/Scale.
+The default value is set as const (or constant), i.e., the
+value (e.g., 0.3 AU) of "ScaleTurbulence1AU" in the unit of [AU].
 </command>
 
 <command name="TURBULENTSPECTRUM">

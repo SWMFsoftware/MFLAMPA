@@ -12,7 +12,6 @@ T			DoEcho
 04			iHour
 00			iMinute
 0			iSecond
-0.0
 
 #TIMEACCURATE
 F			IsTimeAccurate
