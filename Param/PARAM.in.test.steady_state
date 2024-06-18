@@ -37,7 +37,6 @@ MH_data_e20120123		NameInputDir
 
 #ENDBC
 inject			TypeLowerEndBc
-T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
 T			UseModulationPot

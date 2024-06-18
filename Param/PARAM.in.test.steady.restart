@@ -37,7 +37,6 @@ F			DoSaveInitial
 
 #ENDBC
 inject			TypeLowerEndBc
-T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
 T			UseModulationPot

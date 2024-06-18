@@ -53,30 +53,28 @@ contains
        call read_var('TypeLowerEndBc', TypeLowerEndBc)
        call lower_case(TypeLowerEndBc)
 
-       ! Read whether to use UpperEndBc
-       call read_var('UseUpperEndBc', UseUpperEndBc)
-       if(UseUpperEndBc) then
-          ! Read the type of UppenEndBc and Select
-          call read_var('TypeUpperEndBc', TypeUpperEndBc)
-          call lower_case(TypeUpperEndBc)
-          select case(trim(TypeUpperEndBc))
-          case('none')
-             ! Reset UseUpperEndBc
-             UseUpperEndBc = .false.
-          case('float', 'escape')
-             ! Do nothing
-          case('lism')
-             ! We want to read the type of LIS here
-             call read_var('TypeLisBc', TypeLisBc)
-             call lower_case(TypeLisBc)
-             ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
-             call read_var('UseModulationPot', UseModulationPot)
-             if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
-          case default
-             call CON_stop(NameSub//&
-                  ': Unknown type of upper end BC '//TypeUpperEndBc)
-          end select
-       end if
+       ! Read the type of UppenEndBc and Select
+       call read_var('TypeUpperEndBc', TypeUpperEndBc)
+       call lower_case(TypeUpperEndBc)
+       select case(trim(TypeUpperEndBc))
+       case('none', 'f', 'false')
+          ! Reset UseUpperEndBc
+          UseUpperEndBc = .false.
+       case('float', 'escape')
+          ! Do nothing
+          UseUpperEndBc = .true.
+       case('lism')
+          UseUpperEndBc = .true.
+          ! We want to read the type of LIS here
+          call read_var('TypeLisBc', TypeLisBc)
+          call lower_case(TypeLisBc)
+          ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
+          call read_var('UseModulationPot', UseModulationPot)
+          if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
+       case default
+          call CON_stop(NameSub//&
+               ': Unknown type of upper end BC '//TypeUpperEndBc)
+       end select
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
