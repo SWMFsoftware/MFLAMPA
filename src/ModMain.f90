@@ -86,7 +86,7 @@ contains
             '#FLUXINITIAL', '#FLUXCHANNEL')
           if(.not.IsFirstSession) CYCLE
           call read_param_dist(NameCommand)
-       case('#CFL', '#POISSONBRACKET', '#TRACESHOCK')
+       case('#CFL', '#ADVECTION', '#TRACESHOCK')
           call read_param_adv(NameCommand)
        case('#INJECTION', '#ENDBC')
           call read_param_bc(NameCommand)

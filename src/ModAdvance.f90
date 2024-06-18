@@ -37,7 +37,7 @@ contains
     select case(NameCommand)
     case('#CFL')
        call read_var('Cfl', Cfl)
-    case('#POISSONBRACKET')
+    case('#ADVECTION')
        call read_var('UsePoissonBracket', UsePoissonBracket)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)

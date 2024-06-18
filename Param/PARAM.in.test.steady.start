@@ -30,7 +30,7 @@ T			DoRun
 #TRACESHOCK
 F			DoTraceShock
 
-#POISSONBRACKET
+#ADVECTION
 T			UsePoissonBracket
 
 #INCLUDE

@@ -25,7 +25,7 @@ F			DoTraceShock
 #DIFFUSION
 T			UseDiffusion
 
-#POISSONBRACKET
+#ADVECTION
 T			UsePoissonBracket
 
 #PARTICLEENERGYUNIT

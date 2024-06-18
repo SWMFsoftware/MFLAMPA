@@ -81,7 +81,8 @@ There is no default value.
 T			IsTimeAccurate
 
 Allows solving steady-state distribution (cosmic rays, seed population)
-by setting DoTimeAccurate to .false.
+by setting IsTimeAccurate to .false., implying that IsSteadyState is
+.true. in the code.
 </command>
 
 <command name="TIMESIMULATION" if="$_IsFirstSession" multiple="T">
@@ -503,10 +504,10 @@ Default distribution is f(p) propto [1.0 * 2 / p**5].
 Please send an email to Igor Sokolov for more information.
 </command>
 
-<command name="POISSONBRACKET">
+<command name="ADVECTION">
   <parameter name="UsePoissonBracket" type="logical" default="T" />
 
-#POISSONBRACKET
+#ADVECTION
 F			UsePoissonBracket
 
 If UsePoissonBracket is True, the advection scheme is conservative
