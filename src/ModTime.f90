@@ -79,7 +79,7 @@ contains
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-    logical :: DoTimeAccurate = .true.
+    logical :: IsTimeAccurate = .true.
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
@@ -98,8 +98,8 @@ contains
        call read_var('iSecond',iStartTime_I(6))
        iStartTime_I(7) = 0
     case("#TIMEACCURATE")
-       call read_var('DoTimeAccurate', DoTimeAccurate)
-       IsSteadyState = .not. DoTimeAccurate
+       call read_var('IsTimeAccurate', IsTimeAccurate)
+       IsSteadyState = .not. IsTimeAccurate
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
