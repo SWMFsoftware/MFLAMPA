@@ -151,7 +151,7 @@ test_poisson_compile: test_compile
 test_poisson_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.testpoisson PARAM.in
+	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test.poisson PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
 test_poisson_run: test_run
