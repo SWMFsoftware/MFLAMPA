@@ -61,9 +61,9 @@ contains
     Dt = DtProgress/nStep
     FermiFirst_I = FermiFirst_I/nStep
 
-    ! update bc for advection, at nP = 0
-    call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
     STEP:do iStep = 1, nStep
+       ! update bc for advection, at nP = 0
+       call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! set the lower bc at each reduced time step
        call set_lower_end_bc(iLine)
 
