@@ -71,9 +71,9 @@ contains
     ! Prediction for the next time step:
     real    :: DtNext
     ! Now this is the particle-number-conservative advection scheme
+
     character(len=*), parameter:: NameSub = 'advect_via_poisson'
     !--------------------------------------------------------------------------
-
     IsDistNeg = .false.
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
@@ -184,10 +184,10 @@ contains
     ! Time step
     real    :: Dt_C(nP, nX)
     ! Now particle-number-conservative advection scheme for steady-state soln.
-    character(len=*), parameter:: NameSub = 'iterate_poisson'
-    !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
+    character(len=*), parameter:: NameSub = 'iterate_poisson'
+    !--------------------------------------------------------------------------
     DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! Initialize arrays
     VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
