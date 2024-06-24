@@ -38,7 +38,7 @@ contains
     ! Ratio of densities at upper and lower level
     real,    intent(in):: dLogRho_I(1:nX)
     ! Density and magnetic field at the upper level
-    real,    intent(in):: nSI_I(1:nX), BSI_I(1:nX)
+    real,    intent(in):: nSi_I(1:nX), BSi_I(1:nX)
     ! LOCAL VARs:
     integer  :: iStep, iVertex   ! loop variables
     ! time step is split for nStep intervals, so short that the CFL for

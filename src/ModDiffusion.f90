@@ -266,7 +266,7 @@ contains
     use SP_ModDistribution, ONLY: Momentum_I, Distribution_CB
 
     integer, intent(in) :: iLine, nX, iShock
-    real, intent(in)    :: BSI_I(1:nX)
+    real, intent(in)    :: BSi_I(1:nX)
     real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
     real, parameter     :: cCoef = 81.0/7/cPi/cTwoPi**(2.0/3)
     !--------------------------------------------------------------------------

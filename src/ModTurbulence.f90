@@ -258,7 +258,7 @@ contains
 
     ! The resonant wave number, kr = e*B/p in the SI unit
     !--------------------------------------------------------------------------
-    kRSi = cElectronCharge*BSi/(Momentum_I(iP)*MomentumInjSI)
+    kRSi = cElectronCharge*BSi/(Momentum_I(iP)*MomentumInjSi)
 
     ! Calculate D_{xx}: KRes-dependent part
     Dxx = BSi**2*SpeedSi_I(iP)/(cMu*cPi)*(AK_II(iP,iX)-BK_II(iP,iX)*kRSi**2)
@@ -284,7 +284,7 @@ contains
     ! The resonant wave number, kr = e*B/p in the SI unit
     !--------------------------------------------------------------------------
     kRSi_II = cElectronCharge*spread(BSi_I, DIM=2, NCOPIES=nP)  &
-         /spread(Momentum_I(1:nP)*MomentumInjSI, DIM=1, NCOPIES=nX)
+         /spread(Momentum_I(1:nP)*MomentumInjSi, DIM=1, NCOPIES=nX)
 
     ! Calculate D_{xx}: KRes-dependent part
     Dxx_II = spread(BSi_I**2, DIM=2, NCOPIES=nP)*   &

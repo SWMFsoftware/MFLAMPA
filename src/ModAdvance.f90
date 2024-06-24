@@ -248,7 +248,7 @@ contains
        ! of kinetic energy, all others are in SI units.
        BSi_I(1:iEnd) = State_VIB(   B_, 1:iEnd, iLine)
        ! nSi is needed to set up the distribution at the injection.
-       nSI_I(1:iEnd) = MhData_VIB(Rho_, 1:iEnd, iLine)
+       nSi_I(1:iEnd) = MhData_VIB(Rho_, 1:iEnd, iLine)
        ! find how far shock has travelled on this line
        iShock = iShock_IB(Shock_, iLine)
 
