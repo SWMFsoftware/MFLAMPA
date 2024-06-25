@@ -117,12 +117,12 @@ contains
     integer :: iP                ! loop variables
     ! For an optimized loop, we need to change the (nP, nX) into (nX, nP)
     ! for the two-dimensional local time step DtLocal_II array
-    real  :: DtLocal_II(nX, nP)  ! Local time step for diffusion
+    real :: DtLocal_II(nX, nP)   ! Local time step for diffusion
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
-    real  :: DInnerSi_II(nX, nP) ! Calculate once and use later
+    real :: DInnerSi_II(nX, nP)  ! Calculate once and use later
     ! Lower limit to floor the spatial diffusion coefficient For a
     ! given spatial and temporal resolution, the value of the
     ! diffusion coefficient should be artificially increased to get
@@ -136,11 +136,11 @@ contains
     ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
-    real   :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
+    real :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
-    real   :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
+    real :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     ! Auxiliary arrays for the tri-diagonal arrays
-    real   :: Aux1_I(nX), Aux2_I(nX)
+    real :: Aux1_I(nX), Aux2_I(nX)
     !--------------------------------------------------------------------------
     ! diffusion along the field line
     ! Set up the local time step: the reason is that, we loop through
@@ -246,7 +246,7 @@ contains
        if(present(UpperEndSpectrum_I)) then
           Aux2_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)* &
                0.5*(DInnerSi_II(nX-1,iP) + DInnerSi_II(nX,iP))/DsMesh_I(nX)**2
-          Main_I( nX) = Main_I(nX) + Aux2_I(nX)
+          Main_I(nX)  = Main_I(nX) + Aux2_I(nX)
           Lower_I(nX) = -Aux2_I(nX)
           Aux1_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)* &
                DInnerSi_II(nX,iP)/DsMesh_I(nX)**2
@@ -262,8 +262,7 @@ contains
   !============================================================================
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
     ! set diffusion coefficient for the current line
-    use SP_ModBc,           ONLY: SpectralIndex
-    use SP_ModDistribution, ONLY: Momentum_I, Distribution_CB
+    use SP_ModBc, ONLY: SpectralIndex
 
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in)    :: BSi_I(1:nX)

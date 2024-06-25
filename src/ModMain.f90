@@ -65,7 +65,7 @@ contains
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     do
-       if(.not.read_line() ) then
+       if(.not.read_line()) then
           IsLastRead = .true.
           EXIT
        end if
