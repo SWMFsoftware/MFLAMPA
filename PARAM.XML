@@ -50,7 +50,7 @@ We use keV as the default value.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-<command name="STARTTIME">
+<command name="STARTTIME" if="$_IsFirstSession">
   <parameter name="iYear"   type="integer" default="2000" />
   <parameter name="iMonth"  type="integer" min="1" max="12" default="3"/>
   <parameter name="iDay"    type="integer" min="1" max="31" default="21"/>
@@ -72,6 +72,28 @@ The #STARTTIME command sets the date and time in Greenwich Mean Time
 (GMT) or Universal Time (UT) when the simulation starts.
 
 There is no default value.
+</command>
+
+<command name="SETREALTIME" if="$_IsStandAlone and $_IsFirstSession">
+  <parameter name="iYear"   type="integer" default="2000" />
+  <parameter name="iMonth"  type="integer" min="1" max="12" default="3"/>
+  <parameter name="iDay"    type="integer" min="1" max="31" default="21"/>
+  <parameter name="iHour"   type="integer" min="0" max="23" default="10"/>
+  <parameter name="iMinute" type="integer" min="0" max="59" default="45"/>
+  <parameter name="iSecond" type="integer" min="0" max="59" default="0"/>
+
+#SETREALTIME
+2000			iYear
+   3			iMonth
+  22			iDay
+  10			iHour
+  45			iMinute
+   0			iSecond
+
+This command can only be used in the first session.
+
+Detailed descriptions are very similar to the ones in #STARTTIME,
+but here it is with check_stand_alone.
 </command>
 
 <command name="TIMEACCURATE" if="$_IsStandAlone">
@@ -271,8 +293,9 @@ To do the check the CpuTimeMax variable has to be set to a positive value.
 
 
 <commandgroup name="GRID">
-Parameters of the Lagrangian grid used in MFLAMPA 
-<command name="CHECKGRIDSIZE">
+Parameters of the Lagrangian grid used in MFLAMPA
+
+<command name="CHECKGRIDSIZE" if="$_IsFirstSession">
   <parameter name="nVertexMax" type="integer" min="1" default="2000" />
   <parameter name="nLon"  type="integer" min="1" default="20" />
   <parameter name="nLat"  type="integer" min="1" default="20" />
@@ -286,7 +309,7 @@ Check if the configured parameters of the Lagrangian grid match those
 assumed in the input files
 </command>
 
-<command name="GRIDNODE">
+<command name="GRIDNODE" if="$_IsFirstSession">
   <parameter name="nLon"  type="integer" min="1" default="20" />
   <parameter name="nLat"  type="integer" min="1" default="20" />
 
@@ -297,7 +320,7 @@ assumed in the input files
 Set the configured parameters of the Lagrangian grid
 </command>
 
-<command name="TESTPOS">
+<command name="TESTPOS" if="$_IsFirstSession">
   <parameter name="iNodeTest"  type="integer" min="0" default="1" />
   <parameter name="iParticleTest"  type="integer" min="0" default="10" />
   <parameter name="iPTest"  type="integer" min="0" default="1" />
@@ -391,7 +414,7 @@ averaged value over all pitch angles. Also, we need to specify
 how many intervals in the range of [-1, 1] for pitch angle.
 </command>
 
-<command name="FLUXINITIAL">
+<command name="FLUXINITIAL" if="$_IsFirstSession">
   <parameter name="FluxInitIo" type="real" min="0.0" default="0.01" />
 
 #FLUXINITIAL
@@ -402,7 +425,7 @@ default value is set as 0.01 [pfu]. One can set this
 to a lower order of magnitude, e.g., 1.0E-5 pfu.
 </command>
 
-<command name="FLUXCHANNEL">
+<command name="FLUXCHANNEL" if="$_IsFirstSession">
   <parameter name="nFluxChannel" type="integer" min="1" default="6" />
   <for name="iFluxChannel" from="1" to="$nFluxChannel">
       <parameter name="EChannelIo_I" type="real" min="0.0" />
@@ -662,7 +685,7 @@ tag list, becuase the same output files and tags were saved at the end of
 previous run.
 </command>
 
-<command name="READMHDATA" if="$_IsFirstSession">
+<command name="READMHDATA">
   <parameter name="DoReadMhData" type="logical" default="F" />
   <parameter name="NameInputDir" type="string"/>
 
@@ -673,7 +696,7 @@ MH_data			NameInputDir
 Sets the name of input directory with MHD data.
 </command>
 
-<command name="MHDATA" if="$_IsFirstSession">
+<command name="MHDATA">
   <parameter name="TypeFile" type="string" input="select">
     <option name="idl" default="T" />
     <option name="ascii" />
