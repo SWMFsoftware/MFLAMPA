@@ -111,7 +111,7 @@ contains
     real,   intent(in):: CflIn        ! Time step * acceleration rate/(Dlnp)
     integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
     integer,intent(in):: nGCRight     ! advanced in time but used as the BCs
-    real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight)  ! Solution
+    real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight) ! Solution
     ! sol. index 0 is to set boundary condition at the injection energy
     ! Subcycling to achieve the condition CFL<1, if nStep>1
     integer :: nStep
@@ -142,10 +142,10 @@ contains
     ! Single stage second-order upwind scheme
     if(CFL>0.0) then
        do iStep = 1, nStep
-          ! Boundary condition at the left boundary
-          if(nGCLeft<2) F_I(           -1:0-nGCLeft) = F_I( 1-nGCLeft )
-          ! Boundary condition at the right boundary
-          if(nGCRight<2) F_I(nP+1-nGCRight:nP+2    ) = F_I(nP+nGCRight)
+          ! Boundary condition (Ghost cells) at the left boundary
+          if(nGCLeft <2) F_I(           -1:0-nGCLeft) = F_I( 1-nGCLeft )
+          ! Boundary condition (Ghost cells) at the right boundary
+          if(nGCRight<2) F_I(nP+1+nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
           ! f_(i+1/2):
           FSemiUp_I(0:nP) = F_I(0:nP) + 0.5*(1.0-CFL)*df_lim_arr(0, nP)
@@ -157,10 +157,10 @@ contains
        end do
     else
        do iStep = 1, nStep
-          ! Boundary condition at the left boundary
-          if(nGCLeft<2) F_I(           -1:0-nGCLeft) = F_I( 1-nGCLeft)
-          ! Boundary condition at the right boundary
-          if(nGCRight<2) F_I(nP+1-nGCRight:nP+2    ) = F_I(nP+nGCRight)
+          ! Boundary condition (Ghost cells) at the left boundary
+          if(nGCLeft <2) F_I(           -1:0-nGCLeft) = F_I( 1-nGCLeft )
+          ! Boundary condition (Ghost cells) at the right boundary
+          if(nGCRight<2) F_I(nP+1+nGCRight:nP+2     ) = F_I(nP+nGCRight)
 
           ! f_(i-1/2):
           FSemiDown_I(1:nP+1) = F_I(1:nP+1) - 0.5*(1.0+CFL)*df_lim_arr(1,nP+1)
