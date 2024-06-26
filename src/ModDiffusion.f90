@@ -262,7 +262,6 @@ contains
   !============================================================================
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
     ! set diffusion coefficient for the current line
-    use SP_ModBc, ONLY: SpectralIndex
 
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in)    :: BSi_I(1:nX)

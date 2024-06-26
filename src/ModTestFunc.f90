@@ -4,7 +4,6 @@
 module SP_ModTestFunc
 
   ! Provides basic test functionality
-
   use ModReadParam, ONLY: lStringLine
   use SP_ModProc,   ONLY: iProc, nProc
 

@@ -187,9 +187,9 @@ contains
       ! becomes steeper for the current line
       use SP_ModGrid, ONLY: D_, dLogRhoThreshold
       use SP_ModUnit, ONLY: UnitX_, Io2Si_V
-      real   :: DsSi_I(1:iEnd-1)
-      real   :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
-      real   :: dLogRhoExcessIntegral
+      real :: DsSi_I(1:iEnd-1)
+      real :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
+      real :: dLogRhoExcessIntegral
       ! find the excess of dLogRho within the shock compared
       ! to background averaged over length
       !------------------------------------------------------------------------

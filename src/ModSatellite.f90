@@ -6,7 +6,6 @@ module SP_ModSatellite
   use ModUtilities,   ONLY: open_file, close_file, CON_stop
   use SP_ModProc,     ONLY: iProc, iComm
   use SP_ModSize,     ONLY: nDim
-  use SP_ModTime,     ONLY: StartTime
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
 
   implicit none
