@@ -29,25 +29,25 @@ contains
          set_upper_end_bc, UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
     ! INPUTS:
     ! id of line, particle #, and Shock location
-    integer, intent(in):: iLine, nX, iShock
+    integer,intent(in):: iLine, nX, iShock
     ! input time step
-    real,    intent(in):: DtProgress
+    real,   intent(in):: DtProgress
     ! CFL number
-    real,    intent(in):: Cfl
+    real,   intent(in):: Cfl
     ! Ratio of densities at upper and lower level
-    real,    intent(in):: dLogRho_I(1:nX)
+    real,   intent(in):: dLogRho_I(1:nX)
     ! Density and magnetic field at the upper level
-    real,    intent(in):: nSi_I(1:nX), BSi_I(1:nX)
+    real,   intent(in):: nSi_I(1:nX), BSi_I(1:nX)
     ! LOCAL VARs:
-    integer  :: iStep, iVertex   ! loop variables
+    integer :: iStep, iVertex   ! loop variables
     ! time step is split for nStep intervals, so short that the CFL for
     ! (explicit) advection operator is less that CFL declared above.
-    integer  :: nStep
+    integer :: nStep
     ! Time step in the STEP Loop, DtProgress/nStep
-    real     :: Dt
+    real    :: Dt
     ! Lagrangian derivatives, accounting for 1st order Fermi acceleration,
     ! which is responsible for advection in momentum space
-    real     :: FermiFirst_I(1:nX)
+    real    :: FermiFirst_I(1:nX)
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.

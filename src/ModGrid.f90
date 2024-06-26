@@ -433,7 +433,7 @@ contains
     IsFound = .true.
     ! find index of first particle above Radius
     iParticleOut = minloc(State_VIB(R_, 1:nVertex_B(iLine), iLine), &
-       DIM=1, MASK=State_VIB(R_, 1:nVertex_B(iLine), iLine) > Radius)
+         DIM=1, MASK=State_VIB(R_, 1:nVertex_B(iLine), iLine) > Radius)
 
     ! get interpolation weight is necessary
     if(present(Weight))then

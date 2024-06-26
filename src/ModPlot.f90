@@ -1234,7 +1234,7 @@ contains
 
       ! set header
       StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
-            //trim(File_I(iFile) % StringHeaderAux)
+           //trim(File_I(iFile) % StringHeaderAux)
 
       select case(File_I(iFile) % iScale)
       case(Momentum_)
@@ -1269,19 +1269,19 @@ contains
 
          ! the actual distribution, in logarithm
          File_I(iFile) % Buffer_II(:, 1:iEnd) = log10( &
-               Distribution_CB(0:nP+1, nMu, 1:iEnd, iLine))
+              Distribution_CB(0:nP+1, nMu, 1:iEnd, iLine))
          ! account for the requested output
          select case(File_I(iFile) % iTypeDistr)
          case(CDF_)
             ! do nothing
          case(DEFIo_)
             File_I(iFile) % Buffer_II(:, 1:iEnd) = Log10Si2IoFlux + &
-                  File_I(iFile) % Buffer_II(:, 1:iEnd) + &
-                  2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=iEnd)
+                 File_I(iFile) % Buffer_II(:, 1:iEnd) + &
+                 2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=iEnd)
          case(DEFSi_)
             File_I(iFile) % Buffer_II(:, 1:iEnd) = &
-                  File_I(iFile) % Buffer_II(:, 1:iEnd) + &
-                  2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=iEnd)
+                 File_I(iFile) % Buffer_II(:, 1:iEnd) + &
+                 2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=iEnd)
          end select
 
          ! print data to file

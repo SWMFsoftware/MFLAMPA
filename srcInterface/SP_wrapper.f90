@@ -30,18 +30,17 @@ contains
   !============================================================================
   subroutine SP_do_extract_lines(DoExtract)
     ! Interface routine to be called from super-structure on all PEs
+
     use CON_coupler, ONLY: i_proc0, i_comm, is_proc0
     use ModMpi
     logical, intent(out):: DoExtract
-
     integer :: iError
-
-    ! when restarting, line data is available, i.e. ready to couple with mh;
-    ! get value at SP root and broadcast to all SWMF processors
 
     character(len=*), parameter:: NameSub = 'SP_do_extract_lines'
     !--------------------------------------------------------------------------
     if(is_proc0(SP_)) DoExtract = .not.DoRestart
+    ! when restarting, line data is available, i.e. ready to couple with mh;
+    ! get value at SP root and broadcast to all SWMF processors
     call MPI_Bcast(DoExtract, 1, MPI_LOGICAL, i_proc0(SP_), i_comm(), iError)
   end subroutine SP_do_extract_lines
   !============================================================================
@@ -62,7 +61,7 @@ contains
     use ModTimeConvert, ONLY: time_real_to_int
     type(CompInfoType),intent(inout):: CompInfo
     character(len=*),  intent(in)   :: TypeAction
-    real :: UnitX, EnergyCoeff
+    real    :: UnitX, EnergyCoeff
     logical :: DoTimeAccurate = .true.
 
     character(len=*), parameter:: NameSub = 'SP_set_param'
@@ -123,14 +122,13 @@ contains
          State_VIB, MHData_VIB, nVertex_B, FootPoint_VB, Used_B
     use SP_ModOriginPoints, ONLY: ROrigin, LonMin, LonMax, LatMin, LatMax
     use SP_ModSize,         ONLY: nVertexMax
-    use SP_ModPlot,          ONLY: init_plot       => init
+    use SP_ModPlot,          ONLY: init_plot => init
     use CON_bline,          ONLY: BL_init, BL_get_origin_points
     use SP_ModProc,         ONLY: iProc
     integer,  intent(in) :: iSession         ! session number (starting from 1)
     real,     intent(in) :: TimeSimulation   ! seconds from start time
 
     logical, save:: IsInitialized = .false.
-
     !--------------------------------------------------------------------------
     if(IsInitialized)then
        call init_plot
@@ -155,13 +153,13 @@ contains
          call BL_get_origin_points(ROrigin, LonMin, LonMax, LatMin, LatMax)
   end subroutine SP_init_session
   !============================================================================
-  subroutine SP_run(TimeSimulation,TimeSimulationLimit)
-    real,intent(inout)::TimeSimulation
-    real,intent(in)::TimeSimulationLimit
+  subroutine SP_run(TimeSimulation, TimeSimulationLimit)
+    real,intent(inout) :: TimeSimulation
+    real,intent(in)    :: TimeSimulationLimit
 
     !--------------------------------------------------------------------------
-    if(iProc==0)write(*,'(a,es12.5,a,es12.5,a,i6)')'SP:'//              &
-         'Call run from SP_run, DataInputTime=', DataInputTime,         &
+    if(iProc==0)write(*,'(a,es12.5,a,es12.5,a,i6)')'SP:'//      &
+         'Call run from SP_run, DataInputTime=', DataInputTime, &
          ' SPTime=', SPTime, ' nStep=', iIter
     call run(TimeSimulationLimit)
     if(DoReadMhData)then
@@ -173,18 +171,18 @@ contains
   !============================================================================
   subroutine SP_finalize(TimeSimulation)
     use SP_ModMain, ONLY: finalize
-    real,intent(in)::TimeSimulation
+    real,intent(in) :: TimeSimulation
     ! if data are read from files, no special finalization is needed
 
     !--------------------------------------------------------------------------
     if(.not.(DoReadMhData.or.IsSteadyState))then
-       if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                    &
-            'Call run from SP_finalize, DataInputTime=', DataInputTime,     &
+       if(iProc==0)write(*,'(a,es12.5,a,es12.5)')'SP:'//                &
+            'Call run from SP_finalize, DataInputTime=', DataInputTime, &
             ' SPTime=', SPTime
        call run(TimeSimulation)
     end if
-    if(iProc==0)write(*,'(a,es12.5,a,i8)')'SP:'//                    &
-         'Call SP_finalize, Time=', DataInputTime,     &
+    if(iProc==0)write(*,'(a,es12.5,a,i8)')'SP:'//  &
+         'Call SP_finalize, Time=', DataInputTime, &
          ' nStep=', iIter
     call finalize
   end subroutine SP_finalize
@@ -192,7 +190,6 @@ contains
   subroutine SP_save_restart(TimeSimulation)
     use SP_ModRestart, ONLY: save_restart
     real, intent(in) :: TimeSimulation
-
     ! if data are read from files, no need for additional run
 
     !--------------------------------------------------------------------------
@@ -202,19 +199,20 @@ contains
             ' SPTime=', SPTime
        call run(TimeSimulation)
     end if
-    if(iProc==0)write(*,'(a,es12.5,a,i6)')'SP:'//                    &
-            'Call SP_save_restart, Time=', TimeSimulation, &
-            ' nStep=', iIter
+    if(iProc==0)write(*,'(a,es12.5,a,i6)')'SP:'//       &
+         'Call SP_save_restart, Time=', TimeSimulation, &
+         ' nStep=', iIter
     call save_restart
   end subroutine SP_save_restart
   !============================================================================
   subroutine SP_put_coupling_param(Source_, TimeIn)
     use SP_ModGrid, ONLY: copy_old_state
     use CON_bline,  ONLY: Lower_
-    integer,        intent(in) :: Source_
-    real,           intent(in) :: TimeIn
+    integer, intent(in) :: Source_
+    real,    intent(in) :: TimeIn
     !--------------------------------------------------------------------------
     if(DataInputTime >= TimeIn)RETURN
+
     ! New coupling time, get it and save old state
     DataInputTime = TimeIn
     if(Source_==Lower_)then
@@ -235,7 +233,8 @@ contains
     use CON_bline,          ONLY: &
          iOffset_B, BL_adjust_lines,  Lower_, Upper_, nLine
     integer, intent(in) :: Source_
-    integer:: iLine  ! loop variable
+    integer :: iLine  ! loop variable
+
     character(len=*), parameter:: NameSub = 'SP_adjust_lines'
     !--------------------------------------------------------------------------
     call BL_adjust_lines(Source_)
@@ -248,7 +247,7 @@ contains
     end if
     ! Called after the grid points are received from the
     ! component, nullify offset
-    if(Source_ == Upper_)iOffset_B(1:nLine) = 0
+    if(Source_ == Upper_) iOffset_B(1:nLine) = 0
   end subroutine SP_adjust_lines
   !============================================================================
 end module SP_wrapper
