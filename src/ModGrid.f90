@@ -395,8 +395,8 @@ contains
             State_VIB(RhoOld_,1:iEnd,iLine))
 
        ! shock never moves back
-       iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth )
-       iShockMax = nVertex_B(iLine) - nWidth - 1
+       iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth)
+       iShockMax = iEnd - nWidth - 1
        iShockCandidate = iShockMin - 1 + maxloc(&
             DLogRho_I(   iShockMin:iShockMax), 1, MASK = &
             State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
