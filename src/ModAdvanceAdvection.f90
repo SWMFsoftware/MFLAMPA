@@ -27,7 +27,6 @@ contains
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,        ONLY: set_momentum_bc, UseUpperEndBc, &
          set_upper_end_bc, UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
-    use SP_ModGrid,      ONLY: Used_B, nVertex_B
     ! INPUTS:
     ! id of line, particle #, and Shock location
     integer, intent(in):: iLine, nX, iShock
@@ -52,18 +51,22 @@ contains
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
-    ! first order Fermi acceleration for the current line
+
+    ! first-order Fermi acceleration for the current line
     FermiFirst_I = dLogRho_I/(3*dLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1 + int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:
     if(nStep < 1)call CON_stop(NameSub//': nStep <= 0????')
+
+    ! reduce time step and first-order Fermi acceleration
     Dt = DtProgress/nStep
     FermiFirst_I = FermiFirst_I/nStep
 
+    ! update bc for advection at nP = 0
+    call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
+
     STEP:do iStep = 1, nStep
-       ! update bc for advection, at nP = 0
-       call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
        ! set the lower bc at each reduced time step
        call set_lower_end_bc(iLine)
 
