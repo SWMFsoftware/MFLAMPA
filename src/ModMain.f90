@@ -88,7 +88,7 @@ contains
           call read_param_dist(NameCommand)
        case('#CFL', '#ADVECTION', '#TRACESHOCK')
           call read_param_adv(NameCommand)
-       case('#INJECTION', '#ENDBC')
+       case('#INJECTION', '#LOWERENDBC', '#UPPERENDBC')
           call read_param_bc(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
           call read_param_diffuse(NameCommand)

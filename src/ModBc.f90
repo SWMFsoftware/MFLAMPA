@@ -21,60 +21,80 @@ module SP_ModBc
 
   ! Public members:
   public:: read_param
-  public:: set_momentum_bc  ! Set the boundary condition at min/max energy
-  public:: set_upper_end_bc ! Set the boundary condition at the far end point
-  public:: set_lower_end_bc ! Set the boundary condition at the near-Sun end
+  public:: set_momentum_bc   ! Set the boundary condition at min/max energy
+  public:: set_upper_end_bc  ! Set the boundary condition at the far end point
+  public:: set_lower_end_bc  ! Set the boundary condition at the near-Sun end
+  public:: set_lower_end_vdf ! Set the VDF at the near-Sun end
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_B*T_i < Energy < EnergyInjection, to be read from PARAM.in
-  real, public     :: CoefInj = 0.25, SpectralIndex = 5.0
-  real, parameter  :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
+  real, public      :: CoefInj = 0.25, SpectralIndex = 5.0
+  real, parameter   :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
+  ! Lower end BC, set at the firsr point along the field line
+  logical, public   :: UseLowerEndBc = .true.
   ! Type of lower end BC: float, escape, inject
-  character(LEN=6) :: TypeLowerEndBc = 'inject'
+  character(LEN=6)  :: TypeLowerEndBc = 'inject'
+  ! Index of the left lower end BC
+  integer, public   :: iStart = 1
+  integer, parameter:: &
+       iStartUseLeft_   = 1, & ! when UseLowerEndBc = .true.
+       iStartNoUseLeft_ = 2    ! when UseLowerEndBc = .false.
   ! Upper end BC, set at the last point along the field line
-  logical, public  :: UseUpperEndBc = .false.
+  logical, public   :: UseUpperEndBc = .false.
   ! Type of upper end BC: none, float, escape, lism
-  character(LEN=6) :: TypeUpperEndBc = 'none'
-  real, public     :: UpperEndBc_I(1:nP), LowerEndBc_I(0:nP+1)
+  character(LEN=6)  :: TypeUpperEndBc = 'none'
+  real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(0:nP+1)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     use ModUtilities, ONLY: lower_case
+
     character(len=*), intent(in):: NameCommand ! From PARAM.in
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#INJECTION')
        call read_var('SpectralIndex', SpectralIndex)
-       call read_var('Efficiency',    CoefInj)
-    case('#ENDBC')
-       ! Read the type of LowerEndBc and Select
-       call read_var('TypeLowerEndBc', TypeLowerEndBc)
-       call lower_case(TypeLowerEndBc)
+       call read_var('Efficiency'   , CoefInj)
+    case('#LOWERENDBC')
+       ! Read whether to use LowerLowBc
+       call read_var('UseLowerEndBc', UseLowerEndBc)
+       if(UseLowerEndBc) then
+          iStart = iStartUseLeft_
+          ! Read the type of LowerEndBc and Select
+          call read_var('TypeLowerEndBc', TypeLowerEndBc)
+          call lower_case(TypeLowerEndBc)
+       else
+          iStart = iStartNoUseLeft_
+       end if
+    case('#UPPERENDBC')
+       ! Read whether to use UpperLowBc
+       call read_var('UseUpperEndBc', UseUpperEndBc)
+       if(UseUpperEndBc) then
+          ! Read the type of UppenEndBc and Select
+          call read_var('TypeUpperEndBc', TypeUpperEndBc)
+          call lower_case(TypeUpperEndBc)
 
-       ! Read the type of UppenEndBc and Select
-       call read_var('TypeUpperEndBc', TypeUpperEndBc)
-       call lower_case(TypeUpperEndBc)
-       select case(trim(TypeUpperEndBc))
-       case('none', 'f', 'false')
-          ! Reset UseUpperEndBc
-          UseUpperEndBc = .false.
-       case('float', 'escape')
-          ! Do nothing
-          UseUpperEndBc = .true.
-       case('lism')
-          UseUpperEndBc = .true.
-          ! We want to read the type of LIS here
-          call read_var('TypeLisBc', TypeLisBc)
-          call lower_case(TypeLisBc)
-          ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
-          call read_var('UseModulationPot', UseModulationPot)
-          if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
-       case default
-          call CON_stop(NameSub//&
-               ': Unknown type of upper end BC '//TypeUpperEndBc)
-       end select
+          select case(trim(TypeUpperEndBc))
+          case('none', 'f', 'false')
+             ! Reset UseUpperEndBc
+             UseUpperEndBc = .false.
+          case('float', 'escape')
+             ! Do nothing
+          case('lism')
+             ! We want to read the type of LIS here
+             call read_var('TypeLisBc', TypeLisBc)
+             call lower_case(TypeLisBc)
+             ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
+             call read_var('UseModulationPot', UseModulationPot)
+             if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
+          case default
+             call CON_stop(NameSub//&
+                  ': Unknown type of upper end BC '//TypeUpperEndBc)
+          end select
+       end if
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -142,7 +162,7 @@ contains
   end subroutine set_upper_end_bc
   !============================================================================
   subroutine set_lower_end_bc(iLine)
-    ! set boundary condition at the first grid point on the given line
+    ! set boundary condition at the zeroth grid point on the given line
     ! assign the calculated BC to LowerEndBc_I
 
     integer, intent(in) :: iLine
@@ -154,13 +174,25 @@ contains
     case('escape')
        LowerEndBc_I = Background_I
     case('inject')
-       LowerEndBc_I = Distribution_CB(0, 1, 1, iLine)  &
+       LowerEndBc_I = Distribution_CB(0, 1, 1, iLine) &
             /Momentum_I(0:nP+1)**SpectralIndex
     case default
        call CON_stop(NameSub//&
             ': Unknown type of lower end BC '//TypeLowerEndBc)
     end select
   end subroutine set_lower_end_bc
+  !============================================================================
+  subroutine set_lower_end_vdf(iLine)
+    ! set boundary condition for VDF at the zeroth grid point on the given line
+
+    integer, intent(in) :: iLine
+    character(len=*), parameter:: NameSub = 'set_lower_end_bc_vdf'
+    !--------------------------------------------------------------------------
+
+    ! set the left boundary condition of VDF for diffusion
+    Distribution_CB(1:nP+1, 1, 1, iLine) = &
+         Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex
+  end subroutine set_lower_end_vdf
   !============================================================================
 end module SP_ModBc
 !==============================================================================

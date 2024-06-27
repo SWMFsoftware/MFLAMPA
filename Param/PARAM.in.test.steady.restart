@@ -34,8 +34,12 @@ SP/restartIN/restart.H
 #SAVEINITIAL
 F			DoSaveInitial
 
-#ENDBC
+#LOWERENDBC
+T			UseLowerEndBc
 inject			TypeLowerEndBc
+
+#UPPERENDBC
+T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
 T			UseModulationPot

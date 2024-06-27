@@ -450,8 +450,33 @@ particle flux is integrated over energy as the output.
 
 <commandgroup name="ENDBC">
 
-<command name="ENDBC">
+<command name="LOWERENDBC">
+  <parameter name="UseLowerEndBc" type="logical" default="F"/>
   <parameter name="TypeLowerEndBc" type="string" default="inject"/>
+
+#LOWERENDBC
+F			UseLowerEndBc
+inject			TypeLowerEndBc
+
+To determine whether or which type we set the lower boundary conditions.
+If so, we turn UseLowerEndBc, choose different cases of TypeLowerEndBc,
+and will have different LowerEndSpectrum_I values in diffusion.
+
+For LowerEndSpectrum_I, it is the spectral extrapolation following
+the power law of SpectralIndex at the lower boundary when
+TypeLowerEndBc = "inject". Besides, one can set "float" (= current VDF
+at iVertex=1) and "escape" (= Background_I), especially for the
+steady-state GCR spectrum simulations. 
+
+If we use LowerEndBc, we will only set the LowerEndSpectrum_I and include
+it in diffusion; otherwise we will set the VDF for 1:nP+1 in momentum
+space at iVertex = 1 (the first cell), start from iVertex = 2 in advection,
+and exclude the LowerEndSpectrum_I when solving the diffusion term.
+
+</command>
+
+<command name="UPPERENDBC">
+  <parameter name="UseUpperEndBc" type="logical" default="F"/>
   <parameter name="TypeUpperEndBc" type="string" input="select">
     <option name="lism" default="T"/>
     <option name="none"/>
@@ -466,23 +491,16 @@ particle flux is integrated over energy as the output.
   <parameter name="UseModulationPot" type="logical" default="F"/>
   <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
 
-#ENDBC
-inject			TypeLowerEndBc
+#UPPERENDBC
+T			UseUpperEndBc
 lism			TypeUpperEndBc
 default			TypeLisBc
 F			UseModulationPot
 600.0			ModulationPot
 
-To determine whether or which type we set the lower/upper boundary
-conditions. If so, we turn UseUpperEndBc, or choose different cases
-of TypeLowerEndBc and/or TypeUpperEndBc respectively, and will have
-different LowerEndSpectrum_I and UpperEndSpectrum_I in diffusion.
-
-In particular, for LowerEndSpectrum_I, it is the spectral extrapolation
-following the power law of SpectralIndex at the lower boundary when
-TypeLowerEndBc="inject". Besides, one can set "float" (= current VDF
-at iVertex=1) and "escape" (= Background_I), especially for the
-steady-state GCR spectrum simulations. 
+To determine whether or which type we set the upper boundary conditions.
+If so, we turn UseUpperEndBc, choose different cases of TypeUpperEndBc,
+and will have different UpperEndSpectrum_I values in diffusion.
 
 As for UpperEndSpectrum_I, we need to first determine the type of
 UpperEndBc, where LISM is the nominal one for use. If one wants to

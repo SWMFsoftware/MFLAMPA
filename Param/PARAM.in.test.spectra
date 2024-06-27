@@ -62,8 +62,12 @@ MH_data_e20120123/MH_data.H
 T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
-#ENDBC
+#LOWERENDBC
+T			UseLowerEndBc
 inject			TypeLowerEndBc
+
+#UPPERENDBC
+F			UseUpperEndBc
 none			TypeUpperEndBc
 default			TypeLisBc
 T			UseModulationPot
