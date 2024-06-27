@@ -631,7 +631,7 @@ contains
               trim(NameScale) // ' ' // trim(NameVar)
       else
          File_I(iFile) % NameVarPlot = &
-              trim(NameScale)//' Distance '//trim(NameVar)
+              trim(NameScale)//' FieldLineLength '//trim(NameVar)
       end if
 
       ! header: [Momentum/Energy unit], [Rs], [CDF or def/DEF unit]
