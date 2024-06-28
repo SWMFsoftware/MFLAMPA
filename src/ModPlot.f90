@@ -69,10 +69,14 @@ module SP_ModPlot
                                 ! Flux
        Flux2D_    = 5, & ! at a given radius on rectangular Lon-Lat grid
        FluxTime_  = 6    ! at a given radius as time series on Lon-Lat grid
-  ! Momentum or energy axis to use for Distribution plots
+  ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
        Energy_    = 2
+  ! Heliocentric distance or field line length axis for Distribution plots
+  integer, parameter:: &
+       Distance_  = 1, &
+       LineLength_= 2
   ! Plot types for distribution function
   integer, parameter:: &
        CDF_       = 1, &
@@ -113,8 +117,10 @@ module SP_ModPlot
      integer, pointer:: iVarMhd_V(:), iVarExtra_V(:)
      !
      ! Distribution -----------------------------
-     ! Momentum or energy axis to use for distribution plots
+     ! Momentum or energy axis for distribution plots
      integer:: iScale      ! = Momentum_ or Energy_
+     ! Heliocentric distance or field line length for distribution plots
+     integer:: iDistance   ! = Distance_ or LineLength_
      ! type out output (CDF or differential energy flow)
      integer:: iTypeDistr  ! = CDF_, DEFIo_, or DEFSi_
      ! Data on the sphere
@@ -583,20 +589,21 @@ contains
       ! process output parameters for distribution output
       logical, intent(in) :: DoSaveTrj
       integer:: iStringPlot
-      character(len=20):: NameVar, NameScale
+      character(len=20):: NameVar, NameScale, NameDistance
 
       ! only 1 variable is printed
       !------------------------------------------------------------------------
-      File_I(iFile) % nMhdVar = 1
-      File_I(iFile) % nExtraVar = 0
+      File_I(iFile) % nMhdVar = 0
+      File_I(iFile) % nExtraVar = 1
       ! reset
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
       File_I(iFile)%DoPlotSpread = .false.
 
       ! reset string with variables' names and put defaults
-      NameScale = 'Log10Momentum'
-      NameVar   = 'Log10DiffEnergyFlux'
+      NameScale    = 'Log10Momentum'
+      NameDistance = 'Distance'
+      NameVar      = 'Log10DiffEnergyFlux'
       File_I(iFile) % iScale     = Momentum_
       File_I(iFile) % iTypeDistr = DEFIo_
       do iStringPlot = 2, nStringPlot - 1
@@ -609,6 +616,12 @@ contains
          case('energy')
             File_I(iFile) % iScale = Energy_
             NameScale = 'Log10Energy'
+         case('distance')
+            File_I(iFile) % iDistance = Distance_
+            NameDistance = 'Distance'
+         case('length', 'linelength')
+            File_I(iFile) % iDistance = LineLength_
+            NameDistance = 'FieldLineLength'
          case('cdf')
             ! canonical distribution function
             File_I(iFile) % iTypeDistr = CDF_
@@ -631,7 +644,8 @@ contains
               trim(NameScale) // ' ' // trim(NameVar)
       else
          File_I(iFile) % NameVarPlot = &
-              trim(NameScale)//' FieldLineLength '//trim(NameVar)
+              trim(NameScale) // ' ' // &
+              trim(NameDistance) // ' ' // trim(NameVar)
       end if
 
       ! header: [Momentum/Energy unit], [Rs], [CDF or def/DEF unit]
@@ -1218,6 +1232,7 @@ contains
       character(len=100) :: NameFile
       ! header of the output file
       character(len=500) :: StringHeader
+      character(len=2)   :: TypeDist
       character(len=3)   :: TypeDistr
       ! loop variables
       integer :: iLine
@@ -1227,6 +1242,8 @@ contains
       integer :: iEnd
       ! scale and conversion factor
       real    :: Scale_I(0:nP+1)
+      ! index for the length or distance axis
+      integer :: iDistance
       ! timetag
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_1d'
@@ -1236,6 +1253,7 @@ contains
       StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
            //trim(File_I(iFile) % StringHeaderAux)
 
+      ! set the momentum or kinetic energy axis (first axis)
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          Scale_I = Log10Momentum_I
@@ -1243,21 +1261,32 @@ contains
          Scale_I = Log10KinEnergyIo_I
       end select
 
+      ! set the index for the distance axis (second axis)
+      select case(File_I(iFile) % iDistance)
+      case(Distance_)
+         iDistance = R_
+         TypeDist = 'R_'
+      case(LineLength_)
+         iDistance = S_
+         TypeDist = 'S_'
+      end select
+
+      ! set the file name
+      select case(File_I(iFile) % iTypeDistr)
+      case(CDF_)
+         TypeDistr = 'cdf'
+      case(DEFIo_)
+         TypeDistr = 'def'
+      case(DEFSi_)
+         TypeDistr = 'DEF'
+      end select
+
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
-         ! set the file name
-         select case(File_I(iFile) % iTypeDistr)
-         case(CDF_)
-            TypeDistr = 'cdf'
-         case(DEFIo_)
-            TypeDistr = 'def'
-         case(DEFSi_)
-            TypeDistr = 'DEF'
-         end select
          call make_file_name(&
-              StringBase    = 'Distribution_' // TypeDistr ,  &
+              StringBase    = 'Distr_'//TypeDist//TypeDistr,  &
               iLine         = iLine,                          &
               iIter         = iIter,                          &
               NameExtension = File_I(iFile)%NameFileExtension,&
@@ -1293,7 +1322,7 @@ contains
               TimeIn         = SPTime, &
               nStepIn        = iIter, &
               Coord1In_I     = Scale_I, &
-              Coord2In_I     = State_VIB(S_,1:iEnd,iLine), &
+              Coord2In_I     = State_VIB(iDistance,1:iEnd,iLine), &
               NameVarIn      = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
@@ -1387,7 +1416,7 @@ contains
 
          ! set the file name
          call make_file_name(&
-              StringBase    = 'Distribution_' //               &
+              StringBase    = 'Distr_' //               &
               trim(NameSat_I(iSat)) // TypeDistr,              &
               iIter         = iIter,                           &
               NameExtension = File_I(iFile)%NameFileExtension, &

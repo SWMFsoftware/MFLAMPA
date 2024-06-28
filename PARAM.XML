@@ -605,7 +605,7 @@ The default value is true.
 
 #USEFIXEDMFPUPSTREAM
 F			UseFixedMeanFreePathUpstream
-0.3			MeanFreePath0InAu
+0.3			MeanFreePath0InAu [AU]
 
 Determine whether we set the mean free path, see
 Li et al. (2003), doi: 10.1029/2002JA009666.
@@ -788,7 +788,6 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
         <part name="NameVar" type="string" required="T" multiple="T"
               input="select">
           <option name="Flux"     value="flux" default="T"/>
-          <option name="R"        value="r" />
           <option name="LagrID"   value="lagrid"/>
           <option name="X"        value="x"/>  
           <option name="Y"        value="y"/>  
@@ -813,6 +812,8 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
           <option name="BOld"     value="bold"/>
           <option name="energy"   value="energy"/>
           <option name="momentum" value="momentum"/>
+          <option name="distance" value="distance"/>
+          <option name="length"   alias="linelength" value="length"/>
           <option name="distribution function of energy [#/cm**2/s/sr/energy unit]"
               value="def"/>
           <option name="distribution function of energy [#/m**2/s/sr/energy unit]"
@@ -836,7 +837,7 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
     </for>
 
 #SAVEPLOT
-6				nFileOut
+7				nFileOut
 mh1d flux ascii			StringPlot
 mh2d flux ascii			StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
@@ -844,8 +845,8 @@ fluxtime flux ascii		StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
 30.0				Longitude [deg] (red if fluxtime)
 46.0				Latitude [deg] (red if fluxtime)
-distr1d cdf momentum ascii	StringPlot
-distr1d def energy idl		StringPlot
+distr1d momentum length cdf ascii	StringPlot
+distr1d energy distance def idl		StringPlot
 distraj def energy idl		StringPlot
 T				UsePoleTriangulation
 T				UsePlanarTriangles
@@ -862,13 +863,20 @@ energy unit, "distr1d" can save all the values of the VDF (each momentum, at
 each coordinate along each fieldline), and "distraj" can save only the values
 interpolated to the specified trajectories. 
 
-For "distr1d", "cdf" means thecanonical distribution function, "def" means the
-differential intensity, saved in the unit of [#/cm**2/s/sr/energy unit], i.e.,
-[pfu/energy unit], and "DEF" is to save the differential intensity in the unit
-of [#/m**2/s/sr/energy unit]. If using "distraj", one should also specify
-"#SATELLITE" before these lines. In StringPlot, the first identifier is always
-a type of plot, the last identifier is a type of file, and the string variables
-in between denote the list of plot variables extra to the MHD ones.
+For "distr1d", "cdf" means the canonical distribution function, "def" means the
+differential energy function (intensity), saved in the unit of
+[#/cm**2/s/sr/energy unit], i.e., [pfu/energy unit], and "DEF" is to save the
+differential energy function in the unit of [#/m**2/s/sr/energy unit]. Here,
+the "energy" or "momentum" is the first axis, for the log10(kinetic energy)
+in the specified unit (default: keV) or the log10(momentum) normalized by the
+injection momentum, respectively. The "distance" or "length" is the second axis
+saved in the unit of solar radii, for the heliocentric distance or the field
+line length to the foot point on the Sun, respectively.
+
+If using "distraj", one should also specify "#SATELLITE" before these lines.
+In StringPlot, the first identifier is always a type of plot, the last
+identifier is a type of file, and the string variables in between denote the
+list of plot variables extra to the MHD ones.
 
 Please send an email to Igor Sokolov for more information on this command.
 </command>
