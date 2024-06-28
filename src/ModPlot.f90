@@ -1286,10 +1286,10 @@ contains
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
          call make_file_name(&
-              StringBase    = 'Distr_'//TypeDist//TypeDistr,  &
-              iLine         = iLine,                          &
-              iIter         = iIter,                          &
-              NameExtension = File_I(iFile)%NameFileExtension,&
+              StringBase    = 'Distr_' // TypeDist //TypeDistr,&
+              iLine         = iLine,                           &
+              iIter         = iIter,                           &
+              NameExtension = File_I(iFile)%NameFileExtension, &
               NameOut       = NameFile)
 
          ! get max particle indexes on this field line
@@ -1416,7 +1416,7 @@ contains
 
          ! set the file name
          call make_file_name(&
-              StringBase    = 'Distr_' //               &
+              StringBase    = 'Distr_' //                      &
               trim(NameSat_I(iSat)) // TypeDistr,              &
               iIter         = iIter,                           &
               NameExtension = File_I(iFile)%NameFileExtension, &

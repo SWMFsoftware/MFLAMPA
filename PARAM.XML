@@ -170,15 +170,17 @@ Set default value as: False, -1, and -1.0
 		default="RESTART.in" length="100" />
 
 #INCLUDE
-RESTART.in			NameIncludeFile
+run_steady/SP/restartIN/restart.H			NameIncludeFile
 
 The NameIncludeFile parameter contains the name of the file to be included.
-The file name may be followed with a trailing comment if it
-is separated with at least 3 spaces or one TAB character.
-The #INCLUDE command can be used anywhere in the parameter file,
-even in the sections which contain the component specific parameters.
-For example the information in the run/SP/restartIN/restart.H 
-file or parameters specific to a component can be included.
+The file name may be followed with a trailing comment if it is separated
+with at least 3 spaces or one TAB character.
+
+The #INCLUDE command can be used anywhere in the parameter file, even in
+the sections which contain the component specific parameters.
+
+For example, the information in the run/SP/restartIN/restart.H file or
+parameters specific to a component can be included.
 </command>
 
 <command name="RUN" if="$_IsStandAlone">
@@ -813,7 +815,7 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
           <option name="energy"   value="energy"/>
           <option name="momentum" value="momentum"/>
           <option name="distance" value="distance"/>
-          <option name="length"   alias="linelength" value="length"/>
+          <option name="length"   value="length/linelength"/>
           <option name="distribution function of energy [#/cm**2/s/sr/energy unit]"
               value="def"/>
           <option name="distribution function of energy [#/m**2/s/sr/energy unit]"
