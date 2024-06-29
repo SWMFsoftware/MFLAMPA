@@ -186,10 +186,10 @@ contains
     ! set boundary condition for VDF at the zeroth grid point on the given line
 
     integer, intent(in) :: iLine
-    character(len=*), parameter:: NameSub = 'set_lower_end_bc_vdf'
-    !--------------------------------------------------------------------------
 
     ! set the left boundary condition of VDF for diffusion
+    character(len=*), parameter:: NameSub = 'set_lower_end_vdf'
+    !--------------------------------------------------------------------------
     Distribution_CB(1:nP+1, 1, 1, iLine) = &
          Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex
   end subroutine set_lower_end_vdf

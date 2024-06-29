@@ -1715,7 +1715,7 @@ contains
       real    :: Weight_I(3)
       !------------------------------------------------------------------------
 
-      ! Determine the saved distribution function (f or f*p**2)
+      ! set the momentum or kinetic energy axis
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          Scale_I = Log10Momentum_I
@@ -1723,7 +1723,7 @@ contains
          Scale_I = Log10KinEnergyIo_I
       end select
 
-      ! Determine string for the saved filename
+      ! set the file name: saved cdf/def/DEF (f or f*p**2, in which unit)
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
          TypeDistr = '_cdf'
@@ -2125,9 +2125,9 @@ contains
       real :: Param_I(1:Latitude_)
       ! timetag
       character(len=15):: StringTime
+
       character(len=*), parameter:: NameSub = 'write_flux_time'
       !------------------------------------------------------------------------
-
       nFluxVar= File_I(iFile)%nFluxVar
       ! set header
       StringHeader = &
