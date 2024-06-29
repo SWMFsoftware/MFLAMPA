@@ -47,8 +47,9 @@ module SP_ModPlot
   logical, public:: UsePoleTri   = .false.
   logical, public:: UsePlanarTri = .true.
 
-  character(len=*), parameter, public :: NameMHData = "MH_data"
-  character(len=*), parameter, public :: NameFluxData = "Flux"
+  character(len=*), parameter, public :: NameMHData    = "MH_data"
+  character(len=*), parameter, public :: NameDistrData = "Distr"
+  character(len=*), parameter, public :: NameFluxData  = "Flux"
 
   ! number of different output file tags
   integer, public :: nTag = 0
@@ -65,10 +66,11 @@ module SP_ModPlot
        MHTime_    = 2, & ! at given radius as time series for lines
                                 ! Distribution
        Distr1D_   = 3, & ! along each line
-       DisTraj_   = 4, & ! along the specified spacecraft trajectory
+       Distr2D_   = 4, & ! at given radius as Lon-Lat plot
+       DisTraj_   = 5, & ! along the specified spacecraft trajectory
                                 ! Flux
-       Flux2D_    = 5, & ! at a given radius on rectangular Lon-Lat grid
-       FluxTime_  = 6    ! at a given radius as time series on Lon-Lat grid
+       Flux2D_    = 6, & ! at a given radius on rectangular Lon-Lat grid
+       FluxTime_  = 7    ! at a given radius as time series on Lon-Lat grid
   ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
@@ -191,17 +193,17 @@ contains
        if(File_I(iFile) % DoPlotFlux)then
           File_I(iFile) % nFluxVar = FluxMax_ - Flux0_ + 1
           do iVar = Flux0_, FluxMax_
-             File_I(iFile)%NameVarPlot = &
-                  trim(File_I(iFile)%NameVarPlot)//' '//&
+             File_I(iFile) % NameVarPlot = &
+                  trim(File_I(iFile) % NameVarPlot)//' '//&
                   trim(NameFluxChannel_I(iVar))
-             select case(File_I(iFile)%TypeFile)
-             case('tec','tcp')
-                File_I(iFile)%NameVarPlot = &
-                     trim(File_I(iFile)%NameVarPlot)//'_['//&
+             select case(File_I(iFile) % TypeFile)
+             case('tec', 'tcp')
+                File_I(iFile) % NameVarPlot = &
+                     trim(File_I(iFile) % NameVarPlot)//'_['//&
                      trim(NameFluxUnit_I(iVar))//']'
              case default
-                File_I(iFile)%StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)//&
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile) % StringHeaderAux)//&
                      ' '//trim(NameFluxUnit_I(iVar))
              end select
           end do
@@ -224,6 +226,8 @@ contains
                File_I(iFile)%nFluxVar, 1))
        case(Distr1D_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nVertexMax))
+       case(Distr2D_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, nLineAll))
        case(DisTraj_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1))
        case(Flux2D_)
@@ -339,6 +343,8 @@ contains
              File_I(iFile) % iKindData = MHTime_
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
+          case('distr2d')
+             File_I(iFile) % iKindData = Distr2D_
           case('distraj')
              File_I(iFile) % iKindData = DisTraj_
           case('flux2d')
@@ -436,9 +442,14 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
              ! process the distr1d data
-             call process_distr(DoSaveTrj=.false.)
+             call process_distr(DoSkipMh=.false.)
+          case(Distr2D_)
+             ! process the distr2d data
+             call process_distr(DoSkipMh=.true.)
+             ! get radius
+             call read_var('Radius', File_I(iFile) % Radius)
           case(DisTraj_)
-             call process_distr(DoSaveTrj=.true.)
+             call process_distr(DoSkipMh=.true.)
              ! get pole triangulartion flag
              call read_var('UsePoleTriangulation', UsePoleTri)
              ! get the triangulation approach flag
@@ -448,7 +459,7 @@ contains
              File_I(iFile) % DoPlotFlux = .true.
              ! add longitude and latitude with units to variable names
              select case(File_I(iFile) % TypeFile)
-             case('tec','tcp')
+             case('tec', 'tcp')
                 File_I(iFile) % NameVarPlot = 'Longitude_[deg] Latitude_[deg]'
              case default
                 File_I(iFile) % NameVarPlot = 'Longitude Latitude '
@@ -479,7 +490,7 @@ contains
           end select
        end do ! iPlot
        ! Check consistency: only 1 MH1D file can be requested
-       if(count(File_I(1:nFileOut)%iKindData == MH1D_,1) > 1)&
+       if(count(File_I(1:nFileOut) % iKindData == MH1D_,1) > 1)&
             call CON_stop(NameSub//&
             ": only one MH1D output file can be requested")
     case("#NOUTPUT")
@@ -564,7 +575,7 @@ contains
               trim(File_I(iFile)%NameVarPlot)//' '//&
               trim(NameVar_V(iVar))
          select case(File_I(iFile)%TypeFile)
-         case('tec','tcp')
+         case('tec', 'tcp')
             File_I(iFile)%NameVarPlot = &
                  trim(File_I(iFile)%NameVarPlot)//'_['//&
                  trim(NameVarUnit_V(iVar))//']'
@@ -584,14 +595,14 @@ contains
 
     end subroutine process_mh
     !==========================================================================
-    subroutine process_distr(DoSaveTrj)
+    subroutine process_distr(DoSkipMh)
 
       ! process output parameters for distribution output
-      logical, intent(in) :: DoSaveTrj
+      logical, intent(in) :: DoSkipMh ! whether to skip to save the MH Data
       integer:: iStringPlot
       character(len=20):: NameVar, NameScale, NameDistance
 
-      ! only 1 variable is printed
+      ! only 1 variable (at most) is printed
       !------------------------------------------------------------------------
       File_I(iFile) % nMhdVar = 0
       File_I(iFile) % nExtraVar = 1
@@ -639,41 +650,55 @@ contains
       end do
 
       ! form the name with variables' names
-      if(DoSaveTrj) then
-         File_I(iFile) % NameVarPlot = &
-              trim(NameScale) // ' ' // trim(NameVar)
-      else
+      if(File_I(iFile) % iKindData == Distr1D_) then
          File_I(iFile) % NameVarPlot = &
               trim(NameScale) // ' ' // &
               trim(NameDistance) // ' ' // trim(NameVar)
+      elseif(File_I(iFile) % iKindData == Distr2D_) then
+         File_I(iFile) % NameVarPlot = &
+              trim(NameScale) // ' ' // &
+              trim(NameVar_V(LagrID_)) // ' ' // trim(NameVar)
+      else
+         File_I(iFile) % NameVarPlot = &
+              trim(NameScale) // ' ' // trim(NameVar)
       end if
 
-      ! header: [Momentum/Energy unit], [Rs], [CDF or def/DEF unit]
+      ! header 1: [Momentum/Energy unit]
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile)%StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux)// &
               ' log10[(p_{INJ}/[Si])*kg*m/s]'
       case(Energy_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile)%StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux)// &
               ' log10[' // NameEnergyUnit // ']'
       end select
-      if(.not.DoSaveTrj) File_I(iFile) % StringHeaderAux = &
-           trim(File_I(iFile)%StringHeaderAux)//' [Rs]'
+
+      ! header 2: Rsun for both S_ and D_ when saving Distr1D
+      ! LagrID when saving Distr2D, or no/skip when saving DisTraj
+      if(File_I(iFile) % iKindData == DisTraj_) then
+         File_I(iFile) % StringHeaderAux = &
+              trim(File_I(iFile) % StringHeaderAux)//' '//NameVarUnit_V(R_)
+      elseif(File_I(iFile) % iKindData == Distr2D_) then
+         File_I(iFile) % StringHeaderAux = &
+              trim(File_I(iFile) % StringHeaderAux)//' '//NameVar_V(LagrID_)
+      end if
+
+      ! header 3: [CDF or def/DEF unit]
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile)%StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux)// &
               ' log10[#/m**2/s/sr/' // NameEnergyUnit &
               // '*(p_{INJ}/(kg*m/s))**2]'
       case(DEFIo_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile)%StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux)// &
               ' log10[p.f.u/' // NameEnergyUnit // ']'
       case(DEFSi_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile)%StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux)// &
               ' log10[#/m**2/s/sr/' // NameEnergyUnit // ']'
       end select
 
@@ -742,6 +767,8 @@ contains
           call write_mh_time
        case(Distr1D_)
           call write_distr_1d
+       case(Distr2D_)
+          call write_distr_2d
        case(DisTraj_)
           call write_distraj
        case(Flux2D_)
@@ -780,7 +807,7 @@ contains
       character(len=15) :: StringTime
       character(len=*), parameter:: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
-      !  Update number of time tags and write to tag l ist file
+      ! Update number of time tags and write to tag list file
       if(iProc==0)then
          ! increase the file counter
          nTag = nTag + 1
@@ -813,7 +840,7 @@ contains
 
       do iLine = 1, nLine
          if(.not.Used_B(iLine))CYCLE
-         call make_file_name(&
+         call make_file_name( &
               StringBase    = NameMHData,                      &
               iLine         = iLine,                           &
               iIter         = iIter,                           &
@@ -930,7 +957,7 @@ contains
            //trim(File_I(iFile)%StringHeaderAux)
 
       ! set the file name
-      call make_file_name(&
+      call make_file_name( &
            StringBase    = NameMHData,                      &
            Radius        = File_I(iFile) % Radius,          &
            iIter         = iIter,                           &
@@ -938,7 +965,7 @@ contains
            NameOut       = NameFile)
 
       ! reset the output buffer
-      File_I(iFile) % Buffer_II = 0
+      File_I(iFile) % Buffer_II = 0.0
 
       ! reset, all field lines are printed reaching output sphere
       DoPrint_I = .true.
@@ -995,8 +1022,8 @@ contains
                  nLineAll, MPI_Logical, MPI_Land, &
                  0, iComm, iError)
          else
-            call MPI_Reduce(File_I(iFile)%Buffer_II, &
-                 File_I(iFile)%Buffer_II,&
+            call MPI_Reduce(File_I(iFile) % Buffer_II, &
+                 File_I(iFile)%Buffer_II, &
                  nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum, &
                  0, iComm, iError)
             call MPI_Reduce(DoPrint_I, DoPrint_I, &
@@ -1041,7 +1068,7 @@ contains
            TypeFileIn    = File_I(iFile) % TypeFile, &
            nDimIn        = 1, &
            TimeIn        = SPTime, &
-           nStepIn       = iIter, &
+           nStepIn       = iIter,  &
            ParamIn_I     = Param_I(1:nParam), &
            Coord1In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)),&
            NameVarIn     = &
@@ -1050,8 +1077,8 @@ contains
            VarIn_VI      = &
            reshape(&
            pack(File_I(iFile) % Buffer_II(1:iVarLat + nFluxVar,1:nLineAll),&
-           MASK = spread(DoPrint_I, 1,iVarLat + nFluxVar)), &
-           [iVarLat + nFluxVar, count(DoPrint_I)]))
+           MASK = spread(DoPrint_I, DIM=1, NCOPIES=iVarLat + nFluxVar)),   &
+           [iVarLat + nFluxVar, count(DoPrint_I)] ))
 
     end subroutine write_mh_2d
     !==========================================================================
@@ -1106,7 +1133,7 @@ contains
          do iLine = 1, nLine
             if(.not.Used_B(iLine))CYCLE
             ! set the file name
-            call make_file_name(&
+            call make_file_name( &
                  StringBase    = NameMHData,                      &
                  Radius        = File_I(iFile) % Radius,          &
                  iLine         = iLine,                           &
@@ -1135,7 +1162,7 @@ contains
          if(.not.DoPrint) CYCLE
 
          ! set the file name
-         call make_file_name(&
+         call make_file_name( &
               StringBase    = NameMHData,                     &
               Radius        = File_I(iFile) % Radius,         &
               iLine         = iLine,                          &
@@ -1222,9 +1249,9 @@ contains
     !==========================================================================
     subroutine write_distr_1d
 
-      ! Write output with 1D MH data in the format to be read by IDL/TECPLOT.
-      ! Separate file is created for each field line, and the name format is:
-      ! Distribution_<cdf/def/DEF>_<iLon>_<iLat>_e<ddhhmmss>_n<iIter>.{out/dat}
+      ! write output with 1D Distribution in the format read by IDL/TECPLOT;
+      ! separate file is created for each field line, and the name format is:
+      ! Distr_<R/S>_<cdf/def/DEF>_<iLon>_<iLat>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use SP_ModGrid, ONLY: S_
 
@@ -1233,7 +1260,7 @@ contains
       ! header of the output file
       character(len=500) :: StringHeader
       character(len=2)   :: TypeDist
-      character(len=3)   :: TypeDistr
+      character(len=4)   :: TypeDistr
       ! loop variables
       integer :: iLine
       ! indexes of corresponding node, latitude and longitude
@@ -1265,28 +1292,29 @@ contains
       select case(File_I(iFile) % iDistance)
       case(Distance_)
          iDistance = R_
-         TypeDist = 'R_'
+         TypeDist = '_R'
       case(LineLength_)
          iDistance = S_
-         TypeDist = 'S_'
+         TypeDist = '_S'
       end select
 
       ! set the file name
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
-         TypeDistr = 'cdf'
+         TypeDistr = '_cdf'
       case(DEFIo_)
-         TypeDistr = 'def'
+         TypeDistr = '_def'
       case(DEFSi_)
-         TypeDistr = 'DEF'
+         TypeDistr = '_DEF'
       end select
 
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
-         call make_file_name(&
-              StringBase    = 'Distr_' // TypeDist //TypeDistr,&
+         call make_file_name( &
+              StringBase    = &
+              NameDistrData // TypeDistr // TypeDist,          &
               iLine         = iLine,                           &
               iIter         = iIter,                           &
               NameExtension = File_I(iFile)%NameFileExtension, &
@@ -1330,6 +1358,137 @@ contains
       end do
 
     end subroutine write_distr_1d
+    !==========================================================================
+    subroutine write_distr_2d
+
+      ! write output with 2D Distribution in the format read by IDL/TECPLOT.
+      ! Separate file is created for each field line, and the name format is:
+      ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
+
+      use SP_ModProc, ONLY: iComm, nProc
+      use ModMpi
+
+      ! name of the output file
+      character(len=100) :: NameFile
+      ! header of the output file
+      character(len=500) :: StringHeader
+      character(len=4)   :: TypeDistr
+      ! loop variables
+      integer :: iLine
+      ! indexes of corresponding node, latitude and longitude
+      integer :: iLineAll
+      ! index of particle just above the radius
+      integer :: iAbove
+      ! interpolation weight
+      real    :: Weight
+      ! MPI error
+      integer :: iError
+      ! scale and conversion factor
+      real    :: Scale_I(0:nP+1)
+      ! skip a field line not reaching radius of output sphere
+      logical :: DoPrint_I(nLineAll)
+      ! timetag
+      character(len=15):: StringTime
+      character(len=*), parameter:: NameSub = 'write_distr_2d'
+      !------------------------------------------------------------------------
+
+      ! set header
+      StringHeader = &
+           'MFLAMPA: Distribution data on a sphere at '//&
+           'fixed heliocentric distance; Coordindate system: '//&
+           trim(TypeCoordSystem)//'; '//trim(File_I(iFile)%StringHeaderAux)
+
+      ! set the momentum or kinetic energy axis (first axis)
+      select case(File_I(iFile) % iScale)
+      case(Momentum_)
+         Scale_I = Log10Momentum_I
+      case(Energy_)
+         Scale_I = Log10KinEnergyIo_I
+      end select
+
+      ! determine string for the saved filename
+      select case(File_I(iFile) % iTypeDistr)
+      case(CDF_)
+         TypeDistr = '_cdf'
+      case(DEFIo_)
+         TypeDistr = '_def'
+      case(DEFSi_)
+         TypeDistr = '_DEF'
+      end select
+
+      ! set the file name
+      call make_file_name( &
+           StringBase    = NameDistrData // TypeDistr,      &
+           Radius        = File_I(iFile) % Radius,          &
+           iIter         = iIter,                           &
+           NameExtension = File_I(iFile)%NameFileExtension, &
+           NameOut       = NameFile)
+
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0.0
+
+      ! reset, all field lines are printed reaching output sphere
+      DoPrint_I = .true.
+
+      do iLine = 1, nLine
+         if(.not.Used_B(iLine)) CYCLE
+         iLineAll = iLineAll0 + iLine
+
+         ! find the particle just above the given radius
+         call search_line(iLine, File_I(iFile) % Radius, &
+              iAbove, DoPrint_I(iLineAll), Weight)
+         DoPrint_I(iLineAll) = DoPrint_I(iLineAll) .and. iAbove /= 1
+
+         ! if no intersection found -> proceed to the next line
+         if(.not.DoPrint_I(iLineAll)) CYCLE
+
+         ! intersection is found -> get Distribution data at that location
+         File_I(iFile) % Buffer_II(0:nP+1, iLineAll) = log10( &
+              Distribution_CB(0:nP+1, nMu, iAbove-1, iLine) * (1-Weight) + &
+              Distribution_CB(0:nP+1, nMu, iAbove,   iLine) *    Weight)
+      end do
+
+      ! gather interpolated data on the source processor
+      if(nProc > 1)then
+         if(iProc==0)then
+            call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
+                 (nP+2)*nLineAll, MPI_REAL, MPI_Sum, &
+                 0, iComm, iError)
+            call MPI_Reduce(MPI_IN_PLACE, DoPrint_I, &
+                 nLineAll, MPI_Logical, MPI_Land, &
+                 0, iComm, iError)
+         else
+            call MPI_Reduce(File_I(iFile) % Buffer_II, &
+                 File_I(iFile) % Buffer_II, &
+                 (nP+2)*nLineAll, MPI_REAL, MPI_Sum, &
+                 0, iComm, iError)
+            call MPI_Reduce(DoPrint_I, DoPrint_I, &
+                 nLineAll, MPI_Logical, MPI_Land, &
+                 0, iComm, iError)
+         end if
+      end if
+
+      ! print data to file
+      if(iProc==0)&
+           call save_plot_file(&
+           NameFile      = NameFile, &
+           StringHeaderIn= StringHeader, &
+           TypeFileIn    = File_I(iFile) % TypeFile, &
+           nDimIn        = 2, &
+           TimeIn        = SPTime,  &
+           nStepIn       = iIter,   &
+           Coord1In_I    = Scale_I, &
+           Coord2In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)), &
+           NameVarIn     = &
+           trim(File_I(iFile) % NameVarPlot) // ' ' // &
+           trim(File_I(iFile) % NameAuxPlot), &
+           VarIn_II      = &
+           reshape( &
+           pack(File_I(iFile) % Buffer_II(0:nP+1, 1:nLineAll),&
+           MASK = spread(DoPrint_I, DIM=1, NCOPIES=nP+2)),  &
+           [nP+2, count(DoPrint_I)] ))
+
+    end subroutine write_distr_2d
     !==========================================================================
     subroutine write_distraj
 
@@ -1388,6 +1547,15 @@ contains
       integer :: iStencil_I(3)
       real    :: Weight_I(3)
       !------------------------------------------------------------------------
+
+      ! Determine the saved distribution function (f or f*p**2)
+      select case(File_I(iFile) % iScale)
+      case(Momentum_)
+         Scale_I = Log10Momentum_I
+      case(Energy_)
+         Scale_I = Log10KinEnergyIo_I
+      end select
+
       ! Determine string for the saved filename
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
@@ -1396,14 +1564,6 @@ contains
          TypeDistr = '_def'
       case(DEFSi_)
          TypeDistr = '_DEF'
-      end select
-
-      ! Determine the saved distribution function (f or f*p**2)
-      select case(File_I(iFile) % iScale)
-      case(Momentum_)
-         Scale_I = Log10Momentum_I
-      case(Energy_)
-         Scale_I = Log10KinEnergyIo_I
       end select
 
       ! Save outputs for each satellite
@@ -1415,8 +1575,8 @@ contains
               //trim(File_I(iFile)%StringHeaderAux)
 
          ! set the file name
-         call make_file_name(&
-              StringBase    = 'Distr_' //                      &
+         call make_file_name( &
+              StringBase    = NameDistrData //                 &
               trim(NameSat_I(iSat)) // TypeDistr,              &
               iIter         = iIter,                           &
               NameExtension = File_I(iFile)%NameFileExtension, &
@@ -1671,7 +1831,7 @@ contains
            //trim(File_I(iFile)%StringHeaderAux)
 
       ! set the file name
-      call make_file_name(&
+      call make_file_name( &
            StringBase    = NameFluxData,                   &
            Radius        = File_I(iFile)%Radius,           &
            iIter         = iIter,                          &
@@ -1679,7 +1839,7 @@ contains
            NameOut       = NameFile)
 
       ! reset the output buffer
-      File_I(iFile) % Buffer_II = 0
+      File_I(iFile) % Buffer_II = 0.0
 
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
@@ -1733,9 +1893,9 @@ contains
       end do
 
       ! start time in seconds from base year
-      Param_I(StartTime_)  = StartTime
+      Param_I(StartTime_)   = StartTime
       ! start time in Julian date
-      Param_I(StartJulian_)= StartTimeJulian
+      Param_I(StartJulian_) = StartTimeJulian
 
       ! print data to file
       if(iProc==0)&
@@ -1809,7 +1969,7 @@ contains
            //trim(File_I(iFile)%StringHeaderAux)
 
       ! set file name
-      call make_file_name(&
+      call make_file_name( &
            StringBase    = NameFluxData,                   &
            Radius        = File_I(iFile) % Radius,         &
            Longitude     = File_I(iFile) % Lon,            &
@@ -1855,7 +2015,7 @@ contains
       ! add new data
       nDataLine = nDataLine + 1
       ! reset the output buffer
-      File_I(iFile) % Buffer_II(1:nFluxVar, nDataLine) = 0
+      File_I(iFile) % Buffer_II(1:nFluxVar, nDataLine) = 0.0
       ! put time into buffer
       File_I(iFile) % Buffer_II(nFluxVar+1, nDataLine) = SPTime
 
