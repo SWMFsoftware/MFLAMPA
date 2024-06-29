@@ -773,13 +773,14 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
       <parameter name="StringPlot" type="strings" case="lower"
 		 min="3" max="20" >
         <part name="KindData" type="string" input="select">
-          <option name="MHD, fluxes 1D"  value="mh1d" />
-          <option name="MHD 2D"  value="mh2d" />
-          <option name="Distrubution function, 1D" value="distr1d" />
-          <option name="Particle spectra along trajectory" value="distraj" />
-          <option name="Flux 2D"  value="flux2d" />
+          <option name="MHD, fluxes 1D" value="mh1d" />
+          <option name="MHD, fluxes 2D" value="mh2d" />
           <option name="MHD, fluxes timeline" value="mhtime" />
-          <option name="Flux timeline"  value="fluxtime" />
+          <option name="Distrubution function, 1D" value="distr1d" />
+          <option name="Distrubution function, 2D" value="distr2d" />
+          <option name="Distrubution function, along trajectory" value="distraj" />
+          <option name="Flux 2D"       value="flux2d" />
+          <option name="Flux timeline" value="fluxtime" />
         </part>
         <part name="TypeFile" type="string" input="select" required="T">
           <option name="ascii" value="ascii/idl" default="T"/>
@@ -823,7 +824,7 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
           <option name="canonical distribution function" value="cdf"/>
         </part>
       </parameter>
-      <if expr="$KindData=~/mh2d|mhtime|flux2d|fluxtime/">
+      <if expr="$KindData=~/mh2d|mhtime|distr2d|flux2d|fluxtime/">
 	      <parameter name="Radius" type="real" min="1.0" default="215.0"/>
         <if expr="$KindData eq fluxtime">
           <parameter name="Longitude" type="real"
@@ -842,16 +843,18 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
 7				nFileOut
 mh1d flux ascii			StringPlot
 mh2d flux ascii			StringPlot
-215.0				Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
-fluxtime flux ascii		StringPlot
-215.0				Radius [Rs] (read if mh2d/mhtime/flux2d/fluxtime)
-30.0				Longitude [deg] (red if fluxtime)
-46.0				Latitude [deg] (red if fluxtime)
+215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/flux2d/fluxtime)
 distr1d momentum length cdf ascii	StringPlot
 distr1d energy distance def idl		StringPlot
+distr2d energy def idl		StringPlot
+215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/flux2d/fluxtime)
 distraj def energy idl		StringPlot
 T				UsePoleTriangulation
 T				UsePlanarTriangles
+fluxtime flux ascii		StringPlot
+215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/flux2d/fluxtime)
+30.0				Longitude [deg] (read if fluxtime)
+46.0				Latitude [deg] (read if fluxtime)
 
 Sets the number and type of the plotfiles to save. For several types of plot
 the radius of heliocentric spherical surface on which to plot may be also set.
@@ -861,9 +864,10 @@ including coordinates and MHD variables; "R" means radial coordinate (R) plus
 fluxes; "idl" means to save the data in the idl format. Particularly, the "mh1d",
 "mh2d", "mhtime", "flux2d", and "fluxtime" save the integral particle flux in
 the unit of p.f.u. For the differential particle flux in the unit of p.f.u. per
-energy unit, "distr1d" can save all the values of the VDF (each momentum, at
-each coordinate along each fieldline), and "distraj" can save only the values
-interpolated to the specified trajectories. 
+energy unit, "distr1d" saves all the values of the VDF (each momentum, at each
+coordinate along each fieldline), "distr2d" saves the VDF at fixed heliocentric
+distances for all fieldlines, and "distraj" only saves the VDF values
+interpolated to the specified satellite trajectories.
 
 For "distr1d", "cdf" means the canonical distribution function, "def" means the
 differential energy function (intensity), saved in the unit of
@@ -874,6 +878,10 @@ in the specified unit (default: keV) or the log10(momentum) normalized by the
 injection momentum, respectively. The "distance" or "length" is the second axis
 saved in the unit of solar radii, for the heliocentric distance or the field
 line length to the foot point on the Sun, respectively.
+
+For "distr2d", the StringPlot format is basically the same as it is in
+"distr1d", except that we do not use distance or length. Instead, one need
+to specify the radius for interpolating and saving the distribution function.
 
 If using "distraj", one should also specify "#SATELLITE" before these lines.
 In StringPlot, the first identifier is always a type of plot, the last
