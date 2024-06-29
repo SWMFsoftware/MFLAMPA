@@ -90,7 +90,9 @@ mhtime flux ascii		StringPlot
 215.0			Radius
 distr2d energy def ascii		StringPlot
 215.0			Radius
-distraj def energy ascii		StringPlot
+distrtime energy def ascii		StringPlot
+215.0			Radius
+distrtraj energy def ascii		StringPlot
 F				UsePoleTriangulation
 T				UsePlanarTriangles
 distr1d energy distance def ascii		StringPlot

@@ -68,10 +68,11 @@ module SP_ModPlot
                                 ! Distribution
        Distr1D_   = 3, & ! along each line
        Distr2D_   = 4, & ! at given radius as Lon-Lat plot
-       DisTraj_   = 5, & ! along the specified spacecraft trajectory
+       DistrTime_ = 5, & ! at given radius as time series for lines
+       DistrTraj_ = 6, & ! along the specified spacecraft trajectory
                                 ! Flux
-       Flux2D_    = 6, & ! at a given radius on rectangular Lon-Lat grid
-       FluxTime_  = 7    ! at a given radius as time series on Lon-Lat grid
+       Flux2D_    = 7, & ! at a given radius on rectangular Lon-Lat grid
+       FluxTime_  = 8    ! at a given radius as time series on Lon-Lat grid
   ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
@@ -190,7 +191,7 @@ contains
     ! number and names of flux channels are known at this point;
     ! also, allocate buffers for output data
     do iFile = 1, nFileOut
-       File_I(iFile)%nFluxVar = 0
+       File_I(iFile) % nFluxVar = 0
        if(File_I(iFile) % DoPlotFlux)then
           File_I(iFile) % nFluxVar = FluxMax_ - Flux0_ + 1
           do iVar = Flux0_, FluxMax_
@@ -229,7 +230,9 @@ contains
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nVertexMax))
        case(Distr2D_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, nLineAll))
-       case(DisTraj_)
+       case(DistrTime_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1))
+       case(DistrTraj_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1))
        case(Flux2D_)
           if(.not.IsReadySpreadGrid) call CON_stop(NameSub//   &
@@ -346,8 +349,10 @@ contains
              File_I(iFile) % iKindData = Distr1D_
           case('distr2d')
              File_I(iFile) % iKindData = Distr2D_
-          case('distraj')
-             File_I(iFile) % iKindData = DisTraj_
+          case('distrtime')
+             File_I(iFile) % iKindData = DistrTime_
+          case('distrtraj')
+             File_I(iFile) % iKindData = DistrTraj_
           case('flux2d')
              File_I(iFile) % iKindData = Flux2D_
           case('fluxtime')
@@ -438,18 +443,22 @@ contains
                   trim(File_I(iFile) % NameAuxPlot) //&
                   ' StartTime StartTimeJulian'
              ! get radius
-             call read_var('Radius [Rs]', File_I(iFile) % Radius)
+             call read_var('Radius', File_I(iFile) % Radius)
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
-             ! process the distr1d data
              call process_distr
           case(Distr2D_)
-             ! process the distr2d data
              call process_distr
              ! get radius
              call read_var('Radius', File_I(iFile) % Radius)
-          case(DisTraj_)
+          case(DistrTime_)
+             call process_distr
+             ! get radius
+             call read_var('Radius', File_I(iFile) % Radius)
+             ! reset indicator of the first call
+             File_I(iFile) % IsFirstCall = .true.
+          case(DistrTraj_)
              call process_distr
              ! get pole triangulartion flag
              call read_var('UsePoleTriangulation', UsePoleTri)
@@ -471,7 +480,7 @@ contains
                   trim(File_I(iFile) % NameAuxPlot) //&
                   ' StartTime StartTimeJulian'
              ! get radius
-             call read_var('Radius [Rs]', File_I(iFile) % Radius)
+             call read_var('Radius', File_I(iFile) % Radius)
           case(FluxTime_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -480,11 +489,11 @@ contains
              File_I(iFile) % NameAuxPlot = &
                   ' StartTime StartTimeJulian Longitude Latitude'
              ! get radius
-             call read_var('Radius [Rs]', File_I(iFile) % Radius)
+             call read_var('Radius', File_I(iFile) % Radius)
              ! get longitude and latitude of location being tracked
-             call read_var('Longitude [deg]', File_I(iFile) % Lon)
+             call read_var('Longitude', File_I(iFile) % Lon)
              File_I(iFile) % Lon = File_I(iFile) % Lon * cDegToRad
-             call read_var('Latitude [deg]', File_I(iFile) % Lat)
+             call read_var('Latitude', File_I(iFile) % Lat)
              File_I(iFile) % Lat = File_I(iFile) % Lat * cDegToRad
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
@@ -560,8 +569,8 @@ contains
          end if
       end do ! iStringPlot
 
-      File_I(iFile)%nMhdVar   = count(File_I(iFile)%DoPlot_V(1:nMhData))
-      File_I(iFile)%nExtraVar = count(File_I(iFile)%DoPlot_V(1+nMhData:nVar))
+      File_I(iFile) % nMhdVar   = count(File_I(iFile)%DoPlot_V(1:nMhData))
+      File_I(iFile) % nExtraVar = count(File_I(iFile)%DoPlot_V(1+nMhData:nVar))
 
       ! indices in the state vectors
       if(File_I(iFile)%nMhdVar>0) allocate(File_I(iFile)%iVarMhd_V( &
@@ -658,6 +667,9 @@ contains
          File_I(iFile) % NameVarPlot = &
               trim(NameScale) // ' ' // &
               trim(NameVar_V(LagrID_)) // ' ' // trim(NameVar)
+      elseif(File_I(iFile) % iKindData == DistrTime_) then
+         File_I(iFile) % NameVarPlot = &
+              trim(NameScale) // ' Time ' // trim(NameVar)
       else
          File_I(iFile) % NameVarPlot = &
               trim(NameScale) // ' ' // trim(NameVar)
@@ -677,12 +689,15 @@ contains
 
       ! header 2: Rsun for both S_ and D_ when saving Distr1D
       ! LagrID when saving Distr2D, or no/skip when saving DisTraj
-      if(File_I(iFile) % iKindData == DisTraj_) then
+      if(File_I(iFile) % iKindData == Distr1D_) then
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux)//' '//NameVarUnit_V(R_)
       elseif(File_I(iFile) % iKindData == Distr2D_) then
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux)//' '//NameVar_V(LagrID_)
+      elseif(File_I(iFile) % iKindData == DistrTime_) then
+         File_I(iFile) % StringHeaderAux = &
+              trim(File_I(iFile) % StringHeaderAux)//' sec'
       end if
 
       ! header 3: [CDF or def/DEF unit]
@@ -769,8 +784,10 @@ contains
           call write_distr_1d
        case(Distr2D_)
           call write_distr_2d
-       case(DisTraj_)
-          call write_distraj
+       case(DistrTime_)
+          call write_distr_time
+       case(DistrTraj_)
+          call write_distr_traj
        case(Flux2D_)
           call write_flux_2d
        case(FluxTime_)
@@ -908,31 +925,31 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iLine, iVarPlot, iVarIndex
+      integer :: iLine, iVarPlot, iVarIndex
       ! indexes of corresponding node, latitude and longitude
-      integer:: iLineAll
+      integer :: iLineAll
       ! index of particle just above the radius
-      integer:: iAbove
+      integer :: iAbove
       ! xyz coordinate of intersection point or average direction
-      real:: Xyz_D(nDim)
+      real    :: Xyz_D(nDim)
       ! longitude and latitude intersection point
-      real:: LonPoint, LatPoint
+      real    :: LonPoint, LatPoint
       ! interpolation weight
-      real:: Weight
+      real    :: Weight
       ! auxilary variable for xyz_to_rlonlat call
-      real:: Aux
+      real    :: Aux
       ! for better readability
-      integer:: nMhdVar, nExtraVar, nFluxVar, iVarLon, iVarLat
+      integer :: nMhdVar, nExtraVar, nFluxVar, iVarLon, iVarLat
       ! skip a field line not reaching radius of output sphere
-      logical:: DoPrint_I(nLineAll)
+      logical :: DoPrint_I(nLineAll)
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
       integer, parameter:: LonAv_ = StartTime_ + 2
       integer, parameter:: LatAv_ = StartTime_ + 3
       integer, parameter:: AngleSpread_= StartTime_ + 4
-      integer:: nParam
-      real :: Param_I(1:AngleSpread_)
+      integer :: nParam
+      real    :: Param_I(1:AngleSpread_)
       character(len=*), parameter:: NameSub = 'write_mh_2d'
       !------------------------------------------------------------------------
       nExtraVar = File_I(iFile)%nExtraVar
@@ -1089,28 +1106,28 @@ contains
 
       ! name of the output file
       character(len=100):: NameFile
+      ! header for the file
+      character(len=500):: StringHeader
       ! loop variables
-      integer:: iLine, iVarPlot, iVarIndex
+      integer :: iLine, iVarPlot, iVarIndex
       ! index of particle just above the radius
-      integer:: iAbove
+      integer :: iAbove
       ! interpolation weight
-      real:: Weight
+      real    :: Weight
       ! for better readability
-      integer:: nMhdVar, nExtraVar, nFluxVar
+      integer :: nMhdVar, nExtraVar, nFluxVar
       ! skip a field line if it fails to reach radius of output sphere
-      logical:: DoPrint
+      logical :: DoPrint
       ! size of the already written data
-      integer:: nDataLine
+      integer :: nDataLine
       ! current size of the buffer
-      integer:: nBufferSize
+      integer :: nBufferSize
       ! whether the output file already exists
-      logical:: IsPresent
+      logical :: IsPresent
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
-      real :: Param_I(1:StartJulian_)
-      ! header for the file
-      character(len=500):: StringHeader
+      real    :: Param_I(1:StartJulian_)
 
       character(len=*), parameter:: NameSub = 'write_mh_time'
       !------------------------------------------------------------------------
@@ -1129,15 +1146,14 @@ contains
          File_I(iFile) % IsFirstCall = .false.
          ! go over list of lines and remove file for each one
          do iLine = 1, nLine
-            if(.not.Used_B(iLine))CYCLE
+            if(.not.Used_B(iLine)) CYCLE
             ! set the file name
             call make_file_name( &
-                 StringBase    = NameMHData,                      &
-                 Radius        = File_I(iFile) % Radius,          &
-                 iLine         = iLine,                           &
-                 NameExtension = File_I(iFile)%NameFileExtension, &
+                 StringBase    = NameMHData,                        &
+                 Radius        = File_I(iFile) % Radius,            &
+                 iLine         = iLine,                             &
+                 NameExtension = File_I(iFile) % NameFileExtension, &
                  NameOut       = NameFile)
-
             call remove_file(NameFile)
          end do
       end if
@@ -1161,10 +1177,10 @@ contains
 
          ! set the file name
          call make_file_name( &
-              StringBase    = NameMHData,                     &
-              Radius        = File_I(iFile) % Radius,         &
-              iLine         = iLine,                          &
-              NameExtension = File_I(iFile)%NameFileExtension,&
+              StringBase    = NameMHData,                        &
+              Radius        = File_I(iFile) % Radius,            &
+              iLine         = iLine,                             &
+              NameExtension = File_I(iFile) % NameFileExtension, &
               NameOut       = NameFile)
 
          ! if file already exists -> read its content
@@ -1177,45 +1193,45 @@ contains
                  TypeFileIn = File_I(iFile) % TypeFile, &
                  n1Out      = nDataLine)
             ! if buffer is too small then reallocate it
-            nBufferSize = ubound(File_I(iFile)%Buffer_II, 2)
-            if(nBufferSize < nDataLine + 1)then
-               deallocate(File_I(iFile)%Buffer_II)
-               allocate(File_I(iFile)%Buffer_II(&
-                    nMhdVar + nExtraVar + nFluxVar + 1, 2*nBufferSize))
+            nBufferSize = ubound(File_I(iFile)%Buffer_II, DIM=2)
+            if(nBufferSize < nDataLine + 1) then
+               deallocate(File_I(iFile) % Buffer_II)
+               allocate(File_I(iFile) % Buffer_II(&
+                    1 + nMhdVar + nExtraVar + nFluxVar, 2*nBufferSize))
             end if
 
             ! read the data itself
             call read_plot_file(&
                  NameFile   = NameFile,                  &
-                 TypeFileIn = File_I(iFile)%TypeFile,    &
-                 Coord1Out_I= File_I(iFile)%Buffer_II(   &
+                 TypeFileIn = File_I(iFile) % TypeFile,  &
+                 Coord1Out_I= File_I(iFile) % Buffer_II( &
                  1 + nMhdVar + nExtraVar + nFluxVar,:),  &
-                 VarOut_VI  = File_I(iFile)%Buffer_II(   &
+                 VarOut_VI  = File_I(iFile) % Buffer_II( &
                  1:nMhdVar + nExtraVar + nFluxVar,:))
          end if
 
          ! add new data
          nDataLine = nDataLine + 1
          ! put time into buffer
-         File_I(iFile)%Buffer_II(&
-              nMhdVar + nExtraVar + nFluxVar+1,nDataLine) = SPTime
+         File_I(iFile) % Buffer_II(&
+              nMhdVar + nExtraVar + nFluxVar + 1, nDataLine) = SPTime
          ! interpolate data and fill buffer
          ! interpolate each requested variable
          do iVarPlot = 1, nMhdVar
-            iVarIndex = File_I(iFile)%iVarMhd_V(iVarPlot)
-            File_I(iFile)%Buffer_II(iVarPlot, nDataLine) = &
+            iVarIndex = File_I(iFile) % iVarMhd_V(iVarPlot)
+            File_I(iFile) % Buffer_II(iVarPlot, nDataLine) = &
                  MhData_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
                  MhData_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          do iVarPlot = 1, nExtraVar
-            iVarIndex = File_I(iFile)%iVarExtra_V(iVarPlot)
-            File_I(iFile)%Buffer_II(iVarPlot + nMhdVar, nDataLine) = &
+            iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
+            File_I(iFile) % Buffer_II(iVarPlot + nMhdVar, nDataLine) = &
                  State_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
                  State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile)%Buffer_II(1 + nMhdVar + nExtraVar: &
-              nFluxVar + nMhdVar + nExtraVar, nDataLine) =     &
+              File_I(iFile) % Buffer_II(1 + nMhdVar + nExtraVar: &
+              nFluxVar + nMhdVar + nExtraVar, nDataLine) =       &
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
               Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight
 
@@ -1233,13 +1249,13 @@ contains
               nStepIn       = iIter, &
               ParamIn_I     = Param_I, &
               Coord1In_I    = &
-              File_I(iFile) % Buffer_II(1 + nMhdVar + nExtraVar + nFluxVar,&
+              File_I(iFile) % Buffer_II(1 + nMhdVar + nExtraVar + nFluxVar, &
               1:nDataLine), &
               NameVarIn     = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
               VarIn_VI      = &
-              File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar,&
+              File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar, &
               1:nDataLine))
       end do
 
@@ -1311,11 +1327,10 @@ contains
          call iblock_to_lon_lat(iLine, iLon, iLat)
 
          call make_file_name( &
-              StringBase    = &
-              NameDistrData // TypeDistr // TypeDist,          &
-              iLine         = iLine,                           &
-              iIter         = iIter,                           &
-              NameExtension = File_I(iFile)%NameFileExtension, &
+              StringBase    = NameDistrData//TypeDistr//TypeDist, &
+              iLine         = iLine,                              &
+              iIter         = iIter,                              &
+              NameExtension = File_I(iFile) % NameFileExtension,  &
               NameOut       = NameFile)
 
          ! get max particle indexes on this field line
@@ -1345,8 +1360,8 @@ contains
               StringHeaderIn = StringHeader, &
               TypeFileIn     = File_I(iFile) % TypeFile, &
               nDimIn         = 2, &
-              TimeIn         = SPTime, &
-              nStepIn        = iIter, &
+              TimeIn         = SPTime,  &
+              nStepIn        = iIter,   &
               Coord1In_I     = Scale_I, &
               Coord2In_I     = State_VIB(iDistance,1:iEnd,iLine), &
               NameVarIn      = &
@@ -1359,8 +1374,8 @@ contains
     !==========================================================================
     subroutine write_distr_2d
 
-      ! write output with 2D Distribution in the format read by IDL/TECPLOT.
-      ! Separate file is created for each field line, and the name format is:
+      ! write output with 2D Distribution in the format read by IDL/TECPLOT;
+      ! separate file is created for each field line, and the name format is:
       ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use SP_ModProc, ONLY: iComm, nProc, iError
@@ -1414,10 +1429,10 @@ contains
 
       ! set the file name
       call make_file_name( &
-           StringBase    = NameDistrData // TypeDistr,      &
-           Radius        = File_I(iFile) % Radius,          &
-           iIter         = iIter,                           &
-           NameExtension = File_I(iFile)%NameFileExtension, &
+           StringBase    = NameDistrData // TypeDistr,        &
+           Radius        = File_I(iFile) % Radius,            &
+           iIter         = iIter,                             &
+           NameExtension = File_I(iFile) % NameFileExtension, &
            NameOut       = NameFile)
 
       ! reset the output buffer
@@ -1486,16 +1501,174 @@ contains
 
     end subroutine write_distr_2d
     !==========================================================================
-    subroutine write_distraj
+    subroutine write_distr_time
 
-      ! Write the Distribution function along given spacecraft trajectories.
-      ! There are a few steps taken to achieve this:
+      ! write output w/time series Distribution in format read by IDL/TECPLOT;
+      ! separate file is created for each field line, and the name format is:
+      ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
+      ! the file has no timetag as it is updated during the run
+
+      ! name of the output file
+      character(len=100) :: NameFile
+      ! header for the file
+      character(len=500) :: StringHeader
+      character(len=4)   :: TypeDistr
+      ! loop variables
+      integer :: iLine
+      ! index of particle just above the radius
+      integer :: iAbove
+      ! interpolation weight
+      real    :: Weight
+      ! scale and conversion factor
+      real    :: Scale_I(0:nP+1)
+      ! scale and conversion factor
+      real, allocatable :: SPTime_I(:)
+      ! skip a field line if it fails to reach radius of output sphere
+      logical :: DoPrint
+      ! size of the already written data
+      integer :: nPsaved, nTimeSaved
+      ! current size of the buffer
+      integer :: nBufferSize
+      ! whether the output file already exists
+      logical :: IsPresent
+
+      character(len=*), parameter:: NameSub = 'write_distr_time'
+      !------------------------------------------------------------------------
+
+      ! set header
+      StringHeader = &
+           'MFLAMPA: Distribution data on a sphere at '//&
+           'fixed heliocentric distance; Coordindate system: '//&
+           trim(TypeCoordSystem)//'; '//trim(File_I(iFile)%StringHeaderAux)
+
+      ! set the momentum or kinetic energy axis (first axis)
+      select case(File_I(iFile) % iScale)
+      case(Momentum_)
+         Scale_I = Log10Momentum_I
+      case(Energy_)
+         Scale_I = Log10KinEnergyIo_I
+      end select
+
+      ! determine string for the saved filename
+      select case(File_I(iFile) % iTypeDistr)
+      case(CDF_)
+         TypeDistr = '_cdf'
+      case(DEFIo_)
+         TypeDistr = '_def'
+      case(DEFSi_)
+         TypeDistr = '_DEF'
+      end select
+
+      ! at first call, remove files if they exist to reset time series output
+      if(File_I(iFile) % IsFirstCall)then
+         ! mark that the 1st call has already happened
+         File_I(iFile) % IsFirstCall = .false.
+         ! go over list of lines and remove file for each one
+         do iLine = 1, nLine
+            if(.not.Used_B(iLine)) CYCLE
+            ! set the file name
+            call make_file_name( &
+                 StringBase    = NameDistrData // TypeDistr,        &
+                 Radius        = File_I(iFile) % Radius,            &
+                 iLine         = iLine,                             &
+                 NameExtension = File_I(iFile) % NameFileExtension, &
+                 NameOut       = NameFile)
+            call remove_file(NameFile)
+         end do
+      end if
+
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0.0
+
+      ! go over all lines on the processor and find the point of intersection
+      ! with output sphere if present
+      do iLine = 1, nLine
+         if(.not.Used_B(iLine)) CYCLE
+         ! reset, the field line is printed unless fail to reach output sphere
+         DoPrint = .true.
+
+         ! find the particle just above the given radius
+         call search_line(iLine, File_I(iFile)%Radius, iAbove, DoPrint, Weight)
+         DoPrint = DoPrint .and. iAbove /= 1
+
+         ! if no intersection found -> proceed to the next line
+         if(.not.DoPrint) CYCLE
+
+         ! set the file name
+         call make_file_name( &
+              StringBase    = NameDistrData // TypeDistr,        &
+              Radius        = File_I(iFile) % Radius,            &
+              iLine         = iLine,                             &
+              NameExtension = File_I(iFile) % NameFileExtension, &
+              NameOut       = NameFile)
+
+         ! if file already exists -> read its content
+         nTimeSaved = 0; nPsaved = 0
+         inquire(FILE=NameFile, EXIST=IsPresent)
+         if(IsPresent) then
+            ! first, determine its size
+            call read_plot_file(&
+                 NameFile   = NameFile, &
+                 TypeFileIn = File_I(iFile) % TypeFile, &
+                 n1Out      = nPsaved, &
+                 n2Out      = nTimeSaved)
+            ! if buffer is too small then reallocate it
+            nBufferSize = ubound(File_I(iFile)%Buffer_II, DIM=2)
+            if(nBufferSize < nTimeSaved + 1) then
+               deallocate(File_I(iFile) % Buffer_II)
+               allocate(File_I(iFile) % Buffer_II(0:nP+1, 2*nBufferSize))
+            end if
+            ! also allocate the SPTime_I array for the SPTime saved
+            allocate(SPTime_I(1:nTimeSaved+1))
+
+            ! read the data itself
+            call read_plot_file(&
+                 NameFile   = NameFile,                 &
+                 TypeFileIn = File_I(iFile) % TypeFile, &
+                 Coord2Out_I= SPTime_I,                 &
+                 VarOut_II  = File_I(iFile)%Buffer_II(0:nP+1, :))
+         end if
+
+         ! add new data
+         nTimeSaved = nTimeSaved + 1
+         ! may need to allocate SPTime_I (e.g., at the first step)
+         if(.not. allocated(SPTime_I)) allocate(SPTime_I(1:nTimeSaved))
+         ! put time into SPTime_I and the buffer
+         SPTime_I(nTimeSaved) = SPTime
+         File_I(iFile) % Buffer_II(0:nP+1, nTimeSaved) = log10( &
+              Distribution_CB(0:nP+1, nMu, iAbove-1, iLine) * (1-Weight) + &
+              Distribution_CB(0:nP+1, nMu, iAbove,   iLine) *    Weight)
+
+         ! reprint data to file
+         call save_plot_file(&
+              NameFile      = NameFile, &
+              StringHeaderIn= StringHeader, &
+              TypeFileIn    = File_I(iFile) % TypeFile, &
+              nDimIn        = 2, &
+              TimeIn        = SPTime,   &
+              nStepIn       = iIter,    &
+              Coord1In_I    = Scale_I,  &
+              Coord2In_I    = SPTime_I, &
+              NameVarIn     = &
+              trim(File_I(iFile) % NameVarPlot) // ' ' // &
+              trim(File_I(iFile) % NameAuxPlot), &
+              VarIn_II      = File_I(iFile) % Buffer_II(0:nP+1, 1:nTimeSaved))
+         ! may need to deallocate SPTime_I
+         if(allocated(SPTime_I)) deallocate(SPTime_I)
+      end do
+
+    end subroutine write_distr_time
+    !==========================================================================
+    subroutine write_distr_traj
+
+      ! write the Distribution function along given spacecraft trajectories;
+      ! there are a few steps taken to achieve this:
       !     1. Search the TRAJECTORY and read the satellite locations
       !     2. Set up the TRIANGULATIONs as a mesh for interpolation
       !     3. Find the cell of the satellite location and the weights
       !     4. INTERPOLATE log(distribution) on the triangular mesh
       !     5. Set the file name and SAVE the results
-      ! Separate file is created for each satellite, and the name format is:
+      ! separate file is created for each satellite, and the name format is:
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use ModMpi
@@ -1785,7 +1958,7 @@ contains
               VarIn_I       = File_I(iFile) % Buffer_II(:, nMu))
       end do ! iSat
 
-    end subroutine write_distraj
+    end subroutine write_distr_traj
     !==========================================================================
     subroutine write_flux_2d
 
@@ -1900,8 +2073,8 @@ contains
            StringHeaderIn= StringHeader, &
            TypeFileIn    = File_I(iFile) % TypeFile, &
            nDimIn        = 2, &
-           TimeIn        = SPTime, &
-           nStepIn       = iIter, &
+           TimeIn        = SPTime,  &
+           nStepIn       = iIter,   &
            ParamIn_I     = Param_I, &
            Coord1In_I    = SpreadLon_I * cRadToDeg,&
            Coord2In_I    = SpreadLat_I * cRadToDeg,&
@@ -1991,18 +2164,18 @@ contains
                  TypeFileIn = File_I(iFile) % TypeFile, &
                  n1Out      = nDataLine)
             ! if buffer is too small then reallocate it
-            nBufferSize = ubound(File_I(iFile)%Buffer_II, 2)
+            nBufferSize = ubound(File_I(iFile)%Buffer_II, DIM=2)
             if(nBufferSize < nDataLine + 1)then
-               deallocate(File_I(iFile)%Buffer_II)
-               allocate(File_I(iFile)%Buffer_II(nFluxVar+1, 2*nBufferSize))
+               deallocate(File_I(iFile) % Buffer_II)
+               allocate(File_I(iFile) % Buffer_II(nFluxVar+1, 2*nBufferSize))
             end if
 
             ! read the data itself
             call read_plot_file(&
                  NameFile   = NameFile, &
-                 TypeFileIn = File_I(iFile)%TypeFile,&
-                 Coord1Out_I= File_I(iFile)%Buffer_II(1+nFluxVar,:),&
-                 VarOut_VI  = File_I(iFile)%Buffer_II(1:nFluxVar,:))
+                 TypeFileIn = File_I(iFile) % TypeFile, &
+                 Coord1Out_I= File_I(iFile) % Buffer_II(1+nFluxVar,:), &
+                 VarOut_VI  = File_I(iFile) % Buffer_II(1:nFluxVar,:))
          end if
       end if
 
@@ -2032,7 +2205,7 @@ contains
               File_I(iFile)%Lon, File_I(iFile)%Lat, Spread)
 
          ! apply spread to excess fluxes above background/initial flux
-         File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) = &
+         File_I(iFile) % Buffer_II(1:nFluxVar,nDataLine) = &
               File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) + Spread * (&
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
               Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight  - &
@@ -2054,7 +2227,7 @@ contains
 
       if(iProc==0)then
          ! add background/initial flux back
-         File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) = &
+         File_I(iFile) % Buffer_II(1:nFluxVar,nDataLine) = &
               File_I(iFile)%Buffer_II(1:nFluxVar,nDataLine) + &
               FluxChannelInit_V(Flux0_:FluxMax_)
 
@@ -2072,8 +2245,8 @@ contains
               StringHeaderIn= StringHeader, &
               TypeFileIn    = File_I(iFile) % TypeFile, &
               nDimIn        = 1, &
-              TimeIn        = SPTime, &
-              nStepIn       = iIter, &
+              TimeIn        = SPTime,  &
+              nStepIn       = iIter,   &
               ParamIn_I     = Param_I, &
               Coord1In_I    = &
               File_I(iFile) % Buffer_II(1+nFluxVar,1:nDataLine), &
