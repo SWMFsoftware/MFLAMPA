@@ -4,7 +4,7 @@
 program MFLAMPA
 
   use ModKind
-  use SP_ModProc,   ONLY: iProc, nProc, iComm
+  use SP_ModProc,   ONLY: iProc, nProc, iComm, iError
   use ModUtilities, ONLY: remove_file, touch_file
   use SP_ModTime,   ONLY: iIter, init_time  => init
   use SP_ModPlot,   ONLY:        init_plot  => init
@@ -23,7 +23,6 @@ program MFLAMPA
 
   implicit none
 
-  integer      :: iError
   integer      :: iSession = 1
   real(Real8_) :: CpuTimeStart
   logical      :: IsFirstSession = .true.

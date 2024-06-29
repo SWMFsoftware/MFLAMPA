@@ -4,9 +4,9 @@
 module SP_wrapper
 
   use CON_coupler, ONLY: SP_, CON_stop
-  use SP_ModMain, ONLY: run, DoRestart, DoReadMhData
-  use SP_ModTime, ONLY: DataInputTime, SPTime, IsSteadyState, iIter
-  use SP_ModProc, ONLY: iProc
+  use SP_ModMain,  ONLY: run, DoRestart, DoReadMhData
+  use SP_ModTime,  ONLY: DataInputTime, SPTime, IsSteadyState, iIter
+  use SP_ModProc,  ONLY: iProc, iError
 
   implicit none
 
@@ -34,7 +34,6 @@ contains
     use CON_coupler, ONLY: i_proc0, i_comm, is_proc0
     use ModMpi
     logical, intent(out):: DoExtract
-    integer :: iError
 
     character(len=*), parameter:: NameSub = 'SP_do_extract_lines'
     !--------------------------------------------------------------------------

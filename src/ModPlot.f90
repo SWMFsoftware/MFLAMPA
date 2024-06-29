@@ -5,15 +5,16 @@ module SP_ModPlot
 
   ! Methods for saving plots
 
-  use SP_ModAngularSpread, ONLY: get_normalized_spread,     &
-       nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I,    &
+  use SP_ModAngularSpread, ONLY: get_normalized_spread,  &
+       nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I, &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModDistribution, ONLY: nP, KinEnergyIo_I,          &
-       MomentumInjSi, Momentum_I, FluxChannelInit_V,        &
+  use SP_ModDistribution, ONLY: nP, KinEnergyIo_I,       &
+       MomentumInjSi, Momentum_I, FluxChannelInit_V,     &
        Flux_VIB, Flux0_, FluxMax_, NameFluxChannel_I, Distribution_CB
-  use SP_ModGrid, ONLY: search_line, iLineAll0, nVar, nMHData, nLine, &
-       MHData_VIB, State_VIB, iShock_IB, nVertex_B, Shock_,           &
-       X_, Y_, Z_, R_, NameVar_V, TypeCoordSystem, LagrID_, nLineAll
+  use SP_ModGrid, ONLY: nVar, nMHData, nLine, nLineAll,  &
+       iLineAll0, search_line, MHData_VIB, State_VIB,    &
+       iShock_IB, nVertex_B, NameVar_V, Shock_, LagrID_, &
+       X_, Y_, Z_, R_, TypeCoordSystem
   use SP_ModGrid, ONLY: iblock_to_lon_lat, Used_B
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax, nDim
@@ -442,14 +443,14 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           case(Distr1D_)
              ! process the distr1d data
-             call process_distr(DoSkipMh=.false.)
+             call process_distr
           case(Distr2D_)
              ! process the distr2d data
-             call process_distr(DoSkipMh=.true.)
+             call process_distr
              ! get radius
              call read_var('Radius', File_I(iFile) % Radius)
           case(DisTraj_)
-             call process_distr(DoSkipMh=.true.)
+             call process_distr
              ! get pole triangulartion flag
              call read_var('UsePoleTriangulation', UsePoleTri)
              ! get the triangulation approach flag
@@ -595,12 +596,11 @@ contains
 
     end subroutine process_mh
     !==========================================================================
-    subroutine process_distr(DoSkipMh)
+    subroutine process_distr
 
       ! process output parameters for distribution output
-      logical, intent(in) :: DoSkipMh ! whether to skip to save the MH Data
       integer:: iStringPlot
-      character(len=20):: NameVar, NameScale, NameDistance
+      character(len=20):: NameScale, NameDistance, NameVar
 
       ! only 1 variable (at most) is printed
       !------------------------------------------------------------------------
@@ -900,7 +900,7 @@ contains
       ! single file is created for all field lines, name format is
       ! MH_data_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
 
-      use SP_ModProc, ONLY: iComm, nProc
+      use SP_ModProc, ONLY: iComm, nProc, iError
       use ModMpi
 
       ! name of the output file
@@ -923,8 +923,6 @@ contains
       real:: Aux
       ! for better readability
       integer:: nMhdVar, nExtraVar, nFluxVar, iVarLon, iVarLat
-      ! MPI error
-      integer:: iError
       ! skip a field line not reaching radius of output sphere
       logical:: DoPrint_I(nLineAll)
       ! additional parameters
@@ -1007,7 +1005,7 @@ contains
                  State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
          if(File_I(iFile) % DoPlotFlux)&
-              File_I(iFile)%Buffer_II(1 + iVarLat:nFluxVar + iVarLat,iLineAll)&
+              File_I(iFile) % Buffer_II(1+iVarLat:nFluxVar+iVarLat, iLineAll) &
               = Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) +     &
               Flux_VIB(  Flux0_:FluxMax_, iAbove,   iLine) *    Weight
       end do !  iLine
@@ -1365,7 +1363,7 @@ contains
       ! Separate file is created for each field line, and the name format is:
       ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
-      use SP_ModProc, ONLY: iComm, nProc
+      use SP_ModProc, ONLY: iComm, nProc, iError
       use ModMpi
 
       ! name of the output file
@@ -1381,8 +1379,6 @@ contains
       integer :: iAbove
       ! interpolation weight
       real    :: Weight
-      ! MPI error
-      integer :: iError
       ! scale and conversion factor
       real    :: Scale_I(0:nP+1)
       ! skip a field line not reaching radius of output sphere
@@ -1507,7 +1503,7 @@ contains
            find_triangle_orig, find_triangle_sph
       use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
            NameFileSat_I, set_satellite_positions, DoTrackSatellite_I
-      use SP_ModProc,              ONLY: iComm, nProc
+      use SP_ModProc,              ONLY: iComm, nProc, iError
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -1516,8 +1512,6 @@ contains
       character(len=4)   :: TypeDistr
       ! scale and conversion factor
       real    :: Scale_I(0:nP+1)
-      ! MPI error
-      integer :: iError
 
       ! radial distance, longitude and latitude of satellite
       real    :: rSat, LonSat, LatSat
@@ -1624,20 +1618,24 @@ contains
             if(nProc > 1)then
                if(iProc == 0)then
                   call MPI_Reduce(MPI_IN_PLACE, Xyz_DI,     &
-                       3*nLineAll, MPI_REAL, MPI_Sum, 0, iComm, iError)
+                       3*nLineAll, MPI_REAL, MPI_Sum,       &
+                       0, iComm, iError)
                   call MPI_Reduce(MPI_IN_PLACE,             &
                        Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
                        MPI_REAL, MPI_Sum, 0, iComm, iError)
                   call MPI_Reduce(MPI_IN_PLACE, DoReachR_I, &
-                       nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
+                       nLineAll, MPI_LOGICAL, MPI_LOR,      &
+                       0, iComm, iError)
                else
                   call MPI_Reduce(Xyz_DI, Xyz_DI,           &
-                       3*nLineAll, MPI_REAL, MPI_Sum, 0, iComm, iError)
+                       3*nLineAll, MPI_REAL, MPI_Sum,       &
+                       0, iComm, iError)
                   call MPI_Reduce(Log10DistR_IIB,           &
                        Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
                        MPI_REAL, MPI_Sum, 0, iComm, iError)
                   call MPI_Reduce(DoReachR_I, DoReachR_I,   &
-                       nLineAll, MPI_LOGICAL, MPI_LOR, 0, iComm, iError)
+                       nLineAll, MPI_LOGICAL, MPI_LOR,      &
+                       0, iComm, iError)
                end if
             end if
 
@@ -1791,7 +1789,7 @@ contains
     !==========================================================================
     subroutine write_flux_2d
 
-      use SP_ModProc, ONLY: iComm, nProc
+      use SP_ModProc, ONLY: iComm, nProc, iError
       use ModMpi
 
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
@@ -1810,8 +1808,6 @@ contains
       real:: Weight
       ! for better readability
       integer:: nFlux
-      ! MPI error
-      integer:: iError
       ! skip a field line not reaching radius of output sphere
       logical:: DoPrint
       ! additional parameters
@@ -1920,7 +1916,7 @@ contains
     !==========================================================================
     subroutine write_flux_time
 
-      use SP_ModProc, ONLY: iComm, nProc
+      use SP_ModProc, ONLY: iComm, nProc, iError
       use ModMpi
 
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
@@ -1940,8 +1936,6 @@ contains
       real:: Spread
       ! for better readability
       integer:: nFluxVar
-      ! MPI error
-      integer:: iError
       ! skip a field line not reaching radius of output sphere
       logical:: DoPrint
       ! size of the already written data
