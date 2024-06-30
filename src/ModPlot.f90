@@ -694,7 +694,7 @@ contains
               trim(File_I(iFile) % StringHeaderAux)//' '//NameVarUnit_V(R_)
       elseif(File_I(iFile) % iKindData == Distr2D_) then
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)//' '//NameVar_V(LagrID_)
+              trim(File_I(iFile) % StringHeaderAux)//' LineIndex'
       elseif(File_I(iFile) % iKindData == DistrTime_) then
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux)//' sec'
