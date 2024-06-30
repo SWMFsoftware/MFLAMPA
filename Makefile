@@ -234,7 +234,7 @@ test_spectra_check:
 		data/output/test_mflampa/MH_poisson_data.ref.gz \
 		> test_spectra.diff
 
-	cat ${TESTDIR}/SP/IO2/Distribution_def_*n000006.out \
+	cat ${TESTDIR}/SP/IO2/Distr_def_R{*???_???,_001_*_n000006}.out \
 		> ${TESTDIR}/SP/IO2/Distr_data.outs
 	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
 		${TESTDIR}/SP/IO2/Distr_data.outs \

@@ -82,12 +82,14 @@ HGR			TypeCoordSystem
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
 
 #SAVEPLOT
-4			nFileOut
+7			nFileOut
 mh1d flux ascii		StringPlot
 mh2d flux ascii		StringPlot
 215.0			Radius
 mhtime flux ascii		StringPlot
 215.0			Radius
+distr1d energy distance def ascii		StringPlot
+distr1d momentum length cdf ascii		StringPlot
 distr2d energy def ascii		StringPlot
 215.0			Radius
 distrtime energy def ascii		StringPlot
@@ -95,8 +97,6 @@ distrtime energy def ascii		StringPlot
 distrtraj energy def ascii		StringPlot
 F				UsePoleTriangulation
 T				UsePlanarTriangles
-distr1d energy distance def ascii		StringPlot
-distr1d momentum length cdf ascii		StringPlot
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType
