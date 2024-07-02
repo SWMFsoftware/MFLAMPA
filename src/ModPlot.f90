@@ -665,8 +665,7 @@ contains
               trim(NameDistance) // ' ' // trim(NameVar)
       elseif(File_I(iFile) % iKindData == Distr2D_) then
          File_I(iFile) % NameVarPlot = &
-              trim(NameScale) // ' ' // &
-              trim(NameVar_V(LagrID_)) // ' ' // trim(NameVar)
+              trim(NameScale) // ' LineIndex ' // trim(NameVar)
       elseif(File_I(iFile) % iKindData == DistrTime_) then
          File_I(iFile) % NameVarPlot = &
               trim(NameScale) // ' Time ' // trim(NameVar)
@@ -1459,6 +1458,22 @@ contains
               Distribution_CB(0:nP+1, nMu, iAbove,   iLine) *    Weight)
       end do
 
+      ! account for the requested output, only on the source processor
+      if(iProc==0)then
+         select case(File_I(iFile) % iTypeDistr)
+         case(CDF_)
+            ! do nothing
+         case(DEFIo_)
+            File_I(iFile) % Buffer_II = Log10Si2IoFlux + &
+                 File_I(iFile) % Buffer_II + &
+                 2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=nLineAll)
+         case(DEFSi_)
+            File_I(iFile) % Buffer_II = &
+                 File_I(iFile) % Buffer_II + &
+                 2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=nLineAll)
+         end select
+      end if
+
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
@@ -1638,6 +1653,20 @@ contains
          File_I(iFile) % Buffer_II(0:nP+1, nTimeSaved) = log10( &
               Distribution_CB(0:nP+1, nMu, iAbove-1, iLine) * (1-Weight) + &
               Distribution_CB(0:nP+1, nMu, iAbove,   iLine) *    Weight)
+
+         ! account for the requested output
+         select case(File_I(iFile) % iTypeDistr)
+         case(CDF_)
+            ! do nothing
+         case(DEFIo_)
+            File_I(iFile) % Buffer_II(0:nP+1, nTimeSaved) = Log10Si2IoFlux + &
+                 File_I(iFile) % Buffer_II(0:nP+1, nTimeSaved) + &
+                 2.0*Log10Momentum_I
+         case(DEFSi_)
+            File_I(iFile) % Buffer_II(0:nP+1, nTimeSaved) = &
+                 File_I(iFile) % Buffer_II(0:nP+1, nTimeSaved) + &
+                 2.0*Log10Momentum_I
+         end select
 
          ! reprint data to file
          call save_plot_file(&
