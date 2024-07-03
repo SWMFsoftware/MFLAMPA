@@ -352,10 +352,10 @@ contains
                    !
                    ! The contrubution to integral equals:
                    dFluxChannel = &
-                        (KinEnergyIo_I(iP+1) - EChannelIo_I(iFlux))&! Span
-                        *0.5*(                & ! times a half of sum of
-                        DistTimesP2_I(iP+1) + & ! the right boundary value +
-                        ((KinEnergyIo_I(iP+1) -&! interpolation to E_Channel:
+                        (KinEnergyIo_I(iP+1) - EChannelIo_I(iFlux))& ! Span
+                        *0.5*(                &  ! times a half of sum of
+                        DistTimesP2_I(iP+1) + &  ! the right boundary value +
+                        ((KinEnergyIo_I(iP+1) -& ! interpolation to E_Channel:
                         EChannelIo_I(iFlux))*DistTimesP2_I(iP) & ! from iP
                         + (EChannelIo_I(iFlux) - KinEnergyIo_I(iP))* &
                         DistTimesP2_I(iP+1))                   & ! from iP+1
