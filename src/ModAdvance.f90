@@ -6,7 +6,7 @@ module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, iShock_IB, &
-       Used_B, Shock_, ShockOld_, nLine, nVertex_B, nWidth
+       Used_B, Rho_, B_, Shock_, ShockOld_, nLine, nVertex_B
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -48,7 +48,6 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine advance(TimeLimit)
-
     ! advance the solution of the diffusive kinetic equation:
     !    if IsMuAvg: Omnidirectional VDF (Parker transport equation):
     !      f_t + [(1/3)*(d(ln rho)/dt]*f_{ln p} = B*d/ds[D/B*df/ds]
@@ -66,7 +65,7 @@ contains
     ! and (3) new steepen_shock
 
     use SP_ModTime,             ONLY: SPTime
-    use SP_ModGrid,             ONLY: Rho_, RhoOld_, B_, BOld_
+    use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson, &
          init_data_states, advect_via_multi_poisson
@@ -182,11 +181,12 @@ contains
   contains
     !==========================================================================
     subroutine steepen_shock
-
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
+
       use SP_ModGrid, ONLY: D_, dLogRhoThreshold
       use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+
       real :: DsSi_I(1:iEnd-1)
       real :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real :: dLogRhoExcessIntegral
@@ -211,21 +211,19 @@ contains
            dLogRhoExcessIntegral/DsSi_I(iShock)
       ! also, sharpen the magnetic field magnitude
       ! post shock part
-      BSi_I(iShock+1-nWidth:iShock+1)=maxval(BSi_I(iShock+1-nWidth:iShock+1))
+      BSi_I(iShock+1-nWidth:iShock+1) = maxval(BSi_I(iShock+1-nWidth:iShock+1))
       ! pre shock part
-      BSi_I(iShock+1:iShock+nWidth  )=minval(BSi_I(iShock+1:iShock+nWidth))
+      BSi_I(iShock+1:iShock+nWidth  ) = minval(BSi_I(iShock+1:iShock+nWidth))
 
     end subroutine steepen_shock
     !==========================================================================
   end subroutine advance
   !============================================================================
   subroutine iterate_steady_state
-
     ! advance the solution of the diffusive kinetic equation:
     !     f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
-    ! with accounting for diffusion and Fermi acceleration
+    ! with accounting for diffusion and first-order Fermi acceleration
 
-    use SP_ModGrid,           ONLY: Rho_, B_
     use SP_ModAdvancePoisson, ONLY: iterate_poisson
     use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
     use SP_ModDistribution,   ONLY: IsDistNeg
@@ -236,10 +234,10 @@ contains
     integer :: iEnd, iShock
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I
-    ! go line by line and iterate the solution
     !--------------------------------------------------------------------------
 
     LINE:do iLine = 1, nLine
+       ! go line by line and iterate the solution
        if(.not.Used_B(iLine)) CYCLE LINE
        ! the active particles on the line
        iEnd = nVertex_B(iLine)

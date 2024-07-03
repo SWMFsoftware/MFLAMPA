@@ -54,7 +54,7 @@ contains
     IsDistNeg = .false.
 
     ! first-order Fermi acceleration for the current line
-    FermiFirst_I = dLogRho_I/(3*dLogP)
+    FermiFirst_I = dLogRho_I/(3.0*dLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1 + int(maxval(abs(FermiFirst_I(iStart:nX)))/Cfl)
     ! Check if the number of time steps is positive:
@@ -93,22 +93,22 @@ contains
              call set_upper_end_bc(iLine, nX)
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                     LowerEndSpectrum_I = max( &
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, LowerEndSpectrum_I = max( &
                      LowerEndBc_I(1:nP), Background_I(1:nP)), &
                      UpperEndSpectrum_I = max( &
                      UpperEndBc_I(1:nP), Background_I(1:nP)))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I, &
-                     UpperEndSpectrum_I = max( &
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, UpperEndSpectrum_I = max( &
                      UpperEndBc_I(1:nP), Background_I(1:nP)))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, &
-                     BSi_I, LowerEndSpectrum_I = max( &
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, LowerEndSpectrum_I = max( &
                      LowerEndBc_I(1:nP), Background_I(1:nP)))
              else
                 ! with no lower or upper end BCs
@@ -127,9 +127,9 @@ contains
     ! non-conservative formulation, at a logarithmic grid,
     ! using a single-stage second order scheme
 
-    real,   intent(in):: CflIn        ! Time step * acceleration rate/(Dlnp)
-    integer,intent(in):: nGCLeft      ! The solution in the ghost cells is not
-    integer,intent(in):: nGCRight     ! advanced in time but used as the BCs
+    real,   intent(in):: CflIn      ! Time step * acceleration rate/(Dlnp)
+    integer,intent(in):: nGCLeft    ! The solution in the ghost cells is not
+    integer,intent(in):: nGCRight   ! advanced in time but used as the BCs
     real,intent(inout):: FInOut_I(1-nGCLeft:nP+nGCRight) ! Solution
     ! sol. index 0 is to set boundary condition at the injection energy
     ! Subcycling to achieve the condition CFL<1, if nStep>1

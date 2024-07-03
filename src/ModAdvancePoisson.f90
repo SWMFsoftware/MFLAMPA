@@ -12,6 +12,7 @@ module SP_ModAdvancePoisson
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, &
        Background_I, IsDistNeg, check_dist_neg
   use ModUtilities,       ONLY: CON_stop
+  use ModPoissonBracket,  ONLY: explicit
   implicit none
 
   PRIVATE ! Except
@@ -36,7 +37,6 @@ contains
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
 
-    use ModPoissonBracket,  ONLY: explicit
     use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
@@ -154,7 +154,6 @@ contains
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
-    use ModPoissonBracket,  ONLY: explicit
     use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
     use SP_ModGrid,         ONLY: State_VIB, D_, U_
     use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
@@ -254,7 +253,6 @@ contains
     ! focused transport equation considering pitch angle
     ! diffuse the distribution function at each time step
 
-    use ModPoissonBracket,  ONLY: explicit
     use SP_ModDistribution, ONLY: DeltaMu, VolumeP_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
