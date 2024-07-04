@@ -14,7 +14,7 @@ component of the SWMF.
   <parameter name="ROrigin" type="real" min="1.0" default="2.5"/>
   <parameter name="LonMin"  type="real" min="-359.0" max="359.0" default="0.0"/>
   <parameter name="LatMin"  type="real" min="-90.0" max="89.0" default="-70.0"/>
-  <parameter name="LonMax"  type="real" min="1.0" max="360" default="360.0"/>
+  <parameter name="LonMax"  type="real" min="1.0" max="360.0" default="360.0"/>
   <parameter name="LatMax"  type="real" min="-89.0" max="90.0" default="70.0"/>
 
 #ORIGIN
@@ -153,8 +153,8 @@ test suite, which contains these commands when the framework is tested.
 
 <command name="SAVERESTART" if="$_IsStandAlone">
   <parameter name="DoSaveRestart" type="logical" default="F" />
-  <parameter name="DnSaveRestart" type="integer" default="-1" />
-  <parameter name="DtSaveRestart" type="real" default="-1.0" />
+  <parameter name="DnSaveRestart" type="integer" min="-1" default="-1" />
+  <parameter name="DtSaveRestart" type="real" min="-1.0" default="-1.0" />
 
 #SAVERESTART
 F			DoSaveRestart
@@ -368,8 +368,8 @@ Then we set the "Sigma" of the lines, namely the changes in degrees.
 </command>
 
 <command name="SPREADSOLIDANGLE">
-  <parameter name="RadiusRef"  type="real" default="1.0"/>
-  <parameter name="SolidAngleRef"  type="real" default="1.0"/>
+  <parameter name="RadiusRef"  type="real" min="-1.0" default="1.0"/>
+  <parameter name="SolidAngleRef"  type="real" min="-1.0" default="1.0"/>
 
 #SPREADSOLIDANGLE
 -1.0			RadiusRef [Rs]
@@ -841,9 +841,11 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
     </for>
 
 #SAVEPLOT
-7				nFileOut
+10				nFileOut
 mh1d flux ascii			StringPlot
 mh2d flux ascii			StringPlot
+215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
+mhtime flux ascii			StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
 distr1d momentum length cdf ascii	StringPlot
 distr1d energy distance def idl		StringPlot
@@ -854,25 +856,33 @@ distrtime energy def idl		StringPlot
 distrtraj def energy idl		StringPlot
 T				UsePoleTriangulation
 T				UsePlanarTriangles
+flux2d flux ascii		StringPlot
+215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
 fluxtime flux ascii		StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
 30.0				Longitude [deg] (read if fluxtime)
 46.0				Latitude [deg] (read if fluxtime)
 
-Sets the number and type of the plotfiles to save. For several types of plot
+Sets the number and type of the plotfiles to save. For several types of plot,
 the radius of heliocentric spherical surface on which to plot may be also set.
+As a simple example, the #SAVEPLOT above show how to write the StringPlot to
+save all the formats we provide at the current stage. One can include more
+strings for the properties in between for each StringPlot. One also need to
+pay attention, that "mh1d" can only be saved once (appear once in #SAVEPLOT).
 
-As an example, "mh1d" means to save 1D plot (for each magnetic field line)
-including coordinates and MHD variables; "R" means radial coordinate (R) plus
-fluxes; "idl" means to save the data in the idl format. Particularly, the "mh1d",
-"mh2d", "mhtime", "flux2d", and "fluxtime" save the integral particle intensity
-in the unit of p.f.u., for the Lon-Lat contour, along the time axis, with MHD
-data saved or not, respectively. For the differential particle intensity in the
-unit of p.f.u. per energy unit, "distr1d" saves all the values of the VDF (each
-momentum, at each coordinate along each fieldline), "distr2d" saves the VDF at
-fixed heliocentric distances for all fieldlines, "distrtime" saves the VDF at
-fixed radius along the timeline for each fieldline, and "distraj" only saves
-the VDF values interpolated to the specified satellite trajectories.
+Again, as an example, "mh1d" means to save 1D plot (for each magnetic field
+line) including coordinates and MHD variables; "R" means radial coordinate (R)
+plus fluxes; "idl" means to save the data in the idl format. Particularly,
+the "mh1d", "mh2d", "mhtime", "flux2d", and "fluxtime" save the integral
+particle intensity in the unit of p.f.u., for the Lon-Lat contour, along the
+time axis, with MHD data saved or not, respectively.
+
+For the differential particle intensity in the unit of p.f.u. per energy unit,
+"distr1d" saves all the values of the VDF (each momentum, at each coordinate
+along each fieldline), "distr2d" saves the VDF at fixed heliocentric distances
+for all fieldlines, "distrtime" saves the VDF at fixed radius along the timeline
+for each fieldline, and "distraj" only saves the VDF values interpolated to the
+specified satellite trajectories.
 
 For "distr1d", "cdf" represents the canonical distribution function, "def"
 means the differential energy function (intensity), saved in the unit of
@@ -893,6 +903,11 @@ If using "distraj", one should also specify "#SATELLITE" before these lines.
 In StringPlot, the first identifier is always a type of plot, the last
 identifier is a type of file, and the string variables in between denote the
 list of plot variables extra to the MHD ones.
+
+A Jupyter notebook comparing the differential (Distr*) and integral (Mh*)
+particle intensity outputs is SP/MFLAMPA/Scripts/mflampa_crosscheck.ipynb,
+which shows the absolute and relative differences are both very tiny and
+demonstrates these two types of outputs are consistent.
 
 Please send an email to Igor Sokolov for more information on this command.
 </command>
