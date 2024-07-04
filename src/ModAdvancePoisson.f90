@@ -39,7 +39,8 @@ contains
 
     use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
+         UseLowerEndBc, iStart
     ! INPUTS:
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX            ! Number of meshes along s_L axis
@@ -47,8 +48,6 @@ contains
     real,    intent(in):: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
-    ! Loop variables
-    integer :: iX
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
@@ -59,17 +58,17 @@ contains
     ! dVolumeDt_G: total control time derivative
     real, dimension(0:nP+1, 0:nX+1):: VolumeOld_G, Volume_G, dVolumeDt_G
     ! DeltaHamiltonian
-    real    :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
+    real :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
     ! Extended array for distribution function
-    real    :: VDF_G(-1:nP+2, -1:nX+2)
+    real :: VDF_G(-1:nP+2, -1:nX+2)
     ! Advection term
-    real    :: Source_C(nP, nX)
+    real :: Source_C(nP, nX)
     ! Time, ranging from 0 to tFinal
-    real    :: Time
+    real :: Time
     ! Time step
-    real    :: Dt
+    real :: Dt
     ! Prediction for the next time step:
-    real    :: DtNext
+    real :: DtNext
     ! Now this is the particle-number-conservative advection scheme
 
     character(len=*), parameter:: NameSub = 'advect_via_poisson'
@@ -122,8 +121,9 @@ contains
        ! May need to correct the volume if the time step has been reduced
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
        ! Update velocity distribution function
-       Distribution_CB(1:nP, 1, 1:nX, iLine) = &
-            Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
+       Distribution_CB(1:nP, 1, iStart:nX, iLine) = &
+            Distribution_CB(1:nP, 1, iStart:nX, iLine) + &
+            Source_C(1:nP, iStart:nX)
        ! Check if the VDF includes negative values
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg)RETURN
@@ -131,12 +131,25 @@ contains
        ! Diffuse the distribution function
        if(UseDiffusion) then
           if(UseUpperEndBc) then
-             call diffuse_distribution(iLine, nX, iShock, Dt,         &
-                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),    &
-                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+             if(UseLowerEndBc) then
+                ! with lower or upper end BCs
+                call diffuse_distribution(iLine, nX, iShock, Dt,      &
+                     nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0), &
+                     UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+             else
+                ! with upper end BC but no lower end BC
+                call diffuse_distribution(iLine, nX, iShock, Dt,      &
+                     nSi_I, BSi_I, UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+             end if
           else
-             call diffuse_distribution(iLine, nX, iShock, Dt,         &
-                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+             if(UseLowerEndBc) then
+                ! with lower end BC but no upper end BC
+                call diffuse_distribution(iLine, nX, iShock, Dt,      &
+                     nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+             else
+                ! with no lower or upper end BCs
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
+             end if
           end if
           ! Check if the VDF includes negative values after diffusion
           call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
@@ -158,35 +171,35 @@ contains
     use SP_ModGrid,         ONLY: State_VIB, D_, U_
     use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
-
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
+         UseLowerEndBc, iStart
+    ! INPUTS:
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX            ! Number of meshes along s_L axis
     real,    intent(in):: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in):: BSi_I(nX), nSi_I(nX)
     real               :: uSi_I(nX-1), DsSi_I(nX-1)
-    ! Loop variable
-    integer :: iX
     ! Volume_G: global space volume = product of distance in each dimension
-    real    :: Volume_G(0:nP+1, 0:nX+1)
+    real :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
-    real    :: VolumeX_I(0:nX+1)
+    real :: VolumeX_I(0:nX+1)
     ! u/B variable at face
-    real    :: uOverBNodeSi_I(-1:nX+1)
+    real :: uOverBNodeSi_I(-1:nX+1)
     ! Hamiltonian at cell face
-    real    :: Hamiltonian_N(-1:nP+1, -1:nX+1)
+    real :: Hamiltonian_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
-    real    :: VDF_G(-1:nP+2, -1:nX+2)
+    real :: VDF_G(-1:nP+2, -1:nX+2)
     ! Advection term
-    real    :: Source_C(nP, nX)
+    real :: Source_C(nP, nX)
     ! Time step
-    real    :: Dt_C(nP, nX)
+    real :: Dt_C(nP, nX)
+
+    character(len=*), parameter:: NameSub = 'iterate_poisson'
     ! Now particle-number-conservative advection scheme for steady-state soln.
+    !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    character(len=*), parameter:: NameSub = 'iterate_poisson'
-    !--------------------------------------------------------------------------
     DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! Initialize arrays
     VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
@@ -224,8 +237,8 @@ contains
          IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
-    Distribution_CB(1:nP, 1, 1:nX, iLine) = &
-         Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C
+    Distribution_CB(1:nP, 1, iStart:nX, iLine) = &
+         Distribution_CB(1:nP, 1, iStart:nX, iLine) + Source_C(1:nP, iStart:nX)
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg)RETURN
@@ -233,16 +246,29 @@ contains
     ! Diffuse the distribution function
     if(UseDiffusion) then
        if(UseUpperEndBc) then
-          call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
-               nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0),  &
-               UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+          if(UseLowerEndBc) then
+             ! with lower or upper end BCs
+             call diffuse_distribution(iLine, nX, iShock, Dt_C,    &
+                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0), &
+                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+          else
+             ! with upper end BC but no lower end BC
+             call diffuse_distribution(iLine, nX, iShock, Dt_C,    &
+                  nSi_I, BSi_I, UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+          end if
        else
-          call diffuse_distribution(iLine, nX, iShock, Dt_C,     &
-               nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
-          ! Check if the VDF includes negative values after diffusion
-          call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-          if(IsDistNeg)RETURN
+          if(UseLowerEndBc) then
+             ! with lower end BC but no upper end BC
+             call diffuse_distribution(iLine, nX, iShock, Dt_C,    &
+                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+          else
+             ! with no lower or upper end BCs
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I)
+          end if
        end if
+       ! Check if the VDF includes negative values after diffusion
+       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+       if(IsDistNeg)RETURN
     end if
 
   end subroutine iterate_poisson
@@ -255,8 +281,9 @@ contains
 
     use SP_ModDistribution, ONLY: DeltaMu, VolumeP_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc
-
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
+         UseLowerEndBc, iStart
+    ! INPUTS:
     integer, intent(in):: iLine, iShock ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real,    intent(in):: TimeStart ! Start time before advancing
@@ -329,8 +356,9 @@ contains
 
        if(IsExit) then
           ! This step is the last step
-          Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =       &
-               Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) + Source_C
+          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =       &
+               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) +  &
+               Source_C(1:nP, 1:nMu, iStart:nX)
        else
           ! This step is not the last step
           ! Update VDF_G considering the time-dependent Volume_G
@@ -344,10 +372,11 @@ contains
                   spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
           end do
 
-          ! Update VDF_G to CURRENT time: no BCs for (1:nQ, 1:nP, 1;nR)
-          Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =       &
-               Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) +  &
-               Source_C/Volume_G(1:nP, 1:nMu, 1:nX)
+          ! Update VDF_G to CURRENT time: no BCs for (1:nQ, 1:nP, iStart:nR)
+          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =       &
+               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) +  &
+               Source_C(1:nP, 1:nMu, iStart:nX)/ &
+               Volume_G(1:nP, 1:nMu, iStart:nX)
        end if
        ! Check if the VDF includes negative values
        call check_dist_neg(NameSub, 1, nX, iLine)
@@ -421,17 +450,24 @@ contains
     ! in a single layer of the ghost cells along the momentum coordinate.
 
     use SP_ModBc, ONLY: UseUpperEndBc, set_upper_end_bc, &
-         UpperEndBc_I, set_lower_end_bc, LowerEndBc_I
+         UpperEndBc_I, set_lower_end_bc, LowerEndBc_I, &
+         UseLowerEndBc, set_lower_end_vdf, iStart
     integer, intent(in):: iLine     ! Indices of line and shock
     integer, intent(in):: nX        ! Number of meshes along s_L axis
     real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
 
     !--------------------------------------------------------------------------
-    VDF_G(0:nP+1, 1:nX) = Distribution_CB(:, 1, 1:nX, iLine)
+    VDF_G(0:nP+1, iStart:nX) = Distribution_CB(:, 1, iStart:nX, iLine)
+    VDF_G(0:nP+1, 1) = Distribution_CB(:, 1, iStart, iLine)
 
     ! Manipulate the LowerEndBc along the line coordinate:
-    call set_lower_end_bc(iLine)
-    VDF_G(0:nP+1,    0) = max(LowerEndBc_I, Background_I)
+    if(UseLowerEndBc) then
+       call set_lower_end_bc(iLine)
+       VDF_G(0:nP+1, 0) = max(LowerEndBc_I, Background_I)
+    else
+       call set_lower_end_vdf(iLine)
+       VDF_G(0:nP+1, 0) = Background_I
+    end if
 
     ! Manipulate the UpperEndBc along the line coordinate:
     if(UseUpperEndBc) then

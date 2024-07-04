@@ -143,19 +143,19 @@ contains
 
           ! trace shock position and steepen the shock
           iShock = iShockOld + iProgress
-          if(iShock < iEnd-nWidth .and. iShock > nWidth  &
+          if(iShock < iEnd-nWidth .and. iShock > nWidth &
                .and. DoTraceShock) call steepen_shock
 
           ! Advection (2 different schemes) and Diffusion
           ! First, set the diffusion coefficient, from the
           ! given formulae or from the turbulent specrtum, if known
-          if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
+          if(UseDiffusion) call set_diffusion_coef(iLine, iEnd, &
                iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket) then
              ! Poisson bracket scheme: particle-number-conservative
              if(IsMuAvg) then
                 ! Single Poisson bracket: Parker transport equation
-                call advect_via_poisson(iLine, iEnd, iShock, DtProgress,&
+                call advect_via_poisson(iLine, iEnd, iShock, DtProgress, &
                      Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
              else
                 ! Multiple Poisson brackets: Focused transport equation
@@ -167,7 +167,7 @@ contains
              end if
           else
              ! No Poisson bracket scheme, use the default algorithm
-             call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl,  &
+             call advect_via_log(iLine, iEnd, iShock, DtProgress, Cfl, &
                   dLogRho_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
           end if
 
@@ -252,7 +252,7 @@ contains
 
        ! First, set the diffusion coefficient, from the
        ! given formulae or from the turbulent specrtum, if known
-       if(UseDiffusion) call set_diffusion_coef(iLine, iEnd,   &
+       if(UseDiffusion) call set_diffusion_coef(iLine, iEnd, &
             iShock, BSi_I(1:iEnd))
        ! Poisson bracket scheme: particle-number-conservative
        call iterate_poisson(iLine, iEnd, iShock, Cfl, BSi_I(1:iEnd), &
