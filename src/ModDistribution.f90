@@ -325,8 +325,8 @@ contains
        if(.not.Used_B(iLine)) CYCLE
        do iVertex = 1, nVertex_B(iLine)
           ! Calculate intermediate variables
-          DistTimesP2_I = Distribution_CB(1:nP, nMu, iVertex, iLine)* &
-               Momentum_I(1:nP)**2
+          DistTimesP2_I = sum(Distribution_CB(1:nP, 1:nMu, iVertex, iLine), &
+               DIM=2)*DeltaMu*0.5 * Momentum_I(1:nP)**2
           DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_I(1:nP)
           ! Increment of particle and energy fluxes
           ! Integration loop with midpoint rule
