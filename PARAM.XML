@@ -892,7 +892,11 @@ the "energy" or "momentum" is the first axis, for the log10(kinetic energy)
 in the specified unit (default: keV) or the log10(momentum) normalized by the
 injection momentum, respectively. The "distance" or "length" is the second axis
 saved in the unit of solar radii, for the heliocentric distance or the field
-line length to the foot point on the Sun, respectively.
+line length to the foot point on the Sun, respectively. If nMu is not 1, i.e.,
+solving the focused transport equation with anisotropic pitch angles, there
+will also be one axis for mu's value right after the momentum/energy axis in
+the "distr*"-formatted outputs, and the MhData integral flux is then the one
+averaged over all calculated pitch angles.
 
 For "distr2d", the StringPlot format is basically the same as it is in
 "distr1d", except that we do not use distance or length. Instead, one need

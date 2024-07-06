@@ -613,7 +613,13 @@ contains
       ! only 1 variable (at most) is printed
       !------------------------------------------------------------------------
       File_I(iFile) % nMhdVar = 0
-      File_I(iFile) % nExtraVar = 1
+      if(IsMuAvg) then
+         ! Do not save Mu
+         File_I(iFile) % nExtraVar = 1
+      else
+         ! Do save Mu
+         File_I(iFile) % nExtraVar = 2
+      end if
       ! reset
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
@@ -685,41 +691,47 @@ contains
       select case(File_I(iFile) % iScale)
       case(Momentum_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux) // &
               ' log10[(p_{INJ}/[Si])*kg*m/s]'
       case(Energy_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux) // &
               ' log10[' // NameEnergyUnit // ']'
       end select
 
-      ! header 2: Rsun for both S_ and D_ when saving Distr1D
+      ! header 2: cosine pitch angle unit, if saving all mu's values
+      if(.not. IsMuAvg) &
+           File_I(iFile) % StringHeaderAux = &
+           trim(File_I(iFile) % StringHeaderAux) // ' [1]'
+
+      ! header 3: Rsun for both S_ and D_ when saving Distr1D
       ! LagrID when saving Distr2D, or no/skip when saving DisTraj
       if(File_I(iFile) % iKindData == Distr1D_) then
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)//' '//NameVarUnit_V(R_)
+              trim(File_I(iFile) % StringHeaderAux) // &
+              ' ' // NameVarUnit_V(R_)
       elseif(File_I(iFile) % iKindData == Distr2D_) then
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)//' LineIndex'
+              trim(File_I(iFile) % StringHeaderAux) // ' LineIndex'
       elseif(File_I(iFile) % iKindData == DistrTime_) then
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)//' sec'
+              trim(File_I(iFile) % StringHeaderAux) // ' sec'
       end if
 
-      ! header 3: [CDF or def/DEF unit]
+      ! header 4: [CDF or def/DEF unit]
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux) // &
               ' log10[#/m**2/s/sr/' // NameEnergyUnit &
               // '*(p_{INJ}/(kg*m/s))**2]'
       case(DEFIo_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux) // &
               ' log10[p.f.u/' // NameEnergyUnit // ']'
       case(DEFSi_)
          File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)// &
+              trim(File_I(iFile) % StringHeaderAux) // &
               ' log10[#/m**2/s/sr/' // NameEnergyUnit // ']'
       end select
 
@@ -731,7 +743,7 @@ contains
 
     ! write the output data
 
-    use SP_ModDistribution, ONLY: get_integral_flux, Mu_I, IsMuAvg
+    use SP_ModDistribution, ONLY: get_integral_flux, Mu_I
     use SP_ModTime,         ONLY: IsSteadyState
     use SP_ModGrid,         ONLY: Used_B
 
@@ -1367,6 +1379,8 @@ contains
          end select
 
          ! print data to file
+         ! Note: here, by including nDimIn, all the Coord{1, 2(, 3)}In_I
+         ! arrays are not in the size of 1; otherwise, they will be switched
          if(IsMuAvg) then
             ! not necessary to save Mu
             call save_plot_file( &
@@ -1530,6 +1544,8 @@ contains
 
       ! print data to file
       if(iProc==0) then
+         ! Note: here, by including nDimIn, all the Coord{1, 2(, 3)}In_I
+         ! arrays are not in the size of 1; otherwise, they will be switched
          if(IsMuAvg) then
             ! not necessary to save Mu
             call save_plot_file( &
@@ -1691,7 +1707,7 @@ contains
             end if
 
             ! if buffer is too small then reallocate it
-            nBufferSize = ubound(File_I(iFile)%Buffer_II, DIM=2)
+            nBufferSize = ubound(File_I(iFile)%Buffer_II, DIM=3)
             if(nBufferSize < nTimeSaved + 1) then
                deallocate(File_I(iFile)%Buffer_II)
                allocate(File_I(iFile)%Buffer_II(0:nP+1, 1:nMu, 2*nBufferSize))
@@ -1741,6 +1757,8 @@ contains
          end select
 
          ! reprint data to file
+         ! Note: here, by including nDimIn, all the Coord{1, 2(, 3)}In_I
+         ! arrays are not in the size of 1; otherwise, they will be switched
          if(IsMuAvg) then
             ! not necessary to save Mu
             call save_plot_file( &
