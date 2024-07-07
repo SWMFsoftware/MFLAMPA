@@ -103,7 +103,7 @@ module SP_ModPlot
      ! for the given plot; USED ONLY IN write_mh_time  FOR NOW!!!
      logical:: IsFirstCall
      ! names of variables to be written
-     character(len=300):: NameVarPlot
+     character(len=500):: NameVarPlot
      ! names of auxilary parameters
      character(len=300):: NameAuxPlot
      ! output buffer: use first a few DIMs until the last one

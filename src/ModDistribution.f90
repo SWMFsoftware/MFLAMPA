@@ -160,15 +160,15 @@ contains
        FluxLast_ = nFluxChannel
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
-       allocate(character(LEN=13) :: NameFluxChannel_I(Flux0_:FluxMax_))
-       NameFluxChannel_I = [ 'flux_total   ', 'flux_00000005', &
-            'flux_00000010', 'flux_00000030', 'flux_00000050', &
-            'flux_00000060', 'flux_00000100', 'eflux        ']
+       allocate(character(LEN=12) :: NameFluxChannel_I(Flux0_:FluxMax_))
+       NameFluxChannel_I = ['flux_total  ', 'flux_0005MeV', &
+            'flux_0010MeV', 'flux_0030MeV', 'flux_0050MeV', &
+            'flux_0060MeV', 'flux_0100MeV', 'eflux       ']
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
-       EChannelIo_I = [5,10,30,50,60,100]  ! in MeV!
+       EChannelIo_I = [5,10,30,50,60,100] ! in MeV!!
     end if
     ! assign the energy channel and flux unit
-    EChannelIo_I  = EChannelIo_I & ! In MeV Now!!
+    EChannelIo_I  = EChannelIo_I & ! in MeV Now!!
          *cMeV                   & ! in SI
          *Si2Io_V(UnitEnergy_)     ! in NameUnitEnergy
     if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
@@ -197,10 +197,11 @@ contains
 
     use ModReadParam, ONLY: read_var
     use SP_ModProc,   ONLY: iProc
-    character(len=*), intent(in):: NameCommand ! From PARAM.in
-    integer:: nPCheck = nP, nMuCheck = nMu, iFluxChannel
-    character(len=8) :: NameFluxChannel
-    character(len=*), parameter:: NameSub = 'read_param'
+    character(len=*), intent(in) :: NameCommand ! From PARAM.in
+    integer :: nPCheck = nP, nMuCheck = nMu, iFluxChannel
+    real :: FluxChannel
+    character(len=3) :: NameFluxChannel, NameUnitChannel
+    character(len=*), parameter :: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#MOMENTUMGRID')
@@ -208,7 +209,7 @@ contains
        call read_var('EnergyMin', EnergyInjIo)
        call read_var('EnergyMax', EnergyMaxIo)
        call read_var('nP',        nPCheck    )
-       if(nP/=nPCheck)then
+       if(nP/=nPCheck) then
           if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
                'Code is configured with nMomentum=', nP,         &
                ' while value read from PARAM.in is nP=', nPCheck
@@ -216,7 +217,7 @@ contains
        end if
     case('#PITCHANGLEGRID')
        call read_var('nMu', nMuCheck)
-       if(nMu/=nMuCheck)then
+       if(nMu/=nMuCheck) then
           if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
                'Code is configured with nMu=', nMu,              &
                ' while value read from PARAM.in is nMu=', nMuCheck
@@ -232,22 +233,46 @@ contains
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
 
+       ! allocation
        if(allocated(EChannelIo_I)) deallocate(EChannelIo_I)
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
        if(allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(character(LEN=13) :: NameFluxChannel_I(Flux0_:FluxMax_))
+       allocate(character(LEN=12) :: NameFluxChannel_I(Flux0_:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(Flux0_:FluxMax_))
 
-       NameFluxChannel_I(Flux0_) = 'flux_total   '
-       NameFluxChannel_I(EFlux_) = 'eflux        '
+       ! header of total particle and energy fluxes
+       NameFluxChannel_I(Flux0_) = 'flux_total  '
+       NameFluxChannel_I(EFlux_) = 'eflux       '
 
+       ! header of the energy channels for particle flux
        do iFluxChannel = FluxFirst_, FluxLast_
-          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel))
-          write(NameFluxChannel,'(I8.8)') int(EChannelIo_I(iFluxChannel))
-          NameFluxChannel_I(iFluxChannel) = 'flux_'//NameFluxChannel
+          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel)) ! MeV
+          if(EChannelIo_I(iFluxChannel) >= 1.0E-6 .and. &
+               EChannelIo_I(iFluxChannel) < 1.0E-3) then
+             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E+6
+             NameUnitChannel = 'eV'
+          elseif(EChannelIo_I(iFluxChannel) >= 1.0E-3 .and. &
+               EChannelIo_I(iFluxChannel) < 1.0) then
+             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E+3
+             NameUnitChannel = 'keV'
+          elseif(EChannelIo_I(iFluxChannel) >= 1.0 .and. &
+               EChannelIo_I(iFluxChannel) < 1.0E+3) then
+             FluxChannel = EChannelIo_I(iFluxChannel)
+             NameUnitChannel = 'MeV'
+          elseif(EChannelIo_I(iFluxChannel) >= 1.0E+3 .and. &
+               EChannelIo_I(iFluxChannel) < 1.0E+6) then
+             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E-3
+             NameUnitChannel = 'GeV'
+          else
+             ! Maximum in the model: TeV
+             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E-6
+             NameUnitChannel = 'TeV'
+          end if
+          write(NameFluxChannel,'(I3.3)') int(FluxChannel)
+          NameFluxChannel_I(iFluxChannel) = &
+               'flux_' // NameFluxChannel // trim(NameUnitChannel)
        end do
-
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -274,10 +299,10 @@ contains
        Distribution_CB(:,:,2:nVertex_B(iLine), iLine)&
             = Distribution_CB(:,:,1:nVertex_B(iLine)-1, iLine)
        ! Extrapolate state vector components and VDF at iVertex=1
-       Distance2ToMin = norm2(MHData_VIB(X_:Z_,2,iLine) - &
-            FootPoint_VB(X_:Z_,iLine))
-       Distance3To2   = norm2(MHData_VIB(X_:Z_,3,iLine) - &
-            MHData_VIB(X_:Z_,2,iLine))
+       Distance2ToMin = norm2(MHData_VIB(X_:Z_, 2, iLine) - &
+            FootPoint_VB(X_:Z_, iLine))
+       Distance3To2   = norm2(MHData_VIB(X_:Z_, 3, iLine) - &
+            MHData_VIB(X_:Z_, 2, iLine))
        Alpha = Distance2ToMin/(Distance2ToMin + Distance3To2)
        State_VIB([RhoOld_, BOld_], 1, iLine) = &
             (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iLine) &
