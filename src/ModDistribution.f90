@@ -160,12 +160,12 @@ contains
        FluxLast_ = nFluxChannel
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
-       allocate(character(LEN=12) :: NameFluxChannel_I(Flux0_:FluxMax_))
-       NameFluxChannel_I = ['flux_total  ', 'flux_0005MeV', &
-            'flux_0010MeV', 'flux_0030MeV', 'flux_0050MeV', &
-            'flux_0060MeV', 'flux_0100MeV', 'eflux       ']
+       allocate(character(LEN=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
+       NameFluxChannel_I = ['flux_total ',  'flux_005MeV', &
+            'flux_010MeV',  'flux_030MeV',  'flux_050MeV', &
+            'flux_060MeV',  'flux_100MeV',  'eflux      ']
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
-       EChannelIo_I = [5,10,30,50,60,100] ! in MeV!!
+       EChannelIo_I = [5, 10, 30, 50, 60, 100] ! in MeV!!
     end if
     ! assign the energy channel and flux unit
     EChannelIo_I  = EChannelIo_I & ! in MeV Now!!
@@ -201,7 +201,7 @@ contains
     integer :: nPCheck = nP, nMuCheck = nMu, iFluxChannel
     real :: FluxChannel
     character(len=3) :: NameFluxChannel, NameUnitChannel
-    character(len=*), parameter :: NameSub = 'read_param'
+    character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#MOMENTUMGRID')
@@ -237,13 +237,13 @@ contains
        if(allocated(EChannelIo_I)) deallocate(EChannelIo_I)
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
        if(allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(character(LEN=12) :: NameFluxChannel_I(Flux0_:FluxMax_))
+       allocate(character(LEN=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(Flux0_:FluxMax_))
 
        ! header of total particle and energy fluxes
-       NameFluxChannel_I(Flux0_) = 'flux_total  '
-       NameFluxChannel_I(EFlux_) = 'eflux       '
+       NameFluxChannel_I(Flux0_) = 'flux_total '
+       NameFluxChannel_I(EFlux_) = 'eflux      '
 
        ! header of the energy channels for particle flux
        do iFluxChannel = FluxFirst_, FluxLast_
