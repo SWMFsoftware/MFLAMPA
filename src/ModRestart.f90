@@ -183,8 +183,8 @@ contains
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
     write(UnitTmp_,'(i8,a)') nVertexMax,cTab//cTab//'nVertexMax'
-    write(UnitTmp_,'(i8,a)') nLon,     cTab//cTab//'nLon'
     write(UnitTmp_,'(i8,a)') nLat,     cTab//cTab//'nLat'
+    write(UnitTmp_,'(i8,a)') nLon,     cTab//cTab//'nLon'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#STARTTIME'
     write(UnitTmp_,'(i4.4,a)')iStartTime_I(1),cTab//cTab//cTab//'iYear'

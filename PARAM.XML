@@ -299,25 +299,25 @@ Parameters of the Lagrangian grid used in MFLAMPA
 
 <command name="CHECKGRIDSIZE" if="$_IsFirstSession">
   <parameter name="nVertexMax" type="integer" min="1" default="2000" />
-  <parameter name="nLon"  type="integer" min="1" default="20" />
   <parameter name="nLat"  type="integer" min="1" default="20" />
+  <parameter name="nLon"  type="integer" min="1" default="20" />
 
 #CHECKGRIDSIZE
 1000			nParticleMax
-4			nLon
 4			nLat
+4			nLon
 
 Check if the configured parameters of the Lagrangian grid match those
 assumed in the input files
 </command>
 
 <command name="GRIDNODE" if="$_IsFirstSession">
-  <parameter name="nLon"  type="integer" min="1" default="20" />
   <parameter name="nLat"  type="integer" min="1" default="20" />
+  <parameter name="nLon"  type="integer" min="1" default="20" />
 
 #GRIDNODE
-4			nLon
 4			nLat
+4			nLon
 
 Set the configured parameters of the Lagrangian grid
 </command>

@@ -167,19 +167,19 @@ contains
     select case(NameCommand)
     case('#CHECKGRIDSIZE')
        call read_var('nVertexMax', nParticleCheck)
-       call read_var('nLon',       nLonCheck)
        call read_var('nLat',       nLatCheck)
+       call read_var('nLon',       nLonCheck)
        if(iProc==0 .and. any([nLon, nLat] /= [nLonCheck,nLatCheck])) &
             write(*,'(a,2I5)') 'nLon,nLat are reset to ', nLonCheck, nLatCheck
-       nLon = nLonCheck
        nLat = nLatCheck
+       nLon = nLonCheck
        nLineAll = nLon*nLat
        if(nParticleCheck > nVertexMax)then
           if(iProc==0) write(*,*) &
                'nVertexMax is too small, use ./Config.pl -g=', nParticleCheck
           call CON_stop('Code stopped')
        end if
-    case('#COORDSYSTEM','#COORDINATESYSTEM')
+    case('#COORDSYSTEM', '#COORDINATESYSTEM')
        call read_var('TypeCoordSystem', TypeCoordSystem, IsUpperCase=.true.)
        ! case('#DOSMOOTH')
        ! call read_var('DoSmooth', DoSmooth)
