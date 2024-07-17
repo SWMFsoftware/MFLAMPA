@@ -103,9 +103,13 @@ contains
     use SP_ModUnit,   ONLY: kinetic_energy_to_momentum, &
          momentum_to_kinetic_energy, momentum_to_energy
     ! loop variables
-    integer:: iLine, iVertex, iP, iError, iMu
+    integer:: iLine, iVertex, iP, iError, iMu, iFluxChannel
     ! maximal momentum
     real :: MomentumMaxSi
+    ! local FluxChannel, for converting to NameFluxChannel_I
+    real :: FluxChannel
+    ! local NameFluxChannel and NameUnitChannel, written in headers
+    character(len=3) :: NameFluxChannel, NameUnitChannel
     ! set the initial distribution on all lines
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
@@ -160,24 +164,59 @@ contains
     if(.not. allocated(NameFluxChannel_I)) then
        nFluxChannel = 6
        FluxLast_ = nFluxChannel
-       EFlux_    = FluxLast_ + 1
-       FluxMax_  = EFlux_
-       allocate(character(len=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
-       NameFluxChannel_I = ['flux_total ',  'flux_005MeV', &
-            'flux_010MeV',  'flux_030MeV',  'flux_050MeV', &
-            'flux_060MeV',  'flux_100MeV',  'eflux      ']
+       ! Allocate the default GOES energy channels
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
        EChannelIo_I = [5, 10, 30, 50, 60, 100] ! in MeV!!
     end if
-    ! assign the energy channel and flux unit
+
+    ! Get indices and allocate NameFluxChannel_I
+    EFlux_    = FluxLast_ + 1
+    FluxMax_  = EFlux_
+    allocate(character(len=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
+    ! EChannelIo_I is still in the unit of MeV
+    ! Write the header of the energy channels for particle flux
+    do iFluxChannel = FluxFirst_, FluxLast_
+       if(EChannelIo_I(iFluxChannel) >= 1.0E-6 .and. &
+            EChannelIo_I(iFluxChannel) < 1.0E-3) then
+          FluxChannel = EChannelIo_I(iFluxChannel)*1.0E+6
+          NameUnitChannel = 'eV'
+       elseif(EChannelIo_I(iFluxChannel) >= 1.0E-3 .and. &
+            EChannelIo_I(iFluxChannel) < 1.0) then
+          FluxChannel = EChannelIo_I(iFluxChannel)*1.0E+3
+          NameUnitChannel = 'keV'
+       elseif(EChannelIo_I(iFluxChannel) >= 1.0 .and. &
+            EChannelIo_I(iFluxChannel) < 1.0E+3) then
+          FluxChannel = EChannelIo_I(iFluxChannel)
+          NameUnitChannel = 'MeV'
+       elseif(EChannelIo_I(iFluxChannel) >= 1.0E+3 .and. &
+            EChannelIo_I(iFluxChannel) < 1.0E+6) then
+          FluxChannel = EChannelIo_I(iFluxChannel)*1.0E-3
+          NameUnitChannel = 'GeV'
+       else
+          ! Maximum in the model: TeV
+          FluxChannel = EChannelIo_I(iFluxChannel)*1.0E-6
+          NameUnitChannel = 'TeV'
+       end if
+       write(NameFluxChannel,'(I3.3)') int(FluxChannel)
+       NameFluxChannel_I(iFluxChannel) = &
+            'flux_' // NameFluxChannel // trim(NameUnitChannel)
+    end do
+    ! Write the header of total particle and energy fluxes
+    NameFluxChannel_I(Flux0_) = 'flux_total '
+    NameFluxChannel_I(EFlux_) = 'eflux      '
+
+    ! Assign the energy channel and flux unit
     EChannelIo_I  = EChannelIo_I & ! in MeV Now!!
          *cMeV                   & ! in SI
          *Si2Io_V(UnitEnergy_)     ! in NameUnitEnergy
+
+    ! Initialize NameFluxUnit_I for different energy channels
     if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
     allocate(NameFluxUnit_I(Flux0_:FluxMax_))
     NameFluxUnit_I(Flux0_:FluxLast_) = NameFluxUnit
     NameFluxUnit_I(EFlux_) = NameEnergyFluxUnit
 
+    ! Finally allocate Flux_VIB, saved for outputs
     if(.not. allocated(Flux_VIB)) then
        allocate(Flux_VIB(Flux0_:FluxMax_, 1:nVertexMax, nLine), stat=iError)
        call check_allocate(iError, 'Flux_VIB')
@@ -186,9 +225,9 @@ contains
        call CON_stop(NameSub//' Flux_VIB already allocated')
     end if
 
-    ! fill initial values of flux in energy channels
+    ! Fill initial values of flux in energy channels
     allocate(FluxChannelInit_V(Flux0_:FluxMax_))
-    ! for the assumed initial distribution (~1/p^2)
+    ! FluxChannelInit_V, for the assumed initial distribution (~1/p^2)
     FluxChannelInit_V(Flux0_) = FluxInitIo
     FluxChannelInit_V(FluxFirst_:FluxLast_) = FluxInitIo * &
          (EnergyMaxIo - EChannelIo_I) / (EnergyMaxIo - EnergyInjIo)
@@ -202,8 +241,6 @@ contains
     character(len=*), intent(in) :: NameCommand ! From PARAM.in
     integer :: nFluxChannelIn
     integer :: nPCheck = nP, nMuCheck = nMu, iFluxChannel
-    real :: FluxChannel
-    character(len=3) :: NameFluxChannel, NameUnitChannel
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
@@ -235,48 +272,13 @@ contains
        call read_var('nFluxChannel', nFluxChannelIn)
        nFluxChannel = nFluxChannel + nFluxChannelIn
        FluxLast_ = nFluxChannel
-       EFlux_    = FluxLast_ + 1
-       FluxMax_  = EFlux_
 
-       ! allocation
+       ! Allocate EChannelIo_I
        if(allocated(EChannelIo_I)) deallocate(EChannelIo_I)
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
-       if(allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(character(len=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
-       if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
-       allocate(NameFluxUnit_I(Flux0_:FluxMax_))
-
-       ! header of total particle and energy fluxes
-       NameFluxChannel_I(Flux0_) = 'flux_total '
-       NameFluxChannel_I(EFlux_) = 'eflux      '
-
-       ! header of the energy channels for particle flux
+       ! Get the input EChannelIo_I in the unit of MeV
        do iFluxChannel = FluxFirst_, FluxLast_
-          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel)) ! MeV
-          if(EChannelIo_I(iFluxChannel) >= 1.0E-6 .and. &
-               EChannelIo_I(iFluxChannel) < 1.0E-3) then
-             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E+6
-             NameUnitChannel = 'eV'
-          elseif(EChannelIo_I(iFluxChannel) >= 1.0E-3 .and. &
-               EChannelIo_I(iFluxChannel) < 1.0) then
-             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E+3
-             NameUnitChannel = 'keV'
-          elseif(EChannelIo_I(iFluxChannel) >= 1.0 .and. &
-               EChannelIo_I(iFluxChannel) < 1.0E+3) then
-             FluxChannel = EChannelIo_I(iFluxChannel)
-             NameUnitChannel = 'MeV'
-          elseif(EChannelIo_I(iFluxChannel) >= 1.0E+3 .and. &
-               EChannelIo_I(iFluxChannel) < 1.0E+6) then
-             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E-3
-             NameUnitChannel = 'GeV'
-          else
-             ! Maximum in the model: TeV
-             FluxChannel = EChannelIo_I(iFluxChannel)*1.0E-6
-             NameUnitChannel = 'TeV'
-          end if
-          write(NameFluxChannel,'(I3.3)') int(FluxChannel)
-          NameFluxChannel_I(iFluxChannel) = &
-               'flux_' // NameFluxChannel // trim(NameUnitChannel)
+          call read_var('EChannelIo_I', EChannelIo_I(iFluxChannel)) ! in MeV!!
        end do
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
