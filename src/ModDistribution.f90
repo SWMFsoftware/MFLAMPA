@@ -59,9 +59,11 @@ module SP_ModDistribution
   integer, public :: FluxLast_ = 6             ! The last channel
   integer, public :: EFlux_    = 7             ! Total integral energy flux
   integer, public :: FluxMax_  = 7
-  real, allocatable :: EChannelIo_I(:) ! energy limits of the instrument
-  real, public, allocatable  :: Flux_VIB(:,:,:)
-  character(len=:), public, allocatable, dimension(:) :: NameFluxChannel_I
+  real, allocatable, dimension(:) :: EChannelIo_I, EChannelGoesIo_I, &
+       EChannelErneIo_I ! energy limits of the instrument, or defined by users
+  real, public, allocatable :: Flux_VIB(:,:,:)
+  character(len=:), public, allocatable, dimension(:) :: NameFluxChannel_I, &
+       NameFluxGoesChannel_I, NameFluxErneChannel_I ! energy channel names
 
   !-----------------Grid in the momentum space---------------------------------
   ! iP     0     1                         nP   nP+1
@@ -160,7 +162,7 @@ contains
        FluxLast_ = nFluxChannel
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
-       allocate(character(LEN=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
+       allocate(character(len=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
        NameFluxChannel_I = ['flux_total ',  'flux_005MeV', &
             'flux_010MeV',  'flux_030MeV',  'flux_050MeV', &
             'flux_060MeV',  'flux_100MeV',  'eflux      ']
@@ -198,6 +200,7 @@ contains
     use ModReadParam, ONLY: read_var
     use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in) :: NameCommand ! From PARAM.in
+    integer :: nFluxChannelIn
     integer :: nPCheck = nP, nMuCheck = nMu, iFluxChannel
     real :: FluxChannel
     character(len=3) :: NameFluxChannel, NameUnitChannel
@@ -228,7 +231,9 @@ contains
        ! check correctness
        if(FluxInitIo<=0)call CON_stop(NameSub//': flux value must be positive')
     case('#FLUXCHANNEL')
-       call read_var('nFluxChannel', nFluxChannel)
+       nFluxChannel = 0
+       call read_var('nFluxChannel', nFluxChannelIn)
+       nFluxChannel = nFluxChannel + nFluxChannelIn
        FluxLast_ = nFluxChannel
        EFlux_    = FluxLast_ + 1
        FluxMax_  = EFlux_
@@ -237,7 +242,7 @@ contains
        if(allocated(EChannelIo_I)) deallocate(EChannelIo_I)
        allocate(EChannelIo_I(FluxFirst_:FluxLast_))
        if(allocated(NameFluxChannel_I)) deallocate(NameFluxChannel_I)
-       allocate(character(LEN=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
+       allocate(character(len=11) :: NameFluxChannel_I(Flux0_:FluxMax_))
        if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
        allocate(NameFluxUnit_I(Flux0_:FluxMax_))
 

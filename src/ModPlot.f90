@@ -155,6 +155,8 @@ module SP_ModPlot
   character(len=*), parameter :: NameHeaderFile = NameMHData//'.H'
   ! name of the tag list file
   character(len=*), parameter :: NameTagFile  = NameMHData//'.lst'
+  ! name of the energy channel in MH_data file(s)
+  character(len=*), parameter :: NameEChannelFile = NameMHData//'_EChannel.H'
 
   integer :: nOutput = 1, iTimeOutput = 0
   real    :: DtOutput = -1.0
@@ -262,7 +264,7 @@ contains
     if(iProc/=0) RETURN ! done only by the root
     ! full file name
     NameFile = trim(NamePlotDir)//trim(NameTagFile)
-    if(nTag>0)then
+    if(nTag > 0)then
        allocate(StringTag_I(nTag))
        call open_file(file=NameFile, status='old', NameCaller=NameSub)
        do iTag = 1, nTag
@@ -844,7 +846,7 @@ contains
       character(len=*), parameter:: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
       ! Update number of time tags and write to tag list file
-      if(iProc==0)then
+      if(iProc==0) then
          ! increase the file counter
          nTag = nTag + 1
          ! add to the tag list file
@@ -852,7 +854,7 @@ contains
          call open_file(file=NameFile, position='append', status='unknown', &
               NameCaller=NameSub)
 
-         if(UseDateTime)then
+         if(UseDateTime) then
             ! create date_time-iteration tag
             call get_date_time_string(SPTime, StringTime)
             write(UnitTmp_,'(a,i6.6)') 'e'//StringTime//'_n',iIter
@@ -875,7 +877,7 @@ contains
            //trim(File_I(iFile)%StringHeaderAux)
 
       do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
+         if(.not.Used_B(iLine)) CYCLE
          call make_file_name( &
               StringBase    = NameMHData,                      &
               iLine         = iLine,                           &
@@ -1163,7 +1165,7 @@ contains
            //trim(File_I(iFile)%StringHeaderAux)
 
       ! at first call, remove files if they exist to reset time series output
-      if(File_I(iFile) % IsFirstCall)then
+      if(File_I(iFile) % IsFirstCall) then
          ! mark that the 1st call has already happened
          File_I(iFile) % IsFirstCall = .false.
          ! go over list of lines and remove file for each one
