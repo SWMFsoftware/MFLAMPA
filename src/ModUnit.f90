@@ -34,7 +34,7 @@ module SP_ModUnit
   ! unit of SEP energy, also applicable for ion kinetic temperature
   character(len=3), public            :: NameEnergyUnit = 'kev'
 
-  ! Integral flux unit is SI
+  ! Integral flux unit, in usual case, called Io since it is per cm**2
   character(len=6), public, parameter :: NameFluxUnit = 'p.f.u.'
 
   ! Unit particle flux, 1 particle per cm2 per s per steradian,
@@ -44,7 +44,10 @@ module SP_ModUnit
   character(len=12),public, allocatable :: NameFluxUnit_I(:)
 
   ! Unit conversions
-  integer, public, parameter :: UnitX_ = 1, UnitEnergy_ = 2, UnitFlux_ = 3
+  integer, public, parameter :: &
+       UnitX_      = 1, & ! Coordinate conversion between Si (m) and Io (Rsun)
+       UnitEnergy_ = 2, & ! Energy conversion between Si (J) and Io (keV, ...)
+       UnitFlux_   = 3    ! Flux conversion between Si (per m**2) and Io (pfu)
   real, public, dimension(UnitX_:UnitFlux_) :: Io2Si_V, Si2Io_V
 
   ! Unit for all the state variables:

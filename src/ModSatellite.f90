@@ -4,7 +4,7 @@
 module SP_ModSatellite
 
   use ModUtilities,   ONLY: open_file, close_file, CON_stop
-  use SP_ModProc,     ONLY: iProc, iComm
+  use SP_ModProc,     ONLY: iProc, iComm, iError
   use SP_ModSize,     ONLY: nDim
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
 
@@ -14,11 +14,12 @@ module SP_ModSatellite
 
   private ! Except
 
-  public:: read_param                 ! read satellite file input parameters
+  public:: read_param                 ! read satellite-related parameters
   public:: read_satellite_input_files ! read satellite trajectories
   public:: set_satellite_positions    ! set satellite positions
 
-  integer, public    :: nSat   = 0    ! number of satellites
+  ! ----- For saving the distribution function along SATELLITES -----
+  integer, public    :: nSat   = 0    ! number of satellites for DistrTraj_
   integer, parameter :: MaxSat = 300  ! Max number of satellites
 
   ! Names and unit numbers for satellite files
@@ -44,7 +45,7 @@ module SP_ModSatellite
   real, allocatable         :: XyzSat_DII(:, :, :)
   real, public, allocatable :: TimeSat_II(:, :)
 
-  ! Unlike ModSatellite in BASTRUS, here the saveplot frequencyis controlled
+  ! Unlike ModSatellite in BATSRUS, here the saveplot frequencyis controlled
   ! by #NOUTPUT in SP_ModPlot so we do not read StartTime/EndTime/DtTraj.
 contains
   !============================================================================
@@ -53,22 +54,22 @@ contains
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in) :: NameCommand
-    integer :: iSat                          ! loop variable for satellites
-    integer :: l1, l2                        ! indices to get satellite name
-    character(len=3) :: TypeCoordSC = "HGR"  ! as usually used in SC
-
-    logical:: DoTest
+    logical :: DoTest
+    integer :: iSat                         ! loop variable for satellites
+    ! VARs for SATELLITE, specified to save the VDF along trajectories
+    integer :: l1, l2                       ! indices to get satellite name
+    character(len=3) :: TypeCoordSC = "HGR" ! as usually used in SC
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     call test_start(NameSub, DoTest)
 
     select case(NameCommand)
     case("#SATELLITE")
-       ! Read the number of satellites
+       ! Read the number of satellites, for saving the spectrum by DistrTraj_
        call read_var('nSatellite', nSat)
        if(nSat <= 0) RETURN
        UseSatellite = .true.
-       if(nSat > MaxSat) call CON_stop('The number of '//   &
+       if(nSat > MaxSat) call CON_stop(NameSub // ': Number of ' // &
             'output files is too large in #SATELLITE: nSat > MaxSat')
 
        ! Recognize the coordinate system which the satellite trajetory is
@@ -109,13 +110,14 @@ contains
     character(len=100) :: StringLine
 
     ! Local VARs
-    integer            :: iError, i, iSat, nPoint
-    integer            :: iTime_I(7)
-    real               :: Xyz_D(nDim)
-    real(Real8_)       :: DateTime
-    integer            :: MaxPoint
-    real, allocatable  :: Time_I(:), Xyz_DI(:,:)
-    character(len=100) :: NameFile
+    integer            :: nPoint                ! count of location points
+    integer            :: MaxPoint              ! maximum location points
+    integer            :: i, iSat               ! loop variables
+    integer            :: iTime_I(7)            ! time: YYYY/MM/DD-hh:mm:ss:ms
+    real               :: Xyz_D(nDim)           ! location coordinates
+    real(Real8_)       :: DateTime              ! date and time
+    real, allocatable  :: Time_I(:), Xyz_DI(:,:)! time and location arrays
+    character(len=100) :: NameFile              ! readin filenames
     character(len=3)   :: TypeCoordIn = 'HGI'   ! 'HGI' in TRAJECTORY files
 
     logical:: DoTest
