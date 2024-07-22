@@ -12,7 +12,6 @@ module SP_ModDistribution
   use ModUtilities, ONLY: CON_stop
   use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
-  use SP_ModUnit,   ONLY: Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_
   use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
 
   implicit none
@@ -121,10 +120,10 @@ contains
   !============================================================================
   subroutine init
 
-    use ModConst,        ONLY: cLightSpeed
-    use ModUtilities,    ONLY: check_allocate
-    use SP_ModUnit,      ONLY: kinetic_energy_to_momentum, &
-         momentum_to_kinetic_energy, momentum_to_energy
+    use ModConst,     ONLY: cLightSpeed
+    use ModUtilities, ONLY: check_allocate
+    use SP_ModUnit,   ONLY: kinetic_energy_to_momentum, momentum_to_energy, &
+         momentum_to_kinetic_energy, Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_
     ! loop variables
     integer :: iLine, iVertex, iP, iError, iMu
     ! maximal momentum

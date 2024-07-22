@@ -53,8 +53,7 @@ contains
     use SP_ModUnit,          ONLY: read_param_unit       => read_param
 
     ! Read input parameters for SP component
-    use ModReadParam, ONLY: &
-         read_var, read_line, read_command, read_echo_set
+    use ModReadParam, ONLY: read_var, read_line, read_command, read_echo_set
 
     ! aux variables
     integer:: nParticleCheck, nLonCheck, nLatCheck
@@ -90,7 +89,7 @@ contains
           call read_param_adv(NameCommand)
        case('#INJECTION', '#LOWERENDBC', '#UPPERENDBC')
           call read_param_bc(NameCommand)
-       case('#CHANNEL', '#CHANNELSAT')
+       case('#ECHANNEL', '#ECHANNELSAT')
           if(.not.IsFirstSession) CYCLE
           call read_param_channel(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
@@ -160,7 +159,7 @@ contains
       ! certain options are only available for stand alone mode;
       ! check whether the mode is used and stop the code if it's no the case
       !------------------------------------------------------------------------
-      if(IsStandAlone)RETURN
+      if(IsStandAlone) RETURN
       call CON_stop(NameSub//': command '//trim(NameCommand)//&
            ' is only allowed in stand alone mode, correct PARAM.in')
     end subroutine check_stand_alone
@@ -238,7 +237,7 @@ contains
 
     ! write the initial background state to the output file
     !--------------------------------------------------------------------------
-    if(IsFirstCall)then
+    if(IsFirstCall) then
        ! recompute the derived components of state vector, e.g.
        ! magnitude of magnetic field and velocity etc. Smooth if needed.
        if(.not.DoReadMhData) call get_other_state_var
@@ -252,11 +251,11 @@ contains
        IsFirstCall = .false.
     end if
 
-    if(IsSteadyState)then
+    if(IsSteadyState) then
        call iterate_steady_state
     else
        ! May need to read background data from files
-       if(DoReadMhData)then
+       if(DoReadMhData) then
           ! copy some variables from the previous time step
           call copy_old_state
           ! Read the background data from file

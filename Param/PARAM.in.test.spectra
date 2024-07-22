@@ -42,14 +42,18 @@ keV			ParticleEnergyUnit
 #FLUXINITIAL
 0.01			FluxInitIo [pfu]
 
-#FLUXCHANNEL
+ECHANNEL
 6			nFluxChannel
-5			EChannelIo_I [MeV]
-10			EChannelIo_I [MeV]
-30			EChannelIo_I [MeV]
-50			EChannelIo_I [MeV]
-60			EChannelIo_I [MeV]
-100			EChannelIo_I [MeV]
+INT 5 1.0E+4			EChannelIo_I [MeV]
+INT 10 1.0E+4			EChannelIo_I [MeV]
+INT 30 1.0E+4			EChannelIo_I [MeV]
+INT 50 1.0E+4			EChannelIo_I [MeV]
+INT 60 1.0E+4			EChannelIo_I [MeV]
+INT 100 1.0E+4			EChannelIo_I [MeV]
+
+#ECHANNELSAT
+1			nFluxChannel
+GOES			NameSatellite
 
 #INCLUDE
 MH_data_e20120123/MH_data.H
