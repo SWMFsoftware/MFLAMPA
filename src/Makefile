@@ -15,6 +15,7 @@ OBJECTS = \
 	ModAdvanceAdvection.o \
 	ModAngularSpread.o \
 	ModBc.o \
+	ModChannel.o \
 	ModDistribution.o \
 	ModDiffusion.o \
 	ModGrid.o \
