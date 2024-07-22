@@ -31,11 +31,14 @@ module SP_ModUnit
   ! Only protons are simulated at this moment
   character(len=*), public, parameter :: NameParticle = 'proton'
 
-  ! unit of SEP energy, also applicable for ion kinetic temperature
+  ! Unit of SEP energy, also applicable for ion kinetic temperature
   character(len=3), public            :: NameEnergyUnit = 'kev'
 
   ! Integral flux unit, in usual case, called Io since it is per cm**2
   character(len=6), public, parameter :: NameFluxUnit = 'pfu'
+
+  ! Differential flux unit
+  character(len=7), public            :: NameDiffFluxUnit = 'pfu/kev'
 
   ! Unit particle flux, 1 particle per cm2 per s per steradian,
   ! corresponds to 10,000 particles per m2 per s per steradian.
@@ -94,8 +97,9 @@ contains
        call read_var('ParticleEnergyUnit', NameEnergyUnit)
 
        call lower_case(NameEnergyUnit)
-       NameEnergyFluxUnit = NameEnergyUnit//'/cm2*s*sr'
-       NameVarUnit_V(T_)  = NameEnergyUnit//'   '
+       NameEnergyFluxUnit = trim(NameEnergyUnit)//'/cm2*s*sr'
+       NameDiffFluxUnit   = trim(NameFluxUnit)//'/'//trim(NameEnergyUnit)
+       NameVarUnit_V(T_)  = trim(NameEnergyUnit)//'   '
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
@@ -109,7 +113,7 @@ contains
 
     ! unit conversion: IO to Si
     Io2Si_V(UnitX_)      = Rsun
-    Io2Si_V(UnitEnergy_) = energy_in(NameEnergyUnit)
+    Io2Si_V(UnitEnergy_) = energy_in(trim(NameEnergyUnit))
     Io2Si_V(UnitFlux_)   = UnitParticleFluxSi
 
     ! unit conversion: Si to IO

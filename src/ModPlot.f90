@@ -19,8 +19,8 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax, nDim
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: Si2Io_V, UnitFlux_, &
-       NameVarUnit_V, NameFluxUnit, NameEnergyUnit
+  use SP_ModUnit, ONLY: NameFluxUnit, NameDiffFluxUnit,  &
+       NameEnergyUnit, NameVarUnit_V, Si2Io_V, UnitFlux_
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
@@ -587,7 +587,7 @@ contains
       case(Energy_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux) // &
-              ' log10[' // NameEnergyUnit // ']'
+              ' log10[' // trim(NameEnergyUnit) // ']'
       end select
 
       ! header 2: cosine pitch angle unit, if saving all mu's values
@@ -614,16 +614,16 @@ contains
       case(CDF_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux) // &
-              ' log10[#/m**2/s/sr/' // NameEnergyUnit &
+              ' log10[#/m**2/s/sr/' // trim(NameEnergyUnit) &
               // '*(p_{INJ}/(kg*m/s))**2]'
       case(DEFIo_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux) // &
-              ' log10[' // NameFluxUnit // '/' // NameEnergyUnit // ']'
+              ' log10[' // trim(NameDiffFluxUnit) // ']'
       case(DEFSi_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux) // &
-              ' log10[#/m**2/s/sr/' // NameEnergyUnit // ']'
+              ' log10[#/m**2/s/sr/' // trim(NameEnergyUnit) // ']'
       end select
 
     end subroutine process_distr
@@ -1304,7 +1304,7 @@ contains
       use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
       use SP_ModUnit,         ONLY: NameEnergyFluxUnit
       ! header for the file
-      character(len=500) :: StringHeader
+      character(len=200) :: StringHeader, StringColumn
       ! loop variable
       integer:: iFlux
       ! string format for energy channels saved
@@ -1318,21 +1318,22 @@ contains
       if(iProc/=0) RETURN
 
       ! set header
-      StringHeader = 'MFLAMPA MH_data Energy Channels: ' // &
-           'FluxChannel  ChannelSource  EnergyLow  EnergyHigh ' // &
-           'EnergyUnit  FluxChannelUnit'
+      write(StringHeader,'(a,i2,1X,a,i2)') &
+           'MFLAMPA: all flux channels in MH_data; nFluxChannel=', &
+           nFluxChannel, 'nFluxChannelSat=', nFluxChannelSat
+      StringColumn = 'FluxChannel   ChannelSource   EnergyLow' // &
+           '   EnergyHigh   EnergyUnit   FluxChannelUnit'
       ! set string format
-      StringFormatEChannel = 'es18.10'
+      StringFormatEChannel = 'es12.4'
       StringFormatLine = '(a14,1X,a12,1X,'//trim(StringFormatEChannel)//&
            ',1X,'//trim(StringFormatEChannel)//',2X,a3,2X,a12)'
 
       ! open the file
       call open_file(file=trim(NamePlotDir)//trim(NameEChannelFile), &
            NameCaller=NameSub)
-      ! write the header file
+      ! write the header and column descriptions
       write(UnitTmp_,'(a)') StringHeader
-      write(UnitTmp_,'(a,i2,1X,a,i2)') 'nFluxChannel=', nFluxChannel, &
-           'nFluxChannelSat=', nFluxChannelSat
+      write(UnitTmp_,'(a)') StringColumn
 
       ! write flux_total info
       write(UnitTmp_,trim(StringFormatLine)) &

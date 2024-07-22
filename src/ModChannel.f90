@@ -6,7 +6,7 @@ module SP_ModChannel
   use ModUtilities, ONLY: CON_stop
   use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
   use SP_ModUnit,   ONLY: Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_, &
-       NameFluxUnit, NameEnergyFluxUnit
+       NameFluxUnit, NameDiffFluxUnit, NameEnergyFluxUnit
 
   implicit none
 
@@ -14,14 +14,14 @@ module SP_ModChannel
 
   private ! Except
 
-  public:: init                          ! initialize the flux channels
-  public:: read_param                    ! read satellite-related parameters
-  public:: get_integral_flux             ! calculate Flux_VIB
+  public:: init                           ! initialize the flux channels
+  public:: read_param                     ! read satellite-related parameters
+  public:: get_integral_flux              ! calculate Flux_VIB
 
   ! ----- For saving the intensity in energy channels -----
-  integer, public :: nFluxChannelSat = 1 ! GOES as default, energy channels
-  integer, public :: nFluxChannel    = 6 ! GOES as default, 6 channels
-  integer, parameter :: LenNameSat = 12  ! satellite name length
+  integer, public :: nFluxChannelSat = 1  ! GOES as default, energy channels
+  integer, public :: nFluxChannel    = 6  ! GOES as default, 6 channels
+  integer, parameter :: LenNameSat   = 12 ! satellite name length
   type FluxChannelSat
      ! Full set of information, for the energy channels of each satellite
      !
@@ -410,6 +410,9 @@ contains
     if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
     allocate(NameFluxUnit_I(Flux0_:FluxMax_))
     NameFluxUnit_I(Flux0_:FluxLast_) = NameFluxUnit
+    where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
+       NameFluxUnit_I(FluxFirst_:FluxLast_) = NameDiffFluxUnit
+    end where
     NameFluxUnit_I(EFlux_) = NameEnergyFluxUnit
 
     ! Finally allocate Flux_VIB, saved for outputs
@@ -448,8 +451,8 @@ contains
     real   :: dFluxChannelLo, dFluxChannelHi
     ! particle flux of energy channels
     real   :: FluxLo_I(FluxFirst_:FluxLast_), FluxHi_I(FluxFirst_:FluxLast_)
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE
        do iVertex = 1, nVertex_B(iLine)
@@ -472,6 +475,7 @@ contains
           FluxLo_I = 0.0; FluxHi_I = 0.0
           ! Calculate the particle fluxes for all energy channels
           do iFlux = FluxFirst_, FluxLast_
+             ! For EnergyLo to EnergyMax
              do iP = 1, nP-1
                 ! check whether reached the channel's cut-off level
                 if(KinEnergyIo_I(iP+1) <= EChannelLoIo_I(iFlux)) CYCLE
@@ -497,6 +501,8 @@ contains
                    EXIT
                 end if
              end do
+
+             ! For EnergyHi to EnergyMax
              if(abs(EChannelHiIo_I(iFlux) - KinEnergyIo_I(nP)) < cTiny) then
                 FluxHi_I(iFlux) = 0.0
              else
@@ -527,6 +533,7 @@ contains
                 end do
              end if
           end do
+
           ! Store the results for specified energy channels
           Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
                (FluxLo_I - FluxHi_I)*Si2Io_V(UnitFlux_)

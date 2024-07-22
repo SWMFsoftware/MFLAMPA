@@ -52,7 +52,7 @@ INT 60 1.0E+4			EChannelIo_I [MeV]
 INT 100 1.0E+4			EChannelIo_I [MeV]
 
 #ECHANNELSAT
-1			nFluxChannel
+1			nFluxChannelSat
 GOES			NameSatellite
 
 #INCLUDE
