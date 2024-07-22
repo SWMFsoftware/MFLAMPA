@@ -35,13 +35,12 @@ module SP_ModUnit
   character(len=3), public            :: NameEnergyUnit = 'kev'
 
   ! Integral flux unit, in usual case, called Io since it is per cm**2
-  character(len=6), public, parameter :: NameFluxUnit = 'p.f.u.'
+  character(len=6), public, parameter :: NameFluxUnit = 'pfu'
 
   ! Unit particle flux, 1 particle per cm2 per s per steradian,
   ! corresponds to 10,000 particles per m2 per s per steradian.
   real,                     parameter :: UnitParticleFluxSi = 10000.0
   character(len=12),public            :: NameEnergyFluxUnit = 'kev/cm2*s*sr'
-  character(len=12),public, allocatable :: NameFluxUnit_I(:)
 
   ! Unit conversions
   integer, public, parameter :: &

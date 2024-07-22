@@ -8,9 +8,10 @@ module SP_ModPlot
   use SP_ModAngularSpread, ONLY: get_normalized_spread,  &
        nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I, &
        IsReadySpreadPoint, IsReadySpreadGrid
+  use SP_ModChannel, ONLY: FluxChannelInit_V, Flux_VIB,  &
+       Flux0_, FluxMax_, NameFluxChannel_I, NameFluxUnit_I
   use SP_ModDistribution, ONLY: nP, KinEnergyIo_I,       &
-       Momentum_I, FluxChannelInit_V, Flux_VIB, Flux0_,  &
-       FluxMax_, NameFluxChannel_I, nMu, IsMuAvg, Distribution_CB
+       Momentum_I, nMu, IsMuAvg, Distribution_CB
   use SP_ModGrid, ONLY: nVar, nMHData, nLine, nLineAll,  &
        iLineAll0, search_line, MHData_VIB, State_VIB,    &
        iShock_IB, nVertex_B, NameVar_V, Shock_, LagrID_, &
@@ -18,8 +19,8 @@ module SP_ModPlot
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax, nDim
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: Si2Io_V, UnitFlux_, NameVarUnit_V,  &
-       NameFluxUnit_I, NameEnergyUnit
+  use SP_ModUnit, ONLY: Si2Io_V, UnitFlux_, &
+       NameVarUnit_V, NameFluxUnit, NameEnergyUnit
   use ModCoordTransform, ONLY: xyz_to_rlonlat
   use ModIoUnit, ONLY: UnitTmp_
   use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
@@ -151,6 +152,8 @@ module SP_ModPlot
 
   ! info for MH1D header and tag list
   logical:: DoWriteHeader = .false.
+  ! whether this is the initial call for MH_data energy channel list
+  logical:: DoInitEChannel = .true.
   ! name of the header file
   character(len=*), parameter :: NameHeaderFile = NameMHData//'.H'
   ! name of the tag list file
@@ -168,120 +171,6 @@ module SP_ModPlot
   logical :: DoInit        = .false.
 
 contains
-  !============================================================================
-  subroutine init
-
-    ! initialize the file matrix
-    ! storage for existing tags (possible during restart
-    character(len=50),allocatable:: StringTag_I(:)
-    ! full tag file name
-    character(len=100)::NameFile
-    ! loop variable
-    integer:: iTag, iFile, iVar
-
-    character(len=*), parameter:: NameSub = 'init'
-    !--------------------------------------------------------------------------
-    if(.not.DoInit) RETURN
-    DoInit = .false.
-    ! Array for plotting distribution function
-    Log10Momentum_I    = log10(Momentum_I)
-    Log10KinEnergyIo_I = log10(KinEnergyIo_I)
-    Log10Si2IoFlux     = log10(Si2Io_V(UnitFlux_))
-
-    ! Finalize setting output files:
-    ! number and names of flux channels are known at this point;
-    ! also, allocate buffers for output data
-    do iFile = 1, nFileOut
-       File_I(iFile) % nFluxVar = 0
-       if(File_I(iFile) % DoPlotFlux)then
-          File_I(iFile) % nFluxVar = FluxMax_ - Flux0_ + 1
-          do iVar = Flux0_, FluxMax_
-             File_I(iFile) % NameVarPlot = &
-                  trim(File_I(iFile) % NameVarPlot)//' '//&
-                  trim(NameFluxChannel_I(iVar))
-             select case(File_I(iFile) % TypeFile)
-             case('tec', 'tcp')
-                File_I(iFile) % NameVarPlot = &
-                     trim(File_I(iFile) % NameVarPlot)//'_['//&
-                     trim(NameFluxUnit_I(iVar))//']'
-             case default
-                File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile) % StringHeaderAux)//&
-                     ' '//trim(NameFluxUnit_I(iVar))
-             end select
-          end do
-       end if
-       ! prepare the output data containers
-       select case(File_I(iFile) % iKindData)
-       case(MH1D_)
-          allocate(File_I(iFile) % Buffer_II(&
-               File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-               File_I(iFile)%nFluxVar, 1:nVertexMax, 1))
-       case(MH2D_)
-          ! extra space is reserved for longitude and latitude
-          allocate(File_I(iFile) % Buffer_II(&
-               2 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-               File_I(iFile)%nFluxVar, 1:nLineAll, 1))
-       case(MHTime_)
-          ! note extra space reserved for time of the output
-          allocate(File_I(iFile) % Buffer_II(&
-               1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
-               File_I(iFile)%nFluxVar, 1, 1))
-       case(Distr1D_)
-          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nVertexMax))
-       case(Distr2D_)
-          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nLineAll))
-       case(DistrTime_)
-          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
-       case(DistrTraj_)
-          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
-       case(Flux2D_)
-          if(.not.IsReadySpreadGrid) call CON_stop(NameSub//   &
-               ": Angular spread parameters haven't been set;" &
-               //" use #SPREADGRID and #SPREADSOLIDANGLE in PARAM.in")
-          allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
-          ! extra space is reserved for sum of spreads
-          allocate(File_I(iFile) % Buffer_II(&
-               File_I(iFile)%nFluxVar * nSpreadLon, nSpreadLat, 1))
-       case(FluxTime_)
-          if(.not.IsReadySpreadPoint) call CON_stop(NameSub//  &
-               ": Angular spread parameters haven't been set;" &
-               //" use #SPREADSOLIDANGLE in PARAM.in")
-          ! extra space reserved for time of the output
-          allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1, 1))
-       end select
-    end do
-
-    ! Reset/trim NameTagFile if nTag==0/nTag>0; the latter happens at restart.
-
-    ! During the run new tags are continuously appended to NameTagFile,
-    ! however, only when the run is succesfully finalized the list of tags is
-    ! considered to be valid, i.e. new #NTAG is written to the header file.
-
-    ! If previous run hasn't been properly finalized, NameTagFile may be
-    ! inconsistent with nTag, therefore the file is trimmed according to nTag
-
-    if(iProc/=0) RETURN ! done only by the root
-    ! full file name
-    NameFile = trim(NamePlotDir)//trim(NameTagFile)
-    if(nTag > 0)then
-       allocate(StringTag_I(nTag))
-       call open_file(file=NameFile, status='old', NameCaller=NameSub)
-       do iTag = 1, nTag
-          read(UnitTmp_,'(a)') StringTag_I(iTag)
-       end do
-       call close_file
-    end if
-    call open_file(file=NameFile, status='replace', NameCaller=NameSub)
-    if(nTag > 0)then
-       do iTag = 1, nTag
-          write(UnitTmp_,'(a)') StringTag_I(iTag)
-       end do
-       deallocate(StringTag_I)
-    end if
-    call close_file
-
-  end subroutine init
   !============================================================================
   subroutine read_param(NameCommand)
 
@@ -386,7 +275,7 @@ contains
           ! reset variables' and parameters' names
           File_I(iFile) % NameVarPlot = ''
           File_I(iFile) % NameAuxPlot = ''
-          select case(File_I(iFile)%TypeFile)
+          select case(File_I(iFile) % TypeFile)
           case('tec', 'tcp')
              File_I(iFile) % StringHeaderAux = ''
           case default
@@ -730,7 +619,7 @@ contains
       case(DEFIo_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux) // &
-              ' log10[p.f.u/' // NameEnergyUnit // ']'
+              ' log10[' // NameFluxUnit // '/' // NameEnergyUnit // ']'
       case(DEFSi_)
          File_I(iFile) % StringHeaderAux = &
               trim(File_I(iFile) % StringHeaderAux) // &
@@ -741,11 +630,126 @@ contains
     !==========================================================================
   end subroutine read_param
   !============================================================================
+  subroutine init
+
+    ! initialize the file matrix
+    ! storage for existing tags (possible during restart
+    character(len=50),allocatable:: StringTag_I(:)
+    ! full tag file name
+    character(len=100)::NameFile
+    ! loop variable
+    integer:: iTag, iFile, iVar
+
+    character(len=*), parameter:: NameSub = 'init'
+    !--------------------------------------------------------------------------
+    if(.not.DoInit) RETURN
+    DoInit = .false.
+    ! Array for plotting distribution function
+    Log10Momentum_I    = log10(Momentum_I)
+    Log10KinEnergyIo_I = log10(KinEnergyIo_I)
+    Log10Si2IoFlux     = log10(Si2Io_V(UnitFlux_))
+
+    ! Finalize setting output files:
+    ! number and names of flux channels are known at this point;
+    ! also, allocate buffers for output data
+    do iFile = 1, nFileOut
+       File_I(iFile) % nFluxVar = 0
+       if(File_I(iFile) % DoPlotFlux)then
+          File_I(iFile) % nFluxVar = FluxMax_ - Flux0_ + 1
+          do iVar = Flux0_, FluxMax_
+             File_I(iFile) % NameVarPlot = &
+                  trim(File_I(iFile) % NameVarPlot)//' '//&
+                  trim(NameFluxChannel_I(iVar))
+             select case(File_I(iFile) % TypeFile)
+             case('tec', 'tcp')
+                File_I(iFile) % NameVarPlot = &
+                     trim(File_I(iFile) % NameVarPlot)//'_['//&
+                     trim(NameFluxUnit_I(iVar))//']'
+             case default
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile) % StringHeaderAux)//&
+                     ' '//trim(NameFluxUnit_I(iVar))
+             end select
+          end do
+       end if
+       ! prepare the output data containers
+       select case(File_I(iFile) % iKindData)
+       case(MH1D_)
+          allocate(File_I(iFile) % Buffer_II(&
+               File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
+               File_I(iFile)%nFluxVar, 1:nVertexMax, 1))
+       case(MH2D_)
+          ! extra space is reserved for longitude and latitude
+          allocate(File_I(iFile) % Buffer_II(&
+               2 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
+               File_I(iFile)%nFluxVar, 1:nLineAll, 1))
+       case(MHTime_)
+          ! note extra space reserved for time of the output
+          allocate(File_I(iFile) % Buffer_II(&
+               1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
+               File_I(iFile)%nFluxVar, 1, 1))
+       case(Distr1D_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nVertexMax))
+       case(Distr2D_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nLineAll))
+       case(DistrTime_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
+       case(DistrTraj_)
+          allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
+       case(Flux2D_)
+          if(.not.IsReadySpreadGrid) call CON_stop(NameSub//   &
+               ": Angular spread parameters haven't been set;" &
+               //" use #SPREADGRID and #SPREADSOLIDANGLE in PARAM.in")
+          allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
+          ! extra space is reserved for sum of spreads
+          allocate(File_I(iFile) % Buffer_II(&
+               File_I(iFile)%nFluxVar * nSpreadLon, nSpreadLat, 1))
+       case(FluxTime_)
+          if(.not.IsReadySpreadPoint) call CON_stop(NameSub//  &
+               ": Angular spread parameters haven't been set;" &
+               //" use #SPREADSOLIDANGLE in PARAM.in")
+          ! extra space reserved for time of the output
+          allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1, 1))
+       end select
+    end do
+
+    ! Reset/trim NameTagFile if nTag==0/nTag>0; the latter happens at restart.
+
+    ! During the run new tags are continuously appended to NameTagFile,
+    ! however, only when the run is succesfully finalized the list of tags is
+    ! considered to be valid, i.e. new #NTAG is written to the header file.
+
+    ! If previous run hasn't been properly finalized, NameTagFile may be
+    ! inconsistent with nTag, therefore the file is trimmed according to nTag
+
+    if(iProc/=0) RETURN ! done only by the root
+    ! full file name
+    NameFile = trim(NamePlotDir)//trim(NameTagFile)
+    if(nTag > 0)then
+       allocate(StringTag_I(nTag))
+       call open_file(file=NameFile, status='old', NameCaller=NameSub)
+       do iTag = 1, nTag
+          read(UnitTmp_,'(a)') StringTag_I(iTag)
+       end do
+       call close_file
+    end if
+    call open_file(file=NameFile, status='replace', NameCaller=NameSub)
+    if(nTag > 0)then
+       do iTag = 1, nTag
+          write(UnitTmp_,'(a)') StringTag_I(iTag)
+       end do
+       deallocate(StringTag_I)
+    end if
+    call close_file
+
+  end subroutine init
+  !============================================================================
   subroutine save_plot_all(IsInitialOutputIn)
 
     ! write the output data
 
-    use SP_ModDistribution, ONLY: get_integral_flux, Mu_I
+    use SP_ModChannel,      ONLY: get_integral_flux
+    use SP_ModDistribution, ONLY: Mu_I
     use SP_ModTime,         ONLY: IsSteadyState
     use SP_ModGrid,         ONLY: Used_B
 
@@ -797,10 +801,13 @@ contains
        select case(iKindData)
        case(MH1D_)
           call write_mh_1d
+          call write_mh_channel
        case(MH2D_)
           call write_mh_2d
+          call write_mh_channel
        case(MHTime_)
           call write_mh_time
+          call write_mh_channel
        case(Distr1D_)
           call write_distr_1d
        case(Distr2D_)
@@ -1284,6 +1291,77 @@ contains
       end do
 
     end subroutine write_mh_time
+    !==========================================================================
+    subroutine write_mh_channel
+
+      ! write output for energy channels saved in MH data files
+      ! a file is output once with the name being NameEChannelFile, i.e.,
+      ! MH_data_EChannel.H, only created in the first initial call
+
+      use SP_ModChannel,      ONLY: nFluxChannel, nFluxChannelSat, &
+           FluxFirst_, FluxLast_, EFlux_, NameChannelSource_I,     &
+           EChannelLoIo_I, EChannelHiIo_I
+      use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
+      use SP_ModUnit,         ONLY: NameEnergyFluxUnit
+      ! header for the file
+      character(len=500) :: StringHeader
+      ! loop variable
+      integer:: iFlux
+      ! string format for energy channels saved
+      character(len=7)   :: StringFormatEChannel
+      character(len=100) :: StringFormatLine
+
+      character(len=*), parameter:: NameSub = 'write_mh_channel'
+      !------------------------------------------------------------------------
+      if(.not.DoInitEChannel) RETURN
+      ! performed on root proc only
+      if(iProc/=0) RETURN
+
+      ! set header
+      StringHeader = 'MFLAMPA MH_data Energy Channels: ' // &
+           'FluxChannel  ChannelSource  EnergyLow  EnergyHigh ' // &
+           'EnergyUnit  FluxChannelUnit'
+      ! set string format
+      StringFormatEChannel = 'es18.10'
+      StringFormatLine = '(a14,1X,a12,1X,'//trim(StringFormatEChannel)//&
+           ',1X,'//trim(StringFormatEChannel)//',2X,a3,2X,a12)'
+
+      ! open the file
+      call open_file(file=trim(NamePlotDir)//trim(NameEChannelFile), &
+           NameCaller=NameSub)
+      ! write the header file
+      write(UnitTmp_,'(a)') StringHeader
+      write(UnitTmp_,'(a,i2,1X,a,i2)') 'nFluxChannel=', nFluxChannel, &
+           'nFluxChannelSat=', nFluxChannelSat
+
+      ! write flux_total info
+      write(UnitTmp_,trim(StringFormatLine)) &
+           trim(NameFluxChannel_I(Flux0_)), "General", &
+           EnergyInjIo, EnergyMaxIo, &
+           trim(NameEnergyUnit), trim(NameFluxUnit)
+      ! write the flux channel list info, line by line
+      do iFlux = FluxFirst_, FluxLast_
+         write(UnitTmp_,trim(StringFormatLine)) &
+              trim(NameFluxChannel_I(iFlux)), &
+              trim(NameChannelSource_I(iFlux)), &
+              EChannelLoIo_I(iFlux), EChannelHiIo_I(iFlux), &
+              trim(NameEnergyUnit), trim(NameFluxUnit_I(iFlux))
+      end do
+      ! write eflux info
+      write(UnitTmp_,trim(StringFormatLine)) &
+           trim(NameFluxChannel_I(EFlux_)), "General", &
+           EnergyInjIo, EnergyMaxIo, &
+           trim(NameEnergyUnit), trim(NameEnergyFluxUnit)
+
+      ! write the last empty line
+      write(UnitTmp_,*)
+      ! close the file
+      call close_file
+
+      ! finish the initial call
+      DoInitEChannel = .false.
+
+    end subroutine write_mh_channel
     !==========================================================================
     subroutine write_distr_1d
 
@@ -2425,7 +2503,7 @@ contains
   subroutine finalize
 
     use ModUtilities, ONLY: cTab
-    use SP_ModGrid, ONLY: nLat, nLon
+    use SP_ModGrid,   ONLY: nLat, nLon
 
     ! write the header file that contains necessary information
     ! for reading input files in a separate run
@@ -2436,7 +2514,7 @@ contains
     ! performed on root proc only
     if(iProc/=0) RETURN
     ! write the header file
-    call open_file(file=trim(NamePlotDir)//trim(NameHeaderFile),&
+    call open_file(file=trim(NamePlotDir)//trim(NameHeaderFile), &
          NameCaller=NameSub)
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'

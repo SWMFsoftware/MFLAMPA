@@ -37,6 +37,7 @@ contains
     use SP_ModAdvance,       ONLY: read_param_adv        => read_param
     use SP_ModAngularSpread, ONLY: read_param_spread     => read_param
     use SP_ModBc,            ONLY: read_param_bc         => read_param
+    use SP_ModChannel,       ONLY: read_param_channel    => read_param
     use SP_ModDiffusion,     ONLY: read_param_diffuse    => read_param
     use SP_ModDistribution,  ONLY: read_param_dist       => read_param
     use SP_ModGrid,          ONLY: read_param_grid       => read_param
@@ -82,14 +83,16 @@ contains
           ! Currently we do not need '#DOSMOOTH'
           if(.not.IsFirstSession) CYCLE
           call read_param_grid(NameCommand)
-       case('#MOMENTUMGRID', '#PITCHANGLEGRID', &
-            '#FLUXINITIAL', '#FLUXCHANNEL')
+       case('#MOMENTUMGRID', '#PITCHANGLEGRID', '#FLUXINITIAL')
           if(.not.IsFirstSession) CYCLE
           call read_param_dist(NameCommand)
        case('#CFL', '#ADVECTION', '#TRACESHOCK')
           call read_param_adv(NameCommand)
        case('#INJECTION', '#LOWERENDBC', '#UPPERENDBC')
           call read_param_bc(NameCommand)
+       case('#CHANNEL', '#CHANNELSAT')
+          if(.not.IsFirstSession) CYCLE
+          call read_param_channel(NameCommand)
        case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSION')
           call read_param_diffuse(NameCommand)
        case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG', '#NOUTPUT')
@@ -99,6 +102,7 @@ contains
        case('#VERBOSE')
           call read_param_testfunc(NameCommand)
        case('#SATELLITE')
+          if(.not.IsFirstSession) CYCLE
           call read_param_satellite(NameCommand)
        case('#TURBULENTSPECTRUM')
           call read_param_turbulence(NameCommand)
@@ -166,6 +170,7 @@ contains
   subroutine initialize
 
     use SP_ModAngularSpread, ONLY: init_spread     => init
+    use SP_ModChannel,       ONLY: init_channel    => init
     use SP_ModDistribution,  ONLY: init_dist       => init
     use SP_ModPlot,          ONLY: init_plot       => init
     use SP_ModReadMhData,    ONLY: init_mhdata     => init
@@ -174,20 +179,23 @@ contains
          UseTurbulentSpectrum
     use SP_ModUnit,          ONLY: init_unit       => init
 
-    ! initialize the model
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
-    if(iProc==0)then
+    if(iProc==0) then
+       ! Initialize the model
        write(*,'(a)')'SP: '
        write(*,'(a)')'SP: initialize'
        write(*,'(a)')'SP: '
     end if
-    ! Inialize unit for energy ('keV', 'MeV', 'GeV') and convert energies
+    ! Initialize and convert energy units (eV, keV, MeV, GeV, TeV)
     call init_unit
-    ! Allocate the distribution function arrays and set 'uniform' background
+    ! Allocate distribution function and set uniform background
     call init_dist
+    ! Initialize the energy channels for specified satellites
+    call init_channel
+    ! Initialize arrays for outputs and plotting
     call init_plot
-    ! if(DoReadMhData), inialize MH data reader and reads the first data file
+    ! if(DoReadMhData), initialize MH data reader and reads the first data file
     call init_mhdata
     if(UseTurbulentSpectrum) call init_turbulence
     call init_spread

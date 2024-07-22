@@ -140,7 +140,7 @@ module SP_ModGrid
        'UOld      ', &
        'BOld      ' ]
 
-  ! whether the variables are initialized
+  ! Logical variable: whether this is the initial call
   logical:: DoInit = .true.
 
   ! whether to use smoothing of length along lines,
@@ -213,7 +213,7 @@ contains
 
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
-    if(.not.DoInit)RETURN
+    if(.not.DoInit) RETURN
     DoInit = .false.
 
     ! distribute nodes between processors
