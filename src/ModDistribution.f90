@@ -260,19 +260,17 @@ contains
   end subroutine check_dist_neg
   !============================================================================
   subroutine search_kinetic_energy(KinEnergyIo, iKinEnergyOut, &
-       IsFound, dFlux, iLine, iVertex)
+       IsFound, DistTimesP2_I, dFlux)
 
     ! performs search in the KinEnergy_I array, for the given kinetic energy
     real,         intent(in) :: KinEnergyIo   ! input kinetic energy, in Io
     integer,      intent(out):: iKinEnergyOut ! result: index, from 1 to nP-1
-    logical,      intent(out):: IsFound       ! result: whether search succeeds
+    logical,      intent(out):: IsFound       ! whether search succeeds
+    real,optional,intent(in) :: DistTimesP2_I(nP) ! VDF*Momentum_I**2 for dFlux
     real,optional,intent(out):: dFlux         ! integral flux at output index
-    integer,optional,intent(in):: iLine, iVertex ! for calculating dFlux
-    ! VDF*Momentum_I**2 at iKinEnergyOut (left) and iKinEnergyOut+1 (right)
-    real :: DistTimesP2left, DistTimesP2right
     !--------------------------------------------------------------------------
 
-    ! check whether physical KinEnergyIo_I covers the given kinetic energy
+    ! Check whether physical KinEnergyIo_I covers the given kinetic energy
     if(KinEnergyIo < KinEnergyIo_I(1) .or. KinEnergyIo > EnergyMaxIo) then
        IsFound = .false.
        iKinEnergyOut = -1
@@ -281,30 +279,24 @@ contains
 
     ! KinEnergyIo_I covers the given kinetic energy
     IsFound = .true.
-    ! find index of first kinetic energy in the array above KinEnergyIo
+    ! Find index of first kinetic energy in the array above KinEnergyIo
     iKinEnergyOut = maxloc(KinEnergyIo_I(1:nP-1), DIM=1, &
          MASK=KinEnergyIo > KinEnergyIo_I(1:nP-1))
 
-    ! get integral flux contributed by the bin of iKinEnergyOut, if necessary
+    ! Get integral flux contributed by the bin of iKinEnergyOut, if necessary
     if(present(dFlux)) then
        ! Channel cutoff level is often in the middle of a bin
        ! Here we compute partial flux increments at iKinEnergyOut
 
-       ! Calculate auxiliary VDF*Momentum_I**2
-       DistTimesP2left = sum(Distribution_CB(iKinEnergyOut, 1:nMu, &
-            iVertex, iLine))*DeltaMu*0.50 * Momentum_I(iKinEnergyOut)**2
-       DistTimesP2right = sum(Distribution_CB(iKinEnergyOut+1, 1:nMu, &
-            iVertex, iLine))*DeltaMu*0.50 * Momentum_I(iKinEnergyOut+1)**2
-
        ! The contrubution to integral equals:
        dFlux = &
             (KinEnergyIo_I(iKinEnergyOut+1) - KinEnergyIo) & ! Span
-            *0.50*(                          & ! times a half of sum of
-            DistTimesP2right +               & ! the right boundary value +
+            *0.5*(                           & ! times a half of sum of
+            DistTimesP2_I(iKinEnergyOut+1) + & ! the right boundary value +
             ((KinEnergyIo_I(iKinEnergyOut+1) & ! interpolation to EChannel:
-            - KinEnergyIo)*DistTimesP2left   & ! from iP
+            - KinEnergyIo)*DistTimesP2_I(iKinEnergyOut)    & ! from iP
             + (KinEnergyIo - KinEnergyIo_I(iKinEnergyOut)) &
-            *DistTimesP2right)               & ! from iP+1
+            *DistTimesP2_I(iKinEnergyOut+1)) & ! from iP+1
             / & ! per the total of interpolation weights:
             (KinEnergyIo_I(iKinEnergyOut+1) - KinEnergyIo_I(iKinEnergyOut)))
     end if

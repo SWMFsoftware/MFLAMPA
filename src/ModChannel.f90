@@ -225,10 +225,10 @@ contains
 
     ! Not specify satellite energy channels: GOES by default
     ! Not specify self-defined energy channel: 0
-    ! (1) To ONLY use FluxChannelSat_I: not set extra nFluxChannel
-    ! (2) To include self-defined channels: set nFluxChannel
-    ! (3) To ONLY use self-defined channels: set nFluxChannel <= 0
-    ! (4) To include both FluxChannelSat_I and self-defined channels: set both
+    ! 1) To ONLY use FluxChannelSat_I: not set extra nFluxChannel
+    ! 2) To include self-defined channels: set nFluxChannel
+    ! 3) To ONLY use self-defined channels: set nFluxChannel <= 0
+    ! 4) To include both FluxChannelSat_I and self-defined channels: set both
     if(allocated(EChannelType_I)) then
        ! Self-defined channels: will drop satellite channels if not specified
        if(.not.allocated(FluxChannelSat_I)) nFluxChannelSat = 0
@@ -237,9 +237,9 @@ contains
        ! Convert units for self-defined energy channels, and the lower
        ! and upper bounds should fall between KinEnergyIo_I(1) and EnergyMaxIo
        EChannelLoIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_I(1), &
-            EChannelLoIo_I * cMeV * Si2Io_V(UnitEnergy_)))
+            EChannelLoIo_I*cMeV*Si2Io_V(UnitEnergy_)))
        EChannelHiIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_I(1), &
-            EChannelHiIo_I * cMeV * Si2Io_V(UnitEnergy_)))
+            EChannelHiIo_I*cMeV*Si2Io_V(UnitEnergy_)))
     else
        ! No self-defined channels
        nFluxChannel = 0
@@ -437,8 +437,8 @@ contains
   end subroutine init
   !============================================================================
   subroutine get_integral_flux
-    ! compute the total (simulated) integral flux of particles as well as
-    ! particle flux in specified channels; also compute total energy flux
+    ! compute the total (simulated) integral flux of particles and particle
+    ! fluxes in specified energy channels; also compute total energy flux
 
     use ModNumConst,        ONLY: cTiny
     use SP_ModDistribution, ONLY: nP, nMu, DeltaMu, Momentum_I, &
@@ -479,31 +479,33 @@ contains
           FluxLo_I = 0.0; FluxHi_I = 0.0
           ! Calculate the particle fluxes for all energy channels
           do iFlux = FluxFirst_, FluxLast_
-             ! For the flux from EnergyLo to EnergyMax
+             ! 1) For the flux from EnergyLo to EnergyMax
              ! Get the partial flux increments
-             call search_kinetic_energy(EChannelLoIo_I(iFlux), &
-                  iPLo, IsFoundChannelIo, dFluxChannelLo, iLine, iVertex)
-             if(iPLo < nP-1) then
-                ! For the rest bins: make a summation, when iPLo < nP-1
-                FluxLo_I(iFlux) = dFluxChannelLo + sum(dFlux_I(iPLo+1:nP-1))
-             else
+             call search_kinetic_energy(EChannelLoIo_I(iFlux), iPLo, &
+                  IsFoundChannelIo, DistTimesP2_I, dFluxChannelLo)
+             ! iPLo: from 1 to nP-1, due to the range of EChannelLoIo_I
+             if(iPLo == nP-1) then
                 ! Only contributed from nP-1 to nP, when iPLo == nP-1
                 FluxLo_I(iFlux) = dFluxChannelLo
+             else
+                ! For the rest bins: make a summation, when iPLo < nP-1
+                FluxLo_I(iFlux) = dFluxChannelLo + sum(dFlux_I(iPLo+1:nP-1))
              end if
 
-             ! For the flux from EnergyHi to EnergyMax
+             ! 2) For the flux from EnergyHi to EnergyMax
              if(abs(EChannelHiIo_I(iFlux)-KinEnergyIo_I(nP)) < cTiny) then
                 FluxHi_I(iFlux) = 0.0
              else
                 ! Get the partial flux increments
-                call search_kinetic_energy(EChannelHiIo_I(iFlux), &
-                     iPHi, IsFoundChannelHi, dFluxChannelHi, iLine, iVertex)
-                if(iPHi < nP-1) then
-                   ! For the rest bins: make a summation, when iPHi < nP-1
-                   FluxHi_I(iFlux) = dFluxChannelHi + sum(dFlux_I(iPLo+1:nP-1))
-                else
+                call search_kinetic_energy(EChannelHiIo_I(iFlux), iPHi, &
+                     IsFoundChannelHi, DistTimesP2_I, dFluxChannelHi)
+                ! iPHi: from 1 to nP-1, due to the range of EChannelHiIo_I
+                if(iPHi == nP-1) then
                    ! Only contributed from nP-1 to nP, when iPHi == nP-1
                    FluxHi_I(iFlux) = dFluxChannelHi
+                else
+                   ! For the rest bins: make a summation, when iPHi < nP-1
+                   FluxHi_I(iFlux) = dFluxChannelHi + sum(dFlux_I(iPLo+1:nP-1))
                 end if
              end if
           end do
