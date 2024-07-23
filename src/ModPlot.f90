@@ -1260,7 +1260,7 @@ contains
                  State_VIB(iVarIndex, iAbove-1, iLine) * (1-Weight) + &
                  State_VIB(iVarIndex, iAbove,   iLine) *    Weight
          end do
-         if(File_I(iFile) % DoPlotFlux)&
+         if(File_I(iFile) % DoPlotFlux) &
               File_I(iFile) % Buffer_II(1 + nMhdVar + nExtraVar: &
               nFluxVar + nMhdVar + nExtraVar, nDataLine, 1) =    &
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
@@ -1354,8 +1354,6 @@ contains
            EnergyInjIo, EnergyMaxIo, &
            trim(NameEnergyUnit), trim(NameEnergyFluxUnit)
 
-      ! write the last empty line
-      write(UnitTmp_,*)
       ! close the file
       call close_file
 

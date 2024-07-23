@@ -491,6 +491,10 @@ EChannelIo_I. Then, one also needs to input the lower and upper bounds,
 in the unit of MeV, of the energy channel which the particle flux is
 integrated or averaged (differentiated) as the output. All the channels
 for fluxes saved in MH_data will be saved into MH_data_EChannel.H file.
+
+In MH_data and MH_data_EChannel.H files, the energy channels will be
+saved as flux_ChannelXX, from 01 to the summed nFluxChannel. Current
+maximum number of energy channels is 99.
 </command>
 
 <command name="ECHANNELSAT" if="$_IsFirstSession">
@@ -520,6 +524,10 @@ we will use the 6 energy channels of GOES as default. If one specifies
 needs to explicitly specify #ECHANNELSAT in this case. When including
 both #ECHANNEL and #ECHANNELSAT, the self-defined channels will always
 be set ahead of the satellite energy channels in the outputs.
+
+In MH_data and MH_data_EChannel.H files, the energy channels will be
+saved as flux_ChannelXX, from 01 to the summed nFluxChannel. Current
+maximum number of energy channels is 99.
 </command>
 
 </commandgroup>

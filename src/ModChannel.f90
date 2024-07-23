@@ -220,15 +220,14 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
 
-    ! Check correctness for energy channels
-    if(nFluxChannelSat<=0 .and. nFluxChannel<=0) RETURN
-
     ! Not specify satellite energy channels: GOES by default
     ! Not specify self-defined energy channel: 0
     ! 1) To ONLY use FluxChannelSat_I: not set extra nFluxChannel
     ! 2) To include self-defined channels: set nFluxChannel
     ! 3) To ONLY use self-defined channels: set nFluxChannel <= 0
     ! 4) To include both FluxChannelSat_I and self-defined channels: set both
+    ! Note that here we allow for nFluxChannel==0 and nFluxChannelSat==0, and
+    ! in this case, we only save Flux0_ and EFlux_ in the MH_data files.
     if(allocated(EChannelType_I)) then
        ! Self-defined channels: will drop satellite channels if not specified
        if(.not.allocated(FluxChannelSat_I)) nFluxChannelSat = 0
@@ -243,11 +242,16 @@ contains
     else
        ! No self-defined channels
        nFluxChannel = 0
-       ! in this case, nFluxChannelSat should be > 0; otherwise RETURN
-       ! either specified by users, or set to be default
+       ! In this case, nFluxChannelSat should be >= 0, either specified by
+       ! users, or set to be default. For the former, FluxChannelSat_I is
+       ! allocated as long as nFluxChannelSat>0, but when nFluxChannelSat==0,
+       ! FluxChannelSat_I is not allocated, same as the latter situation.
+       ! However, nFluxChannelSat is > 0, set as default for the latter case,
+       ! so we can differentiate them by nFluxChannelSat.
+
        ! if no specify satellite energy channels: GOES by default
        ! To turn this off: set nFluxChannelSat = 0
-       if(.not.allocated(FluxChannelSat_I)) then
+       if(.not.allocated(FluxChannelSat_I) .and. nFluxChannelSat>0) then
           allocate(FluxChannelSat_I(1:nFluxChannelSat))
           FluxChannelSat_I(1) % NameSat = 'GOES'
           FluxChannelSat_I(1) % iKindSat = FluxChannelGOES_
@@ -337,7 +341,7 @@ contains
     FluxMax_  = EFlux_
 
     ! Re-assign energy channel info to the whole array when nFluxChannelSat>0
-    if(nFluxChannelSat>0) then
+    if(nFluxChannelSat > 0) then
        allocate(NameChannelSource_I(FluxFirst_:FluxLast_), &
             EChannelType_I(FluxFirst_:FluxLast_), &
             EChannelLoIo_I(FluxFirst_:FluxLast_), &
@@ -350,6 +354,11 @@ contains
           EChannelType_I(FluxFirst_:iFlux) = EChannelTypeTmp_I
           EChannelLoIo_I(FluxFirst_:iFlux) = EChannelLoIoTmp_I
           EChannelHiIo_I(FluxFirst_:iFlux) = EChannelHiIoTmp_I
+          ! Ready for the satellite energy channel assignments
+          iFlux = iFlux + 1
+
+          deallocate(NameChannelSourceTmp_I, EChannelTypeTmp_I, &
+               EChannelLoIoTmp_I, EChannelHiIoTmp_I)
        else
           iFlux = FluxFirst_
        end if
@@ -372,9 +381,12 @@ contains
        end do
     end if
 
-    ! Calculate the energy channel bin width (inverse)
-    allocate(InvEChannelBinIo_I(FluxFirst_:FluxLast_))
-    InvEChannelBinIo_I = 1.0/(EChannelHiIo_I - EChannelLoIo_I)
+    ! Calculate the energy channel bin width (inverse). Note that we allow
+    ! nFluxChannel == 0 to only save Flux0_ and EFlux_, so we should be careful
+    if(nFluxChannel > 0) then
+       allocate(InvEChannelBinIo_I(FluxFirst_:FluxLast_))
+       InvEChannelBinIo_I = 1.0/(EChannelHiIo_I - EChannelLoIo_I)
+    end if
 
     ! Write the header of the energy channels for particle flux
     allocate(character(len=14) :: NameFluxChannel_I(Flux0_:FluxMax_))
@@ -412,9 +424,12 @@ contains
     if(allocated(NameFluxUnit_I)) deallocate(NameFluxUnit_I)
     allocate(NameFluxUnit_I(Flux0_:FluxMax_))
     NameFluxUnit_I(Flux0_:FluxLast_) = NameFluxUnit
-    where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
-       NameFluxUnit_I(FluxFirst_:FluxLast_) = NameDiffFluxUnit
-    end where
+    ! In case that nFluxChannel == 0
+    if(allocated(EChannelType_I)) then
+       where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
+          NameFluxUnit_I(FluxFirst_:FluxLast_) = NameDiffFluxUnit
+       end where
+    end if
     NameFluxUnit_I(EFlux_) = NameEnergyFluxUnit
 
     ! Finally allocate Flux_VIB, saved for outputs
@@ -513,11 +528,14 @@ contains
           ! Store the results for specified energy channels
           Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
                (FluxLo_I - FluxHi_I)*Si2Io_V(UnitFlux_)
-          where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
-             Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
-                  Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) &
-                  *InvEChannelBinIo_I
-          end where
+          ! In case that nFluxChannel == 0
+          if(allocated(EChannelType_I)) then
+             where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
+                Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
+                     Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) &
+                     *InvEChannelBinIo_I
+             end where
+          end if
        end do
     end do
   end subroutine get_integral_flux
