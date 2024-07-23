@@ -7,9 +7,9 @@ module SP_ModProc
 
   ! MPI information
   !----------------------------------------------------------------------------
-  integer:: iComm  = -1
-  integer:: iProc  = -1
-  integer:: nProc  = -1
-  integer:: iError = -1
+  integer:: iComm  = -1 ! For MPI communicators
+  integer:: iProc  = -1 ! Current processor index
+  integer:: nProc  = -1 ! Total processor number
+  integer:: iError = -1 ! Error message
 end module SP_ModProc
 !==============================================================================

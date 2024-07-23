@@ -56,6 +56,7 @@ module SP_ModTurbulence
 contains
   !============================================================================
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand
     character(len=*), parameter:: NameSub = 'read_param'
@@ -66,10 +67,12 @@ contains
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select
+
   end subroutine read_param
   !============================================================================
   subroutine init
-    ! Init all the allocatable vars
+    ! Allocate all the allocatable vars
+
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModProc, ONLY: iProc
     character(len=*), parameter:: NameSub = 'init'
@@ -87,7 +90,8 @@ contains
     allocate(DispersionMinus_I(1:nVertexMax))
     allocate(CFL_I(1:nVertexMax))
 
-    allocate(AK_II(nP,nVertexMax),BK_II(nP,nVertexMax))
+    allocate(AK_II(nP,nVertexMax), BK_II(nP,nVertexMax))
+
   end subroutine init
   !============================================================================
   subroutine finalize
@@ -106,7 +110,7 @@ contains
     deallocate(DispersionMinus_I)
     deallocate(CFL_I)
 
-    deallocate(AK_II,BK_II)
+    deallocate(AK_II, BK_II)
 
   end subroutine finalize
   !============================================================================
@@ -118,7 +122,7 @@ contains
     ! particle energy.
 
     ! the number of active particles on the line
-    integer, intent(in)::  iEnd
+    integer, intent(in) :: iEnd
 
     ! Coordinates of Lagrangian Meshes in SI unit [m]
     real,dimension(1:3, 1:iEnd),intent(in) :: XyzSi_DI
@@ -153,7 +157,7 @@ contains
 
     rShockSi = sqrt(sum(XyzSi_DI(:,iShock)**2))
 
-    do iVertex=1,iEnd
+    do iVertex = 1, iEnd
        rSi   = sqrt(sum(XyzSi_DI(:,iVertex)**2))
        kSi_I = kOverBSi_I*BSi_I(iVertex)
     end do
@@ -161,6 +165,7 @@ contains
   end subroutine init_spectrum
   !============================================================================
   subroutine set_dxx(iEnd, BSi_I)
+
     integer,intent(in) :: iEnd
     real,intent(in)    :: BSi_I(iEnd)
 
@@ -187,10 +192,10 @@ contains
     ! ik     0     1                         nP   nP+1
     !--------------------------------------------------------------------------
 
-    do iVertex=1, iEnd
+    do iVertex = 1, iEnd
        select case(CorrectionMode_X(iVertex))
        case(1)
-          SpectralIndexAtKMax = 5.0/3
+          SpectralIndexAtKMax = 5.0/3.0
        case(2)
           SpectralIndexAtKMax = 1.0
        end select
@@ -213,7 +218,7 @@ contains
        AK_II(1,iVertex) = F01/(2.0-SpectralIndexAtKMax)
        BK_II(1,iVertex) = F02/(4.0-SpectralIndexAtKMax)
 
-       do iK=2, nP
+       do iK = 2, nP
           ! We calculate the partial sums for a set of the wave number values.
           ! The integral is taken from KRes up to infinity, so we start from
           ! the maximal wave number and add the contributions from each of
@@ -238,6 +243,7 @@ contains
           k0Si = k1Si; F01 = F11; F02 = F12
        end do
     end do
+
   end subroutine set_dxx
   !============================================================================
   function Dxx_s(iX, iP, BSi) result(Dxx)

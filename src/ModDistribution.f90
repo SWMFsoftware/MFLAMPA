@@ -122,10 +122,11 @@ contains
 
     use ModConst,     ONLY: cLightSpeed
     use ModUtilities, ONLY: check_allocate
+    use SP_ModProc,   ONLY: iError
     use SP_ModUnit,   ONLY: kinetic_energy_to_momentum, momentum_to_energy, &
          momentum_to_kinetic_energy, Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_
     ! loop variables
-    integer :: iLine, iVertex, iP, iError, iMu
+    integer :: iLine, iVertex, iP, iMu
     ! maximal momentum
     real :: MomentumMaxSi
     ! local FluxChannel, for converting to NameFluxChannel_I

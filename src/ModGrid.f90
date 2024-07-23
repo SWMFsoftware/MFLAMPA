@@ -206,9 +206,8 @@ contains
 
     ! allocate the grid used in this model
     use ModUtilities, ONLY: check_allocate
-    use SP_ModProc,   ONLY: nProc
+    use SP_ModProc,   ONLY: nProc, iError
 
-    integer:: iError
     integer:: iNodeLast
 
     character(len=*), parameter:: NameSub = 'init'
@@ -241,7 +240,7 @@ contains
   subroutine init_stand_alone
 
     ! allocate the grid used in this model
-    integer :: iVertex, iError
+    integer :: iVertex
     character(len=*), parameter:: NameSub = 'init_stand_alone'
     !--------------------------------------------------------------------------
     ! Allocate here if stand alone

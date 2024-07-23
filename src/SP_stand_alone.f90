@@ -3,7 +3,7 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 program MFLAMPA
 
-  use ModKind
+  use ModKind,      ONLY: Real8_
   use SP_ModProc,   ONLY: iProc, nProc, iComm, iError
   use ModUtilities, ONLY: remove_file, touch_file
   use SP_ModTime,   ONLY: iIter, init_time  => init
@@ -30,7 +30,7 @@ program MFLAMPA
   ! Initialization of MPI/parallel message passing.
   !----------------------------------------------------------------------------
   call MPI_INIT(iError)
-  iComm=MPI_COMM_WORLD
+  iComm = MPI_COMM_WORLD
   call MPI_COMM_RANK(iComm, iProc, iError)
   call MPI_COMM_SIZE(iComm, nProc, iError)
 
@@ -50,19 +50,19 @@ program MFLAMPA
   IsStandAlone = .true.
 
   ! Read PARAM.in file. Provide default restart file for #RESTART
-  call read_file('PARAM.in',iComm)
+  call read_file('PARAM.in', iComm)
 
   SESSIONLOOP: do
      call read_init('  ', iSessionIn=iSession)
 
      if(iProc==0)&
-          write(*,*)'----- Starting Session ',iSession,' ------'
+          write(*,*) '----- Starting Session ',iSession,' ------'
 
      ! Set and check input parameters for this session
-     call SP_read_param  ! Identical to SP_set_param('READ')
-     call SP_check       ! Similar to SP_set_param('CHECK'), but see init_time
+     call SP_read_param ! Identical to SP_set_param('READ')
+     call SP_check      ! Similar to SP_set_param('CHECK'), but see init_time
 
-     if(IsFirstSession)then
+     if(IsFirstSession) then
         ! Time execution (timing parameters set by SP_read_param)
         call timing_start('MFLAMPA')
         call timing_start('setup')
@@ -76,7 +76,7 @@ program MFLAMPA
         call timing_stop('setup')
         if(nTiming > -3) call timing_report_total
         if(iProc==0) &
-             write(*,*)'Resetting timing counters after setup.'
+             write(*,*) 'Resetting timing counters after setup.'
         call timing_reset('#all', 3)
      else
         call init_plot
@@ -87,7 +87,7 @@ program MFLAMPA
         if(is_time_to_stop()) EXIT SESSIONLOOP
         call timing_step(iIter + 1)
 
-        if(TimeMax > 0.0)then
+        if(TimeMax > 0.0) then
            call SP_run(TimeMax)
         else
            call SP_run(huge(0.0))
@@ -96,19 +96,19 @@ program MFLAMPA
         call show_progress
      end do TIMELOOP
 
-     if(IsLastRead)EXIT SESSIONLOOP
+     if(IsLastRead) EXIT SESSIONLOOP
      if(iProc==0) &
-          write(*,*)'----- End of Session   ',iSession,' ------'
-     iSession       = iSession + 1
+          write(*,*) '----- End of Session   ',iSession,' ------'
+     iSession = iSession + 1
      IsFirstSession = .false.
      if(nTiming > -2) call timing_report
      call timing_reset_all
   end do SESSIONLOOP
 
-  if(iProc==0)then
+  if(iProc==0) then
      write(*,*)
-     write(*,'(a)')'    Finished Numerical Simulation'
-     write(*,'(a)')'    -----------------------------'
+     write(*,'(a)') '    Finished Numerical Simulation'
+     write(*,'(a)') '    -----------------------------'
   end if
   if(nTiming > -2) call timing_report
   call timing_stop('MFLAMPA')
@@ -126,6 +126,7 @@ program MFLAMPA
 contains
   !============================================================================
   function stop_condition_true() result(IsStopCondition)
+
     use SP_ModMain, ONLY: nIterMax
     use SP_ModTime, ONLY: SPTime
     logical :: IsStopCondition
@@ -138,28 +139,30 @@ contains
   end function stop_condition_true
   !============================================================================
   function is_time_to_stop() result(IsTimeToStop)
+
     use SP_ModMain, ONLY: CpuTimeMax, UseStopFile
     logical :: IsTimeToStop
     !--------------------------------------------------------------------------
     IsTimeToStop = .false.
 
-    if(iProc==0)then
-       if(CpuTimeMax > 0.0 .and. MPI_WTIME()-CpuTimeStart >= CpuTimeMax)then
-          write(*,*)'CPU time exceeded:',CpuTimeMax,MPI_WTIME()-CpuTimeStart
-          IsTimeToStop=.true.
+    if(iProc==0) then
+       if(CpuTimeMax > 0.0 .and. MPI_WTIME()-CpuTimeStart >= CpuTimeMax) then
+          write(*,*) 'CPU time exceeded:', CpuTimeMax, MPI_WTIME()-CpuTimeStart
+          IsTimeToStop = .true.
        end if
        if(.not.IsTimeToStop .and. UseStopFile) then
           inquire(file='MFLAMPA.STOP',exist=IsTimeToStop)
           if(IsTimeToStop) &
-               write(*,*)'MFLAMPA.STOP file exists: received stop signal'
+               write(*,*) 'MFLAMPA.STOP file exists: received stop signal'
        end if
     end if
     if(nProc==1) RETURN
-    call MPI_BCAST(IsTimeToStop,1,MPI_LOGICAL,0,iComm,iError)
+    call MPI_BCAST(IsTimeToStop, 1, MPI_LOGICAL, 0, iComm, iError)
 
   end function is_time_to_stop
   !============================================================================
   subroutine show_progress
+
     use SP_ModTiming, ONLY: UseTiming
     real(Real8_), external :: timing_func_d
     real(Real8_) :: CpuTimeMFLAMPA, CpuTimeAdvance

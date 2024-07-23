@@ -201,12 +201,11 @@ contains
 
     use ModConst,           ONLY: cMeV
     use ModUtilities,       ONLY: check_allocate
-    use SP_ModSize,         ONLY: nVertexMax
     use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo, FluxInitIo
+    use SP_ModProc,         ONLY: iError
+    use SP_ModSize,         ONLY: nVertexMax
     ! loop variables
     integer :: iSat, iFlux
-    ! check error
-    integer :: iError
     ! index VAR for convenience
     integer :: FluxLastSat_
     ! Tmp VARs

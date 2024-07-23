@@ -113,6 +113,8 @@ contains
   subroutine read_restart
 
     ! read the restart data
+
+    use SP_ModProc, ONLY: iError
     ! name of the input file
     character(len=100):: NameFile
     ! loop variables
@@ -120,7 +122,6 @@ contains
     ! indexes of corresponding node, latitude and longitude
     integer:: iLat, iLon
     real   :: Aux, Aux_I(nShockParam) ! For reading integers
-    integer:: iError
     character(len=*), parameter:: NameSub = 'read_restart'
     !--------------------------------------------------------------------------
 
