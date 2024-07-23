@@ -90,7 +90,7 @@ There is no default value.
   45			iMinute
    0			iSecond
 
-This command can only be used in the first session.
+This command can only be used in the first session and stand alone mode.
 
 Detailed descriptions are very similar to the ones in #STARTTIME,
 but here it is with check_stand_alone.
@@ -102,6 +102,8 @@ but here it is with check_stand_alone.
 #TIMEACCURATE
 T			IsTimeAccurate
 
+This command is only used in stand alone mode.
+
 Allows solving steady-state distribution (cosmic rays, seed population)
 by setting IsTimeAccurate to .false., implying that IsSteadyState is
 .true. in the code.
@@ -112,6 +114,8 @@ by setting IsTimeAccurate to .false., implying that IsSteadyState is
 
 #TIMESIMULATION
 1			SPTime [sec]
+
+This command can only be used in the first session.
 
 The SPTime variable contains the simulation time in seconds
 relative to the initial time set by the #STARTTIME command.
@@ -130,6 +134,8 @@ The default value is SPTime=0.
 
 #NSTEP
 100			nStep
+
+This command can only be used in the first session.
 
 Set nStep for the component. Typically used in the restart.H header file.
 Generally it is not inserted in a PARAM.in file by the user, except
@@ -160,6 +166,8 @@ test suite, which contains these commands when the framework is tested.
 F			DoSaveRestart
 -1			DnSaveRestart
 -1.0			DtSaveRestart
+
+This command is only used in stand alone mode.
 
 Determine whether and when to save the restart file (STAND ALONE ONLY)
 Set default value as: False, -1, and -1.0
@@ -197,9 +205,11 @@ need to use the #RUN command, since the #END command or simply
 the end of the PARAM.in file makes MFLAMPA execute the last session.
 </command>
 
-<command name="END">
+<command name="END" if="$_IsStandAlone">
 
 #END
+
+This command is only used in stand alone mode.
 
 The #END command signals the end of the included file or the
 end of the PARAM.in file. Lines following the #END command are
@@ -307,8 +317,10 @@ Parameters of the Lagrangian grid used in MFLAMPA
 4			nLat
 4			nLon
 
+This command can only be used in the first session.
+
 Check if the configured parameters of the Lagrangian grid match those
-assumed in the input files
+assumed in the input files, which will usually be called in RESTART.
 </command>
 
 <command name="GRIDNODE" if="$_IsFirstSession">
@@ -319,7 +331,11 @@ assumed in the input files
 4			nLat
 4			nLon
 
-Set the configured parameters of the Lagrangian grid
+This command can only be used in the first session.
+
+Set the configured parameters of the Lagrangian grid, where nLat
+and nLon will be placed uniformly on the solar surface, for the
+field line footpoints.
 </command>
 
 <command name="TESTPOS" if="$_IsFirstSession">
@@ -332,7 +348,9 @@ Set the configured parameters of the Lagrangian grid
 99			iParticleTest
 1			iPTest
 
-Set the test position and momentum
+This command can only be used in the first session.
+
+Set the numbers for test node, position, and momentum.
 </command>
 
 <command name="SPREADGRID">
@@ -388,6 +406,8 @@ Set reference radius and value of solid angle associated with lines.
 #COORDSYSTEM
 HGI			TypeCoordSystem
 
+This command can only be used in the first session.
+
 Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 </command>
 
@@ -401,6 +421,8 @@ Type of heliocentric coordinate system used in MFLAMPA (HGI, HGR, HGC).
 1000.0			EnergyMax
 100			nP
 
+This command can only be used in the first session.
+
 Read energy range, the number of energy bins and the energy unit.
 Usually read from the restart.H file.
 </command>
@@ -410,6 +432,8 @@ Usually read from the restart.H file.
 
 #PITCHANGLEGRID
 1			nMu
+
+This command can only be used in the first session.
 
 Read the pitch angle information, determine whether we take the
 averaged value over all pitch angles. Also, we need to specify
@@ -422,33 +446,83 @@ how many intervals in the range of [-1, 1] for pitch angle.
 #FLUXINITIAL
 0.01			FluxInitIo [pfu]
 
+This command can only be used in the first session.
+
 Distribution is initialized to have integral flux:
 default value is set as 0.01 [pfu]. One can set this
 to a lower order of magnitude, e.g., 1.0E-5 pfu.
 </command>
 
-<command name="FLUXCHANNEL" if="$_IsFirstSession">
+</commandgroup>
+
+<commandgroup name="ENERGYCHANNEL">
+
+<command name="ECHANNEL" if="$_IsFirstSession">
   <parameter name="nFluxChannel" type="integer" min="1" default="6" />
   <for name="iFluxChannel" from="1" to="$nFluxChannel">
-      <parameter name="EChannelIo_I" type="real" min="0.0" />
+      <parameter name="EChannelIo_I" type="strings" min="3" max="3" >
+        <part name="KindFlux" type="string" input="select" required="T">
+          <option name="Integral intensity"     value="INT" />
+          <option name="Differential intensity" value="DIFF" />
+        </part>
+        <part name="EChannelLo" type="real" min="0.0" required="T"/>
+        <part name="EChannelHi" type="real" min="0.0" required="T"/>
+      </parameter>
   </for>
 
-#FLUXCHANNEL
+#ECHANNEL
 6			nFluxChannel
-5			EChannelIo_I [MeV]
-10			EChannelIo_I [MeV]
-30			EChannelIo_I [MeV]
-50			EChannelIo_I [MeV]
-60			EChannelIo_I [MeV]
-100			EChannelIo_I [MeV]
+INT 5 1.0E+4			EChannelIo_I [MeV]
+INT 10 1.0E+4			EChannelIo_I [MeV]
+INT 30 1.0E+4			EChannelIo_I [MeV]
+INT 50 1.0E+4			EChannelIo_I [MeV]
+INT 60 1.0E+4			EChannelIo_I [MeV]
+INT 100 1.0E+4			EChannelIo_I [MeV]
 
-Flux channel numbers: use the one on GOES by default, 6 channels.
-EChannelIo_I is the threshold in the unit of MeV above which the
-particle flux is integrated over energy as the output.
+This command can only be used in the first session.
+
+This is to set the self-defined flux channels. As default, the code uses
+the 6 channels of GOES. By setting self-defined flux channels, one will
+not use any satellite channels unless setting #ECHANNELSAT.
+
+For each self-defined energy channels, one needs to specify the type of
+flux, namely integral or diffential intensity, in the first input of
+EChannelIo_I. Then, one also needs to input the lower and upper bounds,
+in the unit of MeV, of the energy channel which the particle flux is
+integrated or averaged (differentiated) as the output. All the channels
+for fluxes saved in MH_data will be saved into MH_data_EChannel.H file.
+</command>
+
+<command name="ECHANNELSAT" if="$_IsFirstSession">
+  <parameter name="nFluxChannelSat" type="integer" min="1" default="1" />
+  <for name="iFluxChannelSat" from="1" to="$nFluxChannelSat">
+    <parameter name="NameSatellite" type="string" case="upper" default="GOES"/>
+  </for>
+
+#ECHANNELSAT
+1			nFluxChannelSat
+GOES			NameSatellite
+
+This command can only be used in the first session.
+
+This is to set the energy channels of specified satellites or instruments
+for convenient comparisons with observational data. These energy channels
+and also flux types, i.e., integral or differential intensity, have 
+already been written in the module, according to the energy bins from the
+original websites of observational data. By specifying satellites, one do
+not have to type each energy channel in #ECHANNEL (Of course, this is the
+alternative way to achieve this). All the channels for fluxes saved in
+MH_data will be saved into MH_data_EChannel.H file.
+
+If one does not specify anything, either by #ECHANNEL or #ECHANNELSAT,
+we will use the 6 energy channels of GOES as default. If one specifies
+#ECHANNEL and still wants to include the satellite energy channels, one
+needs to explicitly specify #ECHANNELSAT in this case. When including
+both #ECHANNEL and #ECHANNELSAT, the self-defined channels will always
+be set ahead of the satellite energy channels in the outputs.
 </command>
 
 </commandgroup>
-
 
 <commandgroup name="ENDBC">
 
@@ -734,7 +808,7 @@ MH_data.lst		NameTagFile
 
 Sets type, number and names of the MHD input files. While running MFLAMPA
 in cinjunction with the MHD code, these parameters are usually saved into
-the header file, which is then included into the MFLAMPA parameter file
+the header file, which is then included into the MFLAMPA parameter file.
 </command>
 
 <command name="NTAG">
@@ -746,7 +820,7 @@ the header file, which is then included into the MFLAMPA parameter file
 The number of different time-line tags of the MH_data files.
 </command>
 
-<command name="SATELLITE">
+<command name="SATELLITE" if="$_IsFirstSession">
   <parameter name="nSatellite" type="integer" min="0" default="0" />
   <parameter name="TypeCoordSystem" type="string" default="HGR" />
   <for name="iSatellite" from="1" to="$nSatellite">
@@ -760,6 +834,8 @@ HGR			TypeCoordSystem
 ../TRAJECTORY/sta.dat		NameTrajectoryFile
 ../TRAJECTORY/psp.dat		NameTrajectoryFile
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
+
+This command can only be used in the first session.
 
 Set the satellites included for spectra outputs along the trajectory.
 nSatellite is the number of the satellite trajectory, TypeCoordSystem

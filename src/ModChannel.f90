@@ -280,7 +280,7 @@ contains
             ", set for energy channels.")
 
        ! Set the last channel index of satellite, according to its nFluxChannel
-       FluxLastSat_  = FluxChannelSat_I(iSat)%nFluxChannel
+       FluxLastSat_ = FluxChannelSat_I(iSat)%nFluxChannel
 
        ! Allocate the energy channels, names, and units
        ! Lower bound: from 0 => EnergyInjIo in code

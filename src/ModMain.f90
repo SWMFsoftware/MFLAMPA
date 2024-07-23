@@ -60,7 +60,7 @@ contains
     logical:: DoEcho
 
     ! The name of the command
-    character (len=100) :: NameCommand
+    character(len=100) :: NameCommand
     ! Read the corresponding section of input file
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
@@ -115,11 +115,11 @@ contains
           call read_param_timing
        case('#END')
           call check_stand_alone
-          IsLastRead=.true.
+          IsLastRead = .true.
           EXIT
        case('#RUN')
           call check_stand_alone
-          IsLastRead=.false.
+          IsLastRead = .false.
           EXIT
        case('#STOP')
           call check_stand_alone
@@ -136,10 +136,10 @@ contains
           call read_var('DoEcho', DoEcho)
           if(iProc==0)call read_echo_set(DoEcho)
        case("#STARTTIME",'#NSTEP','#TIMESIMULATION')
-          if(.not.IsFirstSession)CYCLE
+          if(.not.IsFirstSession) CYCLE
           call read_param_time(NameCommand)
        case("#SETREALTIME")
-          if(.not.IsFirstSession)CYCLE
+          if(.not.IsFirstSession) CYCLE
           call check_stand_alone
           call read_param_time(NameCommand)
        case("#TIMEACCURATE")
@@ -231,7 +231,7 @@ contains
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
     ! advance the solution in time
-    real, intent(in)   :: TimeLimit
+    real, intent(in) :: TimeLimit
     logical, save :: IsFirstCall = .true.
     real :: Dt ! time increment in the current call
 
