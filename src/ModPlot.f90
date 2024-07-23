@@ -55,7 +55,7 @@ module SP_ModPlot
   ! number of different output file tags
   integer, public :: nTag = 0
 
-  ! ---- Local variables ----
+  ! ------------ Local variables ------------
 
   ! Number of plot file types, to be read from param file
   integer:: nFileOut = 0
@@ -90,7 +90,7 @@ module SP_ModPlot
   type TypePlotFile
      ! Full set of information, for each plot
      !
-     ! General information---------------
+     ! ------ General information ------
      ! kind of data printed to a file
      ! = MH1D_ or MH2D_ or MHTime_ or Distr1D_ or Flux2D_ or FluxTime_
      integer:: iKindData
@@ -110,7 +110,7 @@ module SP_ModPlot
      ! output buffer: use first a few DIMs until the last one
      real, pointer:: Buffer_II(:,:,:)
      !
-     ! MH data  -------------------------------
+     ! ------ MH data ------
      ! variables from the state vector to be written
      logical:: DoPlot_V(X_:nVar)
      ! whether fluxes are to be written
@@ -120,13 +120,13 @@ module SP_ModPlot
      ! their indices in the state vectors
      integer, pointer:: iVarMhd_V(:), iVarExtra_V(:)
      !
-     ! Distribution -----------------------------
+     ! ------ Distribution ------
      ! Momentum or energy axis for distribution plots
-     integer:: iScale      ! = Momentum_ or Energy_
+     integer:: iScale     ! = Momentum_ or Energy_
      ! Heliocentric distance or field line length for distribution plots
-     integer:: iDistance   ! = Distance_ or LineLength_
+     integer:: iDistance  ! = Distance_ or LineLength_
      ! type out output (CDF or differential energy flow)
-     integer:: iTypeDistr  ! = CDF_, DEFIo_, or DEFSi_
+     integer:: iTypeDistr ! = CDF_, DEFIo_, or DEFSi_
      ! Data on the sphere
      ! radius of the sphere the data to be written at
      real:: Radius
@@ -136,11 +136,11 @@ module SP_ModPlot
      ! angular coords of point where output is requested
      real:: Lon, Lat
      ! spread of flux of an individual line over grid
-     real, pointer :: Spread_II(:,:)
+     real, pointer:: Spread_II(:,:)
   end type TypePlotFile
 
   ! All plot files
-  type(TypePlotFile), allocatable:: File_I(:)
+  type(TypePlotFile), allocatable :: File_I(:)
 
   ! Arrays used to visualize the distribution function
   real :: Log10Momentum_I(0:nP+1), Log10KinEnergyIo_I(0:nP+1)
@@ -148,12 +148,12 @@ module SP_ModPlot
 
   ! auxilary array, used to write data on a sphere
   ! contains integers 1:nLineAll
-  integer, allocatable:: iNodeIndex_I(:)
+  integer, allocatable :: iNodeIndex_I(:)
 
   ! info for MH1D header and tag list
-  logical:: DoWriteHeader = .false.
+  logical :: DoWriteHeader = .false.
   ! whether this is the initial call for MH_data energy channel list
-  logical:: DoInitEChannel = .true.
+  logical :: DoInitEChannel = .true.
   ! name of the header file
   character(len=*), parameter :: NameHeaderFile = NameMHData//'.H'
   ! name of the tag list file

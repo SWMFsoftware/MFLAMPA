@@ -412,35 +412,35 @@ contains
     ! for FIRST location ABOVE given heliocentric radius;
     ! if found, IsFound is set to .true. (.false. otherwise)
     ! and iParticleOut is set to index of particle just above Radius
-    integer,      intent(in) :: iLine ! line/line index
-    real,         intent(in) :: Radius ! heliocentric distance to find
+    integer,      intent(in) :: iLine   ! line/line index
+    real,         intent(in) :: Radius  ! heliocentric distance to find
     integer,      intent(out):: iParticleOut ! result: index
-    logical,      intent(out):: IsFound! result: whether search was successful
-    real,optional,intent(out):: Weight ! interpolation weight for output index
-
-    integer:: iVertex ! loop variable
+    logical,      intent(out):: IsFound ! result: whether search succeeds
+    real,optional,intent(out):: Weight  ! interpolation weight at output index
     !--------------------------------------------------------------------------
-    ! check whether line reaches given radial distance
-    if(State_VIB(R_, nVertex_B(iLine), iLine) < Radius)then
+
+    ! check whether line reaches the given radial distance
+    if(State_VIB(R_, nVertex_B(iLine), iLine) < Radius) then
        ! mark failure to find location
        IsFound = .false.
        iParticleOut = -1
        RETURN
     end if
 
-    ! line reaches given radial distance
+    ! line reaches the given radial distance
     IsFound = .true.
     ! find index of first particle above Radius
     iParticleOut = minloc(State_VIB(R_, 1:nVertex_B(iLine), iLine), &
          DIM=1, MASK=State_VIB(R_, 1:nVertex_B(iLine), iLine) > Radius)
 
-    ! get interpolation weight is necessary
-    if(present(Weight))then
-       if(iParticleOut > 1)then
+    ! get interpolation weight, if necessary
+    if(present(Weight)) then
+       if(iParticleOut > 1) then
           Weight = (Radius - State_VIB(R_, iParticleOut-1, iLine)) / &
                (State_VIB(R_, iParticleOut,  iLine) - &
                State_VIB(R_, iParticleOut-1, iLine))
        else
+          ! iParticleOut == 1, right at the first point
           Weight = 1.0
        end if
     end if
