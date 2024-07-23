@@ -21,13 +21,14 @@ module SP_ModDistribution
   private ! except
 
   ! Public members:
-  public:: init              ! Initialize Distribution_CB
-  public:: read_param        ! Read momentum grid parameters
-  public:: offset            ! Sync. index in State_VIB and Distribution_CB
-  public:: check_dist_neg    ! Check any of Distribution_CB is negative
-  public:: nP                ! Number of points in the momentum grid
-  public:: nMu               ! Number of points over pitch-angle (\mu)
-  public:: IsMuAvg           ! If .true., dist. function is omnidirectional
+  public:: init                  ! Initialize Distribution_CB
+  public:: read_param            ! Read momentum grid parameters
+  public:: offset                ! Sync. index in State_VIB and Distribution_CB
+  public:: check_dist_neg        ! Check any of Distribution_CB is negative
+  public:: search_kinetic_energy ! Search the given kinetic energy index
+  public:: nP                    ! Number of points in the momentum grid
+  public:: nMu                   ! Number of points over pitch-angle (\mu)
+  public:: IsMuAvg               ! If .true., VDF is omnidirectional
 
   ! Injection and maximal energy, in kev (or, in Io energy unit)
   ! To be read from the PARAM.in file
@@ -257,6 +258,58 @@ contains
             call CON_stop(NameSub//': Distribution_CB < 0')
     end if
   end subroutine check_dist_neg
+  !============================================================================
+  subroutine search_kinetic_energy(KinEnergyIo, iKinEnergyOut, &
+       IsFound, dFlux, iLine, iVertex)
+
+    ! performs search in the KinEnergy_I array, for the given kinetic energy
+    real,         intent(in) :: KinEnergyIo   ! input kinetic energy, in Io
+    integer,      intent(out):: iKinEnergyOut ! result: index, from 1 to nP-1
+    logical,      intent(out):: IsFound       ! result: whether search succeeds
+    real,optional,intent(out):: dFlux         ! integral flux at output index
+    integer,optional,intent(in):: iLine, iVertex ! for calculating dFlux
+    ! VDF*Momentum_I**2 at iKinEnergyOut (left) and iKinEnergyOut+1 (right)
+    real :: DistTimesP2left, DistTimesP2right
+    !--------------------------------------------------------------------------
+
+    ! check whether physical KinEnergyIo_I covers the given kinetic energy
+    if(KinEnergyIo < KinEnergyIo_I(1) .or. KinEnergyIo > EnergyMaxIo) then
+       IsFound = .false.
+       iKinEnergyOut = -1
+       RETURN
+    end if
+
+    ! KinEnergyIo_I covers the given kinetic energy
+    IsFound = .true.
+    ! find index of first kinetic energy in the array above KinEnergyIo
+    iKinEnergyOut = maxloc(KinEnergyIo_I(1:nP-1), DIM=1, &
+         MASK=KinEnergyIo > KinEnergyIo_I(1:nP-1))
+
+    ! get integral flux contributed by the bin of iKinEnergyOut, if necessary
+    if(present(dFlux)) then
+       ! Channel cutoff level is often in the middle of a bin
+       ! Here we compute partial flux increments at iKinEnergyOut
+
+       ! Calculate auxiliary VDF*Momentum_I**2
+       DistTimesP2left = sum(Distribution_CB(iKinEnergyOut, 1:nMu, &
+            iVertex, iLine))*DeltaMu*0.50 * Momentum_I(iKinEnergyOut)**2
+       DistTimesP2right = sum(Distribution_CB(iKinEnergyOut+1, 1:nMu, &
+            iVertex, iLine))*DeltaMu*0.50 * Momentum_I(iKinEnergyOut+1)**2
+
+       ! The contrubution to integral equals:
+       dFlux = &
+            (KinEnergyIo_I(iKinEnergyOut+1) - KinEnergyIo) & ! Span
+            *0.50*(                          & ! times a half of sum of
+            DistTimesP2right +               & ! the right boundary value +
+            ((KinEnergyIo_I(iKinEnergyOut+1) & ! interpolation to EChannel:
+            - KinEnergyIo)*DistTimesP2left   & ! from iP
+            + (KinEnergyIo - KinEnergyIo_I(iKinEnergyOut)) &
+            *DistTimesP2right)               & ! from iP+1
+            / & ! per the total of interpolation weights:
+            (KinEnergyIo_I(iKinEnergyOut+1) - KinEnergyIo_I(iKinEnergyOut)))
+    end if
+
+  end subroutine search_kinetic_energy
   !============================================================================
 end module SP_ModDistribution
 !==============================================================================
