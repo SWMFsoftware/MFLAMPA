@@ -42,21 +42,21 @@ contains
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
          UseLowerEndBc, iStart
     ! INPUTS:
-    integer, intent(in):: iLine, iShock ! Indices of line and shock
-    integer, intent(in):: nX            ! Number of meshes along s_L axis
-    real,    intent(in):: tFinal        ! Time interval to advance through
-    real,    intent(in):: CflIn         ! Input CFL number
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: nX            ! Number of meshes along s_L axis
+    real,    intent(in) :: tFinal        ! Time interval to advance through
+    real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
     ! dVolumeXDt_I: time derivative of geometric volume
-    real, dimension(0:nX+1):: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
+    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
     ! Volume_G: total control volume at the end of each iteration
     ! VolumeOld_G: total control volume at the end of each iteration
     ! dVolumeDt_G: total control time derivative
-    real, dimension(0:nP+1, 0:nX+1):: VolumeOld_G, Volume_G, dVolumeDt_G
+    real, dimension(0:nP+1, 0:nX+1) :: VolumeOld_G, Volume_G, dVolumeDt_G
     ! DeltaHamiltonian
     real :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
     ! Extended array for distribution function
@@ -174,12 +174,12 @@ contains
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
          UseLowerEndBc, iStart
     ! INPUTS:
-    integer, intent(in):: iLine, iShock ! Indices of line and shock
-    integer, intent(in):: nX            ! Number of meshes along s_L axis
-    real,    intent(in):: CflIn         ! Input CFL number
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: nX            ! Number of meshes along s_L axis
+    real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: BSi_I(nX), nSi_I(nX)
-    real               :: uSi_I(nX-1), DsSi_I(nX-1)
+    real,    intent(in) :: BSi_I(nX), nSi_I(nX)
+    real                :: uSi_I(nX-1), DsSi_I(nX-1)
     ! Volume_G: global space volume = product of distance in each dimension
     real :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
@@ -284,13 +284,13 @@ contains
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
          UseLowerEndBc, iStart
     ! INPUTS:
-    integer, intent(in):: iLine, iShock ! Indices of line and shock
-    integer, intent(in):: nX        ! Number of meshes along s_L axis
-    real,    intent(in):: TimeStart ! Start time before advancing
-    real,    intent(in):: DtFinal   ! Time interval to advance through
-    real,    intent(in):: CflIn     ! Input CFL number
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: nX            ! Number of meshes along s_L axis
+    real,    intent(in) :: TimeStart     ! Start time before advancing
+    real,    intent(in) :: DtFinal       ! Time interval to advance through
+    real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in):: nSi_I(nX), BSi_I(nX)
+    real,    intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Loop variables
     integer :: iX, iMu, iP
     ! ------------ Control volume ------------
@@ -450,11 +450,11 @@ contains
     ! in a single layer of the ghost cells along the momentum coordinate.
 
     use SP_ModBc, ONLY: UseUpperEndBc, set_upper_end_bc, &
-         UpperEndBc_I, set_lower_end_bc, LowerEndBc_I, &
-         UseLowerEndBc, set_lower_end_vdf, iStart
-    integer, intent(in):: iLine     ! Indices of line and shock
-    integer, intent(in):: nX        ! Number of meshes along s_L axis
-    real, intent(inout):: VDF_G(-1:nP+2, -1:nX+2)
+         UpperEndBc_I, UseLowerEndBc, set_lower_end_bc, &
+         LowerEndBc_I, set_lower_end_vdf, iStart
+    integer, intent(in) :: iLine     ! Indices of line and shock
+    integer, intent(in) :: nX        ! Number of meshes along s_L axis
+    real, intent(inout) :: VDF_G(-1:nP+2, -1:nX+2)
 
     !--------------------------------------------------------------------------
     VDF_G(0:nP+1, iStart:nX) = Distribution_CB(:, 1, iStart:nX, iLine)
@@ -494,7 +494,7 @@ contains
     ! Line number and number along grid axis
     integer, intent(in) :: iLine, nX
     ! Time difference between Old (State_VIB) and New (MHData_VIB) States
-    real, intent(in)    :: DtFull
+    real,    intent(in) :: DtFull
     ! Midpoint for to consecutive points, \deltas
     real                :: MidPoint_IB(x_:z_, nX), DeltaS_I(nX)
     real                :: InvDtFull
@@ -532,7 +532,7 @@ contains
     ! Calculate \DeltaS/B at grid center
     DeltaSOverBNew_C(1:nX) = DeltaS_I/State_VIB(B_, 1:nX, iLine)
     ! Calculate ln(B*\DeltaS^2) at grid center
-    LnBDeltaS2New_C(1:nX) = log(State_VIB(B_, 1:nX, iLine)*DeltaS_I**2)
+    LnBDeltaS2New_C(1:nX) = log(State_VIB(B_, 1:nX, iLine)) + 2.0*log(DeltaS_I)
 
     ! Calculate the time-derivative physical quantities
     ! Calculate \deltas/B time derivative = D[delta(s_L)/B]/Dt
@@ -552,7 +552,7 @@ contains
 
     integer, intent(in) :: iLine  ! Index of the current field line
     integer, intent(in) :: nX     ! Number of grid along s_L axis
-    real, intent(in)    :: Time   ! Current time
+    real,    intent(in) :: Time   ! Current time
     ! Calculate values for CURRENT time: here we use linear interpolation
     ! to get the data of each time step from every to consecutive files
     !--------------------------------------------------------------------------
@@ -566,9 +566,9 @@ contains
     ! p^3/3*\deltas/B at cell face of p^3/3, regarding to tau and p^3/3
 
     use SP_ModDistribution, ONLY: DeltaMu, Momentum3_I
-    integer, intent(in) :: nX                   ! Number of s_L grid
+    integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
-    integer             :: iX, iMu              ! Loop variables
+    integer             :: iX, iMu   ! Loop variables
     ! Calculate the first Hamiltonian function
     !--------------------------------------------------------------------------
 
@@ -590,14 +590,14 @@ contains
     ! Calculate the 2nd Hamiltonian function at each fixed time:
     ! (mu^2-1)*v/(2B) at face of s_L and mu, regarding to s_L and mu
 
-    use ModConst, ONLY: cProtonMass, cLightSpeed
+    use ModConst,           ONLY: cProtonMass, cLightSpeed
     use SP_ModDistribution, ONLY: Momentum_I, VolumeP_I, MuFace_I
-    integer, intent(in) :: nX             ! Number of s_L grid
-    real, intent(in)    :: BSi_I(nX)      ! B-field strength at cell center
+    integer, intent(in) :: nX        ! Number of s_L grid
+    real, intent(in)    :: BSi_I(nX) ! B-field strength at cell center
     real, intent(inout) :: Hamiltonian2_N(0:nP+1, -1:nMu+1, -1:nX+1)
-    real    :: Velocity_I(0:nP+1)   ! Particle velocity array at cell face
+    real    :: Velocity_I(0:nP+1)    ! Particle velocity array at cell face
     real    :: InvBSi_I(nX), InvBFaceSi_I(0:nX) ! 1/B at center and face
-    integer :: iX, iMu              ! Loop variables
+    integer :: iX, iMu               ! Loop variables
 
     !--------------------------------------------------------------------------
     Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
@@ -638,11 +638,11 @@ contains
     ! ProtonMass = cRmeProtonGeV, in the unit of GeV/c^2
     ! \vec{b}*d\vec{u}/dt = bDuDt_C
 
-    use ModConst, ONLY: cProtonMass
+    use ModConst,           ONLY: cProtonMass
     use SP_ModDistribution, ONLY: Momentum3_I, MuFace_I
-    integer, intent(in) :: nX             ! Number of s_L grid
+    integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
-    integer             :: iX, iMu        ! Loop variables
+    integer             :: iX, iMu   ! Loop variables
     ! Calculate the third hamiltonian function
 
     !--------------------------------------------------------------------------

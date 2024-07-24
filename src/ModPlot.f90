@@ -5,27 +5,25 @@ module SP_ModPlot
 
   ! Methods for saving plots
 
+  use ModIoUnit,           ONLY: UnitTmp_
+  use ModNumConst,         ONLY: cDegToRad, cRadToDeg, cTolerance
+  use ModPlotFile,         ONLY: save_plot_file, read_plot_file
+  use ModUtilities,        ONLY: open_file, close_file, remove_file, CON_stop
   use SP_ModAngularSpread, ONLY: get_normalized_spread,  &
        nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I, &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModChannel, ONLY: FluxChannelInit_V, Flux_VIB,  &
+  use SP_ModChannel,       ONLY: FluxChannelInit_V, Flux_VIB,    &
        Flux0_, FluxMax_, NameFluxChannel_I, NameFluxUnit_I
-  use SP_ModDistribution, ONLY: nP, KinEnergyIo_I,       &
-       Momentum_I, nMu, IsMuAvg, Distribution_CB
-  use SP_ModGrid, ONLY: nVar, nMHData, nLine, nLineAll,  &
-       iLineAll0, search_line, MHData_VIB, State_VIB,    &
-       iShock_IB, nVertex_B, NameVar_V, Shock_, LagrID_, &
-       X_, Y_, Z_, R_, TypeCoordSystem
-  use SP_ModProc, ONLY: iProc
-  use SP_ModSize, ONLY: nVertexMax, nDim
-  use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit, ONLY: NameFluxUnit, NameDiffFluxUnit,  &
+  use SP_ModDistribution,  ONLY: nP, KinEnergyIo_I, Momentum_I,  &
+       nMu, IsMuAvg, Distribution_CB
+  use SP_ModGrid,          ONLY: nVar, nMHData, nLine, nLineAll, &
+       iLineAll0, search_line, MHData_VIB, State_VIB, iShock_IB, &
+       nVertex_B, NameVar_V, Shock_, LagrID_, X_, Y_, Z_, R_, TypeCoordSystem
+  use SP_ModProc,          ONLY: iProc
+  use SP_ModSize,          ONLY: nVertexMax, nDim
+  use SP_ModTime,          ONLY: SPTime, iIter, StartTime, StartTimeJulian
+  use SP_ModUnit,          ONLY: NameFluxUnit, NameDiffFluxUnit, &
        NameEnergyUnit, NameVarUnit_V, Si2Io_V, UnitFlux_
-  use ModCoordTransform, ONLY: xyz_to_rlonlat
-  use ModIoUnit, ONLY: UnitTmp_
-  use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
-  use ModPlotFile, ONLY: save_plot_file, read_plot_file
-  use ModUtilities, ONLY: open_file, close_file, remove_file, CON_stop
 
   implicit none
 
@@ -948,8 +946,9 @@ contains
       ! single file is created for all field lines, name format is
       ! MH_data_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
 
-      use SP_ModProc, ONLY: iComm, nProc, iError
       use ModMpi
+      use ModCoordTransform, ONLY: xyz_to_rlonlat
+      use SP_ModProc,        ONLY: iComm, nProc, iError
 
       ! name of the output file
       character(len=100):: NameFile
@@ -1891,6 +1890,7 @@ contains
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use ModMpi
+      use ModCoordTransform,       ONLY: xyz_to_rlonlat
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
            find_triangle_orig, find_triangle_sph
       use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
@@ -2556,7 +2556,6 @@ contains
   !============================================================================
   subroutine get_date_time_string(Time, StringTime)
 
-    use SP_ModTime,    ONLY: StartTime
     use ModTimeConvert, ONLY: time_real_to_int
     ! the subroutine converts real variable Time into a string,
     ! the structure of the string is 'ddhhmmss',

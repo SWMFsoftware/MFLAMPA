@@ -3,6 +3,8 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModChannel
 
+  ! Setting energy channels and get the integral/differential intensity
+
   use ModUtilities, ONLY: CON_stop
   use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
   use SP_ModUnit,   ONLY: Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_, &
@@ -14,12 +16,12 @@ module SP_ModChannel
 
   private ! Except
 
-  public:: init                           ! initialize the flux channels
-  public:: read_param                     ! read satellite-related parameters
-  public:: get_integral_flux              ! calculate Flux_VIB
+  public:: init               ! initialize the flux channels
+  public:: read_param         ! read satellite-related parameters
+  public:: get_integral_flux  ! calculate Flux_VIB
 
   ! ------------ For saving the intensity in energy channels ------------
-  integer, public :: nFluxChannelSat = 1  ! GOES as default, energy channels
+  integer, public :: nFluxChannelSat = 1  ! GOES satellite as default
   integer, public :: nFluxChannel    = 6  ! GOES as default, 6 channels
   integer, parameter :: LenNameSat   = 12 ! satellite name length
   type FluxChannelSat

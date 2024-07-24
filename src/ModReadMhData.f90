@@ -93,7 +93,7 @@ contains
          file=trim(NameInputDir)//trim(NameTagFile), status='old')
 
     ! if nTag > 0, need to skip nTag lines
-    if(nTag>0)then
+    if(nTag>0) then
        do iTag = 1, nTag-1
           read(iIOTag,'(a)') StringAux
        end do

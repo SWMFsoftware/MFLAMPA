@@ -5,10 +5,10 @@ module SP_ModDiffusion
 
   ! Solve the diffusion term in the Parker equation
   ! Revision history:
-  ! Prototype:Sp/FLAMPA/src/SP_ModDiffusion.f90
+  ! Prototype: SP/FLAMPA/src/ModDiffusion.f90
   ! Adapted for the use in MFLAMPA (Dist_I is an input paramater,
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
-  ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
+  ! Updated (identation, comments): I.Sokolov, Dec.17, 2017
 
   use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
