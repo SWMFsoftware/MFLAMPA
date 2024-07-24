@@ -30,14 +30,14 @@ module SP_ModChannel
      character(len=LenNameSat):: NameSat
      ! Flux channel counts
      integer:: nFluxChannel
-     ! Satellite index and flux type
-     integer:: iKindSat, iKindFlux
+     ! Satellite index
+     integer:: iKindSat
      !
-     ! ------ Saved particle flux, name, and unit ------
-     ! Energy channels in the unit of MeV (Lo & Hi ranges)
+     ! ------ Saved energy channels and flux type ------
+     ! Satellite flux type
+     integer:: iKindFlux
+     ! Energy channels: Lo & Hi bounds, first in the unit of MeV
      real, allocatable, dimension(:):: EChannelLoIo_I, EChannelHiIo_I
-     ! Energy channel units
-     character(len=3):: NameFluxUnit
   end type FluxChannelSat
 
   ! All plot files
@@ -302,7 +302,6 @@ contains
           FluxChannelSat_I(iSat)%EChannelLoIo_I = [5, 10, 30, 50, 60, 100]
           FluxChannelSat_I(iSat)%EChannelHiIo_I = &
                EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV
-          FluxChannelSat_I(iSat)%NameFluxUnit = NameFluxUnit
        case(FluxChannelERNE_)
           FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
           FluxChannelSat_I(iSat)%EChannelLoIo_I = [1.3, 1.6, 2.0, 2.5, &
@@ -311,7 +310,6 @@ contains
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
                FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 130.0
-          FluxChannelSat_I(iSat)%NameFluxUnit = NameFluxUnit // '/MeV'
        case(FluxChannelEPAM_)
           FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
           FluxChannelSat_I(iSat)%EChannelLoIo_I = &
@@ -319,7 +317,6 @@ contains
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
                FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 4.70
-          FluxChannelSat_I(iSat)%NameFluxUnit = NameFluxUnit // '/MeV'
        end select
 
        ! Convert energy channel units: MeV to SI to Io, and the lower
@@ -391,28 +388,6 @@ contains
     ! Write the header of the energy channels for particle flux
     allocate(character(len=14) :: NameFluxChannel_I(Flux0_:FluxMax_))
     do iFlux = FluxFirst_, FluxLast_
-       ! Keep three-digit integer in energy channels
-       !   if(EChannelIo_I(iFlux) >= 1.0E-6 .and. &
-       !        EChannelIo_I(iFlux) < 1.0E-3) then
-       !      FluxChannel = EChannelIo_I(iFlux)*1.0E+6
-       !      NameUnitChannel = 'eV'
-       !   elseif(EChannelIo_I(iFlux) >= 1.0E-3 .and. &
-       !        EChannelIo_I(iFlux) < 1.0) then
-       !      FluxChannel = EChannelIo_I(iFlux)*1.0E+3
-       !      NameUnitChannel = 'keV'
-       !   elseif(EChannelIo_I(iFlux) >= 1.0 .and. &
-       !        EChannelIo_I(iFlux) < 1.0E+3) then
-       !      FluxChannel = EChannelIo_I(iFlux)
-       !      NameUnitChannel = 'MeV'
-       !   elseif(EChannelIo_I(iFlux) >= 1.0E+3 .and. &
-       !        EChannelIo_I(iFlux) < 1.0E+6) then
-       !      FluxChannel = EChannelIo_I(iFlux)*1.0E-3
-       !      NameUnitChannel = 'GeV'
-       !   else
-       !      ! Maximum in the model: TeV
-       !      FluxChannel = EChannelIo_I(iFlux)*1.0E-6
-       !      NameUnitChannel = 'TeV'
-       !   end if
        write(NameFluxChannel,'(I2.2)') iFlux
        NameFluxChannel_I(iFlux) = 'flux_Channel' // NameFluxChannel
     end do
@@ -426,7 +401,7 @@ contains
     NameFluxUnit_I(Flux0_:FluxLast_) = NameFluxUnit
     ! In case that nFluxChannel == 0
     if(allocated(EChannelType_I)) then
-       where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
+       where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDiff_)
           NameFluxUnit_I(FluxFirst_:FluxLast_) = NameDiffFluxUnit
        end where
     end if
@@ -530,7 +505,7 @@ contains
                (FluxLo_I - FluxHi_I)*Si2Io_V(UnitFlux_)
           ! In case that nFluxChannel == 0
           if(allocated(EChannelType_I)) then
-             where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDIFF_)
+             where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDiff_)
                 Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
                      Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) &
                      *InvEChannelBinIo_I
