@@ -85,7 +85,9 @@ def plot_mh1d_flux_1line_1time(ifile, filename, ax):
         px.set_xlabel(r'$r ~(R_\mathrm{S})$')
     return ax
 #==========================================================================================================
-def main_plot(DoSave=False, DoShow=False, fmt='jpg'):
+def main_plot_flux(DoSave=False, DoShow=False, figfmt='jpg'):
+    # Main function for plotting the mh1d flux
+
     # Set all directories
     rootdir = find_rootdir()
     testdir = rootdir + '/run_test'
@@ -108,10 +110,10 @@ def main_plot(DoSave=False, DoShow=False, fmt='jpg'):
                 fig.suptitle('Field Line: iLon_iLat = '+str(iLon).zfill(3)+'_'+str(iLat).zfill(3), y=0.99)
 
             # Save, show, and close
-            if(DoSave): fig.savefig(fig1ddir+'/mh1d_sep_%.3d_%.3d.%s'%(iLon, iLat, fmt), dpi=360)
+            if(DoSave): fig.savefig(fig1ddir+'/mh1d_sep_%.3d_%.3d.%s'%(iLon, iLat, figfmt), dpi=360)
             if(DoShow): plt.show()
             plt.close(fig)
 #==========================================================================================================
 
 if __name__ == "__main__":
-    main_plot(DoSave=True, DoShow=False, fmt='pdf')
+    main_plot_flux(DoSave=True, DoShow=False, figfmt='pdf')
