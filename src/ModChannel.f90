@@ -520,7 +520,7 @@ contains
                    FluxHi_I(iFlux) = dFluxChannelHi
                 else
                    ! For the rest bins: make a summation, when iPHi < nP-1
-                   FluxHi_I(iFlux) = dFluxChannelHi + sum(dFlux_I(iPLo+1:nP-1))
+                   FluxHi_I(iFlux) = dFluxChannelHi + sum(dFlux_I(iPHi+1:nP-1))
                 end if
              end if
           end do

@@ -195,8 +195,8 @@ contains
     ! Time step
     real :: Dt_C(nP, nX)
 
-    character(len=*), parameter:: NameSub = 'iterate_poisson'
     ! Now particle-number-conservative advection scheme for steady-state soln.
+    character(len=*), parameter:: NameSub = 'iterate_poisson'
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
