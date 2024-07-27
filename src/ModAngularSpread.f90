@@ -74,14 +74,12 @@ module SP_ModAngularSpread
 
 contains
   !============================================================================
-
   subroutine read_param(NameCommand)
+
     use ModReadParam, ONLY: read_var
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-
     character(len=100):: StringAux
     integer:: nSigma=-1, iSigma
-
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
@@ -136,6 +134,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine init
+
     integer:: iLine, iLon, iLat
     real:: DLon, DLat, AuxLon, AuxLat
     character(len=*), parameter:: NameSub = 'init'
@@ -189,12 +188,12 @@ contains
   !============================================================================
   subroutine get_magnetic_flux
     ! fill MagneticFluxAbs_B with reference value and radius from PARAM.in
+
     integer:: iLine
     integer:: iRef
     logical:: IsFoundRef
     real:: Weight
     real:: Xyz_D(nDim)
-
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE
@@ -219,9 +218,9 @@ contains
     !   2\pi\int\limits_0^\pi \sin(t) \exp(-0.5*(t/Sigma)^2) dt
     ! CAUTION: function isnt designed to be called repeatedly during run,
     !          computations are time-expensive, originally called only at init
+
     real, intent(in) :: Sigma ! characteristic scale of spread
     real, intent(out):: Norm  ! result
-
     ! temporary values used to compute Norm
     real:: DNorm, Aux1, Aux2
     integer:: iTerm
@@ -274,11 +273,12 @@ contains
     ! value of non-normalized angular spread function;
     ! as in probability of deviation angle < T
     !   Prob = const \int\limits_0^T spread_shape(t,\sigma) \sin(t) dt
+
     real, intent(in):: Angle
     real, intent(in):: Sigma
     real            :: SpreadShape
     !--------------------------------------------------------------------------
-    SpreadShape = exp(- 0.5 * (Angle/Sigma)**2 )
+    SpreadShape = exp(- 0.5 * (Angle/Sigma)**2)
   end function spread_shape
   !============================================================================
   subroutine get_normalized_spread_point(&
@@ -286,6 +286,7 @@ contains
     ! value of normalized angular spread function:
     ! equal to probability of particle deviation to be within some solid angle
     ! centered around LonPoint, LatPoint
+
     integer, intent(in) :: iLine   ! line index on processor
     real,    intent(in) :: Radius  ! heliocentric radius
     real,    intent(in) :: LonPoint! longitude of location
@@ -361,6 +362,7 @@ contains
   subroutine get_normalized_spread_grid(iLine, Radius, Spread_II)
     ! value of normalized angular spread on rectangular angular grid
     ! defined by SpreadLon_I and SpreadLat_I;
+
     integer, intent(in) :: iLine
     real,    intent(in) :: Radius
     real,    intent(out):: Spread_II(nSpreadLon, nSpreadLat)

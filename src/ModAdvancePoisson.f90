@@ -8,7 +8,6 @@ module SP_ModAdvancePoisson
   ! See https://doi.org/10.1016/j.jcp.2023.111923
 
   use SP_ModSize,         ONLY: nVertexMax
-  use SP_ModGrid,         ONLY: nLine
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, &
        Background_I, IsDistNeg, check_dist_neg
   use ModUtilities,       ONLY: CON_stop
