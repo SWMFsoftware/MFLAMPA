@@ -281,7 +281,7 @@ contains
     ! focusing term (partial f/pattial mu) for the pitch angle.
     ! Here, we diffuse the distribution function at each time step.
 
-    use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
+    use SP_ModDistribution, ONLY: dLogP, DeltaMu, VolumeP_I, Momentum3_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
          UseLowerEndBc, iStart
@@ -293,14 +293,70 @@ contains
     ! Input variables for diffusion
     real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
-
+    ! Loop variables
+    integer :: iX, iMu, iP
+    ! ------------ Control volume ------------
+    ! Volume_G: total control volume at the end of each iteration
+    ! dVolumeDt_G: total control time derivative
+    real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: Volume_G
+    real :: dVolumeDt_G(0:nP+1, 0:nMu+1, 0:nX+1)
+    ! ------------ Hamiltonian functions ------------
+    ! Poisson bracket with regard to the first and second vars
+    ! considering the case when there are more than one Poisson bracket
+    ! and when there is a Poisson bracket with respect to the time
+    real :: dHamiltonian01_FX(0:nP+1, 0:nMu+1, -1:nX+1)
+    real :: Hamiltonian2_N(0:nP+1, -1:nMu+1, -1:nX+1)
+    ! Extended array for distribution function
+    real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
+    ! Advection term
+    real    :: Source_C(nP, nMu, nX)
+    ! Time, ranging from TimeStart to tFinal
+    real    :: Time
+    ! Time step
+    real    :: Dt
+    ! Prediction of next time step:
+    real    :: DtNext
+    ! Mark whether this is the last run:
+    logical :: IsExit
     ! Now this is the particle-number-conservative advection scheme with \mu
-
     character(len=*), parameter:: NameSub = 'advect_via_double_poisson'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
 
+    ! Calculate time derivative of total control volume
+    do iX = 1, nX
+       dVolumeDt_G(:, :, iX) = dDeltaSOverBDt_C(iX)*DeltaMu* &
+            spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
+    end do
   end subroutine advect_via_double_poisson
+  !============================================================================
+  subroutine calc_double_hamiltonian_1(nX, dHamiltonian01_FX)
+    ! Calculate the 1st Hamiltonian function with time:
+    ! mu^2 * p^3/3 * \deltas/B at p^3/3 face, regarding to tau and p^3/3
+
+    use SP_ModDistribution, ONLY: DeltaMu, Mu_I, Momentum3_I
+    integer, intent(in) :: nX        ! Number of s_L grid
+    real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
+    integer             :: iX, iMu   ! Loop variables
+    ! Calculate the first Hamiltonian function
+    !--------------------------------------------------------------------------
+
+    do iX = 1, nX
+       dHamiltonian01_FX(:, 1:nMu, iX) = -dDeltaSOverBDt_C(iX)* &
+            spread(Momentum3_I, DIM=2, NCOPIES=nMu)* &
+            spread(Mu_I, DIM=1, NCOPIES=nP+3)
+    end do
+
+    ! Calculate the Hamiltonian function used actually：\tilde\deltaH
+    dHamiltonian01_FX(:, 1:nMu, 1:nX) = &
+         dHamiltonian01_FX(:, 1:nMu, 1:nX)*DeltaMu
+
+    ! Boundary condition of Hamiltonian function
+    dHamiltonian01_FX(:,    :,    0) = dHamiltonian01_FX(:,  :,  1)
+    dHamiltonian01_FX(:,    :, nX+1) = dHamiltonian01_FX(:,  :, nX)
+    dHamiltonian01_FX(:,    0,    :) = dHamiltonian01_FX(:,  1,  :)
+    dHamiltonian01_FX(:, nX+1,    :) = dHamiltonian01_FX(:, nX,  :)
+  end subroutine calc_double_hamiltonian_1
   !============================================================================
   subroutine advect_via_triple_poisson(iLine, nX, iShock,  &
        TimeStart, DtFinal, CflIn, nSi_I, BSi_I)
@@ -365,9 +421,9 @@ contains
 
     ! Here we would like to get the first trial of DtNext
     call set_VDF(iLine, nX, VDF_G)  ! Set the VDF first
-    call advance_multi_poisson      ! Now we get DtNext
+    call advance_triple_poisson      ! Now we get DtNext
 
-    ! Advection by multiple-Poisson-bracket scheme
+    ! Advection by triple-Poisson-bracket scheme
     do
        ! Time Updates
        if(DtNext > tFinal - Time) then
@@ -382,7 +438,7 @@ contains
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        call set_VDF(iLine, nX, VDF_G)
        ! Advance by multi-Poisson-bracket scheme
-       call advance_multi_poisson(DtIn=Dt)
+       call advance_triple_poisson(DtIn=Dt)
 
        if(IsExit) then
           ! This step is the last step
@@ -430,7 +486,7 @@ contains
 
   contains
     !==========================================================================
-    subroutine advance_multi_poisson(DtIn)
+    subroutine advance_triple_poisson(DtIn)
       ! advance by multiple Poisson brackets for each time step
 
       real, optional :: DtIn
@@ -470,7 +526,7 @@ contains
            dVolumeDt_G = dVolumeDt_G,                       &
            DtIn = DtIn, DtOut = DtNext, CFLIn=CflIn)
 
-    end subroutine advance_multi_poisson
+    end subroutine advance_triple_poisson
     !==========================================================================
   end subroutine advect_via_triple_poisson
   !============================================================================
@@ -539,9 +595,9 @@ contains
     DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(x_:z_, 2:nX-1) &
          - MidPoint_IB(x_:z_, 1:nX-2))**2, dim=1))
     ! Linear interpolate the deltas such that there will be nQ deltas
-    DeltaS_I(1 ) = 2*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
+    DeltaS_I(1 ) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
          - State_VIB(x_:z_,  1, iLine))**2))
-    DeltaS_I(nX) = 2*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
+    DeltaS_I(nX) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
          - State_VIB(x_:z_, nX, iLine))**2))
     ! Calculate \DeltaS/B at grid center
     DeltaSOverBOld_C(1:nX) = DeltaS_I/State_VIB(BOld_, 1:nX, iLine)
@@ -555,9 +611,9 @@ contains
     DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(x_:z_, 2:nX-1) &
          - MidPoint_IB(x_:z_, 1:nX-2))**2, dim=1))
     ! Linear interpolate the deltas such that there will be nQ deltas
-    DeltaS_I(1 ) = 2*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
+    DeltaS_I(1 ) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
          - MHData_VIB(x_:z_,  1, iLine))**2))
-    DeltaS_I(nX) = 2*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
+    DeltaS_I(nX) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
          - MHData_VIB(x_:z_, nX, iLine))**2))
     ! Calculate \DeltaS/B at grid center
     DeltaSOverBNew_C(1:nX) = DeltaS_I/State_VIB(B_, 1:nX, iLine)
@@ -631,7 +687,7 @@ contains
 
     !--------------------------------------------------------------------------
     Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
-    ! Considering the law of relativity, v=1/sqrt(1+m^2*c^2/p^2), v can be
+    ! Considering the law of relativity, v = 1/sqrt(1+(m*c/p)**2), v can be
     ! calculated as a function of p. Note that light speed is the unit of
     ! speed here, so we do not need to multiply c^2 in the following steps
 
@@ -644,7 +700,7 @@ contains
     ! Calculate the second hamiltonian function = (mu^2-1)*v/(2B)
     do iX = 1, nX
        do iMu = 0, nMu
-          Hamiltonian2_N(:, iMu, iX) = (MuFace_I(iMu)**2 - 1.0)*  &
+          Hamiltonian2_N(:, iMu, iX) = 0.5*(MuFace_I(iMu)**2 - 1.0)* &
                Velocity_I*InvBFaceSi_I(iX)
           ! Here, what we use actually is: \tilde\deltaH
           Hamiltonian2_N(:, iMu, iX) = Hamiltonian2_N(:, iMu, iX)*VolumeP_I
