@@ -67,8 +67,9 @@ contains
     use SP_ModTime,             ONLY: SPTime
     use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
-    use SP_ModAdvancePoisson,   ONLY: advect_via_poisson, &
-         init_data_states, advect_via_multi_poisson
+    use SP_ModAdvancePoisson,   ONLY: advect_via_single_poisson, &
+         advect_via_double_poisson, &
+         init_data_states, advect_via_triple_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
     use SP_ModDistribution,     ONLY: IsMuAvg, IsDistNeg
 
@@ -155,14 +156,15 @@ contains
              ! Poisson bracket scheme: particle-number-conservative
              if(IsMuAvg) then
                 ! Single Poisson bracket: Parker transport equation
-                call advect_via_poisson(iLine, iEnd, iShock, DtProgress, &
-                     Cfl, nOldSi_I(1:iEnd), nSi_I(1:iEnd), BSi_I(1:iEnd))
+                call advect_via_single_poisson(iLine, iEnd, &
+                     iShock, DtProgress, Cfl, nOldSi_I(1:iEnd), &
+                     nSi_I(1:iEnd), BSi_I(1:iEnd))
              else
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See the descriptions for development in ModAdvancePoisson.f90
                 Time = Alpha*DtFull - DtProgress            ! Tstart this step
                 call init_data_states(iLine, iEnd, DtFull)  ! Inital states
-                call advect_via_multi_poisson(iLine, iEnd, iShock, &
+                call advect_via_triple_poisson(iLine, iEnd, iShock, &
                      Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
           else
@@ -224,7 +226,7 @@ contains
     !     f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and first-order Fermi acceleration
 
-    use SP_ModAdvancePoisson, ONLY: iterate_poisson
+    use SP_ModAdvancePoisson, ONLY: iterate_single_poisson
     use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
     use SP_ModDistribution,   ONLY: IsDistNeg
 
@@ -255,8 +257,8 @@ contains
        if(UseDiffusion) call set_diffusion_coef(iLine, iEnd, &
             iShock, BSi_I(1:iEnd))
        ! Poisson bracket scheme: particle-number-conservative
-       call iterate_poisson(iLine, iEnd, iShock, Cfl, BSi_I(1:iEnd), &
-            nSi_I(1:iEnd))
+       call iterate_single_poisson(iLine, iEnd, iShock, Cfl, &
+            BSi_I(1:iEnd), nSi_I(1:iEnd))
 
        ! For any scheme, check if any VDF along this line is negative
        if(IsDistNeg) CYCLE LINE

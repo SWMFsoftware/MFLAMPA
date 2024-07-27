@@ -17,10 +17,11 @@ module SP_ModAdvancePoisson
   PRIVATE ! Except
 
   SAVE
-  public:: advect_via_poisson       ! Time-accurate advance through given Dt
-  public:: iterate_poisson          ! Local time-stepping for steady states
-  public:: advect_via_multi_poisson ! Time-accurate advance with pitch angle
-  public:: init_data_states         ! Initialize the states for multi_poisson
+  public:: advect_via_single_poisson ! Time-accurate advance through given Dt
+  public:: iterate_single_poisson    ! Local time-stepping for steady states
+  public:: advect_via_double_poisson ! Advance with 2 Poisson brackets
+  public:: advect_via_triple_poisson ! Advance with 3 Poisson brackets
+  public:: init_data_states          ! Initialize the states for multi_poisson
 
   ! \Deltas/b, ln(B\deltas^2) at Old time
   real, public, dimension(nVertexMax) :: DeltaSOverBOld_C, LnBDeltaS2Old_C
@@ -31,7 +32,7 @@ module SP_ModAdvancePoisson
        dDeltaSOverBDt_C, dLnBdeltaS2Dt_C, bDuDt_C
 contains
   !============================================================================
-  subroutine advect_via_poisson(iLine, nX, iShock, &
+  subroutine advect_via_single_poisson(iLine, nX, iShock, &
        tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
@@ -70,7 +71,7 @@ contains
     real :: DtNext
     ! Now this is the particle-number-conservative advection scheme
 
-    character(len=*), parameter:: NameSub = 'advect_via_poisson'
+    character(len=*), parameter:: NameSub = 'advect_via_single_poisson'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
     ! Initialize arrays
@@ -125,7 +126,7 @@ contains
             Source_C(1:nP, iStart:nX)
        ! Check if the VDF includes negative values
        call check_dist_neg(NameSub, 1, nX, iLine)
-       if(IsDistNeg)RETURN
+       if(IsDistNeg) RETURN
 
        ! Diffuse the distribution function
        if(UseDiffusion) then
@@ -152,7 +153,7 @@ contains
           end if
           ! Check if the VDF includes negative values after diffusion
           call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-          if(IsDistNeg)RETURN
+          if(IsDistNeg) RETURN
        end if
 
        ! Update time
@@ -160,9 +161,9 @@ contains
        if(Time > tFinal - 1.0e-8*DtNext) EXIT
     end do
 
-  end subroutine advect_via_poisson
+  end subroutine advect_via_single_poisson
   !============================================================================
-  subroutine iterate_poisson(iLine, nX, iShock, CflIn, BSi_I, nSi_I)
+  subroutine iterate_single_poisson(iLine, nX, iShock, CflIn, BSi_I, nSi_I)
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
@@ -195,7 +196,7 @@ contains
     real :: Dt_C(nP, nX)
 
     ! Now particle-number-conservative advection scheme for steady-state soln.
-    character(len=*), parameter:: NameSub = 'iterate_poisson'
+    character(len=*), parameter:: NameSub = 'iterate_single_poisson'
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
@@ -240,7 +241,7 @@ contains
          Distribution_CB(1:nP, 1, iStart:nX, iLine) + Source_C(1:nP, iStart:nX)
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
-    if(IsDistNeg)RETURN
+    if(IsDistNeg) RETURN
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
@@ -267,16 +268,46 @@ contains
        end if
        ! Check if the VDF includes negative values after diffusion
        call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-       if(IsDistNeg)RETURN
+       if(IsDistNeg) RETURN
     end if
 
-  end subroutine iterate_poisson
+  end subroutine iterate_single_poisson
   !============================================================================
-  subroutine advect_via_multi_poisson(iLine, nX, iShock,  &
+  subroutine advect_via_double_poisson(iLine, nX, iShock, &
+       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
+    ! Advect via multiple Possion Bracket scheme for the focused transport
+    ! equation considering pitch angle, including: adiabatic cooling or
+    ! accleration, and pitch-angle scattering terms, but without adiabatic
+    ! focusing term (partial f/pattial mu) for the pitch angle.
+    ! Here, we diffuse the distribution function at each time step.
+
+    use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
+    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
+    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
+         UseLowerEndBc, iStart
+    ! INPUTS:
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: nX            ! Number of meshes along s_L axis
+    real,    intent(in) :: tFinal        ! Time interval to advance through
+    real,    intent(in) :: CflIn         ! Input CFL number
+    ! Input variables for diffusion
+    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    ! Extended arrays for implementation of the Poisson bracket scheme
+
+    ! Now this is the particle-number-conservative advection scheme with \mu
+
+    character(len=*), parameter:: NameSub = 'advect_via_double_poisson'
+    !--------------------------------------------------------------------------
+    IsDistNeg = .false.
+
+  end subroutine advect_via_double_poisson
+  !============================================================================
+  subroutine advect_via_triple_poisson(iLine, nX, iShock,  &
        TimeStart, DtFinal, CflIn, nSi_I, BSi_I)
-    ! advect via multiple Possion Bracket scheme for the
-    ! focused transport equation considering pitch angle
-    ! diffuse the distribution function at each time step
+    ! Advect via multiple Possion Bracket scheme for the focused transport
+    ! equation considering pitch angle, including: adiabatic focusing,
+    ! cooling or accleration, and pitch-angle scattering terms.
+    ! Here, we diffuse the distribution function at each time step.
 
     use SP_ModDistribution, ONLY: DeltaMu, VolumeP_I
     use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
@@ -317,7 +348,7 @@ contains
     ! Mark whether this is the last run:
     logical :: IsExit
     ! Now this is the particle-number-conservative advection scheme with \mu
-    character(len=*), parameter:: NameSub = 'advect_via_multi_poisson'
+    character(len=*), parameter:: NameSub = 'advect_via_triple_poisson'
     !--------------------------------------------------------------------------
 
     ! Calculate time derivative of total control volume
@@ -413,14 +444,14 @@ contains
 
       ! Calculate 1st Hamiltonian function used in the time-dependent
       ! poisson bracket: {f_jk, (p^3/3)*(DeltaS/B)}_{tau, p^3/3}
-      call calc_hamiltonian_1(nX, dHamiltonian01_FX)
+      call calc_triple_hamiltonian_1(nX, dHamiltonian01_FX)
       ! Calculate 2nd Hamiltonian function used in the time-dependent
       ! poisson bracket: {f_jk, (mu^2-1)*v/(2B)}_{s_L, mu}
-      call calc_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
+      call calc_triple_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
       ! Calculate 3rd Hamiltonian function used in the time-dependent
       ! poisson bracket: {f_jk, (1-mu^2)/2 * [ mu*(p^3/3)*
       ! d(ln(B*ds^2))/dt + ProtonMass*p^2*bDuDt_C ]}_{p^3/3, mu}
-      call calc_hamiltonian_3(nX, Hamiltonian3_N)
+      call calc_triple_hamiltonian_3(nX, Hamiltonian3_N)
 
       ! Calculate the total control volume
       do iX = 1, nX
@@ -441,7 +472,7 @@ contains
 
     end subroutine advance_multi_poisson
     !==========================================================================
-  end subroutine advect_via_multi_poisson
+  end subroutine advect_via_triple_poisson
   !============================================================================
   subroutine set_VDF(iLine, nX, VDF_G)
     ! We need the VDF on the extended grid with two layers of ghost cells,
@@ -560,7 +591,7 @@ contains
     DeltaSOverB_C(1:nX) = DeltaSOverBOld_C(1:nX) + dDeltaSOverBDt_C(1:nX)*Time
   end subroutine update_states
   !============================================================================
-  subroutine calc_hamiltonian_1(nX, dHamiltonian01_FX)
+  subroutine calc_triple_hamiltonian_1(nX, dHamiltonian01_FX)
     ! Calculate the 1st Hamiltonian function with time:
     ! p^3/3*\deltas/B at cell face of p^3/3, regarding to tau and p^3/3
 
@@ -583,9 +614,9 @@ contains
     ! Boundary condition of Hamiltonian function
     dHamiltonian01_FX(:, :,    0) = dHamiltonian01_FX(:, :,  1)
     dHamiltonian01_FX(:, :, nX+1) = dHamiltonian01_FX(:, :, nX)
-  end subroutine calc_hamiltonian_1
+  end subroutine calc_triple_hamiltonian_1
   !============================================================================
-  subroutine calc_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
+  subroutine calc_triple_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
     ! Calculate the 2nd Hamiltonian function at each fixed time:
     ! (mu^2-1)*v/(2B) at face of s_L and mu, regarding to s_L and mu
 
@@ -625,9 +656,9 @@ contains
     Hamiltonian2_N(:,     :, nX+1) = Hamiltonian2_N(:,     :, nX)
     Hamiltonian2_N(:,    -1,    :) = Hamiltonian2_N(:,     1,  :)
     Hamiltonian2_N(:, nMu+1,    :) = Hamiltonian2_N(:, nMu-1,  :)
-  end subroutine calc_hamiltonian_2
+  end subroutine calc_triple_hamiltonian_2
   !============================================================================
-  subroutine calc_hamiltonian_3(nX, Hamiltonian3_N)
+  subroutine calc_triple_hamiltonian_3(nX, Hamiltonian3_N)
     ! Calculate the 3rd Hamiltonian function at each fixed time:
     ! (1-mu^2)/2 * [ mu*(p^3/3)*(3\vec{b}\vec{b}:\nabla\vec{u} - div\vec{u})
     ! + ProtonMass*p^2*(\vec{b}*d\vec{u}/dt) ], regarding to p^3/3 and mu,
@@ -661,7 +692,7 @@ contains
     Hamiltonian3_N(:,     :, nX+1) = Hamiltonian3_N(:,     :, nX)
     Hamiltonian3_N(:,    -1,    :) = Hamiltonian3_N(:,     1,  :)
     Hamiltonian3_N(:, nMu+1,    :) = Hamiltonian3_N(:, nMu-1,  :)
-  end subroutine calc_hamiltonian_3
+  end subroutine calc_triple_hamiltonian_3
   !============================================================================
 end module SP_ModAdvancePoisson
 !==============================================================================
