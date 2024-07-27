@@ -34,6 +34,8 @@ module SP_ModBc
   logical, public   :: UseLowerEndBc = .true.
   ! Type of lower end BC: float, escape, inject
   character(LEN=6)  :: TypeLowerEndBc = 'inject'
+  ! Injection coefficient at lower end boundary, should set 0.0 for GCRs
+  real, public      :: CoefInjLowBc = 0.25
   ! Index of the left lower end BC
   integer, public   :: iStart = 1
   integer, parameter:: &
@@ -56,8 +58,9 @@ contains
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#INJECTION')
-       call read_var('SpectralIndex', SpectralIndex)
-       call read_var('Efficiency'   , CoefInj)
+       call read_var('SpectralIndex',   SpectralIndex)
+       call read_var('EfficiencyGlob',  CoefInj)
+       call read_var('EfficiencyLowBc', CoefInjLowBc)
     case('#LOWERENDBC')
        ! Read whether to use LowerLowBc
        call read_var('UseLowerEndBc', UseLowerEndBc)
@@ -110,6 +113,7 @@ contains
     real    :: MomentumSi  ! Momentum for the thermal energy k_BTi
     real    :: CoefInjLocal, DistributionBc
     !--------------------------------------------------------------------------
+
     do iVertex = 1, iEnd
        ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
        ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(1/2)/p_inj)^5
@@ -129,6 +133,9 @@ contains
 
        Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
     end do
+    ! Modified for lower end boundary
+    Distribution_CB(0, :, 1, iLine) = &
+         Distribution_CB(0, :, 1, iLine)/CoefInj*CoefInjLowBc
 
   end subroutine set_momentum_bc
   !============================================================================

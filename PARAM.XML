@@ -607,11 +607,13 @@ in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
 
 <command name="INJECTION">
   <parameter name="SpectralIndex" type="real" default="5.0" />
-  <parameter name="Efficiency" type="real" min="0.0" default="1.0" />
+  <parameter name="EfficiencyGlob" type="real" min="0.0" default="1.0" />
+  <parameter name="EfficiencyLowBc" type="real" min="0.0" default="1.0" />
 
 #INJECTION
 5.0			SpectralIndex
-1.0			Efficiency
+1.0			EfficiencyGlob
+1.0			EfficiencyLowBc
 
 Set up parameters of the power-law spectrum of suprathermal
 particles at sqrt(2*mp*Ti) lt p lt Pinj:
@@ -622,6 +624,15 @@ The injection efficiency is the ratio of suprathermal proton
 density to the total proton density. Should not exceed one,
 however, somewhat higher than one values may be of use.
 Default distribution is f(p) propto [1.0 * 2 / p**5].
+
+Here, "EfficiencyGlob" is the injection efficiency for all particles
+at all coordinates, and "EfficiencyLowBc" is the one at the first point,
+namely the footpoint of multiple field lines at the solar surface. For
+solar energetic particle simulations, the injection particles are usually
+set to be ~10 keV, with the same "EfficiencyGlob" and "EfficiencyLowBc".
+However, for galactic cosmic rays simulations, "EfficiencyLowBc" should
+be set as 0 since no particles should be injected from the solar surface,
+since these cosmic ray particles are coming from outside the solar system.
 </command>
 
 <command name="CFL">
