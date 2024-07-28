@@ -649,9 +649,18 @@ Please send an email to Igor Sokolov for more information.
 
 #ADVECTION
 F			UsePoissonBracket
+F			UseMuFocusing
 
 If UsePoissonBracket is True, the advection scheme is conservative
-Poisson bracket scheme; otherwise, it is non-conservative.
+Poisson bracket scheme; otherwise, it is non-conservative. When
+nMu is not 1, we will solve the focused transport equation, including
+the extra pitch-angle adiabatic focusing effect. If one wants to
+account for this term, UseMuFocusing should be set as true, namely
+using triple/3 Poisson brackets; otherwise, one will neglect this
+term and use double/2 Poisson brackets. 
+
+This will be implemented later.
+parameter name="UseMuFocusing" type="logical" default="F"
 
 The default value is false.
 </command>

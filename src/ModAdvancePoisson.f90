@@ -69,8 +69,8 @@ contains
     real :: Dt
     ! Prediction for the next time step:
     real :: DtNext
-    ! Now this is the particle-number-conservative advection scheme
 
+    ! Now this is the particle-number-conservative advection scheme
     character(len=*), parameter:: NameSub = 'advect_via_single_poisson'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
@@ -274,7 +274,7 @@ contains
   end subroutine iterate_single_poisson
   !============================================================================
   subroutine advect_via_double_poisson(iLine, nX, iShock, &
-       TimeStart, DtFinal, CflIn, nSi_I, BSi_I)
+       tFinal, CflIn, nSi_I, BSi_I)
     ! Advect via multiple Possion Bracket scheme for the focused transport
     ! equation considering pitch angle, including: adiabatic cooling or
     ! accleration, and pitch-angle scattering terms, but without adiabatic
@@ -288,8 +288,7 @@ contains
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
-    real,    intent(in) :: TimeStart     ! Start time before advancing
-    real,    intent(in) :: DtFinal       ! Time interval to advance through
+    real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in) :: nSi_I(nX), BSi_I(nX)
@@ -312,13 +311,14 @@ contains
     ! Advection term
     real    :: Source_C(nP, nMu, nX)
     ! Time, ranging from TimeStart to tFinal
-    real    :: Time, tFinal
+    real    :: Time
     ! Time step
     real    :: Dt
     ! Prediction of next time step:
     real    :: DtNext
     ! Mark whether this is the last run:
     logical :: IsExit
+
     ! Now this is the particle-number-conservative advection scheme with \mu
     character(len=*), parameter:: NameSub = 'advect_via_double_poisson'
     !--------------------------------------------------------------------------
@@ -333,8 +333,7 @@ contains
     dVolumeDt_G(:, :,    0) = dVolumeDt_G(:, :,  1)
     dVolumeDt_G(:, :, nX+1) = dVolumeDt_G(:, :, nX)
     ! Time initialization
-    tFinal = TimeStart + DtFinal
-    Time = TimeStart
+    Time = 0.0
 
   contains
     !==========================================================================
@@ -375,7 +374,6 @@ contains
 
     end subroutine advance_double_poisson
     !==========================================================================
-
   end subroutine advect_via_double_poisson
   !============================================================================
   subroutine calc_double_hamiltonian_1(nX, dHamiltonian01_FX)
@@ -386,7 +384,7 @@ contains
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
     integer             :: iX, iMu   ! Loop variables
-    ! Calculate the first Hamiltonian function
+    ! Calculate the first Hamiltonian function for the 2-Poisson-bracket scheme
     !--------------------------------------------------------------------------
 
     do iX = 1, nX
@@ -404,10 +402,11 @@ contains
     dHamiltonian01_FX(:,    :, nX+1) = dHamiltonian01_FX(:,  :, nX)
     dHamiltonian01_FX(:,    0,    :) = dHamiltonian01_FX(:,  1,  :)
     dHamiltonian01_FX(:, nX+1,    :) = dHamiltonian01_FX(:, nX,  :)
+
   end subroutine calc_double_hamiltonian_1
   !============================================================================
-  subroutine advect_via_triple_poisson(iLine, nX, iShock,  &
-       TimeStart, DtFinal, CflIn, nSi_I, BSi_I)
+  subroutine advect_via_triple_poisson(iLine, nX, iShock, &
+       tFinal, CflIn, nSi_I, BSi_I)
     ! Advect via multiple Possion Bracket scheme for the focused transport
     ! equation considering pitch angle, including: adiabatic focusing,
     ! cooling or accleration, and pitch-angle scattering terms.
@@ -420,8 +419,7 @@ contains
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
-    real,    intent(in) :: TimeStart     ! Start time before advancing
-    real,    intent(in) :: DtFinal       ! Time interval to advance through
+    real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in) :: nSi_I(nX), BSi_I(nX)
@@ -444,13 +442,14 @@ contains
     ! Advection term
     real    :: Source_C(nP, nMu, nX)
     ! Time, ranging from TimeStart to tFinal
-    real    :: Time, tFinal
+    real    :: Time
     ! Time step
     real    :: Dt
     ! Prediction of next time step:
     real    :: DtNext
     ! Mark whether this is the last run:
     logical :: IsExit
+
     ! Now this is the particle-number-conservative advection scheme with \mu
     character(len=*), parameter:: NameSub = 'advect_via_triple_poisson'
     !--------------------------------------------------------------------------
@@ -464,8 +463,7 @@ contains
     dVolumeDt_G(:, :,    0) = dVolumeDt_G(:, :,  1)
     dVolumeDt_G(:, :, nX+1) = dVolumeDt_G(:, :, nX)
     ! Time initialization
-    tFinal = TimeStart + DtFinal
-    Time = TimeStart
+    Time = 0.0
 
     ! Here we would like to get the first trial of DtNext
     call set_VDF(iLine, nX, VDF_G)  ! Set the VDF first
@@ -622,64 +620,84 @@ contains
     VDF_G(nP+2, :) = VDF_G(nP+1, :)
   end subroutine set_VDF
   !============================================================================
-  subroutine init_states_for_poisson(iLine, nX, DtFull)
+  subroutine init_states_for_poisson(iLine, nX, InvnProgress, &
+       iProgress, DtProgress, BOldSi_I, BSi_I)
     ! Calculate data states from the input files
 
-    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, x_, z_, BOld_, B_, UOld_, U_
+    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, X_, Z_, UOld_, U_
     ! Line number and number along grid axis
     integer, intent(in) :: iLine, nX
-    ! Time difference between Old (State_VIB) and New (MHData_VIB) States
-    real,    intent(in) :: DtFull
-    ! Midpoint for to consecutive points, \deltas
-    real                :: MidPoint_IB(x_:z_, nX), DeltaS_I(nX)
-    real                :: InvDtFull
+    ! Inverse of nProgress, the reduced time step number
+    real,    intent(in) :: InvnProgress
+    ! iProgress for the iteration of the reduced time steps
+    integer, intent(in) :: iProgress
+    ! Time difference between Old (iProgress-1) and New (iProgress) States
+    real,    intent(in) :: DtProgress
+    ! Old and New |B| states, and we include steepen_shock to make updates
+    real,    intent(in) :: BOldSi_I(nX), BSi_I(nX)
+    ! Inverse of DtProgress, the reduced time step
+    real :: InvDtProgress
+    ! \delta_s for consecutive points, at old and new states
+    real :: DeltaSOld_I(nX), DeltaSNew_I(nX)
+
     !--------------------------------------------------------------------------
-    InvDtFull = 1.0/DtFull
+    InvDtProgress = 1.0/DtProgress
 
     ! Calculate values at OLD time
-    ! Calculate midpoints
-    MidPoint_IB(x_:z_, 1:nX-1) = (State_VIB(x_:z_, 2:nX, iLine)   &
-         + State_VIB(x_:z_, 1:nX-1, iLine))*0.5
-    ! Calculate DeltaS
-    DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(x_:z_, 2:nX-1) &
-         - MidPoint_IB(x_:z_, 1:nX-2))**2, dim=1))
-    ! Linear interpolate the deltas such that there will be nQ deltas
-    DeltaS_I(1 ) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
-         - State_VIB(x_:z_,  1, iLine))**2))
-    DeltaS_I(nX) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
-         - State_VIB(x_:z_, nX, iLine))**2))
+    DeltaSOld_I = calc_DeltaS_I(Alpha=(iProgress-1.0)*InvnProgress)
     ! Calculate \DeltaS/B at grid center
-    DeltaSOverBOld_C(1:nX) = DeltaS_I/State_VIB(BOld_, 1:nX, iLine)
+    DeltaSOverBOld_C(1:nX) = DeltaSOld_I/BOldSi_I(1:nX)
     ! Calculate ln(B*\DeltaS^2) at grid center
-    LnBDeltaS2Old_C(1:nX) = log(State_VIB(BOld_, 1:nX, iLine)*DeltaS_I**2)
+    LnBDeltaS2Old_C(1:nX) = log(BOldSi_I(1:nX)) + 2.0*log(DeltaSOld_I)
 
     ! Calculate values at NEW time
-    MidPoint_IB(x_:z_, 1:nX-1) = (MHData_VIB(x_:z_, 2:nX, iLine)  &
-         + MhData_VIB(x_:z_, 1:nX-1, iLine))*0.5
-    ! Calculate DeltaS
-    DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(x_:z_, 2:nX-1) &
-         - MidPoint_IB(x_:z_, 1:nX-2))**2, dim=1))
-    ! Linear interpolate the deltas such that there will be nQ deltas
-    DeltaS_I(1 ) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, 1)     &
-         - MHData_VIB(x_:z_,  1, iLine))**2))
-    DeltaS_I(nX) = 2.0*sqrt(sum((MidPoint_IB(x_:z_, nX-1)  &
-         - MHData_VIB(x_:z_, nX, iLine))**2))
+    DeltaSNew_I = calc_DeltaS_I(Alpha=iProgress*InvnProgress)
     ! Calculate \DeltaS/B at grid center
-    DeltaSOverBNew_C(1:nX) = DeltaS_I/State_VIB(B_, 1:nX, iLine)
+    DeltaSOverBNew_C(1:nX) = DeltaSNew_I/BSi_I(1:nX)
     ! Calculate ln(B*\DeltaS^2) at grid center
-    LnBDeltaS2New_C(1:nX) = log(State_VIB(B_, 1:nX, iLine)) + 2.0*log(DeltaS_I)
+    LnBDeltaS2New_C(1:nX) = log(BSi_I(1:nX)) + 2.0*log(DeltaSNew_I)
 
     ! Calculate the time-derivative physical quantities
     ! Calculate \deltas/B time derivative = D[delta(s_L)/B]/Dt
-    dDeltaSOverBDt_C(1:nX) = (DeltaSOverBNew_C(1:nX) -   &
-         DeltaSOverBOld_C(1:nX))*InvDtFull
+    dDeltaSOverBDt_C(1:nX) = (DeltaSOverBNew_C(1:nX) - &
+         DeltaSOverBOld_C(1:nX))*InvDtProgress
     ! Calculate Dln(B\deltas^2)/Dt
-    dLnBdeltaS2Dt_C(1:nX)  = (LnBDeltaS2New_C(1:nX) -    &
-         LnBDeltaS2Old_C(1:nX))*InvDtFull
+    dLnBdeltaS2Dt_C(1:nX)  = (LnBDeltaS2New_C(1:nX) - &
+         LnBDeltaS2Old_C(1:nX))*InvDtProgress
     ! Calculate b*Du/Dt
-    bDuDt_C(1:nX)          = (State_VIB(U_, 1:nX, iLine) -  &
-         State_VIB(UOld_, 1:nX, iLine))*InvDtFull
+    bDuDt_C(1:nX)          = (State_VIB(U_, 1:nX, iLine) - &
+         State_VIB(UOld_, 1:nX, iLine))*InvDtProgress
 
+  contains
+    !==========================================================================
+    function calc_DeltaS_I(Alpha)
+      ! Calculate DeltaS_I at given time-interpolation coefficient, Alpha
+
+      real, intent(in) :: Alpha ! Coefficient to interpolate "old" and "new"
+      real :: calc_DeltaS_I(nX) ! Output results: DeltaS_I
+      real :: Xyz_IB(X_:Z_, nX), MidPoint_IB(X_:Z_, nX) ! Coordinates
+      ! Get DeltaS_I at current time: for calculating other old and new states
+      !------------------------------------------------------------------------
+
+      ! Calculate coordinates
+      Xyz_IB = State_VIB(X_:Z_, 1:nX, iLine) + Alpha* &
+           (MhData_VIB(X_:Z_, 1:nX, iLine) - State_VIB(X_:Z_, 1:nX, iLine))
+
+      ! Calculate midpoints
+      MidPoint_IB(:, 1:nX-1) = (Xyz_IB(:, 2:nX) + Xyz_IB(:, 1:nX-1))*0.5
+
+      ! Calculate DeltaS_I
+      calc_DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(:, 2:nX-1) &
+           - MidPoint_IB(:, 1:nX-2))**2, dim=1))
+
+      ! Linear interpolate the deltas such that there will be nQ deltas
+      calc_DeltaS_I(1 ) = 2.0*sqrt(sum(( &
+           MidPoint_IB(:, 1) - Xyz_IB(:,  1))**2))
+      calc_DeltaS_I(nX) = 2.0*sqrt(sum(( &
+           MidPoint_IB(:, nX-1) - Xyz_IB(:, nX))**2))
+
+    end function calc_DeltaS_I
+    !==========================================================================
   end subroutine init_states_for_poisson
   !============================================================================
   subroutine update_states_for_poisson(iLine, nX, Time)
@@ -704,7 +722,7 @@ contains
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
     integer             :: iX, iMu   ! Loop variables
-    ! Calculate the first Hamiltonian function
+    ! Calculate the 1st Hamiltonian function for the 3-Poisson-bracket scheme
     !--------------------------------------------------------------------------
 
     do iX = 1, nX
@@ -719,6 +737,7 @@ contains
     ! Boundary condition of Hamiltonian function
     dHamiltonian01_FX(:, :,    0) = dHamiltonian01_FX(:, :,  1)
     dHamiltonian01_FX(:, :, nX+1) = dHamiltonian01_FX(:, :, nX)
+
   end subroutine calc_triple_hamiltonian_1
   !============================================================================
   subroutine calc_triple_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
@@ -733,8 +752,9 @@ contains
     real    :: Velocity_I(0:nP+1)    ! Particle velocity array at cell face
     real    :: InvBSi_I(nX), InvBFaceSi_I(0:nX) ! 1/B at center and face
     integer :: iX, iMu               ! Loop variables
-
+    ! Calculate the 2nd hamiltonian function for the 3-Poisson-bracket scheme
     !--------------------------------------------------------------------------
+
     Velocity_I = 1.0/sqrt(1.0 + (cProtonMass*cLightSpeed/Momentum_I)**2)
     ! Considering the law of relativity, v = 1/sqrt(1+(m*c/p)**2), v can be
     ! calculated as a function of p. Note that light speed is the unit of
@@ -763,6 +783,7 @@ contains
     Hamiltonian2_N(:,     :, nX+1) = Hamiltonian2_N(:,     :, nX)
     Hamiltonian2_N(:,    -1,    :) = Hamiltonian2_N(:,     1,  :)
     Hamiltonian2_N(:, nMu+1,    :) = Hamiltonian2_N(:, nMu-1,  :)
+
   end subroutine calc_triple_hamiltonian_2
   !============================================================================
   subroutine calc_triple_hamiltonian_3(nX, Hamiltonian3_N)
@@ -780,9 +801,9 @@ contains
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
     integer             :: iX, iMu   ! Loop variables
-    ! Calculate the third hamiltonian function
-
+    ! Calculate the 3rd hamiltonian function for the 3-Poisson-bracket scheme
     !--------------------------------------------------------------------------
+
     do iX = 1, nX
        do iMu = 0, nMu
           Hamiltonian3_N(:, iMu, iX) = 0.5*(1.0 - MuFace_I(iMu)**2)* &
@@ -799,6 +820,7 @@ contains
     Hamiltonian3_N(:,     :, nX+1) = Hamiltonian3_N(:,     :, nX)
     Hamiltonian3_N(:,    -1,    :) = Hamiltonian3_N(:,     1,  :)
     Hamiltonian3_N(:, nMu+1,    :) = Hamiltonian3_N(:, nMu-1,  :)
+
   end subroutine calc_triple_hamiltonian_3
   !============================================================================
 end module SP_ModAdvancePoisson

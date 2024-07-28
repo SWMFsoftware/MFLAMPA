@@ -26,6 +26,7 @@ module SP_ModAdvance
   ! Local variables
   real    :: Cfl = 0.9   ! Controls the maximum allowed time step
   logical :: UsePoissonBracket = .false.
+  logical :: UseMuFocusing = .false.
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -39,6 +40,7 @@ contains
        call read_var('Cfl', Cfl)
     case('#ADVECTION')
        call read_var('UsePoissonBracket', UsePoissonBracket)
+       ! call read_var('UseMuFocusing', UseMuFocusing)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)
     case default
@@ -82,16 +84,15 @@ contains
     ! a time step so short that the shock wave passes
     ! a single grid interval per a progress step:
     integer :: iProgress, nProgress
-    ! coefficient to interpolate "old" and "new"
+    real    :: InvnProgress
+    ! Coefficient to interpolate "old" and "new"
     real    :: Alpha
     ! Full difference between DataInputTime and SPTime
     real    :: DtFull
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real    :: DtProgress
-    ! Current time: for updating states in multi-Poisson-bracket scheme
-    real    :: Time
     ! Local arrays to store the state vectors in SI units
-    real, dimension(1:nVertexMax):: nOldSi_I, nSi_I, BSi_I
+    real, dimension(1:nVertexMax):: nOldSi_I, nSi_I, BOldSi_I, BSi_I
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax):: dLogRho_I
 
@@ -109,6 +110,7 @@ contains
        ! summary is: Length is in the unit of Rs, temperature is in the
        ! unit of kinetic energy, all others are in SI units.
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine)
+       BOldSi_I(1:iEnd) = State_VIB(BOld_, 1:iEnd, iLine)
 
        ! Find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,    iLine)
@@ -126,14 +128,12 @@ contains
        ! Each particles shock has crossed should be
        ! processed separately => reduce the time step
        DtProgress = DtFull/nProgress
-       ! Initialize necessary states for double/triple-Poisson-bracket schemes
-       if(UsePoissonBracket .and. .not.IsMuAvg) &
-          call init_states_for_poisson(iLine, iEnd, DtFull)  ! Inital states
+       InvnProgress = 1.0/nProgress
 
        ! Go over each crossed particle
        PROGRESS:do iProgress = 1, nProgress
           ! Account for change in the background up to the current moment
-          Alpha = real(iProgress)/real(nProgress)
+          Alpha = iProgress*InvnProgress
 
           ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
@@ -164,10 +164,19 @@ contains
                      nSi_I(1:iEnd), BSi_I(1:iEnd))
              else
                 ! Multiple Poisson brackets: Focused transport equation
-                ! See the descriptions for development in ModAdvancePoisson.f90
-                Time = Alpha*DtFull - DtProgress ! Tstart this step
-                call advect_via_triple_poisson(iLine, iEnd, iShock, &
-                     Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
+                ! See descriptions for development in ModAdvancePoisson.f90
+                ! Initialize states for double/triple-Poisson-bracket schemes
+                call init_states_for_poisson(iLine, iEnd, InvnProgress, &
+                     iProgress, DtProgress, BOldSi_I(1:iEnd), BSi_I(1:iEnd))
+                if(.not.UseMuFocusing) then
+                   ! 2 Poisson brackets
+                   call advect_via_double_poisson(iLine, iEnd, iShock, &
+                        DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
+                else
+                   ! 3 Poisson brackets
+                   call advect_via_triple_poisson(iLine, iEnd, iShock, &
+                        DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
+                end if
              end if
           else
              ! No Poisson bracket scheme, use the default algorithm
@@ -179,6 +188,7 @@ contains
           if(IsDistNeg) CYCLE LINE
           ! Store the old density at the end of each iProgress
           nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
+          BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
        end do PROGRESS
     end do LINE
 
