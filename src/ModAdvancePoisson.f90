@@ -8,8 +8,12 @@ module SP_ModAdvancePoisson
   ! See https://doi.org/10.1016/j.jcp.2023.111923
 
   use SP_ModSize,         ONLY: nVertexMax
+  use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
+       UseUpperEndBc, UseLowerEndBc, iStart
   use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, &
-       Background_I, IsDistNeg, check_dist_neg
+       dLogP, VolumeP_I, Momentum3_I, DeltaMu, Mu_I,      &
+       IsDistNeg, check_dist_neg
+  use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
   use ModUtilities,       ONLY: CON_stop
   use ModPoissonBracket,  ONLY: explicit
   implicit none
@@ -37,10 +41,6 @@ contains
     ! advect via Possion Bracket scheme
     ! diffuse the distribution function at each time step
 
-    use SP_ModDistribution, ONLY: dLogP, VolumeP_I, Momentum3_I
-    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
-         UseLowerEndBc, iStart
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -101,14 +101,14 @@ contains
 
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
-    ! Advection by Poisson bracket scheme
+    ! Advection by the single-Poisson-bracket scheme
     do
-       ! Time Updates
+       ! Update Time step
        Dt = min(DtNext, tFinal - Time)
-       ! Volume Updates
+       ! Update Volumes
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
-       ! BC Updates
+       ! Update Bc
        call set_VDF(iLine, nX, VDF_G)
 
        ! Advance by Poisson bracket scheme
@@ -167,12 +167,8 @@ contains
     ! Advect via Possion Bracket scheme to the steady state
     ! Diffuse the distribution function at each time step
 
-    use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I
-    use SP_ModGrid,         ONLY: State_VIB, D_, U_
-    use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
-    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
-         UseLowerEndBc, iStart
+    use SP_ModGrid, ONLY: State_VIB, D_, U_
+    use SP_ModUnit, ONLY: UnitX_, Io2Si_V
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -281,10 +277,6 @@ contains
     ! focusing term (partial f/pattial mu) for the pitch angle.
     ! Here, we diffuse the distribution function at each time step.
 
-    use SP_ModDistribution, ONLY: dLogP, DeltaMu, VolumeP_I, Momentum3_I
-    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
-         UseLowerEndBc, iStart
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -335,6 +327,61 @@ contains
     ! Time initialization
     Time = 0.0
 
+    ! Here we would like to get the first trial of DtNext
+    call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
+    call advance_double_poisson    ! Now we get DtNext
+
+    ! Advect by the double-Poisson-bracket scheme
+    do
+       ! Update Time step
+       if(DtNext > tFinal - Time) then
+          Dt = tFinal - Time
+          IsExit = .true.          ! Last step
+       else
+          Dt = DtNext
+          IsExit = .false.         ! Intermediate steps
+       end if
+
+       ! Update Bc for VDF at minimal energy, at nP = 0
+       call set_momentum_bc(iLine, nX, nSi_I, iShock)
+       ! Update Bc
+       call set_VDF(iLine, nX, VDF_G)
+
+       if(IsExit) then
+          ! This step is the last step
+          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
+               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
+               Source_C(1:nP, 1:nMu, iStart:nX)
+       else
+          ! This step is not the last step
+          ! Update VDF_G considering the time-dependent Volume_G
+
+          Source_C = Source_C*Volume_G(1:nP, 1:nMu, 1:nX)
+          ! Update DeltaSOverB_C for the calculation of volume
+          call update_states_for_poisson(iLine, nX, Time)
+          ! Calculate the total control volume
+          do iX = 1, nX
+             Volume_G(:, :, iX) = DeltaSOverB_C(iX)*DeltaMu* &
+                  spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
+          end do
+
+          ! Update VDF_G to CURRENT time: no BCs for (1:nQ, 1:nP, iStart:nR)
+          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
+               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
+               Source_C(1:nP, 1:nMu, iStart:nX)/ &
+               Volume_G(1:nP, 1:nMu, iStart:nX)
+       end if
+       ! Check if the VDF includes negative values
+       call check_dist_neg(NameSub, 1, nX, iLine)
+       if(IsDistNeg) RETURN
+
+       ! !! SCATTERING and DIFFUSION here !!!
+
+       ! Update time
+       Time = Time + Dt
+       if(Time > tFinal - 1.0e-8*DtNext) EXIT
+    end do
+
   contains
     !==========================================================================
     subroutine advance_double_poisson(DtIn)
@@ -380,7 +427,6 @@ contains
     ! Calculate the 1st Hamiltonian function with time:
     ! mu^2 * p^3/3 * \deltas/B at p^3/3 face, regarding to tau and p^3/3
 
-    use SP_ModDistribution, ONLY: DeltaMu, Mu_I, Momentum3_I
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
     integer             :: iX, iMu   ! Loop variables
@@ -412,10 +458,6 @@ contains
     ! cooling or accleration, and pitch-angle scattering terms.
     ! Here, we diffuse the distribution function at each time step.
 
-    use SP_ModDistribution, ONLY: DeltaMu, VolumeP_I
-    use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc,           ONLY: set_momentum_bc, UseUpperEndBc, &
-         UseLowerEndBc, iStart
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -450,7 +492,7 @@ contains
     ! Mark whether this is the last run:
     logical :: IsExit
 
-    ! Now this is the particle-number-conservative advection scheme with \mu
+    ! Now this is the particle-number-conservative advection scheme with mu
     character(len=*), parameter:: NameSub = 'advect_via_triple_poisson'
     !--------------------------------------------------------------------------
 
@@ -466,12 +508,12 @@ contains
     Time = 0.0
 
     ! Here we would like to get the first trial of DtNext
-    call set_VDF(iLine, nX, VDF_G)  ! Set the VDF first
-    call advance_triple_poisson      ! Now we get DtNext
+    call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
+    call advance_triple_poisson    ! Now we get DtNext
 
-    ! Advection by triple-Poisson-bracket scheme
+    ! Advect by the triple-Poisson-bracket scheme
     do
-       ! Time Updates
+       ! Update Time step
        if(DtNext > tFinal - Time) then
           Dt = tFinal - Time
           IsExit = .true.          ! Last step
@@ -488,8 +530,8 @@ contains
 
        if(IsExit) then
           ! This step is the last step
-          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =       &
-               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) +  &
+          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
+               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
                Source_C(1:nP, 1:nMu, iStart:nX)
        else
           ! This step is not the last step
@@ -505,8 +547,8 @@ contains
           end do
 
           ! Update VDF_G to CURRENT time: no BCs for (1:nQ, 1:nP, iStart:nR)
-          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =       &
-               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) +  &
+          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
+               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
                Source_C(1:nP, 1:nMu, iStart:nX)/ &
                Volume_G(1:nP, 1:nMu, iStart:nX)
        end if
@@ -576,49 +618,6 @@ contains
     end subroutine advance_triple_poisson
     !==========================================================================
   end subroutine advect_via_triple_poisson
-  !============================================================================
-  subroutine set_VDF(iLine, nX, VDF_G)
-    ! We need the VDF on the extended grid with two layers of ghost cells,
-    ! to solve the second order scheme. Add solution in physical cells and
-    ! in a single layer of the ghost cells along the momentum coordinate.
-
-    use SP_ModBc, ONLY: UseUpperEndBc, set_upper_end_bc, &
-         UpperEndBc_I, UseLowerEndBc, set_lower_end_bc, &
-         LowerEndBc_I, set_lower_end_vdf, iStart
-    integer, intent(in) :: iLine     ! Indices of line and shock
-    integer, intent(in) :: nX        ! Number of meshes along s_L axis
-    real, intent(inout) :: VDF_G(-1:nP+2, -1:nX+2)
-
-    !--------------------------------------------------------------------------
-    VDF_G(0:nP+1, iStart:nX) = Distribution_CB(:, 1, iStart:nX, iLine)
-    VDF_G(0:nP+1, 1) = Distribution_CB(:, 1, iStart, iLine)
-
-    ! Manipulate the LowerEndBc along the line coordinate:
-    if(UseLowerEndBc) then
-       call set_lower_end_bc(iLine)
-       VDF_G(0:nP+1, 0) = max(LowerEndBc_I, Background_I)
-    else
-       call set_lower_end_vdf(iLine)
-       VDF_G(0:nP+1, 0) = Background_I
-    end if
-
-    ! Manipulate the UpperEndBc along the line coordinate:
-    if(UseUpperEndBc) then
-       call set_upper_end_bc(iLine, nX)
-       VDF_G(1:nP, nX+1) = max(UpperEndBc_I, Background_I(1:nP))
-       VDF_G(0   , nX+1) = max(VDF_G(0, nX), Background_I(0))
-       VDF_G(nP+1, nX+1) = max(VDF_G(nP+1,nX), Background_I(nP+1))
-    else
-       VDF_G(0:nP+1, nX+1) = Background_I
-    end if
-
-    ! Add a second layer of the ghost cells along the line coordinate:
-    VDF_G(0:nP+1,   -1) = VDF_G(0:nP+1,    0)
-    VDF_G(0:nP+1, nX+2) = VDF_G(0:nP+1, nX+1)
-    ! Add a second layer of the ghost cells along the momentum coordinate:
-    VDF_G(-1  , :) = VDF_G(0   , :)
-    VDF_G(nP+2, :) = VDF_G(nP+1, :)
-  end subroutine set_VDF
   !============================================================================
   subroutine init_states_for_poisson(iLine, nX, InvnProgress, &
        iProgress, DtProgress, BOldSi_I, BSi_I)
@@ -718,7 +717,6 @@ contains
     ! Calculate the 1st Hamiltonian function with time:
     ! p^3/3*\deltas/B at cell face of p^3/3, regarding to tau and p^3/3
 
-    use SP_ModDistribution, ONLY: DeltaMu, Momentum3_I
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: dHamiltonian01_FX(-1:nP+1, 0:nMu+1, 0:nX+1)
     integer             :: iX, iMu   ! Loop variables
@@ -745,7 +743,7 @@ contains
     ! (mu^2-1)*v/(2B) at face of s_L and mu, regarding to s_L and mu
 
     use ModConst,           ONLY: cProtonMass, cLightSpeed
-    use SP_ModDistribution, ONLY: Momentum_I, VolumeP_I, MuFace_I
+    use SP_ModDistribution, ONLY: Momentum_I, MuFace_I
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(in)    :: BSi_I(nX) ! B-field strength at cell center
     real, intent(inout) :: Hamiltonian2_N(0:nP+1, -1:nMu+1, -1:nX+1)
@@ -797,7 +795,7 @@ contains
     ! \vec{b}*d\vec{u}/dt = bDuDt_C
 
     use ModConst,           ONLY: cProtonMass
-    use SP_ModDistribution, ONLY: Momentum3_I, MuFace_I
+    use SP_ModDistribution, ONLY: MuFace_I
     integer, intent(in) :: nX        ! Number of s_L grid
     real, intent(inout) :: Hamiltonian3_N(-1:nP+1, -1:nMu+1, 0:nX+1)
     integer             :: iX, iMu   ! Loop variables
