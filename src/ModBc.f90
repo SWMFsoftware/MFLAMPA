@@ -21,26 +21,34 @@ module SP_ModBc
 
   ! Public members:
   public:: read_param
-  public:: set_momentum_bc   ! Set the boundary condition at min/max energy
-  public:: set_upper_end_bc  ! Set the boundary condition at the far end point
-  public:: set_lower_end_bc  ! Set the boundary condition at the near-Sun end
-  public:: set_lower_end_vdf ! Set the VDF at the near-Sun end
+  public:: set_momentum_bc   ! Set the Distribution_CB Bc at min/max energy
+  public:: set_upper_end_bc  ! Set the UpperEndBc_I Bc at the far end point
+  public:: set_lower_end_bc  ! Set the LowerEndBc_I Bc at the near-Sun end
+  public:: set_lower_end_vdf ! Set the Distribution_CB Bc at the near-Sun end
+  public:: set_VDF           ! Set the VDF Bc, typically with 2 ghost cells
+  interface set_VDF
+     module procedure set_VDF2 ! VDF2: along P^3/3 and s_L
+     module procedure set_VDF3 ! VDF3: along P^3/3, mu and s_L
+  end interface set_VDF
+
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_B*T_i < Energy < EnergyInjection, to be read from PARAM.in
   real, public      :: CoefInj = 0.25, SpectralIndex = 5.0
   real, parameter   :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
+  ! Injection coefficient at lower end boundary, should set 0.0 for GCRs
+  real, public      :: CoefInjLowBc = 0.25
+
   ! Lower end BC, set at the firsr point along the field line
   logical, public   :: UseLowerEndBc = .true.
   ! Type of lower end BC: float, escape, inject
   character(LEN=6)  :: TypeLowerEndBc = 'inject'
-  ! Injection coefficient at lower end boundary, should set 0.0 for GCRs
-  real, public      :: CoefInjLowBc = 0.25
   ! Index of the left lower end BC
   integer, public   :: iStart = 1
   integer, parameter:: &
        iStartUseLeft_   = 1, & ! when UseLowerEndBc = .true.
        iStartNoUseLeft_ = 2    ! when UseLowerEndBc = .false.
+
   ! Upper end BC, set at the last point along the field line
   logical, public   :: UseUpperEndBc = .false.
   ! Type of upper end BC: none, float, escape, lism
@@ -104,7 +112,8 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine set_momentum_bc(iLine, iEnd, nSi_I, iShock)
-    ! set boundary conditions on grid point on the current line
+    ! Set boundary conditions for Distribution_CB on grid point,
+    ! on the given field line.
 
     integer, intent(in) :: iLine, iEnd, iShock
     real,    intent(in) :: nSi_I(1:iEnd)
@@ -120,12 +129,12 @@ contains
        !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
        ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
        CoefInjLocal = CoefInjTiny
-       MomentumSi   = kinetic_energy_to_momentum(  &
+       MomentumSi   = kinetic_energy_to_momentum( &
             MhData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
-       DistributionBc = (SpectralIndex-3)/(4*cPi)     &
-            * MomentumInjSi**2*Io2Si_V(UnitEnergy_)   &
-            * nSi_I(iVertex)/MomentumSi**3            &
+       DistributionBc = (SpectralIndex-3)/(4*cPi)   &
+            * MomentumInjSi**2*Io2Si_V(UnitEnergy_) &
+            * nSi_I(iVertex)/MomentumSi**3          &
             * (MomentumSi/MomentumInjSi)**SpectralIndex
 
        if(iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
@@ -140,8 +149,8 @@ contains
   end subroutine set_momentum_bc
   !============================================================================
   subroutine set_upper_end_bc(iLine, iEnd)
-    ! set boundary condition at the last grid point on the given line
-    ! assign the calculated BC to UpperEndBc_I
+    ! Set boundary condition at the last grid point on the given field line.
+    ! Assign the calculated BC to UpperEndBc_I.
 
     integer, intent(in) :: iLine, iEnd
     real :: XyzSi_D(3)                          ! Where to set BC
@@ -169,8 +178,8 @@ contains
   end subroutine set_upper_end_bc
   !============================================================================
   subroutine set_lower_end_bc(iLine)
-    ! set boundary condition at the zeroth grid point on the given line
-    ! assign the calculated BC to LowerEndBc_I
+    ! Set boundary condition at the zeroth grid point on the given field line.
+    ! Assign the calculated BC to LowerEndBc_I.
 
     integer, intent(in) :: iLine
     character(len=*), parameter:: NameSub = 'set_lower_end_bc'
@@ -190,16 +199,85 @@ contains
   end subroutine set_lower_end_bc
   !============================================================================
   subroutine set_lower_end_vdf(iLine)
-    ! set boundary condition for VDF at the zeroth grid point on the given line
+    ! Set boundary condition for Distribution_CB at the zeroth grid point,
+    ! namely the footpoint on the solar surface, on the current field line.
 
     integer, intent(in) :: iLine
-
-    ! set the left boundary condition of VDF for diffusion
-    character(len=*), parameter:: NameSub = 'set_lower_end_vdf'
     !--------------------------------------------------------------------------
+    ! Set the left boundary condition of VDF for diffusion
     Distribution_CB(1:nP+1, 1, 1, iLine) = &
          Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex
   end subroutine set_lower_end_vdf
+  !============================================================================
+  subroutine set_VDF2(iLine, nX, VDF_G)
+    ! We need the VDF on the extended grid with two layers of ghost cells, to
+    ! solve the second-order accurate scheme. Add solution in physical cells
+    ! and in a single layer of the ghost cells along the momentum coordinate,
+    ! plus two layers of ghost cells along the pitch-angle coordinates.
+    ! This function is for the 2-dimensional VDF, with momentum (P^3/3)
+    ! and line coordinates (s_L).
+
+    integer, intent(in) :: iLine     ! Indices of line and shock
+    integer, intent(in) :: nX        ! Number of meshes along s_L axis
+    real, intent(inout) :: VDF_G(-1:nP+2, -1:nX+2)
+    real :: VDF3_G(-1:nP+2, -1:nMu+2, -1:nX+2) ! nMu = 1 for VDF2
+    !--------------------------------------------------------------------------
+
+    call set_VDF3(iLine, nX, VDF3_G)
+    VDF_G = VDF3_G(:, nMu, :) ! nMu = 1 for VDF2
+
+  end subroutine set_VDF2
+  !============================================================================
+  subroutine set_VDF3(iLine, nX, VDF_G)
+    ! We need the VDF on the extended grid with two layers of ghost cells, to
+    ! solve the second-order accurate scheme. Add solution in physical cells
+    ! and in a single layer of the ghost cells along the momentum coordinate,
+    ! plus two layers of ghost cells along the pitch-angle coordinates.
+    ! This function is for the 3-dimensional VDF, with momentum (P^3/3),
+    ! pitch angle (mu), and line coordinates (s_L).
+
+    integer, intent(in) :: iLine     ! Indices of line and shock
+    integer, intent(in) :: nX        ! Number of meshes along s_L axis
+    real, intent(inout) :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
+    !--------------------------------------------------------------------------
+
+    VDF_G(0:nP+1, 1:nMu, iStart:nX) = Distribution_CB(:, :, iStart:nX, iLine)
+    VDF_G(0:nP+1, 1:nMu, 1) = Distribution_CB(:, :, iStart, iLine)
+
+    ! Manipulate the LowerEndBc along the line coordinate:
+    if(UseLowerEndBc) then
+       call set_lower_end_bc(iLine)
+       VDF_G(0:nP+1, 1:nMu, 0) = spread(max(LowerEndBc_I, &
+            Background_I), DIM=2, NCOPIES=nMu)
+    else
+       call set_lower_end_vdf(iLine)
+       VDF_G(0:nP+1, 1:nMu, 0) = spread(Background_I, DIM=2, NCOPIES=nMu)
+    end if
+
+    ! Manipulate the UpperEndBc along the line coordinate:
+    if(UseUpperEndBc) then
+       call set_upper_end_bc(iLine, nX)
+       VDF_G(1:nP, 1:nMu, nX+1) = spread(max(UpperEndBc_I, &
+            Background_I(1:nP)), DIM=2, NCOPIES=nMu)
+       VDF_G(0   , 1:nMu, nX+1) = max(VDF_G(0, 1:nMu, nX), Background_I(0))
+       VDF_G(nP+1, 1:nMu, nX+1) = max(VDF_G(nP+1,1:nMu,nX), Background_I(nP+1))
+    else
+       VDF_G(0:nP+1, 1:nMu, nX+1) = spread(Background_I, DIM=2, NCOPIES=nMu)
+    end if
+
+    ! Add a second layer of the ghost cells along the line coordinate:
+    VDF_G(0:nP+1, 1:nMu,   -1) = VDF_G(0:nP+1, 1:nMu,    0)
+    VDF_G(0:nP+1, 1:nMu, nX+2) = VDF_G(0:nP+1, 1:nMu, nX+1)
+    ! Add two layer of the ghost cells along the line coordinate:
+    VDF_G(0:nP+1,     0, :) = VDF_G(0:nP+1,    1,  :)
+    VDF_G(0:nP+1,    -1, :) = VDF_G(0:nP+1,    0,  :)
+    VDF_G(0:nP+1, nMu+1, :) = VDF_G(0:nP+1,   nMu, :)
+    VDF_G(0:nP+1, nMu+2, :) = VDF_G(0:nP+1, nMu+1, :)
+    ! Add a second layer of the ghost cells along the momentum coordinate:
+    VDF_G(  -1, :, :) = VDF_G(   0, :, :)
+    VDF_G(nP+2, :, :) = VDF_G(nP+1, :, :)
+
+  end subroutine set_VDF3
   !============================================================================
 end module SP_ModBc
 !==============================================================================
