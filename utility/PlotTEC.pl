@@ -65,7 +65,7 @@ my $deg= 180/$pi;
 #/
 my $BatsrusVar = '"X [R]" "Y [R]" "Z [R]" "`r [g/cm^3]" "U_x [km/s]" "U_y [km/s]" "U_z [km/s]" "B_x [Gauss]" "B_y [Gauss]" "B_z [Gauss]" "ehot [erg/cm^3]" "I01 [erg/cm^3]" "I02 [erg/cm^3]" "pe [dyne/cm^2" "p [dyne/cm^2" "B1_x [Gauss]" "B1_y [Gauss]" "B1_z [Gauss]" "E [erg/cm^3]" "J_x [`mA/m^2]" "J_y [`mA/m^2]" "J_z [`mA/m^2]"';
 my $nBatsrusVar = split(/" "/, $BatsrusVar);
-my $MflampaVar = '"I" "LagrID" "X_[RSun]" "Y_[RSun]" "Z_[RSun]" "Rho_[amu/m3]" "T_[kev]" "Ux_[m/s]" "Uy_[m/s]" "Uz_[m/s]" "Bx_[T]" "By_[T]" "Bz_[T]" "Wave1_[J/m3]" "Wave2_[J/m3]" "flux_total_[p.f.u.]" "flux_00005_[p.f.u.]" "flux_00010_[p.f.u.]" "flux_00030_[p.f.u.]" "flux_00050_[p.f.u.]" "flux_00060_[p.f.u.]" "flux_00100_[p.f.u.]" "eflux_[kev/cm2*s*sr]"';
+my $MflampaVar = '"I" "LagrID" "X_[RSun]" "Y_[RSun]" "Z_[RSun]" "Rho_[amu/m3]" "T_[kev]" "Ux_[m/s]" "Uy_[m/s]" "Uz_[m/s]" "Bx_[T]" "By_[T]" "Bz_[T]" "Wave1_[J/m3]" "Wave2_[J/m3]" "flux_total_[pfu]" "flux_Channel01_[pfu]" "flux_Channel02_[pfu]" "flux_Channel03_[pfu]" "flux_Channel04_[pfu]" "flux_Channel05_[pfu]" "flux_Channel06_[pfu]" "eflux_[kev/cm2*s*sr]"';
 my $nMflampaVar = split(/" "/, $MflampaVar);
 
 #\
@@ -181,7 +181,7 @@ unless(`which $TecBatch`){
 }
 
 #\
-# prepare Tecplot and execute macros 
+# prepare Tecplot and execute macros
 #/
 for( my $t = 0; $t < @Time; $t++){
     
@@ -648,7 +648,7 @@ $!FIELDMAP [|SPFIRST|-|SPLAST|]  MESH{SHOW = YES}';
 # GOES FLUX
 #/
 $!ALTERDATA
-  EQUATION = \'{FLUX > 10MeV [PFU]} = {flux_00010_[p.f.u.]}\'';
+  EQUATION = \'{FLUX > 10MeV [PFU]} = {flux_Channel02_[pfu]}\'';
     # -----------------------------------------------------------------
     print $fh '
 
