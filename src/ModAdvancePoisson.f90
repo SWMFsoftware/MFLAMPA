@@ -344,8 +344,10 @@ contains
 
        ! Update Bc for VDF at minimal energy, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
-       ! Update Bc
+       ! Update Bc for VDF
        call set_VDF(iLine, nX, VDF_G)
+       ! Advance by multi-Poisson-bracket scheme
+       call advance_double_poisson(DtIn=Dt)
 
        if(IsExit) then
           ! This step is the last step
@@ -375,7 +377,7 @@ contains
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg) RETURN
 
-       ! !! SCATTERING and DIFFUSION here !!!
+       ! !! SCATTERING and DIFFUSION here !! !
 
        ! Update time
        Time = Time + Dt
@@ -385,9 +387,9 @@ contains
   contains
     !==========================================================================
     subroutine advance_double_poisson(DtIn)
-      ! advance by double Poisson brackets for each time step
+      ! Advance by the double-Poisson-bracket scheme for each time step
 
-      real, optional :: DtIn
+      real, optional, intent(inout) :: DtIn ! Input time step
       ! Get DeltaSOverB_C at current time: for calculating
       ! the total control volume and Hamiltonian functions
       !------------------------------------------------------------------------
@@ -413,11 +415,20 @@ contains
       Volume_G(:, :, nX+1) = Volume_G(:, :, nX)
 
       ! Here we have three Lagrangian coordinates: p^3/3, mu, s_L
-      call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
-           dHamiltonian01_FX = dHamiltonian01_FX,           &
-           Hamiltonian23_N = -Hamiltonian2_N,               &
-           dVolumeDt_G = dVolumeDt_G,                       &
-           DtIn = DtIn, DtOut = DtNext, CFLIn = CflIn)
+      if(present(DtIn)) then
+         call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+              dHamiltonian01_FX = dHamiltonian01_FX,           &
+              Hamiltonian23_N = -Hamiltonian2_N,               &
+              dVolumeDt_G = dVolumeDt_G,                       &
+              DtIn = DtIn, DtOut = DtNext, CFLIn = CflIn)
+      else
+         ! Not present DtIn for the first call
+         call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+              dHamiltonian01_FX = dHamiltonian01_FX,           &
+              Hamiltonian23_N = -Hamiltonian2_N,               &
+              dVolumeDt_G = dVolumeDt_G,                       &
+              DtOut = DtNext, CFLIn = CflIn)
+      end if
 
     end subroutine advance_double_poisson
     !==========================================================================
@@ -524,6 +535,7 @@ contains
 
        ! Update bc for at minimal energy, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
+       ! Update Bc for VDF
        call set_VDF(iLine, nX, VDF_G)
        ! Advance by multi-Poisson-bracket scheme
        call advance_triple_poisson(DtIn=Dt)
@@ -575,9 +587,9 @@ contains
   contains
     !==========================================================================
     subroutine advance_triple_poisson(DtIn)
-      ! advance by triple Poisson brackets for each time step
+      ! advance by the triple-Poisson-bracket scheme for each time step
 
-      real, optional :: DtIn
+      real, optional, intent(inout) :: DtIn ! Input time step
       ! Get DeltaSOverB_C at current time: for calculating
       ! the total control volume and Hamiltonian functions
       !------------------------------------------------------------------------
@@ -608,12 +620,22 @@ contains
       Volume_G(:, :, nX+1) = Volume_G(:, :, nX)
 
       ! Here we have three Lagrangian coordinates: p^3/3, mu, s_L
-      call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
-           dHamiltonian01_FX = dHamiltonian01_FX,           &
-           Hamiltonian12_N = Hamiltonian3_N,                &
-           Hamiltonian23_N = -Hamiltonian2_N,               &
-           dVolumeDt_G = dVolumeDt_G,                       &
-           DtIn = DtIn, DtOut = DtNext, CFLIn = CflIn)
+      if(present(DtIn)) then
+         call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+              dHamiltonian01_FX = dHamiltonian01_FX,           &
+              Hamiltonian12_N = Hamiltonian3_N,                &
+              Hamiltonian23_N = -Hamiltonian2_N,               &
+              dVolumeDt_G = dVolumeDt_G,                       &
+              DtIn = DtIn, DtOut = DtNext, CFLIn = CflIn)
+      else
+         ! Not present DtIn for the first call
+         call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+              dHamiltonian01_FX = dHamiltonian01_FX,           &
+              Hamiltonian12_N = Hamiltonian3_N,                &
+              Hamiltonian23_N = -Hamiltonian2_N,               &
+              dVolumeDt_G = dVolumeDt_G,                       &
+              DtOut = DtNext, CFLIn = CflIn)
+      end if
 
     end subroutine advance_triple_poisson
     !==========================================================================
@@ -655,10 +677,10 @@ contains
     LnBDeltaS2New_C(1:nX) = log(BSi_I(1:nX)) + 2.0*log(DeltaSNew_I)
 
     ! Calculate the time-derivative physical quantities
-    ! Calculate \deltas/B time derivative = D[delta(s_L)/B]/Dt
+    ! Calculate \DeltaS/B time derivative = D[delta(s_L)/B]/Dt
     dDeltaSOverBDt_C(1:nX) = (DeltaSOverBNew_C(1:nX) - &
          DeltaSOverBOld_C(1:nX))*InvDtProgress
-    ! Calculate Dln(B\deltas^2)/Dt
+    ! Calculate Dln(B\DeltaS^2)/Dt
     dLnBdeltaS2Dt_C(1:nX)  = (LnBDeltaS2New_C(1:nX) - &
          LnBDeltaS2Old_C(1:nX))*InvDtProgress
     ! Calculate b*Du/Dt
