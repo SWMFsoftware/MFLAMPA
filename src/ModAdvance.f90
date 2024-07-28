@@ -4,10 +4,12 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-  use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, iShock_IB, &
+  use SP_ModDiffusion,    ONLY: UseDiffusion, set_diffusion_coef
+  use SP_ModDistribution, ONLY: IsMuAvg, IsDistNeg
+  use SP_ModGrid,         ONLY: State_VIB, MHData_VIB, iShock_IB, &
        Used_B, Rho_, B_, Shock_, ShockOld_, nLine, nVertex_B
-  use ModUtilities, ONLY: CON_stop
+  use SP_ModSize,         ONLY: nVertexMax
+  use ModUtilities,       ONLY: CON_stop
 
   implicit none
 
@@ -66,14 +68,13 @@ contains
     ! (1) no turbulence (2) new shock finder moved to SP_ModMain,
     ! and (3) new steepen_shock
 
-    use SP_ModTime,             ONLY: SPTime
-    use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: init_states_for_poisson, &
          advect_via_single_poisson, advect_via_double_poisson, &
          advect_via_triple_poisson
-    use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
-    use SP_ModDistribution,     ONLY: IsMuAvg, IsDistNeg
+    use SP_ModGrid,             ONLY: RhoOld_, BOld_, X_, Z_, nWidth
+    use SP_ModTime,             ONLY: SPTime
+    use SP_ModUnit,             ONLY: Io2Si_V, UnitX_
 
     real, intent(in):: TimeLimit
     ! Loop variable
@@ -92,9 +93,11 @@ contains
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real    :: DtProgress
     ! Local arrays to store the state vectors in SI units
-    real, dimension(1:nVertexMax):: nOldSi_I, nSi_I, BOldSi_I, BSi_I
+    real, dimension(1:nVertexMax) :: nOldSi_I, nSi_I, BOldSi_I, BSi_I
+    ! Local arrays to store the coordinates in space, in SI units
+    real, dimension(X_:Z_, 1:nVertexMax) :: XyzOldSi_DI, XyzSi_DI
     ! Lagrangian derivatives
-    real, dimension(1:nVertexMax):: dLogRho_I
+    real, dimension(1:nVertexMax) :: dLogRho_I
 
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
@@ -111,6 +114,7 @@ contains
        ! unit of kinetic energy, all others are in SI units.
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine)
        BOldSi_I(1:iEnd) = State_VIB(BOld_, 1:iEnd, iLine)
+       XyzOldSi_DI(:, 1:iEnd) = State_VIB(X_:Z_, 1:iEnd, iLine)*Io2Si_V(UnitX_)
 
        ! Find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,    iLine)
@@ -137,12 +141,15 @@ contains
 
           ! nSi is needed to set up the distribution at the injection.
           ! It is calculated at the end of the iProgress' time step
-          nSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine) + Alpha* &
-               (MhData_VIB( Rho_, 1:iEnd, iLine) - &
+          nSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine) + &
+               Alpha*(MhData_VIB(Rho_, 1:iEnd, iLine) - &
                State_VIB(RhoOld_, 1:iEnd, iLine))
-          BSi_I(1:iEnd) = State_VIB(  BOld_, 1:iEnd, iLine) + Alpha* &
-               (State_VIB(  B_, 1:iEnd, iLine) - &
+          BSi_I(1:iEnd) = State_VIB(BOld_, 1:iEnd, iLine) + &
+               Alpha*(State_VIB(B_, 1:iEnd, iLine) - &
                State_VIB(BOld_, 1:iEnd, iLine))
+          XyzSi_DI(:, 1:iEnd) = State_VIB(X_:Z_, 1:iEnd, iLine) + &
+               Alpha*(MhData_VIB(X_:Z_, 1:iEnd, iLine) - &
+               State_VIB(X_:Z_, 1:iEnd, iLine))*Io2Si_V(UnitX_)
           dLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
 
           ! trace shock position and steepen the shock
@@ -166,8 +173,9 @@ contains
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See descriptions for development in ModAdvancePoisson.f90
                 ! Initialize states for double/triple-Poisson-bracket schemes
-                call init_states_for_poisson(iLine, iEnd, InvnProgress, &
-                     iProgress, DtProgress, BOldSi_I(1:iEnd), BSi_I(1:iEnd))
+                call init_states_for_poisson(iLine, iEnd, DtProgress,     &
+                     XyzOldSi_DI(X_:Z_, 1:iEnd), XyzSi_DI(X_:Z_, 1:iEnd), &
+                     BOldSi_I(1:iEnd), BSi_I(1:iEnd))
                 if(.not.UseMuFocusing) then
                    ! 2 Poisson brackets
                    call advect_via_double_poisson(iLine, iEnd, iShock, &
@@ -189,6 +197,7 @@ contains
           ! Store the old density at the end of each iProgress
           nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
           BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
+          XyzOldSi_DI(:, 1:iEnd) = XyzSi_DI(:, 1:iEnd)
        end do PROGRESS
     end do LINE
 
@@ -199,8 +208,6 @@ contains
       ! becomes steeper for the current line
 
       use SP_ModGrid, ONLY: D_, dLogRhoThreshold
-      use SP_ModUnit, ONLY: UnitX_, Io2Si_V
-
       real :: DsSi_I(1:iEnd-1)
       real :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real :: dLogRhoExcessIntegral
@@ -239,9 +246,6 @@ contains
     ! with accounting for diffusion and first-order Fermi acceleration
 
     use SP_ModAdvancePoisson, ONLY: iterate_single_poisson
-    use SP_ModDiffusion,      ONLY: UseDiffusion, set_diffusion_coef
-    use SP_ModDistribution,   ONLY: IsDistNeg
-
     ! Loop variable
     integer :: iLine
     ! For a given line: nVertex_B, iShock_IB:

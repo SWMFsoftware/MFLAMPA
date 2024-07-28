@@ -90,7 +90,7 @@ module SP_ModGrid
   real, public, pointer :: State_VIB(:,:,:)
 
   ! Number of variables in the state vector and the identifications
-  integer, public, parameter :: nMhData = 13, nVar = 21,          &
+  integer, public, parameter :: nMhData = 13, nVar = 21, &
        LagrID_     = 0, & ! Lagrangian id           ^saved/   ^set to 0
        X_          = 1, & !                         |read in  |in copy_
        Y_          = 2, & ! Cartesian coordinates   |restart  |old_stat
@@ -170,7 +170,7 @@ contains
        call read_var('nLat',       nLatCheck)
        call read_var('nLon',       nLonCheck)
        if(iProc==0 .and. any([nLon, nLat] /= [nLonCheck,nLatCheck])) &
-            write(*,'(a,2I5)') 'nLon,nLat are reset to ', nLonCheck, nLatCheck
+            write(*,'(a,2I5)') 'nLon, nLat are reset to ', nLonCheck, nLatCheck
        nLat = nLatCheck
        nLon = nLonCheck
        nLineAll = nLon*nLat
@@ -216,14 +216,14 @@ contains
     DoInit = .false.
 
     ! distribute nodes between processors
-    if(nLineAll < nProc)call CON_stop(NameSub//&
+    if(nLineAll < nProc) call CON_stop(NameSub//&
          ': There are more processors than field lines')
     iLineAll0 = (iProc*nLineAll)/nProc
     iNodeLast = ((iProc+1)*nLineAll)/nProc
     nLine = iNodeLast - iLineAll0
 
     ! check consistency
-    if(nLat <= 0 .or. nLon <= 0)&
+    if(nLat <= 0 .or. nLon <= 0) &
          call CON_stop(NameSub//': Origin surface grid is invalid')
 
     ! allocate data and grid containers

@@ -619,19 +619,17 @@ contains
     !==========================================================================
   end subroutine advect_via_triple_poisson
   !============================================================================
-  subroutine init_states_for_poisson(iLine, nX, InvnProgress, &
-       iProgress, DtProgress, BOldSi_I, BSi_I)
+  subroutine init_states_for_poisson(iLine, nX, DtProgress, &
+       XyzOldSi_DI, XyzSi_DI, BOldSi_I, BSi_I)
     ! Calculate data states from the input files
 
-    use SP_ModGrid, ONLY: State_VIB, MHData_VIB, X_, Z_, UOld_, U_
+    use SP_ModGrid, ONLY: X_, Z_, UOld_, U_, State_VIB
     ! Line number and number along grid axis
     integer, intent(in) :: iLine, nX
-    ! Inverse of nProgress, the reduced time step number
-    real,    intent(in) :: InvnProgress
-    ! iProgress for the iteration of the reduced time steps
-    integer, intent(in) :: iProgress
     ! Time difference between Old (iProgress-1) and New (iProgress) States
     real,    intent(in) :: DtProgress
+    ! Given Old and New coordinates
+    real,    intent(in) :: XyzOldSi_DI(X_:Z_, nX), XyzSi_DI(X_:Z_, nX)
     ! Old and New |B| states, and we include steepen_shock to make updates
     real,    intent(in) :: BOldSi_I(nX), BSi_I(nX)
     ! Inverse of DtProgress, the reduced time step
@@ -643,14 +641,14 @@ contains
     InvDtProgress = 1.0/DtProgress
 
     ! Calculate values at OLD time
-    DeltaSOld_I = calc_DeltaS_I(Alpha=(iProgress-1.0)*InvnProgress)
+    DeltaSOld_I = calc_DeltaS_I(XyzOldSi_DI)
     ! Calculate \DeltaS/B at grid center
     DeltaSOverBOld_C(1:nX) = DeltaSOld_I/BOldSi_I(1:nX)
     ! Calculate ln(B*\DeltaS^2) at grid center
     LnBDeltaS2Old_C(1:nX) = log(BOldSi_I(1:nX)) + 2.0*log(DeltaSOld_I)
 
     ! Calculate values at NEW time
-    DeltaSNew_I = calc_DeltaS_I(Alpha=iProgress*InvnProgress)
+    DeltaSNew_I = calc_DeltaS_I(XyzSi_DI)
     ! Calculate \DeltaS/B at grid center
     DeltaSOverBNew_C(1:nX) = DeltaSNew_I/BSi_I(1:nX)
     ! Calculate ln(B*\DeltaS^2) at grid center
@@ -669,21 +667,17 @@ contains
 
   contains
     !==========================================================================
-    function calc_DeltaS_I(Alpha)
+    function calc_DeltaS_I(XyzSi_DI)
       ! Calculate DeltaS_I at given time-interpolation coefficient, Alpha
 
-      real, intent(in) :: Alpha ! Coefficient to interpolate "old" and "new"
-      real :: calc_DeltaS_I(nX) ! Output results: DeltaS_I
-      real :: Xyz_IB(X_:Z_, nX), MidPoint_IB(X_:Z_, nX) ! Coordinates
+      real, intent(in) :: XyzSi_DI(X_:Z_, nX) ! Current coordinates
+      real :: calc_DeltaS_I(nX)               ! Output results: DeltaS_I
+      real :: MidPoint_IB(X_:Z_, nX)          ! Midpoints
       ! Get DeltaS_I at current time: for calculating other old and new states
       !------------------------------------------------------------------------
 
-      ! Calculate coordinates
-      Xyz_IB = State_VIB(X_:Z_, 1:nX, iLine) + Alpha* &
-           (MhData_VIB(X_:Z_, 1:nX, iLine) - State_VIB(X_:Z_, 1:nX, iLine))
-
       ! Calculate midpoints
-      MidPoint_IB(:, 1:nX-1) = (Xyz_IB(:, 2:nX) + Xyz_IB(:, 1:nX-1))*0.5
+      MidPoint_IB(:, 1:nX-1) = (XyzSi_DI(:, 2:nX) + XyzSi_DI(:, 1:nX-1))*0.5
 
       ! Calculate DeltaS_I
       calc_DeltaS_I(2:nX-1) = sqrt(sum((MidPoint_IB(:, 2:nX-1) &
@@ -691,9 +685,9 @@ contains
 
       ! Linear interpolate the deltas such that there will be nQ deltas
       calc_DeltaS_I(1 ) = 2.0*sqrt(sum(( &
-           MidPoint_IB(:, 1) - Xyz_IB(:,  1))**2))
+           MidPoint_IB(:, 1) - XyzSi_DI(:,  1))**2))
       calc_DeltaS_I(nX) = 2.0*sqrt(sum(( &
-           MidPoint_IB(:, nX-1) - Xyz_IB(:, nX))**2))
+           MidPoint_IB(:, nX-1) - XyzSi_DI(:, nX))**2))
 
     end function calc_DeltaS_I
     !==========================================================================
