@@ -21,7 +21,7 @@ module SP_ModAdvancePoisson
   public:: iterate_single_poisson    ! Local time-stepping for steady states
   public:: advect_via_double_poisson ! Advance with 2 Poisson brackets
   public:: advect_via_triple_poisson ! Advance with 3 Poisson brackets
-  public:: init_data_states          ! Initialize the states for multi_poisson
+  public:: init_states_for_poisson   ! Initialize the states for multi_poisson
 
   ! \Deltas/b, ln(B\deltas^2) at Old time
   real, public, dimension(nVertexMax) :: DeltaSOverBOld_C, LnBDeltaS2Old_C
@@ -274,7 +274,7 @@ contains
   end subroutine iterate_single_poisson
   !============================================================================
   subroutine advect_via_double_poisson(iLine, nX, iShock, &
-       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
+       TimeStart, DtFinal, CflIn, nSi_I, BSi_I)
     ! Advect via multiple Possion Bracket scheme for the focused transport
     ! equation considering pitch angle, including: adiabatic cooling or
     ! accleration, and pitch-angle scattering terms, but without adiabatic
@@ -288,10 +288,11 @@ contains
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
-    real,    intent(in) :: tFinal        ! Time interval to advance through
+    real,    intent(in) :: TimeStart     ! Start time before advancing
+    real,    intent(in) :: DtFinal       ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
-    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    real,    intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! Loop variables
     integer :: iX, iMu, iP
@@ -311,7 +312,7 @@ contains
     ! Advection term
     real    :: Source_C(nP, nMu, nX)
     ! Time, ranging from TimeStart to tFinal
-    real    :: Time
+    real    :: Time, tFinal
     ! Time step
     real    :: Dt
     ! Prediction of next time step:
@@ -328,6 +329,53 @@ contains
        dVolumeDt_G(:, :, iX) = dDeltaSOverBDt_C(iX)*DeltaMu* &
             spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
     end do
+    ! BCs of the time derivative of total control volume
+    dVolumeDt_G(:, :,    0) = dVolumeDt_G(:, :,  1)
+    dVolumeDt_G(:, :, nX+1) = dVolumeDt_G(:, :, nX)
+    ! Time initialization
+    tFinal = TimeStart + DtFinal
+    Time = TimeStart
+
+  contains
+    !==========================================================================
+    subroutine advance_double_poisson(DtIn)
+      ! advance by double Poisson brackets for each time step
+
+      real, optional :: DtIn
+      ! Get DeltaSOverB_C at current time: for calculating
+      ! the total control volume and Hamiltonian functions
+      !------------------------------------------------------------------------
+
+      call update_states_for_poisson(iLine, nX, Time)
+      Hamiltonian2_N = 0.0
+
+      ! Calculate 1st Hamiltonian function used in the time-dependent
+      ! poisson bracket: {f_jk, (mu^2 * p^3)*(DeltaS/B)}_{tau, p^3/3}
+      call calc_double_hamiltonian_1(nX, dHamiltonian01_FX)
+      ! Calculate 2nd Hamiltonian function used in the time-dependent
+      ! poisson bracket: {f_jk, (mu^2-1)*v/(2B)}_{s_L, mu}
+      call calc_triple_hamiltonian_2(nX, BSi_I, Hamiltonian2_N)
+
+      ! Calculate the total control volume
+      do iX = 1, nX
+         Volume_G(:, :, iX) = DeltaSOverB_C(iX)*DeltaMu* &
+              spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
+      end do
+
+      ! Boundary conditions for total control volume
+      Volume_G(:, :,    0) = Volume_G(:, :,  1)
+      Volume_G(:, :, nX+1) = Volume_G(:, :, nX)
+
+      ! Here we have three Lagrangian coordinates: p^3/3, mu, s_L
+      call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+           dHamiltonian01_FX = dHamiltonian01_FX,           &
+           Hamiltonian23_N = -Hamiltonian2_N,               &
+           dVolumeDt_G = dVolumeDt_G,                       &
+           DtIn = DtIn, DtOut = DtNext, CFLIn = CflIn)
+
+    end subroutine advance_double_poisson
+    !==========================================================================
+
   end subroutine advect_via_double_poisson
   !============================================================================
   subroutine calc_double_hamiltonian_1(nX, dHamiltonian01_FX)
@@ -343,8 +391,8 @@ contains
 
     do iX = 1, nX
        dHamiltonian01_FX(:, 1:nMu, iX) = -dDeltaSOverBDt_C(iX)* &
-            spread(Momentum3_I, DIM=2, NCOPIES=nMu)* &
-            spread(Mu_I, DIM=1, NCOPIES=nP+3)
+            spread(Momentum3_I, DIM=2, NCOPIES=nMu)*3.0* & ! momentum at face
+            spread(Mu_I, DIM=1, NCOPIES=nP+3)              ! mu at cell center
     end do
 
     ! Calculate the Hamiltonian function used actually：\tilde\deltaH
@@ -451,7 +499,7 @@ contains
 
           Source_C = Source_C*Volume_G(1:nP, 1:nMu, 1:nX)
           ! Update DeltaSOverB_C for the calculation of volume
-          call update_states(iLine, nX, Time)
+          call update_states_for_poisson(iLine, nX, Time)
           ! Calculate the total control volume
           do iX = 1, nX
              Volume_G(:, :, iX) = DeltaSOverB_C(iX)*DeltaMu* &
@@ -487,14 +535,14 @@ contains
   contains
     !==========================================================================
     subroutine advance_triple_poisson(DtIn)
-      ! advance by multiple Poisson brackets for each time step
+      ! advance by triple Poisson brackets for each time step
 
       real, optional :: DtIn
       ! Get DeltaSOverB_C at current time: for calculating
       ! the total control volume and Hamiltonian functions
       !------------------------------------------------------------------------
 
-      call update_states(iLine, nX, Time)
+      call update_states_for_poisson(iLine, nX, Time)
       Hamiltonian2_N = 0.0
       Hamiltonian3_N = 0.0
 
@@ -519,12 +567,13 @@ contains
       Volume_G(:, :,    0) = Volume_G(:, :,  1)
       Volume_G(:, :, nX+1) = Volume_G(:, :, nX)
 
-      call explicit(nX, nMu, nX, VDF_G, Volume_G, Source_C, &
-           Hamiltonian12_N = Hamiltonian2_N,                &
-           Hamiltonian23_N = -Hamiltonian3_N,               &
-           dHamiltonian03_FZ = dHamiltonian01_FX,           &
+      ! Here we have three Lagrangian coordinates: p^3/3, mu, s_L
+      call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+           dHamiltonian01_FX = dHamiltonian01_FX,           &
+           Hamiltonian12_N = Hamiltonian3_N,                &
+           Hamiltonian23_N = -Hamiltonian2_N,               &
            dVolumeDt_G = dVolumeDt_G,                       &
-           DtIn = DtIn, DtOut = DtNext, CFLIn=CflIn)
+           DtIn = DtIn, DtOut = DtNext, CFLIn = CflIn)
 
     end subroutine advance_triple_poisson
     !==========================================================================
@@ -573,7 +622,7 @@ contains
     VDF_G(nP+2, :) = VDF_G(nP+1, :)
   end subroutine set_VDF
   !============================================================================
-  subroutine init_data_states(iLine, nX, DtFull)
+  subroutine init_states_for_poisson(iLine, nX, DtFull)
     ! Calculate data states from the input files
 
     use SP_ModGrid, ONLY: State_VIB, MHData_VIB, x_, z_, BOld_, B_, UOld_, U_
@@ -631,9 +680,9 @@ contains
     bDuDt_C(1:nX)          = (State_VIB(U_, 1:nX, iLine) -  &
          State_VIB(UOld_, 1:nX, iLine))*InvDtFull
 
-  end subroutine init_data_states
+  end subroutine init_states_for_poisson
   !============================================================================
-  subroutine update_states(iLine, nX, Time)
+  subroutine update_states_for_poisson(iLine, nX, Time)
     ! Update states according to the current time
 
     integer, intent(in) :: iLine  ! Index of the current field line
@@ -645,7 +694,7 @@ contains
 
     ! Update \deltas/B
     DeltaSOverB_C(1:nX) = DeltaSOverBOld_C(1:nX) + dDeltaSOverBDt_C(1:nX)*Time
-  end subroutine update_states
+  end subroutine update_states_for_poisson
   !============================================================================
   subroutine calc_triple_hamiltonian_1(nX, dHamiltonian01_FX)
     ! Calculate the 1st Hamiltonian function with time:
@@ -690,6 +739,8 @@ contains
     ! Considering the law of relativity, v = 1/sqrt(1+(m*c/p)**2), v can be
     ! calculated as a function of p. Note that light speed is the unit of
     ! speed here, so we do not need to multiply c^2 in the following steps
+    ! Note that momentum (or velocity) in this term is non-related to the
+    ! Lagrangian coordinates {s_L, mu}, so it should be cell-centered.
 
     ! Calculate 1/B on the boundary of grid
     InvBSi_I             = 1.0/BSi_I
