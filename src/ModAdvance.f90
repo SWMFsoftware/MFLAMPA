@@ -67,9 +67,9 @@ contains
     use SP_ModTime,             ONLY: SPTime
     use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
-    use SP_ModAdvancePoisson,   ONLY: advect_via_single_poisson, &
-         advect_via_double_poisson, &
-         init_data_states, advect_via_triple_poisson
+    use SP_ModAdvancePoisson,   ONLY: init_states_for_poisson, &
+         advect_via_single_poisson, advect_via_double_poisson, &
+         advect_via_triple_poisson
     use SP_ModDiffusion,        ONLY: UseDiffusion, set_diffusion_coef
     use SP_ModDistribution,     ONLY: IsMuAvg, IsDistNeg
 
