@@ -97,8 +97,8 @@ contains
 
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
-    ! go line by line and advance the solution
 
+    ! Go line by line and advance the solution
     LINE:do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE LINE
        ! the active particles on the line
@@ -110,7 +110,7 @@ contains
        ! unit of kinetic energy, all others are in SI units.
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine)
 
-       ! find how far shock has travelled on this line: nProgress
+       ! Find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,    iLine)
        iShockOld = iShock_IB(ShockOld_, iLine)
        if(DoTraceShock) then
@@ -123,13 +123,16 @@ contains
           iShockOld = 0
        end if
 
-       ! each particles shock has crossed should be
+       ! Each particles shock has crossed should be
        ! processed separately => reduce the time step
        DtProgress = DtFull/nProgress
+       ! Initialize necessary states for double/triple-Poisson-bracket schemes
+       if(UsePoissonBracket .and. .not.IsMuAvg) &
+          call init_states_for_poisson(iLine, iEnd, DtFull)  ! Inital states
 
-       ! go over each crossed particle
+       ! Go over each crossed particle
        PROGRESS:do iProgress = 1, nProgress
-          ! account for change in the background up to the current moment
+          ! Account for change in the background up to the current moment
           Alpha = real(iProgress)/real(nProgress)
 
           ! nSi is needed to set up the distribution at the injection.
@@ -162,8 +165,7 @@ contains
              else
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See the descriptions for development in ModAdvancePoisson.f90
-                Time = Alpha*DtFull - DtProgress            ! Tstart this step
-                call init_data_states(iLine, iEnd, DtFull)  ! Inital states
+                Time = Alpha*DtFull - DtProgress ! Tstart this step
                 call advect_via_triple_poisson(iLine, iEnd, iShock, &
                      Time, DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
