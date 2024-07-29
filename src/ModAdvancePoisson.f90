@@ -74,6 +74,7 @@ contains
     character(len=*), parameter:: NameSub = 'advect_via_single_poisson'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
+
     ! Initialize arrays
     ! Geometric volume: use 1 ghost point at each side of the boundary
     ! Start volume
@@ -94,13 +95,18 @@ contains
     ! calculate: dHamiltonian/dVolumeSubX
     dHamiltonian01_FX    = -spread(Momentum3_I, DIM=2, NCOPIES=nX+2)* &
          spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
+    ! Time initialization
     Time   = 0.0
-    ! Trial timestep
-    DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
-         max(VolumeXEnd_I, VolumeXStart_I))*(3.0*dLogP)
 
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
+    ! Trial time step: Get DtNext
+    call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
+    call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
+         dHamiltonian01_FX = dHamiltonian01_FX,       &
+         dVolumeDt_G = dVolumeDt_G,                   &
+         CFLIn = CflIn, DtOut = DtNext)
+
     ! Advection by the single-Poisson-bracket scheme
     do
        ! Update Time step
@@ -108,16 +114,17 @@ contains
        ! Update Volumes
        VolumeOld_G = Volume_G
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
-       ! Update Bc
-       call set_VDF(iLine, nX, VDF_G)
 
-       ! Advance by Poisson bracket scheme
+       ! Update Bc for VDF
+       call set_VDF(iLine, nX, VDF_G)
+       ! Advance by single-Poisson-bracket scheme
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX = dHamiltonian01_FX,       &
             dVolumeDt_G = dVolumeDt_G,                   &
             DtIn = Dt,         & ! Input time step, which may be reduced
             CFLIn = CflIn,     & ! Input CFL to calculate next time step
             DtOut = DtNext)
+
        ! May need to correct the volume if the time step has been reduced
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
        ! Update velocity distribution function
@@ -227,6 +234,7 @@ contains
 
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
+    ! Update Bc for VDF
     call set_VDF(iLine, nX, VDF_G)
     call explicit(nP, nX, VDF_G, Volume_G, Source_C,   &
          Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,   &
@@ -328,6 +336,8 @@ contains
     Time = 0.0
 
     ! Here we would like to get the first trial of DtNext
+    ! Update Bc for VDF at minimal energy, at nP = 0
+    call set_momentum_bc(iLine, nX, nSi_I, iShock)
     call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
     call advance_double_poisson    ! Now we get DtNext
 
@@ -346,7 +356,7 @@ contains
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        ! Update Bc for VDF
        call set_VDF(iLine, nX, VDF_G)
-       ! Advance by multi-Poisson-bracket scheme
+       ! Advance by double-Poisson-bracket scheme
        call advance_double_poisson(DtIn=Dt)
 
        if(IsExit) then
@@ -519,6 +529,8 @@ contains
     Time = 0.0
 
     ! Here we would like to get the first trial of DtNext
+    ! Update Bc for VDF at minimal energy, at nP = 0
+    call set_momentum_bc(iLine, nX, nSi_I, iShock)
     call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
     call advance_triple_poisson    ! Now we get DtNext
 
@@ -537,7 +549,7 @@ contains
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
        ! Update Bc for VDF
        call set_VDF(iLine, nX, VDF_G)
-       ! Advance by multi-Poisson-bracket scheme
+       ! Advance by triple-Poisson-bracket scheme
        call advance_triple_poisson(DtIn=Dt)
 
        if(IsExit) then
