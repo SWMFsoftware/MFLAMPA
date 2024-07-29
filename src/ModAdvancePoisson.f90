@@ -97,7 +97,7 @@ contains
     Time   = 0.0
     ! Trial timestep
     DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
-         max(VolumeXEnd_I, VolumeXStart_I))/(3.0*dLogP)
+         max(VolumeXEnd_I, VolumeXStart_I))*(3.0*dLogP)
 
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
