@@ -255,7 +255,7 @@ contains
     end do
 
     ! Allocate auxiliary State vector
-    allocate(State_VIB(nMhData+1:nVar, 1:nVertexMax, nLine))
+    allocate(State_VIB(1:nVar, 1:nVertexMax, nLine))
     State_VIB = -1
     allocate(nVertex_B(nLine))
     nVertex_B = 0
@@ -291,6 +291,7 @@ contains
        iEnd = nVertex_B(iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = MhData_VIB(Rho_, 1:iEnd, iLine)
+       State_VIB(X_:Z_, 1:iEnd, iLine) = MhData_VIB(X_:Z_, 1:iEnd, iLine)
        State_VIB(UOld_, 1:iEnd, iLine) = State_VIB(U_, 1:iEnd, iLine)
        State_VIB(BOld_, 1:iEnd, iLine) = State_VIB(B_, 1:iEnd, iLine)
        ! reset variables read from file or received via coupler
@@ -317,7 +318,7 @@ contains
           ! NOTE: the iVertex'th value is the distance from
           ! i'th to (i+1)'th nodes
           ! if(.not.DoSmooth)then
-          if(iVertex /=nVertex_B(iLine))then
+          if(iVertex /= nVertex_B(iLine))then
              State_VIB(D_, iVertex, iLine) = norm2(&
                   MhData_VIB(X_:Z_, iVertex  , iLine) - &
                   MhData_VIB(X_:Z_, iVertex+1, iLine))
