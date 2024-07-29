@@ -90,9 +90,9 @@ BLESS=NO
 
 test:
 	rm -f test*.diff
-	${MAKE} test_mflampa
-	${MAKE} test_poisson TESTDIR=run_poisson
-	${MAKE} test_steady TESTDIR=run_steady
+	-@(${MAKE} test_mflampa)
+	-@(${MAKE} test_poisson TESTDIR=run_poisson)
+	-@(${MAKE} test_steady TESTDIR=run_steady)
 	ls -l test*.diff
 
 # Same for all tests
