@@ -27,8 +27,13 @@ module SP_ModAdvance
 
   ! Local variables
   real    :: Cfl = 0.9   ! Controls the maximum allowed time step
-  logical :: UsePoissonBracket = .false.
-  logical :: UseMuFocusing = .false.
+  logical :: UsePoissonBracket = .false., UseMuFocusing = .false.
+  integer :: nPoissonBracket = -1
+  integer, parameter :: &
+     PoissonBracketNotUse_ = 0, & ! Upwind scheme, with no Poisson brackets
+     PoissonBracketSingle_ = 1, & ! Single Poisson bracket scheme
+     PoissonBracketDouble_ = 2, & ! Double Poisson bracket scheme
+     PoissonBracketTriple_ = 3    ! Triple Poisson bracket scheme
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -42,7 +47,6 @@ contains
        call read_var('Cfl', Cfl)
     case('#ADVECTION')
        call read_var('UsePoissonBracket', UsePoissonBracket)
-       ! call read_var('UseMuFocusing', UseMuFocusing)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)
     case default
@@ -72,9 +76,8 @@ contains
     use SP_ModAdvancePoisson,   ONLY: init_states_for_poisson, &
          advect_via_single_poisson, advect_via_double_poisson, &
          advect_via_triple_poisson
-    use SP_ModGrid,             ONLY: RhoOld_, BOld_, X_, Z_, nWidth
+    use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModTime,             ONLY: SPTime
-    use SP_ModUnit,             ONLY: Io2Si_V, UnitX_
 
     real, intent(in):: TimeLimit
     ! Loop variable
@@ -94,8 +97,6 @@ contains
     real    :: DtProgress
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax) :: nOldSi_I, nSi_I, BOldSi_I, BSi_I
-    ! Local arrays to store the coordinates in space, in SI units
-    real, dimension(X_:Z_, 1:nVertexMax) :: XyzOldSi_DI, XyzSi_DI
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax) :: dLogRho_I
 
@@ -114,7 +115,6 @@ contains
        ! unit of kinetic energy, all others are in SI units.
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine)
        BOldSi_I(1:iEnd) = State_VIB(BOld_, 1:iEnd, iLine)
-       XyzOldSi_DI(:, 1:iEnd) = State_VIB(X_:Z_, 1:iEnd, iLine)*Io2Si_V(UnitX_)
 
        ! Find how far shock has travelled on this line: nProgress
        iShock    = iShock_IB(Shock_,    iLine)
@@ -147,9 +147,6 @@ contains
           BSi_I(1:iEnd) = State_VIB(BOld_, 1:iEnd, iLine) + &
                Alpha*(State_VIB(B_, 1:iEnd, iLine) - &
                State_VIB(BOld_, 1:iEnd, iLine))
-          XyzSi_DI(:, 1:iEnd) = State_VIB(X_:Z_, 1:iEnd, iLine) + &
-               Alpha*(MhData_VIB(X_:Z_, 1:iEnd, iLine) - &
-               State_VIB(X_:Z_, 1:iEnd, iLine))*Io2Si_V(UnitX_)
           dLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
 
           ! trace shock position and steepen the shock
@@ -173,8 +170,8 @@ contains
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See descriptions for development in ModAdvancePoisson.f90
                 ! Initialize states for double/triple-Poisson-bracket schemes
-                call init_states_for_poisson(iLine, iEnd, DtProgress,     &
-                     XyzOldSi_DI(X_:Z_, 1:iEnd), XyzSi_DI(X_:Z_, 1:iEnd), &
+                call init_states_for_poisson(iLine, iEnd, DtProgress, &
+                     nOldSi_I(1:iEnd), nSi_I(1:iEnd), &
                      BOldSi_I(1:iEnd), BSi_I(1:iEnd))
                 if(.not.UseMuFocusing) then
                    ! 2 Poisson brackets
@@ -197,7 +194,6 @@ contains
           ! Store the old density at the end of each iProgress
           nOldSi_I(1:iEnd) = nSi_I(1:iEnd)
           BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
-          XyzOldSi_DI(:, 1:iEnd) = XyzSi_DI(:, 1:iEnd)
        end do PROGRESS
     end do LINE
 
@@ -208,6 +204,7 @@ contains
       ! becomes steeper for the current line
 
       use SP_ModGrid, ONLY: D_, dLogRhoThreshold
+      use SP_ModUnit, ONLY: Io2Si_V, UnitX_
       real :: DsSi_I(1:iEnd-1)
       real :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real :: dLogRhoExcessIntegral
