@@ -30,10 +30,10 @@ module SP_ModAdvance
   logical :: UsePoissonBracket = .false., UseMuFocusing = .false.
   integer :: nPoissonBracket = -1
   integer, parameter :: &
-     PoissonBracketNotUse_ = 0, & ! Upwind scheme, with no Poisson brackets
-     PoissonBracketSingle_ = 1, & ! Single Poisson bracket scheme
-     PoissonBracketDouble_ = 2, & ! Double Poisson bracket scheme
-     PoissonBracketTriple_ = 3    ! Triple Poisson bracket scheme
+       PoissonBracketNotUse_ = 0, & ! Upwind scheme, with no Poisson brackets
+       PoissonBracketSingle_ = 1, & ! Single Poisson bracket scheme
+       PoissonBracketDouble_ = 2, & ! Double Poisson bracket scheme
+       PoissonBracketTriple_ = 3    ! Triple Poisson bracket scheme
 contains
   !============================================================================
   subroutine read_param(NameCommand)
