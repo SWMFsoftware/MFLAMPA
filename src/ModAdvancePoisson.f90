@@ -100,14 +100,12 @@ contains
 
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
-    DtNext = CflIn/maxval(abs(dVolumeXDt_I)/ &
-         (max(VolumeXStart_I, VolumeXEnd_I)))*(3.0*dLogP)
-    !     ! Trial time step: Get DtNext
-    !     call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
-    !     call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
-    !          dHamiltonian01_FX = dHamiltonian01_FX,       &
-    !          dVolumeDt_G = dVolumeDt_G,                   &
-    !          CFLIn = CflIn, DtOut = DtNext)
+    ! Trial time step: Get DtNext
+    call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
+    call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
+         dHamiltonian01_FX = dHamiltonian01_FX,       &
+         dVolumeDt_G = dVolumeDt_G,                   &
+         CFLIn = CflIn, DtOut = DtNext)
 
     ! Advection by the single-Poisson-bracket scheme
     do
