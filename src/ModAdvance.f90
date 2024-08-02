@@ -27,13 +27,8 @@ module SP_ModAdvance
 
   ! Local variables
   real    :: Cfl = 0.9   ! Controls the maximum allowed time step
-  logical :: UsePoissonBracket = .false., UseMuFocusing = .false.
-  integer :: nPoissonBracket = -1
-  integer, parameter :: &
-       PoissonBracketNotUse_ = 0, & ! Upwind scheme, with no Poisson brackets
-       PoissonBracketSingle_ = 1, & ! Single Poisson bracket scheme
-       PoissonBracketDouble_ = 2, & ! Double Poisson bracket scheme
-       PoissonBracketTriple_ = 3    ! Triple Poisson bracket scheme
+  ! Logical variable for the advection scheme
+  logical :: UsePoissonBracket = .false.
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -60,12 +55,12 @@ contains
     !    if IsMuAvg: Omnidirectional VDF (Parker transport equation):
     !      f_t + [(1/3)*(d(ln rho)/dt]*f_{ln p} = B*d/ds[D/B*df/ds]
     !    if not IsMuAvg: VDF with pitch angle (Focused transport equation):
-    !      f_t + {f; p^3/3*(\vec{u}*\vec{B}/|B|)}_{x, p^3/3}
-    !          + {f; (\mu^2-1)*p/(2|B|)}_{x, mu}
-    !          + {f; (1-mu^2)/2*(mu*(p^3/3)*
+    !      f_t + {f; p**3/3*(\vec{u}*\vec{B}/|B|)}_{x, p**3/3}
+    !          + {f; (mu**2-1)*p/(2|B|)}_{x, mu}
+    !          + {f; (1-mu**2)/2*(mu*(p**3/3)*
     !             (3\vec{b}\vec{b}:\nabla\vec{u} - \nabla\cdot\vec{u})
-    !             + p^2*m_i*bDu/Dt)} = I^(s) = B*d/ds[D/B*df/ds]
-    ! with accounting for diffusion and Fermi acceleration
+    !             + p**2*m_i*bDu/Dt)} = I**(s) = B*d/ds[D/B*df/ds]
+    ! with accounting for scattering and first-order Fermi acceleration
     ! from SPTime to TimeLimit
     ! Prototype: FLAMPA/src/SP_main, case("RUN"), Roussev&Sokolov2008
     ! Version: Borovikov&Sokolov, Dec.19 2017, distinctions:
@@ -73,9 +68,8 @@ contains
     ! and (3) new steepen_shock
 
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
-    use SP_ModAdvancePoisson,   ONLY: init_states_for_poisson, &
-         advect_via_single_poisson, advect_via_double_poisson, &
-         advect_via_triple_poisson
+    use SP_ModAdvancePoisson,   ONLY: advect_via_poisson_parker, &
+         init_states_poisson_focused, advect_via_poisson_focused
     use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModTime,             ONLY: SPTime
 
@@ -84,9 +78,8 @@ contains
     integer :: iLine
     ! For a given line: nVertex_B, iShock_IB:
     integer :: iEnd, iShock, iShockOld
-    ! Upper limit and variable for the Loop which makes
-    ! a time step so short that the shock wave passes
-    ! a single grid interval per a progress step:
+    ! Upper limit and variable for the loop which makes a time step so short
+    ! that the shock wave passes a single grid interval per a progress step:
     integer :: iProgress, nProgress
     real    :: InvnProgress
     ! Coefficient to interpolate "old" and "new"
@@ -106,12 +99,17 @@ contains
     ! Go line by line and advance the solution
     LINE:do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE LINE
-       ! the active particles on the line
+       ! Number of the active particles on the line
        iEnd = nVertex_B(iLine)
+
+       ! For focused transport equation: 
+       ! initialize states for the multiple Poisson bracket scheme
+       if(UsePoissonBracket .and. .not.IsMuAvg) &
+            call init_states_poisson_focused(iLine, iEnd, DtFull)
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
-       ! summary is: Length is in the unit of Rs, temperature is in the
+       ! summary is: Length is in the unit of Rsun, temperature is in the
        ! unit of kinetic energy, all others are in SI units.
        nOldSi_I(1:iEnd) = State_VIB(RhoOld_, 1:iEnd, iLine)
        BOldSi_I(1:iEnd) = State_VIB(BOld_, 1:iEnd, iLine)
@@ -129,10 +127,10 @@ contains
           iShockOld = 0
        end if
 
-       ! Each particles shock has crossed should be
+       ! Each particle shock has crossed should be
        ! processed separately => reduce the time step
-       DtProgress = DtFull/nProgress
        InvnProgress = 1.0/nProgress
+       DtProgress = DtFull*InvnProgress
 
        ! Go over each crossed particle
        PROGRESS:do iProgress = 1, nProgress
@@ -163,25 +161,15 @@ contains
              ! Poisson bracket scheme: particle-number-conservative
              if(IsMuAvg) then
                 ! Single Poisson bracket: Parker transport equation
-                call advect_via_single_poisson(iLine, iEnd, &
+                call advect_via_poisson_parker(iLine, iEnd, &
                      iShock, DtProgress, Cfl, nOldSi_I(1:iEnd), &
                      nSi_I(1:iEnd), BSi_I(1:iEnd))
              else
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See descriptions for development in ModAdvancePoisson.f90
-                ! Initialize states for double/triple-Poisson-bracket schemes
-                call init_states_for_poisson(iLine, iEnd, DtProgress, &
-                     nOldSi_I(1:iEnd), nSi_I(1:iEnd), &
-                     BOldSi_I(1:iEnd), BSi_I(1:iEnd))
-                if(.not.UseMuFocusing) then
-                   ! 2 Poisson brackets
-                   call advect_via_double_poisson(iLine, iEnd, iShock, &
-                        DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
-                else
-                   ! 3 Poisson brackets
-                   call advect_via_triple_poisson(iLine, iEnd, iShock, &
-                        DtProgress, Cfl, nSi_I(1:iEnd), BSi_I(1:iEnd))
-                end if
+                call advect_via_poisson_focused(iLine, iEnd, &
+                     iShock, DtProgress, Cfl, nOldSi_I(1:iEnd), &
+                     nSi_I(1:iEnd), BOldSi_I(1:iEnd), BSi_I(1:iEnd))
              end if
           else
              ! No Poisson bracket scheme, use the default algorithm
@@ -242,7 +230,7 @@ contains
     !     f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and first-order Fermi acceleration
 
-    use SP_ModAdvancePoisson, ONLY: iterate_single_poisson
+    use SP_ModAdvancePoisson, ONLY: iterate_poisson_parker
     ! Loop variable
     integer :: iLine
     ! For a given line: nVertex_B, iShock_IB:
@@ -270,7 +258,7 @@ contains
        if(UseDiffusion) call set_diffusion_coef(iLine, iEnd, &
             iShock, BSi_I(1:iEnd))
        ! Poisson bracket scheme: particle-number-conservative
-       call iterate_single_poisson(iLine, iEnd, iShock, Cfl, &
+       call iterate_poisson_parker(iLine, iEnd, iShock, Cfl, &
             BSi_I(1:iEnd), nSi_I(1:iEnd))
 
        ! For any scheme, check if any VDF along this line is negative
