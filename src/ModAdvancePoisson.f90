@@ -442,9 +442,11 @@ contains
        ! One should specify the TypeScatter in the PARAM.in file.
        ! We will work on this further later since it is more advanced.
        ! ------------ Thank you! ------------
-       ! Check if the VDF includes negative values
-       call check_dist_neg(NameSub//' after scattering', 1, nX, iLine)
-       if(IsDistNeg) RETURN
+       if(UseDiffusion) then
+          ! Check if the VDF includes negative values after scattering
+          call check_dist_neg(NameSub//' after scattering', 1, nX, iLine)
+          if(IsDistNeg) RETURN
+       end if
 
        ! Update time
        Time = Time + Dt
@@ -483,7 +485,7 @@ contains
       InvBSi_I    = 1.0/BSi_I
       ! Time derivative: D(1/B)/Dt
       dInvBSiDt_C = (InvBSi_I - InvBOldSi_I)*InvtFinal
-      ! Averaged 1/B over the whole time step'
+      ! Averaged 1/B over the whole time step
       InvBSi_C    = 0.5*(InvBOldSi_I + InvBSi_I)
       ! End Face-centered 1/B
       InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
@@ -511,10 +513,10 @@ contains
               spread(VolumeP_I, DIM=2, NCOPIES=nMu+1)
       end do
       ! BCs for time-related Hamiltonian functions: {f_jk; H}_{tau, ...}
-      dHamiltonian01_FX(:,     0, :) = dHamiltonian01_FX(:,   1, :)
-      dHamiltonian01_FX(:, nMu+1, :) = dHamiltonian01_FX(:, nMu, :)
-      dHamiltonian02_FY(:,    -1, :) = dHamiltonian02_FY(:,   0, :)
-      dHamiltonian02_FY(:, nMu+1, :) = dHamiltonian02_FY(:, nMu, :)
+      dHamiltonian01_FX(:,     0, :) = dHamiltonian01_FX(:,     1, :)
+      dHamiltonian01_FX(:, nMu+1, :) = dHamiltonian01_FX(:, nMu-1, :)
+      dHamiltonian02_FY(:,    -1, :) = dHamiltonian02_FY(:,     1, :)
+      dHamiltonian02_FY(:, nMu+1, :) = dHamiltonian02_FY(:, nMu-1, :)
 
       ! Clean the Hamiltonian function for {f_jk; H_23}_{mu, s_L}
       Hamiltonian23_N = 0.0
@@ -586,7 +588,7 @@ contains
 
       ! For the inertial force
       if(UseInertialForce) then
-          do iX = 1, nX
+         do iX = 1, nX
             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
                  0.5*spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+3)* &
                  spread((Momentum3_I*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
@@ -605,7 +607,7 @@ contains
     subroutine calc_hamiltonian_23
 
       ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
-      ! H_23 = -(mu**2-1)*v/(2B), at the faces of mu and s_L => \tilde\deltaH
+      ! H_23 = (1-mu**2)*v/(2B), at the faces of mu and s_L => \tilde\deltaH
 
       ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2), 
       ! calculated as a function of p. Note that momentum (or speed) in this
@@ -613,7 +615,7 @@ contains
       ! should be cell-centered, by using SpeedSi_I.
       do iX = 0, nX
          Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
-              spread(MuFace_I**2-1.0, DIM=1, NCOPIES=nP+2)* &
+              spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+2)* &
               spread(SpeedSi_I*VolumeP_I, DIM=2, NCOPIES=nMu+1)
       end do
 
