@@ -69,7 +69,7 @@ contains
 
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson_parker, &
-         init_states_poisson_focused, advect_via_poisson_focused
+         calc_states_poisson_focused, advect_via_poisson_focused
     use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
     use SP_ModTime,             ONLY: SPTime
 
@@ -105,7 +105,7 @@ contains
        ! For focused transport equation: 
        ! initialize states for the multiple Poisson bracket scheme
        if(UsePoissonBracket .and. .not.IsMuAvg) &
-            call init_states_poisson_focused(iLine, iEnd, DtFull)
+            call calc_states_poisson_focused(iLine, iEnd, DtFull)
 
        ! Various data along the line in SI units.
        ! The IO units of the state vectors could be seen in ModUnit, the
