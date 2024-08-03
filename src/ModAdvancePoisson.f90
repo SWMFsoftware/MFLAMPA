@@ -11,7 +11,7 @@ module SP_ModAdvancePoisson
   use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
        UseUpperEndBc, UseLowerEndBc, iStart
   use SP_ModDistribution, ONLY: nP, VolumeP_I, Momentum3_I, &
-       nMu, IsMuAvg, Distribution_CB, IsDistNeg, check_dist_neg
+       Distribution_CB, IsDistNeg, check_dist_neg
   use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
   use ModUtilities,       ONLY: CON_stop
   use ModPoissonBracket,  ONLY: explicit
@@ -35,30 +35,20 @@ module SP_ModAdvancePoisson
   logical, public :: UseBetatron = .false.
   ! Whether to include the inertial force in focused transport equation
   logical, public :: UseInertialForce = .false.
-  ! Time-derivatives over DtFull (linear interpolation for time):
+  ! Time derivative over DtFull (linear interpolation for time):
   real, public, dimension(nVertexMax) :: bDuDt_C
 contains
   !============================================================================
   subroutine read_param(NameCommand)
 
     use ModReadParam, ONLY: read_var
-    use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in):: NameCommand ! From PARAM.in
-    logical :: UseBetatronIn, UseInertialForceIn 
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#FOCUSEDTRANSPORT')
-       call read_var('UseBetatron',      UseBetatronIn)
-       call read_var('UseInertialForce', UseInertialForceIn)
-       if(.not.IsMuAvg) then
-          UseBetatron = UseBetatronIn
-          UseInertialForce = UseInertialForceIn
-       else
-          if(iProc==0) write(*,'(a,i6,a)') NameSub//' Code is configured '// &
-               'with nMu=', nMu, ' with no use of focused transport equation.'
-          call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
-       end if
+       call read_var('UseBetatron',      UseBetatron)
+       call read_var('UseInertialForce', UseInertialForce)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -338,7 +328,7 @@ contains
     ! Here, we diffuse the distribution function at each time step.
 
     use ModConst,           ONLY: cProtonMass
-    use SP_ModDistribution, ONLY: DeltaMu, Mu_I, MuFace_I, SpeedSi_I
+    use SP_ModDistribution, ONLY: nMu, Mu_I, MuFace_I, DeltaMu, SpeedSi_I
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -349,18 +339,16 @@ contains
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! Loop variables
     integer :: iP, iMu, iX
-    ! For time derivatives and interpolations
-    real, dimension(nX) :: InvBOldSi_I, InvBSi_I, dInvBSiDt_C
-    ! 1/B at the cell center and face center
-    real :: InvBSi_C(nX), InvBSi_F(0:nX)
+    ! Inverse magetic field: time derivative, cell- and face-centered values
+    real    :: dInvBSiDt_C(nX), InvBSi_C(nX), InvBSi_F(0:nX)
     ! ------------ Volumes ------------
-    ! VolumeXStart_I: geometric volume when the subroutine starts
-    ! VolumeXEnd_I: geometric volume when the subroutine ends
+    ! VolumeStart_G: geometric volume when the subroutine starts
+    ! VolumeX_I: geometric volume at the end of each iteration
     ! dVolumeXDt_I: time derivative of geometric volume
-    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeXEnd_I, dVolumeXDt_I
-    ! VolumeStart_G: total control volume at the very beginning
+    real, dimension(0:nX+1) :: VolumeXStart_I, VolumeX_I, dVolumeXDt_I
+    ! VolumeStart_G: total control volume when the subroutine starts
     ! Volume_G: total control volume at the end of each iteration
-    ! dVolumeDt_G: total control time derivative
+    ! dVolumeDt_G: time derivative of total control volume
     real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: &
          VolumeStart_G, Volume_G, dVolumeDt_G
     ! ------------ Hamiltonian functions ------------
@@ -466,8 +454,14 @@ contains
   contains
     !==========================================================================
     subroutine init_states_focused
-      ! Initialize states: VolumeX_I, Volume_I, 1.0/B, time derivatives,
+
+      ! Initialize states: VolumeX_I, Volume_G, 1/B, time derivatives,
       ! and time-related and non-related Hamiltonian functions
+
+      ! Geometric volume when the subroutine ends
+      real, dimension(0:nX+1) :: VolumeXEnd_I
+      ! Inverse of B when the subroutine starts and ends
+      real, dimension(1:nX  ) :: InvBOldSi_I, InvBSi_I
       !------------------------------------------------------------------------
 
       ! Geometric volume: for DeltaS/B, with 1 ghost point at the boundary
@@ -482,14 +476,14 @@ contains
       ! Time derivative: D(1/n)/Dt
       dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)*InvtFinal
 
-      ! Magnetic field related variables:
+      ! Magnetic-field-related variables:
       ! Start cell-centered 1/B
       InvBOldSi_I = 1.0/BOldSi_I
       ! End cell-centered 1/B
       InvBSi_I    = 1.0/BSi_I
       ! Time derivative: D(1/B)/Dt
       dInvBSiDt_C = (InvBSi_I - InvBOldSi_I)*InvtFinal
-      ! Averaged 1/B over the whole time step
+      ! Averaged 1/B over the whole time step'
       InvBSi_C    = 0.5*(InvBOldSi_I + InvBSi_I)
       ! End Face-centered 1/B
       InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
@@ -516,92 +510,37 @@ contains
               spread(MuFace_I*(1.0-MuFace_I**2), DIM=1, NCOPIES=nP+2)* &
               spread(VolumeP_I, DIM=2, NCOPIES=nMu+1)
       end do
-      ! Bcs for time-related Hamiltonian functions: {f_jk; H}_{tau, ...}
+      ! BCs for time-related Hamiltonian functions: {f_jk; H}_{tau, ...}
       dHamiltonian01_FX(:,     0, :) = dHamiltonian01_FX(:,   1, :)
       dHamiltonian01_FX(:, nMu+1, :) = dHamiltonian01_FX(:, nMu, :)
       dHamiltonian02_FY(:,    -1, :) = dHamiltonian02_FY(:,   0, :)
       dHamiltonian02_FY(:, nMu+1, :) = dHamiltonian02_FY(:, nMu, :)
 
+      ! Clean the Hamiltonian function for {f_jk; H_23}_{mu, s_L}
+      Hamiltonian23_N = 0.0
+      ! Calculate H_23 = Hamiltonian function for {f; H_23}_{mu, s_L}
+      call calc_hamiltonian_23
+
     end subroutine init_states_focused
-    !==========================================================================
-    subroutine calc_hamiltonian_12
-      ! Calculate the 3rd Hamiltonian function at each fixed time:
-      ! (1-mu**2)/2*[ mu*(p**3/3)*(3\vec{b}\vec{b}:\nabla\vec{u} - div\vec{u})
-      ! + ProtonMass*p**2*(\vec{b}*d\vec{u}/dt) ], regarding to p**3/3 and mu,
-      ! so the coordinates of p**3/3 and mu are at face, and s_L is at center.
-      ! Here we list the variables in the analytical function:
-      ! (3\vec{b}\vec{b}:\nabla\vec{u} - div\vec{u}) = d(ln(B*ds**2))/dt
-      ! ProtonMass = cRmeProtonGeV, in the unit of GeV/c**2
-      ! \vec{b}*d\vec{u}/dt = bDuDt_C
-
-      !------------------------------------------------------------------------
-
-      !  do iX = 1, nX
-      !     do iMu = 0, nMu
-      !        Hamiltonian3_N(:, iMu, iX) = 0.5*(1.0 - MuFace_I(iMu)**2)* &
-      !             (MuFace_I(iMu)*Momentum3_I*dLnBDeltaS2Dt_C(iX) +      &
-      !             cProtonMass*(Momentum3_I*3.0)**(2.0/3.0)*bDuDt_C(iX))
-      !     end do
-      !     ! Here, what we use actually is: \tilde\deltaH
-      !     Hamiltonian3_N(:, 0:nMu, iX) = &
-      !          Hamiltonian3_N(:, 0:nMu, iX)*DeltaSOverB_C(iX)
-      !  end do
-
-      ! Boundary condition of Hamiltonian function
-      Hamiltonian12_N(:,     :,    0) = Hamiltonian12_N(:,     :,  1)
-      Hamiltonian12_N(:,     :, nX+1) = Hamiltonian12_N(:,     :, nX)
-      Hamiltonian12_N(:,    -1,    :) = Hamiltonian12_N(:,     1,  :)
-      Hamiltonian12_N(:, nMu+1,    :) = Hamiltonian12_N(:, nMu-1,  :)
-
-    end subroutine calc_hamiltonian_12
-    !==========================================================================
-    subroutine calc_hamiltonian_23
-      ! Calculate the Hamiltonian function at each fixed time:
-      ! (mu**2-1)*v/(2B) at face of s_L and mu, regarding to s_L and mu
-      !------------------------------------------------------------------------
-      ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2), 
-      ! calculated as a function of p. Note that momentum (or speed) in this
-      ! term is non-related to the Lagrangian coordinates (s_L, mu), so it
-      ! should be cell-centered, by using SpeedSi_I.
-
-      ! Calculate the 2nd hamiltonian = (mu**2-1)*v/(2B) => \tilde\deltaH
-      do iX = 0, nX
-         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)*( &
-              spread(MuFace_I**2, DIM=1, NCOPIES=nP+2) - 1.0)* &
-              spread(SpeedSi_I*VolumeP_I, DIM=2, NCOPIES=nMu+1)
-      end do
-
-      ! Boundary condition of Hamiltonian function
-      Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
-      Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
-
-    end subroutine calc_hamiltonian_23
     !==========================================================================
     subroutine advance_poisson_focused(DtIn)
       ! advance by the multiple-Poisson-bracket scheme for each time step
+      ! split as a subroutine here for updating states at small time steps
 
       real, optional, intent(inout) :: DtIn ! Input time step
-      ! Get Volume_G and Hamiltonian functions at the current time
+      ! Get VolumeX_I, Volume_G and Hamiltonian function at the current time,
+      ! and then solve the advection equation by the Poisson bracket scheme
       !------------------------------------------------------------------------
 
-      ! Clean the Hamiltonian function for {f_jk; H_12}_{p**3/3, mu}
+      ! Update the geometric and total control volumes
+      VolumeX_I = VolumeXStart_I + Time*dVolumeXDt_I
+      Volume_G  = VolumeStart_G  + Time*dVolumeDt_G
+
+      ! Clean the Hamiltonian function for {f_jk; H_12}_{p**3/3, mu},
+      ! with time-dependent variables, needed to be updated at each time step
       Hamiltonian12_N = 0.0
-      ! Clean the Hamiltonian function for {f_jk; H_23}_{mu, s_L}
-      Hamiltonian23_N = 0.0
-
       ! Calculate H_12 = Hamiltonian function for {f; H_12}_{p**3/3, mu}
-      ! poisson bracket: split into two terms for
-      !     (1) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
-      !        p**3/3 * 3*DeltaS/B * [D(1/B)/Dt]/(1/B) }_{p**3/3, mu}; and
-      !     (2) inertial force: {f_jk; (1-mu**2)/2 * ProtonMass
-      !        p**2 * DeltaS/B * D(\vec{b}*\vec{u})/Dt }_{p**3/3, mu}
       call calc_hamiltonian_12
-      ! Calculate H_23 = Hamiltonian function for {f; H_23}_{mu, s_L}
-      ! used in the poisson bracket: {f_jk; -(mu**2-1)*v/(2B)}_{mu, s_L}
-      call calc_hamiltonian_23
-
-      ! Update the total control volume
-      Volume_G = VolumeStart_G + Time*dVolumeDt_G
 
       ! Here we have three Lagrangian coordinates: (p**3/3, mu, s_L)
       if(present(DtIn)) then
@@ -624,6 +563,65 @@ contains
       end if
 
     end subroutine advance_poisson_focused
+    !==========================================================================
+    subroutine calc_hamiltonian_12
+
+      ! Calculate the Hamiltonian function for {f_jk, H_12}_{p**3/3, mu}:
+      ! We split into two terms for
+      !     (1) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
+      !        p**3/3 * 3*DeltaS/B * [D(1/B)/Dt]/(1/B) }_{p**3/3, mu}; and
+      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 *
+      !        ProtonMass * DeltaS/B * D(\vec{b}*\vec{u})/Dt }_{p**3/3, mu},
+      ! then summed as H_12, at the faces of p**3/3 and mu => \tilde\deltaH
+
+      ! For the betatron acceleration
+      if(UseBetatron) then
+         do iX = 1, nX
+            Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) - &
+                 0.5*spread(MuFace_I*(1.0-MuFace_I**2), DIM=1, NCOPIES=nP+3)* &
+                 3.0*spread(Momentum3_I, DIM=2, NCOPIES=nMu+1)* &
+                 VolumeX_I(iX)*dInvBSiDt_C(iX)/InvBSi_C(iX)
+         end do
+      end if
+
+      ! For the inertial force
+      if(UseInertialForce) then
+          do iX = 1, nX
+            Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
+                 0.5*spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+3)* &
+                 spread((Momentum3_I*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
+                 cProtonMass*VolumeX_I(iX)*bDuDt_C(iX)
+         end do
+      end if
+
+      ! Boundary condition of Hamiltonian function
+      Hamiltonian12_N(:,     :,    0) = Hamiltonian12_N(:,     :,  1)
+      Hamiltonian12_N(:,     :, nX+1) = Hamiltonian12_N(:,     :, nX)
+      Hamiltonian12_N(:,    -1,    :) = Hamiltonian12_N(:,     1,  :)
+      Hamiltonian12_N(:, nMu+1,    :) = Hamiltonian12_N(:, nMu-1,  :)
+
+    end subroutine calc_hamiltonian_12
+    !==========================================================================
+    subroutine calc_hamiltonian_23
+
+      ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
+      ! H_23 = -(mu**2-1)*v/(2B), at the faces of mu and s_L => \tilde\deltaH
+
+      ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2), 
+      ! calculated as a function of p. Note that momentum (or speed) in this
+      ! term is non-related to the Lagrangian coordinates (mu, s_L), so it
+      ! should be cell-centered, by using SpeedSi_I.
+      do iX = 0, nX
+         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
+              spread(MuFace_I**2-1.0, DIM=1, NCOPIES=nP+2)* &
+              spread(SpeedSi_I*VolumeP_I, DIM=2, NCOPIES=nMu+1)
+      end do
+
+      ! Boundary condition of the Hamiltonian function: symmetry
+      Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
+      Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
+
+    end subroutine calc_hamiltonian_23
     !==========================================================================
   end subroutine advect_via_poisson_focused
   !============================================================================

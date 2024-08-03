@@ -665,6 +665,29 @@ parameter name="UseMuFocusing" type="logical" default="F"
 The default value is false.
 </command>
 
+<command name="FOCUSEDTRANSPORT">
+  <parameter name="UseBetatron" type="logical" default="F" />
+  <parameter name="UseInertialForce" type="logical" default="F" />
+
+#FOCUSEDTRANSPORT
+F			UseBetatron
+F			UseInertialForce
+
+When choosing to solve the focused transport equation, one should
+configure SP/MFLAMPA with nMu greater than 1; otherwise, there
+will be a warning and stop for the run.
+
+When solving the focused transport equation, we keep including
+the adiabatic focusing in the magnetic field (with such, we first
+have energy consevation), and the first-order Fermi accleration.
+One can also specify more terms of interest for the simulation,
+such as the betatron accleration (D(lnB)/Dt /= 0) and the
+inertial force (Du/Dt /= 0), by setting parameters of UseBetatron
+and UseInertialForce, respectively, in the PARAM.in file.
+
+The default values for both of these parameters are false.
+</command>
+
 </commandgroup>
 
 

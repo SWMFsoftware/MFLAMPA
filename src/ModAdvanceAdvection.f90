@@ -16,6 +16,7 @@ module SP_ModAdvanceAdvection
 
   PRIVATE ! Except
 
+  ! Public members:
   public :: advect_via_log
 contains
   !============================================================================
