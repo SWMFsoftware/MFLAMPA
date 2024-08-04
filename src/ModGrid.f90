@@ -397,7 +397,7 @@ contains
        iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth)
        iShockMax = iEnd - nWidth - 1
        iShockCandidate = iShockMin - 1 + maxloc(&
-            DLogRho_I(   iShockMin:iShockMax), 1, MASK = &
+            DLogRho_I(   iShockMin:iShockMax), DIM=1, MASK = &
             State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
             DLogRho_I(   iShockMin:iShockMax)       > dLogRhoThreshold)
        if(iShockCandidate >= iShockMin)&
@@ -406,15 +406,15 @@ contains
 
   end subroutine get_shock_location
   !============================================================================
-  subroutine search_line(iLine, Radius, iParticleOut, IsFound, Weight)
+  subroutine search_line(iLine, Radius, iXOut, IsFound, Weight)
 
     ! performs search along given line
     ! for FIRST location ABOVE given heliocentric radius;
-    ! if found, IsFound is set to .true. (.false. otherwise)
-    ! and iParticleOut is set to index of particle just above Radius
+    ! if found, IsFound is set to .true. (.false. otherwise) and iXout is set
+    ! to index where the particle's spatial coordinate is just above Radius
     integer,      intent(in) :: iLine   ! line/line index
     real,         intent(in) :: Radius  ! heliocentric distance to find
-    integer,      intent(out):: iParticleOut ! result: index
+    integer,      intent(out):: iXout   ! result: index just above Radius
     logical,      intent(out):: IsFound ! result: whether search succeeds
     real,optional,intent(out):: Weight  ! interpolation weight at output index
     !--------------------------------------------------------------------------
@@ -423,24 +423,23 @@ contains
     if(State_VIB(R_, nVertex_B(iLine), iLine) < Radius) then
        ! mark failure to find location
        IsFound = .false.
-       iParticleOut = -1
+       iXOut = -1
        RETURN
     end if
 
     ! line reaches the given radial distance
     IsFound = .true.
     ! find index of first particle above Radius
-    iParticleOut = minloc(State_VIB(R_, 1:nVertex_B(iLine), iLine), &
+    iXOut = minloc(State_VIB(R_, 1:nVertex_B(iLine), iLine), &
          DIM=1, MASK=State_VIB(R_, 1:nVertex_B(iLine), iLine) > Radius)
 
     ! get interpolation weight, if necessary
     if(present(Weight)) then
-       if(iParticleOut > 1) then
-          Weight = (Radius - State_VIB(R_, iParticleOut-1, iLine)) / &
-               (State_VIB(R_, iParticleOut,  iLine) - &
-               State_VIB(R_, iParticleOut-1, iLine))
+       if(iXOut > 1) then
+          Weight = (Radius - State_VIB(R_, iXOut-1, iLine)) / &
+               (State_VIB(R_, iXOut,  iLine) - State_VIB(R_, iXOut-1, iLine))
        else
-          ! iParticleOut == 1, right at the first point
+          ! iXOut == 1, right at the first point
           Weight = 1.0
        end if
     end if
