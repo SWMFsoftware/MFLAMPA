@@ -24,7 +24,8 @@ module SP_ModDiffusion
 
   PRIVATE
   logical, public :: UseDiffusion = .true.
-  real,    public :: DOuterSi_I(1:nVertexMax), CoefDInnerSi_I(1:nVertexMax)
+  real,    public :: DOuterSi_I(nVertexMax), CoefLambdaxx_I(nVertexMax)
+  real,    public :: CoefLambdaMuMu_I(nVertexMax) ! For Lambda_mumu
   ! Local parameters!
   ! Diffusion as in Li et al. (2003), doi:10.1029/2002JA009666
   logical, public :: UseFixedMeanFreePathUpstream = .false.
@@ -37,7 +38,8 @@ module SP_ModDiffusion
   integer         :: iScaleTurbulenceType = Const_
 
   ! Public members:
-  public          :: read_param, diffuse_distribution, set_diffusion_coef
+  public          :: read_param, diffuse_distribution, &
+       scatter_distribution, set_diffusion_coef
   interface diffuse_distribution
      module procedure diffuse_distribution_s   ! Global time step Dt, nMu>=1
      module procedure diffuse_distribution_arr ! DtLocal_I array, nMu>=1
@@ -86,7 +88,7 @@ contains
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
-    real, intent(in) :: Dt              ! Time step for diffusion
+    real, intent(in) :: Dt          ! Time step for diffusion
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
     ! Given spectrum of particles at low end (flare acceleration)
     real, intent(in), optional :: LowerEndSpectrumIn_I(nP)       ! Mu-averaged
@@ -98,9 +100,11 @@ contains
     real :: DtFake_C(nP, nX)
     !--------------------------------------------------------------------------
     DtFake_C = Dt
+
     call diffuse_distribution_arr(iLine, nX, iShock, DtFake_C, &
          nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
+
   end subroutine diffuse_distribution_s
   !============================================================================
   subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocalIn_II, &
@@ -215,7 +219,7 @@ contains
             spread(BSi_I(1:nX), DIM=2, NCOPIES=nP)
     else
        ! Add v (= p*c**2 / E_total in the relativistic case) and p**(1/3)
-       DInnerSi_II = spread(CoefDInnerSi_I(1:nX), DIM=2, NCOPIES=NP) &
+       DInnerSi_II = spread(CoefLambdaxx_I(1:nX), DIM=2, NCOPIES=NP) &
             * spread(SpeedSi_I(1:nP)*Momentum_I(1:nP)**(1.0/3),      &
             DIM=1, NCOPIES=NX)
        DInnerSi_II = max(DInnerSi_II, &
@@ -293,15 +297,88 @@ contains
                Distribution_CB(iP, iMu, 1:nX, iLine))
        end do MU
     end do MOMENTUM
+
   end subroutine diffuse_distribution_arr
+  !===========================================================================
+  subroutine scatter_distribution(iLine, nX, Dt, nSi_I, BSi_I)
+    ! Calculate scatter: \deltaf/\deltat = (Dmumu*f_mu)_mu
+
+    use ModConst,           ONLY: cAtomicMass
+    use SP_ModDistribution, ONLY: MuFace_I, DeltaMu, &
+         SpeedSi_I, Momentum_I, Distribution_CB
+    ! Variables as inputs
+    ! input Line and End index (for how many particles)
+    integer, intent(in) :: iLine, nX
+    real, intent(in) :: Dt          ! Time step for diffusion
+    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    ! LOCAL VARs
+    ! Dmumu for each fixed iMu and iX. Dmumu is the coefficient of diffusion
+    ! about the pitch angle: Dmumu = v/lambda_mumu * (1-mu**2) * mu**(2.0/3.0)
+    real :: DMuMu_I(0:nMu)
+    ! Factorize DMuMu, each factor being only a function of p**3/3, mu, s_L
+    real :: FactorMu_F(0:nMu)
+    ! Lower, main, upper diagonals, and source for the scatter calculation
+    real :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
+    ! Physical VARs
+    real :: LowerLimMu              ! Lower limit of Factor_mu
+    real :: DtOverDMu2              ! (\Delta t) / (\Delta \mu^2)
+    real :: AlfvenSpeed_I(nX)       ! Alfven wave speed
+    integer :: iP, iX               ! Loop integers
+    integer :: iMuswitch            ! Control parameter for mu
+    !--------------------------------------------------------------------------
+    DtOverDMu2 = Dt/DeltaMu**2      ! (\Delta t) / (\Delta \mu^2)
+
+    ! Calculate factorized diffusion coefficient: (1-mu**2) * mu**(2.0/3.0)
+    LowerLimMu = (1.0 - DeltaMu**2) * abs(DeltaMu)**(2.0/3.0)
+    FactorMu_F = (1.0 - MuFace_I**2) * abs(MuFace_I)**(2.0/3.0)
+
+    ! Get the Alfven wave speed for each s_L
+    AlfvenSpeed_I = BSi_I/sqrt(cMu*nSi_I*cAtomicMass)
+
+    ! Calculate the effect of scatter along \mu axis for each fixed iX and iP
+    SPACELOC:do iX = 1, nX
+       MOMENTUM:do iP = 1, nP
+          ! For each pitch angle, set DMuMu and solve VDF for mu scattering
+          ! Meanwhile, we control whether we floor the value of D_mumu or not
+          iMuswitch = 0
+          if(.not.any(SpeedSi_I(iP)*abs(MuFace_I) >= &
+               10.0*AlfvenSpeed_I(iX))) then
+             iMuswitch = minloc(MuFace_I, DIM=1, MASK= &
+                  SpeedSi_I(iP)*abs(MuFace_I) < 10.0*AlfvenSpeed_I(iX))
+          end if
+
+          where(SpeedSi_I(iP)*abs(MuFace_I) >= 10.0*AlfvenSpeed_I(iX))
+             ! Set Dmumu where mu is large enough
+             DMuMu_I = SpeedSi_I(iP)/(CoefLambdaMuMu_I(iX)* &
+                  Momentum_I(iP))*FactorMu_F*DtOverDMu2
+          elsewhere
+             ! Set the lower limit of D_mumu when |mu| is close to zero
+             DMuMu_I = SpeedSi_I(iP)/CoefLambdaMuMu_I(iX)* &
+                  max(FactorMu_F(iMuswitch), LowerLimMu)*DtOverDMu2
+          end where
+
+          ! Set up coefficients for solving the linear equation set
+          Lower_I = -DMuMu_I(0:nMu-1)
+          Upper_I = -DMuMu_I(1:nMu  )
+          Main_I  = 1.0 - Lower_I - Upper_I
+          Res_I   = Distribution_CB(iP, 1:nMu, iX, iLine)
+
+          ! Update the solution for mu scattering
+          call tridiag(nMu, Lower_I, Main_I, Upper_I, Res_I, &
+               Distribution_CB(iP, 1:nMu, iX, iLine))
+       end do MOMENTUM
+    end do SPACELOC
+
+  end subroutine scatter_distribution
   !============================================================================
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
-    ! set diffusion coefficient for the current line
+    ! set spatial diffusion and mu scattering coefficients for given field line
 
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in)    :: BSi_I(1:nX)
     real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
-    real, parameter     :: cCoef = 81.0/7/cPi/cTwoPi**(2.0/3)
+    real, parameter     :: cCoef = 81.0/(7*cPi*cTwoPi**(2.0/3))
+    real, parameter     :: cCoefMumu_To_xx = 14.0/27
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
     RadiusSi_I(1:nX) = State_VIB(R_,1:nX,iLine)*Io2Si_V(UnitX_)
@@ -326,10 +403,10 @@ contains
           ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
           ! 1/AU cancels with unit of Lambda0, no special attention needed;
           ! v (velocity) and (p)**(1/3) are calculated in momentum do loop
-          CoefDInnerSi_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
+          CoefLambdaxx_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
                RadiusSi_I(1:nX)*(cLightSpeed*MomentumInjSi/cGeV)**(1.0/3)
        elsewhere
-          CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /       &
+          CoefLambdaxx_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /       &
                (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
                (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
                **(1.0/3)
@@ -341,14 +418,17 @@ contains
        ! ------------------------------------------------------
        ! effective level of turbulence is different for different momenta:
        ! (\delta B)**2 \propto Gyroradius**(1/3)
-       CoefDInnerSi_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /          &
+       CoefLambdaxx_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /          &
             (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
             (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
             **(1.0/3)
     end if
 
     ! Add 1/B as the actual diffusion is D/B
-    CoefDInnerSi_I(1:nX) = CoefDInnerSi_I(1:nX)/BSi_I(1:nX)
+    CoefLambdaxx_I(1:nX) = CoefLambdaxx_I(1:nX)/BSi_I(1:nX)
+
+    ! CoefLambda_xx => CoefLambda_mumu
+    CoefLambdaMuMu_I(1:nX) = cCoefMumu_To_xx * CoefLambdaxx_I(1:nX)
 
   end subroutine set_diffusion_coef
   !============================================================================
@@ -388,6 +468,7 @@ contains
     do j = n-1, 1, -1
        W_I(j) = W_I(j) - Aux_I(j+1)*W_I(j+1)
     end do
+
   end subroutine tridiag
   !============================================================================
 end module SP_ModDiffusion

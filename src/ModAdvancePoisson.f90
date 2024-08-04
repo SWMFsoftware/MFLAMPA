@@ -331,6 +331,7 @@ contains
     ! Here, we diffuse the distribution function at each time step.
 
     use ModConst,           ONLY: cProtonMass
+    use SP_ModDiffusion,    ONLY: scatter_distribution
     use SP_ModDistribution, ONLY: Mu_I, MuFace_I, DeltaMu, SpeedSi_I
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
@@ -446,6 +447,7 @@ contains
        ! We will work on this further later since it is more advanced.
        ! For pitch angle scattering
        if(UseMuScattering) then
+          call scatter_distribution(iLine, nX, Dt, nSi_I, BSi_I)
           ! Check if the VDF includes negative values after mu scattering
           call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
           if(IsDistNeg) RETURN
