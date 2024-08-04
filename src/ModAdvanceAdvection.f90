@@ -94,23 +94,23 @@ contains
              call set_upper_end_bc(iLine, nX)
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
-                     LowerEndSpectrumIn_II = spread(max(LowerEndBc_I(1:nP),   &
-                     Background_I(1:nP)), DIM=2, NCOPIES=nMu),                &
-                     UpperEndSpectrumIn_II = spread(max(UpperEndBc_I(1:nP),   &
-                     Background_I(1:nP)), DIM=2, NCOPIES=nMu))
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, LowerEndSpectrumIn_I = max(   &
+                     LowerEndBc_I(1:nP), Background_I(1:nP)),    &
+                     UpperEndSpectrumIn_I = max(                 &
+                     UpperEndBc_I(1:nP), Background_I(1:nP)))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
-                     UpperEndSpectrumIn_II = spread(max(UpperEndBc_I(1:nP),   &
-                     Background_I(1:nP)), DIM=2, NCOPIES=nMu))
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, UpperEndSpectrumIn_I = max(   &
+                     UpperEndBc_I(1:nP), Background_I(1:nP)))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
-                     LowerEndSpectrumIn_II = spread(max(LowerEndBc_I(1:nP),   &
-                     Background_I(1:nP)), DIM=2, NCOPIES=nMu))
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, LowerEndSpectrumIn_I = max(   &
+                     LowerEndBc_I(1:nP), Background_I(1:nP)))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)

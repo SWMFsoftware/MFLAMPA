@@ -39,8 +39,8 @@ module SP_ModDiffusion
   ! Public members:
   public          :: read_param, diffuse_distribution, set_diffusion_coef
   interface diffuse_distribution
-     module procedure diffuse_distribution_s    ! Global time step Dt
-     module procedure diffuse_distribution_arr  ! DtLocal_I array
+     module procedure diffuse_distribution_s   ! Global time step Dt, nMu>=1
+     module procedure diffuse_distribution_arr ! DtLocal_I array, nMu>=1
   end interface diffuse_distribution
 
 contains
@@ -78,8 +78,10 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine diffuse_distribution_s(iLine, nX, iShock, Dt, &
-       nSi_I, BSi_I, LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
-    ! diffuse the distribution function with scalar/global Dt
+       nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+       LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
+    ! diffuse the distribution function with scalar/global Dt, with
+    ! the pitch-angle-averaged or dependent lower and upper spectra
 
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
@@ -87,19 +89,23 @@ contains
     real, intent(in) :: Dt              ! Time step for diffusion
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
     ! Given spectrum of particles at low end (flare acceleration)
-    real, intent(in), optional :: LowerEndSpectrumIn_II(nP, nMu)
+    real, intent(in), optional :: LowerEndSpectrumIn_I(nP)       ! Mu-averaged
+    real, intent(in), optional :: LowerEndSpectrumIn_II(nP, nMu) ! Mu-dependent
     ! Given spectrum of particles at upper end (GCRs)
-    real, intent(in), optional :: UpperEndSpectrumIn_II(nP, nMu)
+    real, intent(in), optional :: UpperEndSpectrumIn_I(nP)       ! Mu-averaged
+    real, intent(in), optional :: UpperEndSpectrumIn_II(nP, nMu) ! Mu-dependent
     ! LOCAL VARS
     real :: DtFake_C(nP, nX)
     !--------------------------------------------------------------------------
     DtFake_C = Dt
     call diffuse_distribution_arr(iLine, nX, iShock, DtFake_C, &
-         nSi_I, BSi_I, LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
+         nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+         LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
   end subroutine diffuse_distribution_s
   !============================================================================
-  subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocalIn_II,  &
-       nSi_I, BSi_I, LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
+  subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocalIn_II, &
+       nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+       LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
     ! diffuse the distribution function with vector/local Dt
     use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, Distribution_CB
     use SP_ModTurbulence,   ONLY: UseTurbulentSpectrum, set_dxx, Dxx
@@ -110,22 +116,26 @@ contains
     real, intent(in) :: DtLocalIn_II(nP, nX)  ! Local time step for diffusion
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
     ! Given spectrum of particles at low end (flare acceleration)
-    real, intent(in), optional :: LowerEndSpectrumIn_II(nP, nMu)
+    real, intent(in), optional :: LowerEndSpectrumIn_I(nP)       ! Mu-averaged
+    real, intent(in), optional :: LowerEndSpectrumIn_II(nP, nMu) ! Mu-dependent
     ! Given spectrum of particles at upper end (GCRs)
-    real, intent(in), optional :: UpperEndSpectrumIn_II(nP, nMu)
+    real, intent(in), optional :: UpperEndSpectrumIn_I(nP)       ! Mu-averaged
+    real, intent(in), optional :: UpperEndSpectrumIn_II(nP, nMu) ! Mu-dependent
     ! Variables declared in this subroutine
-    integer :: iP, iMu           ! loop variables
+    integer :: iP, iMu              ! Loop variables
     ! For an optimized loop, we need to change the (nP, nX) into (nX, nP)
     ! for the two-dimensional local time step DtLocal_II array
-    real :: DtLocal_II(nX, nP)   ! Local time step for diffusion
+    real    :: DtLocal_II(nX, nP)   ! Local time step for diffusion
     ! Same reason for LowerEndSpectrumIn_II and UpperEndSpectrumIn_II:
     ! change (nP, nMu) => (nMu, nP) for a better looping order
-    real :: LowerEndSpectrum_II(nMu, nP), UpperEndSpectrum_II(nMu, nP)
+    real    :: LowerEndSpectrum_II(nMu, nP), UpperEndSpectrum_II(nMu, nP)
+    ! Logical variable for whether or not to use given lower and upper spectra
+    logical :: UseLowerSpectrum = .false., UseUpperSpectrum = .false.
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
-    real :: DInnerSi_II(nX, nP)  ! Calculate once and use later
+    real :: DInnerSi_II(nX, nP)     ! Calculate once and use later
     ! Lower limit to floor the spatial diffusion coefficient For a
     ! given spatial and temporal resolution, the value of the
     ! diffusion coefficient should be artificially increased to get
@@ -151,11 +161,26 @@ contains
     ! in the loop with the inner-most iX and outer-most iP. It will
     ! visit and put the data in cache that are stored adjacently.
     DtLocal_II = transpose(DtLocalIn_II)
-    ! Same reason for LowerEndSpectrum_II and UpperEndSpectrum_II:
-    if(present(LowerEndSpectrumIn_II)) &
-         LowerEndSpectrum_II = transpose(LowerEndSpectrumIn_II)
-    if(present(UpperEndSpectrumIn_II)) &
-         UpperEndSpectrum_II = transpose(UpperEndSpectrumIn_II)
+
+    ! Get LowerEndSpectrum_II and/or UpperEndSpectrum_II if given
+    ! Given Mu-averaged arrays: spread into 2 dimensions with nMu
+    if(present(LowerEndSpectrumIn_I)) then
+       UseLowerSpectrum = .true.
+       LowerEndSpectrum_II = spread(LowerEndSpectrumIn_I, DIM=1, NCOPIES=nMu)
+    end if
+    if(present(UpperEndSpectrumIn_I)) then
+       UseUpperSpectrum = .true.
+       UpperEndSpectrum_II = spread(UpperEndSpectrumIn_I, DIM=1, NCOPIES=nMu)
+    end if
+    ! Given Mu-dependent arrays: transpose with a better index for the loop
+    if(present(LowerEndSpectrumIn_II)) then
+       UseLowerSpectrum = .true.
+       LowerEndSpectrum_II = transpose(LowerEndSpectrumIn_II)
+    end if
+    if(present(UpperEndSpectrumIn_II)) then
+       UseUpperSpectrum = .true.
+       UpperEndSpectrum_II = transpose(UpperEndSpectrumIn_II)
+    end if
 
     ! if using turbulent spectrum: set_dxx for diffusion along the field line
     if(UseTurbulentSpectrum) call set_dxx(nX, BSi_I(1:nX))
@@ -213,7 +238,7 @@ contains
                0.5*(DInnerSi_II(1,iP) + DInnerSi_II(2,iP))/DsMesh_I(2)**2
           Main_I(1)  = Main_I(1) + Aux1_I(1)
           Upper_I(1) = -Aux1_I(1)
-          if(present(LowerEndSpectrumIn_II)) then
+          if(UseLowerSpectrum) then
              ! With the given value for f_0 behind the boundary,
              ! the above scheme reads:
              ! f^(n+1)_1-Dt*DOuter_I/DsFace_I*(&
@@ -252,7 +277,7 @@ contains
           ! So, effectively for the version after Nov. 2023
           ! Main_I(n) = 1; Lower_I(n) = 0 (equivalently to doing nothing)
           ! For backward compatibility, please keep UseUpperEndBc=.false.
-          if(present(UpperEndSpectrumIn_II)) then
+          if(UseUpperSpectrum) then
              Aux2_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)*0.5* &
                   (DInnerSi_II(nX-1,iP) + DInnerSi_II(nX,iP))/DsMesh_I(nX)**2
              Main_I(nX)  = Main_I(nX) + Aux2_I(nX)

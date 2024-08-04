@@ -164,22 +164,18 @@ contains
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, LowerEndSpectrumIn_II=spread( &
-                     VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu),        &
-                     UpperEndSpectrumIn_II= spread(              &
-                     VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
+                     nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
+                     UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
              else
                 ! with upper end BC but no lower end BC
                 call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, UpperEndSpectrumIn_II=spread( &
-                     VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
+                     nSi_I, BSi_I, UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
                 call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, LowerEndSpectrumIn_II=spread( &
-                     VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu))
+                     nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
@@ -279,22 +275,18 @@ contains
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, Dt_C, &
-                  nSi_I, BSi_I, LowerEndSpectrumIn_II= spread(  &
-                  VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu),          &
-                  UpperEndSpectrumIn_II= spread(                &
-                  VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
+                  nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
+                  UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
           else
              ! with upper end BC but no lower end BC
              call diffuse_distribution(iLine, nX, iShock, Dt_C, &
-                  nSi_I, BSi_I, UpperEndSpectrumIn_II= spread(  &
-                  VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
+                  nSi_I, BSi_I, UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
              call diffuse_distribution(iLine, nX, iShock, Dt_C, &
-                  nSi_I, BSi_I, LowerEndSpectrumIn_II= spread(  &
-                  VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu))
+                  nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0))
           else
              ! with no lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I)
