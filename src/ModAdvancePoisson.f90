@@ -11,7 +11,7 @@ module SP_ModAdvancePoisson
   use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
        UseUpperEndBc, UseLowerEndBc, iStart
   use SP_ModDistribution, ONLY: nP, VolumeP_I, Momentum3_I, &
-       Distribution_CB, IsDistNeg, check_dist_neg
+       nMu, Distribution_CB, IsDistNeg, check_dist_neg
   use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
   use ModUtilities,       ONLY: CON_stop
   use ModPoissonBracket,  ONLY: explicit
@@ -35,6 +35,8 @@ module SP_ModAdvancePoisson
   logical, public :: UseBetatron = .false.
   ! Whether to include the inertial force in focused transport equation
   logical, public :: UseInertialForce = .false.
+  ! Whether to include the pitch angle scattering term
+  logical, public :: UseMuScattering = .false.
   ! Time derivative over DtFull (linear interpolation for time):
   real, public, dimension(nVertexMax) :: bDuDt_C
 contains
@@ -49,6 +51,7 @@ contains
     case('#FOCUSEDTRANSPORT')
        call read_var('UseBetatron',      UseBetatron)
        call read_var('UseInertialForce', UseInertialForce)
+       call read_var('UseMuScattering',  UseMuScattering)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -160,19 +163,23 @@ contains
           if(UseUpperEndBc) then
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt,      &
-                     nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0), &
-                     UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, LowerEndSpectrumIn_II=spread( &
+                     VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu),        &
+                     UpperEndSpectrumIn_II= spread(              &
+                     VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt,      &
-                     nSi_I, BSi_I, UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, UpperEndSpectrumIn_II=spread( &
+                     VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt,      &
-                     nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+                call diffuse_distribution(iLine, nX, iShock, Dt, &
+                     nSi_I, BSi_I, LowerEndSpectrumIn_II=spread( &
+                     VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
@@ -255,8 +262,8 @@ contains
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
     ! Update Bc for VDF
     call set_VDF(iLine, nX, VDF_G)
-    call explicit(nP, nX, VDF_G, Volume_G, Source_C,   &
-         Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn,   &
+    call explicit(nP, nX, VDF_G, Volume_G, Source_C, &
+         Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn, &
          IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
@@ -271,19 +278,23 @@ contains
        if(UseUpperEndBc) then
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock, Dt_C,    &
-                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0), &
-                  UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, &
+                  nSi_I, BSi_I, LowerEndSpectrumIn_II= spread(  &
+                  VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu),          &
+                  UpperEndSpectrumIn_II= spread(                &
+                  VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
           else
              ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, iShock, Dt_C,    &
-                  nSi_I, BSi_I, UpperEndSpectrum_I=VDF_G(1:nP, nX+1))
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, &
+                  nSi_I, BSi_I, UpperEndSpectrumIn_II= spread(  &
+                  VDF_G(1:nP, nX+1), DIM=2, NCOPIES=nMu))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, iShock, Dt_C,    &
-                  nSi_I, BSi_I, LowerEndSpectrum_I=VDF_G(1:nP, 0))
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, &
+                  nSi_I, BSi_I, LowerEndSpectrumIn_II= spread(  &
+                  VDF_G(1:nP, 0), DIM=2, NCOPIES=nMu))
           else
              ! with no lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I)
@@ -328,7 +339,7 @@ contains
     ! Here, we diffuse the distribution function at each time step.
 
     use ModConst,           ONLY: cProtonMass
-    use SP_ModDistribution, ONLY: nMu, Mu_I, MuFace_I, DeltaMu, SpeedSi_I
+    use SP_ModDistribution, ONLY: Mu_I, MuFace_I, DeltaMu, SpeedSi_I
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -441,12 +452,41 @@ contains
        ! One can refer to test_multi_poisson in share/Library/test/
        ! One should specify the TypeScatter in the PARAM.in file.
        ! We will work on this further later since it is more advanced.
-       ! ------------ Thank you! ------------
-       if(UseDiffusion) then
-          ! Check if the VDF includes negative values after scattering
-          call check_dist_neg(NameSub//' after scattering', 1, nX, iLine)
+       ! For pitch angle scattering
+       if(UseMuScattering) then
+          ! Check if the VDF includes negative values after mu scattering
+          call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
           if(IsDistNeg) RETURN
        end if
+
+       ! For spatial diffusion
+       if(UseDiffusion) then
+          if(UseUpperEndBc) then
+             if(UseLowerEndBc) then
+                ! with lower or upper end BCs
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I,  &
+                     BSi_I, LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0), &
+                     UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
+             else
+                ! with upper end BC but no lower end BC
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I,  &
+                     BSi_I, UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
+             end if
+          else
+             if(UseLowerEndBc) then
+                ! with lower end BC but no upper end BC
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, &
+                     BSi_I, LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0))
+             else
+                ! with no lower or upper end BCs
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
+             end if
+          end if
+          ! Check if the VDF includes negative values after spatial diffusion
+          call check_dist_neg(NameSub//' after spatial diffusion',1,nX,iLine)
+          if(IsDistNeg) RETURN
+       end if
+       ! ------------ Thank you! ------------
 
        ! Update time
        Time = Time + Dt

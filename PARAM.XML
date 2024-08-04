@@ -668,10 +668,12 @@ The default value is false.
 <command name="FOCUSEDTRANSPORT">
   <parameter name="UseBetatron" type="logical" default="F" />
   <parameter name="UseInertialForce" type="logical" default="F" />
+  <parameter name="UseMuScattering" type="logical" default="F" />
 
 #FOCUSEDTRANSPORT
 F			UseBetatron
 F			UseInertialForce
+F			UseMuScattering
 
 When choosing to solve the focused transport equation, one should
 configure SP/MFLAMPA with nMu greater than 1; otherwise, there
@@ -684,6 +686,13 @@ One can also specify more terms of interest for the simulation,
 such as the betatron accleration (D(lnB)/Dt /= 0) and the
 inertial force (Du/Dt /= 0), by setting parameters of UseBetatron
 and UseInertialForce, respectively, in the PARAM.in file.
+
+In the focused transport equation solver, one can also determine
+whether to include the scattering term for pitch angle. If so,
+the coefficients (e.g., DMuMu and LamdbaMuMu) will be set up and
+the scattering with pitch angles will be included. One can also
+determine whether to solve the spatial diffusion by setting
+UseDiffusion in #DIFFUSION.
 
 The default values for both of these parameters are false.
 </command>
