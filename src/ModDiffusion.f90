@@ -329,8 +329,8 @@ contains
     DtOverDMu2 = Dt/DeltaMu**2      ! (\Delta t) / (\Delta \mu^2)
 
     ! Calculate factorized diffusion coefficient: (1-mu**2) * mu**(2.0/3.0)
-    LowerLimMu = (1.0 - DeltaMu**2) * abs(DeltaMu)**(2.0/3.0)
-    FactorMu_F = (1.0 - MuFace_I**2) * abs(MuFace_I)**(2.0/3.0)
+    LowerLimMu = (1.0 - DeltaMu**2)*abs(DeltaMu)**(2.0/3.0)
+    FactorMu_F = (1.0 - MuFace_I**2)*abs(MuFace_I)**(2.0/3.0)
 
     ! Get the Alfven wave speed for each s_L
     AlfvenSpeed_I = BSi_I/sqrt(cMu*nSi_I*cAtomicMass)
@@ -378,7 +378,7 @@ contains
     real, intent(in)    :: BSi_I(1:nX)
     real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
     real, parameter     :: cCoef = 81.0/(7*cPi*cTwoPi**(2.0/3))
-    real, parameter     :: cCoefMumu_To_xx = 14.0/27
+    real, parameter     :: cCoefxx_to_mumu = 14.0/27
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
     RadiusSi_I(1:nX) = State_VIB(R_,1:nX,iLine)*Io2Si_V(UnitX_)
@@ -428,7 +428,7 @@ contains
     CoefLambdaxx_I(1:nX) = CoefLambdaxx_I(1:nX)/BSi_I(1:nX)
 
     ! CoefLambda_xx => CoefLambda_mumu
-    CoefLambdaMuMu_I(1:nX) = cCoefMumu_To_xx * CoefLambdaxx_I(1:nX)
+    CoefLambdaMuMu_I(1:nX) = cCoefxx_to_mumu * CoefLambdaxx_I(1:nX)
 
   end subroutine set_diffusion_coef
   !============================================================================
