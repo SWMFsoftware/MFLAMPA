@@ -59,7 +59,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine advect_via_poisson_parker(iLine, nX, iShock, &
-       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I)
+       tFinal, CflIn, nOldSi_I, nSi_I, BSi_I, Mass_C)
     ! advect via Possion Bracket scheme: (p**3/3, s_L)
     ! diffuse the distribution function at each time step
 
@@ -69,7 +69,7 @@ contains
     real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion, assuming at the time of tFinal
-    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX)
+    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BSi_I(nX), Mass_C(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! VolumeXStart_I: geometric volume when the subroutine starts
     ! VolumeXEnd_I: geometric volume when the subroutine ends
@@ -100,11 +100,11 @@ contains
     ! Initialize arrays
     ! Geometric volume: for DeltaS/B, with 1 ghost point at the boundary
     ! Start volume
-    VolumeXStart_I(1:nX) = 1.0/nOldSi_I(1:nX)
+    VolumeXStart_I(1:nX) = Mass_C/nOldSi_I(1:nX)
     VolumeXStart_I(0)    = VolumeXStart_I(1)
     VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
     ! End volume
-    VolumeXEnd_I(1:nX)   = 1.0/nSi_I(1:nX)
+    VolumeXEnd_I(1:nX)   = Mass_C/nSi_I(1:nX)
     VolumeXEnd_I(0)      = VolumeXEnd_I(1)
     VolumeXEnd_I(nX+1)   = VolumeXEnd_I(nX)
     ! Time derivative

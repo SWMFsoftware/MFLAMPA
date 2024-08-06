@@ -70,8 +70,9 @@ contains
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson_parker, &
          calc_states_poisson_focused, advect_via_poisson_focused
-    use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth
+    use SP_ModGrid,             ONLY: RhoOld_, BOld_, nWidth, D_
     use SP_ModTime,             ONLY: SPTime
+    use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
     real, intent(in):: TimeLimit
     ! Loop variable
@@ -89,7 +90,8 @@ contains
     ! Time step in the PROGRESS Loop, DtFull/nProgress
     real    :: DtProgress
     ! Local arrays to store the state vectors in SI units
-    real, dimension(1:nVertexMax) :: nOldSi_I, nSi_I, BOldSi_I, BSi_I
+    real, dimension(1:nVertexMax) :: nOldSi_I, nSi_I, BOldSi_I, BSi_I, Mass_C
+    real    :: DsSi_I(1:nVertexMax-1)
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax) :: dLogRho_I
 
@@ -101,7 +103,14 @@ contains
        if(.not.Used_B(iLine)) CYCLE LINE
        ! Number of the active particles on the line
        iEnd = nVertex_B(iLine)
-
+       ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
+       DsSi_I(1:iEnd-1) = State_VIB(D_, 1:iEnd-1, iLine)*Io2Si_V(UnitX_)
+       Mass_C(2:iEnd-1) = 0.5*(DsSi_I(2:iEnd-1) + DsSi_I(1:iEnd-2))*&
+            MhData_VIB(Rho_, 2:iEnd-1, iLine)/State_VIB(B_, 2:iEnd-1, iLine)
+       Mass_C(1)        = DsSi_I(1)*MhData_VIB(Rho_,1,iLine)&
+            /State_VIB(B_, 1, iLine)
+       Mass_C(iEnd)     = DsSi_I(iEnd-1)*MhData_VIB(Rho_,iEnd,iLine)&
+            /State_VIB(B_, iEnd, iLine)
        ! For focused transport equation: 
        ! initialize states for the multiple Poisson bracket scheme
        if(UsePoissonBracket .and. .not.IsMuAvg) &
@@ -164,7 +173,7 @@ contains
                 call advect_via_poisson_parker(iLine, iEnd, &
                      iShock, DtProgress, Cfl, &
                      nSi_I(1:iEnd)*exp(-dLogRho_I(1:iEnd)), &
-                     nSi_I(1:iEnd), BSi_I(1:iEnd))
+                     nSi_I(1:iEnd), BSi_I(1:iEnd), Mass_C(1:iEnd))
              else
                 ! Multiple Poisson brackets: Focused transport equation
                 ! See descriptions for development in ModAdvancePoisson.f90
@@ -194,7 +203,6 @@ contains
       ! becomes steeper for the current line
 
       use SP_ModGrid, ONLY: D_, dLogRhoThreshold
-      use SP_ModUnit, ONLY: Io2Si_V, UnitX_
       real :: DsSi_I(1:iEnd-1)
       real :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real :: dLogRhoExcessIntegral
