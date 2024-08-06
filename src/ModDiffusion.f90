@@ -13,7 +13,8 @@ module SP_ModDiffusion
   use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: MomentumInjSi, nP, nMu
+  use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, &
+       MomentumInjSi, nMu, MuFace_I, DeltaMu, Distribution_CB
   use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, D_, R_, Wave1_, Wave2_
   use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
@@ -111,7 +112,6 @@ contains
        nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
        LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
     ! diffuse the distribution function with vector/local Dt
-    use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, Distribution_CB
     use SP_ModTurbulence,   ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
@@ -226,8 +226,8 @@ contains
             DiffCoeffMinSi/spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=NP))
     end if
 
-    MOMENTUM:do iP = 1, nP
-       MU:do iMu = 1, nMu
+    MU:do iMu = 1, nMu
+       MOMENTUM:do iP = 1, nP
           ! Now, we solve the matrix equation
           ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
           !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
@@ -295,8 +295,8 @@ contains
           ! Update the solution from f^(n) to f^(n+1):
           call tridiag(nX, Lower_I, Main_I, Upper_I, Res_I, &
                Distribution_CB(iP, iMu, 1:nX, iLine))
-       end do MU
-    end do MOMENTUM
+       end do MOMENTUM
+    end do MU
 
   end subroutine diffuse_distribution_arr
   !===========================================================================
@@ -304,8 +304,6 @@ contains
     ! Calculate scatter: \deltaf/\deltat = (Dmumu*f_mu)_mu
 
     use ModConst,           ONLY: cAtomicMass
-    use SP_ModDistribution, ONLY: MuFace_I, DeltaMu, &
-         SpeedSi_I, Momentum_I, Distribution_CB
     ! Variables as inputs
     ! input Line and End index (for how many particles)
     integer, intent(in) :: iLine, nX
@@ -377,8 +375,8 @@ contains
     integer, intent(in) :: iLine, nX, iShock
     real, intent(in)    :: BSi_I(1:nX)
     real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
-    real, parameter     :: cCoef = 81.0/(7*cPi*cTwoPi**(2.0/3))
-    real, parameter     :: cCoefxx_to_mumu = 14.0/27
+    real, parameter     :: cCoef = 81.0/(7.0*cPi*cTwoPi**(2.0/3))
+    real, parameter     :: cCoefxx_to_mumu = 14.0/27.0
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
     RadiusSi_I(1:nX) = State_VIB(R_,1:nX,iLine)*Io2Si_V(UnitX_)
@@ -403,10 +401,10 @@ contains
           ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
           ! 1/AU cancels with unit of Lambda0, no special attention needed;
           ! v (velocity) and (p)**(1/3) are calculated in momentum do loop
-          CoefLambdaxx_I(1:nX) = (1.0/3)*MeanFreePath0InAu *      &
+          CoefLambdaxx_I(1:nX) = (1.0/3.0)*MeanFreePath0InAu *    &
                RadiusSi_I(1:nX)*(cLightSpeed*MomentumInjSi/cGeV)**(1.0/3)
        elsewhere
-          CoefLambdaxx_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /       &
+          CoefLambdaxx_I(1:nX) = (cCoef/3.0)*BSi_I(1:nX)**2 /     &
                (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
                (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
                **(1.0/3)
@@ -418,7 +416,7 @@ contains
        ! ------------------------------------------------------
        ! effective level of turbulence is different for different momenta:
        ! (\delta B)**2 \propto Gyroradius**(1/3)
-       CoefLambdaxx_I(1:nX) = (cCoef/3)*BSi_I(1:nX)**2 /          &
+       CoefLambdaxx_I(1:nX) = (cCoef/3.0)*BSi_I(1:nX)**2 /        &
             (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
             (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
             **(1.0/3)
