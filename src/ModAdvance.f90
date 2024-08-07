@@ -180,7 +180,8 @@ contains
                 call advect_via_poisson_focused(iLine, iEnd, &
                      iShock, DtProgress, Cfl, &
                      nSi_I(1:iEnd)*exp(-dLogRho_I(1:iEnd)), &
-                     nSi_I(1:iEnd), BOldSi_I(1:iEnd), BSi_I(1:iEnd))
+                     nSi_I(1:iEnd), BOldSi_I(1:iEnd), BSi_I(1:iEnd),&
+                     Mass_C(1:iEnd))
              end if
           else
              ! No Poisson bracket scheme, use the default algorithm

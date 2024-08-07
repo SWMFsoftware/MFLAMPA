@@ -321,7 +321,7 @@ contains
   end subroutine calc_states_poisson_focused
   !============================================================================
   subroutine advect_via_poisson_focused(iLine, nX, iShock, &
-       tFinal, CflIn, nOldSi_I, nSi_I, BOldSi_I, BSi_I)
+       tFinal, CflIn, nOldSi_I, nSi_I, BOldSi_I, BSi_I, Mass_C)
     ! Advect via multiple Possion Bracket scheme for the focused transport
     ! equation considering pitch angle, may including: adiabatic focusing
     ! (conservation of the magnetic moment), cooling or accleration (with
@@ -339,7 +339,8 @@ contains
     real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables at last and next time steps
-    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BOldSi_I(nX), BSi_I(nX)
+    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BOldSi_I(nX), BSi_I(nX),&
+         Mass_C(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! Loop variables
     integer :: iP, iMu, iX
@@ -502,11 +503,11 @@ contains
 
       ! Geometric volume: for DeltaS/B, with 1 ghost point at the boundary
       ! Start volume: 1/n at Time = 0.0
-      VolumeXStart_I(1:nX) = 1.0/nOldSi_I
+      VolumeXStart_I(1:nX) = Mass_C/nOldSi_I
       VolumeXStart_I(0)    = VolumeXStart_I(1)
       VolumeXStart_I(nX+1) = VolumeXStart_I(nX)
       ! End volume: 1/n at Time = tFinal, i.e., DtProgress
-      VolumeXEnd_I(1:nX)   = 1.0/nSi_I
+      VolumeXEnd_I(1:nX)   = Mass_C/nSi_I
       VolumeXEnd_I(0)      = VolumeXEnd_I(1)
       VolumeXEnd_I(nX+1)   = VolumeXEnd_I(nX)
       ! Time derivative: D(1/n)/Dt
