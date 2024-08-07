@@ -179,9 +179,8 @@ contains
                 ! See descriptions for development in ModAdvancePoisson.f90
                 call advect_via_poisson_focused(iLine, iEnd, &
                      iShock, DtProgress, Cfl, &
-                     nSi_I(1:iEnd)*exp(-dLogRho_I(1:iEnd)), &
-                     nSi_I(1:iEnd), BOldSi_I(1:iEnd), BSi_I(1:iEnd),&
-                     Mass_C(1:iEnd))
+                     nSi_I(1:iEnd)*exp(-dLogRho_I(1:iEnd)), nSi_I(1:iEnd), &
+                     BOldSi_I(1:iEnd), BSi_I(1:iEnd), Mass_C(1:iEnd))
              end if
           else
              ! No Poisson bracket scheme, use the default algorithm
@@ -203,14 +202,12 @@ contains
       ! change the density profile near the shock front so it
       ! becomes steeper for the current line
 
-      use SP_ModGrid, ONLY: D_, dLogRhoThreshold
-      real :: DsSi_I(1:iEnd-1)
+      use SP_ModGrid, ONLY: dLogRhoThreshold
       real :: dLogRhoExcess_I(iShock-nWidth:iShock+nWidth-1)
       real :: dLogRhoExcessIntegral
       ! find the excess of dLogRho within the shock compared
       ! to background averaged over length
       !------------------------------------------------------------------------
-      DsSi_I = State_VIB(D_,1:iEnd-1,iLine)*Io2Si_V(UnitX_)
       dLogRhoExcess_I = max(0.5*(dLogRho_I(iShock-nWidth:iShock+nWidth-1) + &
            dLogRho_I(iShock-nWidth+1:iShock+nWidth)) - dLogRhoThreshold, 0.0)
       ! A jump (dLogRhoExcess>0) in velocity accross the shock wave * \Delta t

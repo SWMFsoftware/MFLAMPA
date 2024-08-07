@@ -332,15 +332,15 @@ contains
 
     use ModConst,           ONLY: cProtonMass
     use SP_ModDiffusion,    ONLY: scatter_distribution
-    use SP_ModDistribution, ONLY: Mu_I, MuFace_I, DeltaMu, SpeedSi_I
+    use SP_ModDistribution, ONLY: DeltaMu, MuFace_I, DeltaMu3_I, SpeedSi_I
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
     real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables at last and next time steps
-    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), BOldSi_I(nX), BSi_I(nX),&
-         Mass_C(nX)
+    real,    intent(in) :: nOldSi_I(nX), nSi_I(nX), &
+         BOldSi_I(nX), BSi_I(nX), Mass_C(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! Loop variables
     integer :: iP, iMu, iX
@@ -376,8 +376,6 @@ contains
     real    :: Dt
     ! Prediction of next time step:
     real    :: DtNext
-    ! Mark whether this is the last run:
-    logical :: IsExit
 
     ! Now this is the particle-number-conservative advection scheme with mu
     character(len=*), parameter:: NameSub = 'advect_via_triple_poisson'
@@ -398,13 +396,7 @@ contains
     ! Advect by the multiple-Poisson-bracket scheme
     do
        ! Update Time step
-       if(DtNext > tFinal - Time) then
-          Dt = tFinal - Time
-          IsExit = .true.          ! Last step
-       else
-          Dt = DtNext
-          IsExit = .false.         ! Intermediate steps
-       end if
+       Dt = min(DtNext, tFinal - Time)
 
        ! Update Bc for at minimal energy, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -413,26 +405,11 @@ contains
        ! Advance by the multiple-Poisson-bracket scheme
        call advance_poisson_focused(DtIn=Dt)
 
-       if(IsExit) then
-          ! This step is the last step
-          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
-               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
-               Source_C(1:nP, 1:nMu, iStart:nX)
-       else
-          ! This step is not the last step
-          ! Update VDF_G considering the time-dependent Volume_G
-
-          Source_C = Source_C*Volume_G(1:nP, 1:nMu, 1:nX)
-          ! Update Volume_G assuming this small time step has been marched
-          Volume_G = VolumeStart_G + (Time+Dt)*dVolumeDt_G
-
-          ! Update Distribution_CB to the CURRENT time plus Dt, with no
-          ! BC setups, only within the range of (1:nP, 1:nMu, iStart:nX).
-          Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
-               Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
-               Source_C(1:nP, 1:nMu, iStart:nX)/ &
-               Volume_G(1:nP, 1:nMu, iStart:nX)
-       end if
+       ! Update Distribution_CB to the CURRENT time plus Dt, with no
+       ! BC setups, only within the range of (1:nP, 1:nMu, iStart:nX).
+       Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
+            Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
+            Source_C(1:nP, 1:nMu, iStart:nX)
        ! Check if the VDF includes negative values after scattering
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg) RETURN
@@ -452,10 +429,8 @@ contains
           ! Check if the VDF includes negative values after mu scattering
           call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
           if(IsDistNeg) RETURN
-       end if
-
-       ! For spatial diffusion
-       if(UseDiffusion) then
+       else if(UseDiffusion) then
+          ! For spatial diffusion
           if(UseUpperEndBc) then
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
@@ -537,12 +512,14 @@ contains
               spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
 
          ! Calculate 1st Hamiltonian function in the time-dependent Poisson
-         ! bracket: {f_jk; (p**3/3)*(DeltaS/B)}_{tau, p**3/3} => \tilde\DeltaH
-         dHamiltonian01_FX(:, 1:nMu, iX) = -dVolumeXDt_I(iX)*DeltaMu* &
-              3.0*spread(Mu_I**2, DIM=1, NCOPIES=nP+3)* &
+         ! bracket: {f_jk; (3*mu**2)*(p**3/3)*(DeltaS/B)}_{tau, p**3/3} =>
+         ! {f_jk; D(mu**3)*(p**3/3)*(DVx)}_{tau, p**3/3}, as \tilde\DeltaH
+         dHamiltonian01_FX(:, 1:nMu, iX) = -dVolumeXDt_I(iX)* &
+              spread(DeltaMu3_I, DIM=1, NCOPIES=nP+3)* &
               spread(Momentum3_I, DIM=2, NCOPIES=nMu)
          ! Calculate 2nd Hamiltonian function in the time-dependent Poisson
-         ! bracket: {f_jk; mu*(1-mu**2)*(DeltaS/B)}_{tau, mu} => \tilde\DeltaH
+         ! bracket: {f_jk; mu*(1-mu**2)*(DeltaS/B)}_{tau, mu} =>
+         ! {f_jk; mu*(1-mu**2)*(D(p**3/3)*DVx)}_{tau, mu} as \tilde\DeltaH
          dHamiltonian02_FY(:, 0:nMu, iX) = -dVolumeXDt_I(iX)* &
               spread(MuFace_I*(1.0-MuFace_I**2), DIM=1, NCOPIES=nP+2)* &
               spread(VolumeP_I, DIM=2, NCOPIES=nMu+1)

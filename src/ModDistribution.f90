@@ -43,7 +43,7 @@ module SP_ModDistribution
 
   ! uniform distribution of pitch angle
   real, public :: DeltaMu = 2.0/nMu
-  real, public :: MuFace_I(0:nMu), Mu_I(nMu)
+  real, public :: MuFace_I(0:nMu), Mu_I(nMu), DeltaMu3_I(nMu)
 
   ! speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
@@ -168,6 +168,7 @@ contains
        MuFace_I(iMu) = -1.0 + real(iMu)*DeltaMu
     end do
     Mu_I = 0.5*(MuFace_I(0:nMu-1) + MuFace_I(1:nMu))
+    DeltaMu3_I = MuFace_I(1:nMu)**3.0 - MuFace_I(0:nMu-1)**3.0
 
     ! Distribution function
     allocate(Distribution_CB(0:nP+1, nMu, nVertexMax, nLine), stat=iError)

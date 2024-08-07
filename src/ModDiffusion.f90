@@ -316,7 +316,7 @@ contains
     ! Factorize DMuMu, each factor being only a function of p**3/3, mu, s_L
     real :: FactorMu_F(0:nMu)
     ! Lower, main, upper diagonals, and source for the scatter calculation
-    real :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
+    real :: Main_I(nMu), Upper_I(nMu), Lower_I(nMu), Res_I(nMu)
     ! Physical VARs
     real :: LowerLimMu              ! Lower limit of Factor_mu
     real :: DtOverDMu2              ! (\Delta t) / (\Delta \mu^2)
