@@ -5,9 +5,9 @@ module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
   use SP_ModDiffusion,    ONLY: UseDiffusion, set_diffusion_coef
-  use SP_ModDistribution, ONLY: IsMuAvg, IsDistNeg
+  use SP_ModDistribution, ONLY: IsDistNeg
   use SP_ModGrid,         ONLY: State_VIB, MHData_VIB, iShock_IB, &
-       Used_B, Rho_, B_, Shock_, ShockOld_, nLine, nVertex_B
+       Used_B, Rho_, B_, Shock_, ShockOld_, nLine, nVertex_B, IsMuAvg
   use SP_ModSize,         ONLY: nVertexMax
   use ModUtilities,       ONLY: CON_stop
 

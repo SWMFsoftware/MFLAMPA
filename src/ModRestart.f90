@@ -165,10 +165,11 @@ contains
   !============================================================================
   subroutine write_restart_header
 
+    use ModUtilities,       ONLY: cTab
+    use SP_ModGrid,         ONLY: nP, nMu
     use SP_ModPlot,         ONLY: nTag
     use SP_ModProc,         ONLY: iProc
-    use ModUtilities,       ONLY: cTab
-    use SP_ModDistribution, ONLY: nP, EnergyInjIo, EnergyMaxIo, nMu
+    use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
     ! full name of the header file
     character(len=100):: NameFile
 
@@ -205,12 +206,14 @@ contains
     write(UnitTmp_,'(i8,a)')nTag,cTab//cTab//'nTag'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#MOMENTUMGRID'
-    write(UnitTmp_,'(es22.15,a)')EnergyInjIo, cTab//cTab//'EnergyMin'
-    write(UnitTmp_,'(es22.15,a)')EnergyMaxIo, cTab//cTab//'EnergyMax'
     write(UnitTmp_,'(i8,a)')nP, cTab//cTab//'nP'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#PITCHANGLEGRID'
     write(UnitTmp_,'(i8,a)')nMu, cTab//cTab//'nMu'
+    write(UnitTmp_,*)
+    write(UnitTmp_,'(a)')'#ENERGYRANGE'
+    write(UnitTmp_,'(es22.15,a)')EnergyInjIo, cTab//cTab//'EnergyMin'
+    write(UnitTmp_,'(es22.15,a)')EnergyMaxIo, cTab//cTab//'EnergyMax'
     write(UnitTmp_,*)
     write(UnitTMP_,'(a)')'#END'
     write(UnitTmp_,*)

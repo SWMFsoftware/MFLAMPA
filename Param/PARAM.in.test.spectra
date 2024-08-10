@@ -32,12 +32,14 @@ T			UsePoissonBracket
 keV			ParticleEnergyUnit
 
 #MOMENTUMGRID
-1.0E+1			EnergyMin
-1.0E+7			EnergyMax
 100			nP
 
 #PITCHANGLEGRID
 1			nMu
+
+#ENERGYRANGE
+1.0E+1			EnergyMin
+1.0E+7			EnergyMax
 
 #FLUXINITIAL
 0.01			FluxInitIo [pfu]

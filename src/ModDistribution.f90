@@ -10,9 +10,8 @@ module SP_ModDistribution
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
-       nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
-  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
+  use SP_ModSize,   ONLY: nVertexMax
+  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B, nP, nMu, IsMuAvg
 
   implicit none
 
@@ -26,9 +25,6 @@ module SP_ModDistribution
   public:: offset                ! Sync. index in State_VIB and Distribution_CB
   public:: check_dist_neg        ! Check any of Distribution_CB is negative
   public:: search_kinetic_energy ! Search the given kinetic energy index
-  public:: nP                    ! Number of points in the momentum grid
-  public:: nMu                   ! Number of points over pitch-angle (\mu)
-  public:: IsMuAvg               ! If .true., VDF is omnidirectional
 
   ! Injection and maximal energy, in kev (or, in Io energy unit)
   ! To be read from the PARAM.in file
@@ -83,31 +79,17 @@ contains
   subroutine read_param(NameCommand)
 
     use ModReadParam, ONLY: read_var
-    use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in) :: NameCommand ! From PARAM.in
-    integer :: nPCheck = nP, nMuCheck = nMu
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-    case('#MOMENTUMGRID')
+    case('#ENERGYRANGE')
        ! Read energy range for particles, in the unit of NameEnergyUnit
        call read_var('EnergyMin', EnergyInjIo)
        call read_var('EnergyMax', EnergyMaxIo)
-       call read_var('nP',        nPCheck    )
-       if(nP/=nPCheck) then
-          if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
-               'Code is configured with nMomentum=', nP,         &
-               ' while value read from PARAM.in is nP=', nPCheck
-          call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
-       end if
-    case('#PITCHANGLEGRID')
-       call read_var('nMu', nMuCheck)
-       if(nMu/=nMuCheck) then
-          if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
-               'Code is configured with nMu=', nMu,              &
-               ' while value read from PARAM.in is nMu=', nMuCheck
-          call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
-       end if
+       ! check correctness
+       if(EnergyInjIo <= 0.0 .or. EnergyMaxIo <= 0.0) call CON_stop( &
+            NameSub // ': EnergyInjIo and EnergyInjIo must be positive')
     case('#FLUXINITIAL')
        call read_var('FluxInitIo', FluxInitIo)
        ! check correctness
@@ -220,11 +202,10 @@ contains
        ! for strictly positive quantities; such occurences need fixing
        where(State_VIB([RhoOld_,BOld_],1,iLine) <= 0.0)
           State_VIB([RhoOld_,BOld_],1,iLine) = &
-               0.01 * State_VIB([RhoOld_,BOld_],2,iLine)
+               0.01*State_VIB([RhoOld_,BOld_],2,iLine)
        end where
        where(Distribution_CB(:,:,1,iLine) <= 0.0)
-          Distribution_CB(:,:,1,iLine) = &
-               0.01 * Distribution_CB(:,:,2,iLine)
+          Distribution_CB(:,:,1,iLine) = 0.01*Distribution_CB(:,:,2,iLine)
        end where
     elseif(iOffset < 0)then
        State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &

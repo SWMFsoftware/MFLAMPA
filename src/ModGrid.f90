@@ -12,7 +12,8 @@ module SP_ModGrid
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use SP_ModSize,   ONLY: nVertexMax
+  use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
+       nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
   use SP_ModProc,   ONLY: iProc
 
   implicit none
@@ -29,6 +30,9 @@ module SP_ModGrid
   public:: get_other_state_var ! Auxiliary components of state vector
   public:: get_shock_location  ! finds shock location on all lines
   public:: search_line         ! find particle index corresponding to radius
+  public:: nP                  ! Number of points in the momentum grid
+  public:: nMu                 ! Number of points over pitch-angle (\mu)
+  public:: IsMuAvg             ! If .true., VDF is omnidirectional
 
   ! Coordinate system and geometry
   character(len=3), public :: TypeCoordSystem = 'HGR'
@@ -38,7 +42,7 @@ module SP_ModGrid
   integer, public :: nLon = 4
   integer, public :: nLat = 4
 
-  ! Total number of magnetic field lines on all PEs (a product of nLat * nLon)
+  ! Total number of magnetic field lines on all PEs (a product of nLat*nLon)
   integer, public :: nLineAll = 16
 
   ! All nodes are enumerated. Last node number on the previous proc = iProc-1,
@@ -160,11 +164,29 @@ contains
   subroutine read_param(NameCommand)
 
     use ModReadParam, ONLY: read_var
-    character(len=*), intent(in):: NameCommand        ! From PARAM.in
-    integer :: nParticleCheck, nLonCheck, nLatCheck   ! Misc
+    use SP_ModProc,   ONLY: iProc
+    character(len=*), intent(in):: NameCommand      ! From PARAM.in
+    integer :: nPCheck = nP, nMuCheck = nMu         ! Check nP and nMu
+    integer :: nParticleCheck, nLonCheck, nLatCheck ! Check nLon/nLat/nParticle
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
+    case('#MOMENTUMGRID')
+       call read_var('nP', nPCheck)
+       if(nP/=nPCheck) then
+          if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
+               'Code is configured with nMomentum=', nP,         &
+               ' while value read from PARAM.in is nP=', nPCheck
+          call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
+       end if
+    case('#PITCHANGLEGRID')
+       call read_var('nMu', nMuCheck)
+       if(nMu/=nMuCheck) then
+          if(iProc==0) write(*,'(a,i6,a,i6)') NameSub//' '//     &
+               'Code is configured with nMu=', nMu,              &
+               ' while value read from PARAM.in is nMu=', nMuCheck
+          call CON_stop('Modify PARAM.in or reconfigure SP/MFLAMPA')
+       end if
     case('#CHECKGRIDSIZE')
        call read_var('nVertexMax', nParticleCheck)
        call read_var('nLat',       nLatCheck)

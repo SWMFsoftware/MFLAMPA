@@ -14,11 +14,11 @@ module SP_ModPlot
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModChannel,       ONLY: FluxChannelInit_V, Flux_VIB,    &
        Flux0_, FluxMax_, NameFluxChannel_I, NameFluxUnit_I
-  use SP_ModDistribution,  ONLY: nP, KinEnergyIo_I, Momentum_I,  &
-       nMu, IsMuAvg, Distribution_CB
+  use SP_ModDistribution,  ONLY: KinEnergyIo_I, Momentum_I, Distribution_CB
   use SP_ModGrid,          ONLY: nVar, nMHData, nLine, nLineAll, &
        iLineAll0, search_line, MHData_VIB, State_VIB, iShock_IB, &
-       nVertex_B, NameVar_V, Shock_, LagrID_, X_, Y_, Z_, R_, TypeCoordSystem
+       nVertex_B, NameVar_V, Shock_, LagrID_, X_, Y_, Z_, R_,    &
+       TypeCoordSystem, nP, nMu, IsMuAvg
   use SP_ModProc,          ONLY: iProc
   use SP_ModSize,          ONLY: nVertexMax, nDim
   use SP_ModTime,          ONLY: SPTime, iIter, StartTime, StartTimeJulian

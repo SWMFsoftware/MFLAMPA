@@ -8,10 +8,11 @@ module SP_ModAdvancePoisson
   ! See https://doi.org/10.1016/j.jcp.2023.111923
 
   use SP_ModSize,         ONLY: nVertexMax
+  use SP_ModGrid,         ONLY: nP, nMu, State_VIB
   use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
        UseUpperEndBc, UseLowerEndBc, iStart
-  use SP_ModDistribution, ONLY: nP, VolumeP_I, Momentum3_I, &
-       nMu, Distribution_CB, IsDistNeg, check_dist_neg
+  use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I, &
+       Distribution_CB, IsDistNeg, check_dist_neg, dLogP
   use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
   use ModUtilities,       ONLY: CON_stop
   use ModPoissonBracket,  ONLY: explicit
@@ -197,7 +198,7 @@ contains
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, s_L)
     ! Diffuse the distribution function at each time step
 
-    use SP_ModGrid, ONLY: State_VIB, D_, U_
+    use SP_ModGrid, ONLY: D_, U_
     use SP_ModUnit, ONLY: UnitX_, Io2Si_V
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
@@ -303,7 +304,7 @@ contains
     ! Calculate time derivatives from the input files, used for focused
     ! transport equation, if UseBetatron or UseInertialForce is .true.
 
-    use SP_ModGrid, ONLY: UOld_, U_, State_VIB
+    use SP_ModGrid, ONLY: UOld_, U_
     ! Line number and number along grid axis
     integer, intent(in) :: iLine, nX
     ! Time difference over the entire loop: DtFull
@@ -630,7 +631,6 @@ contains
               spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+2)* &
               spread(SpeedSi_I*VolumeP_I, DIM=2, NCOPIES=nMu+1)
       end do
-
       ! Boundary condition of the Hamiltonian function: symmetry
       Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
       Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)

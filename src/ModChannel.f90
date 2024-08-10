@@ -6,7 +6,7 @@ module SP_ModChannel
   ! Setting energy channels and get the integral/differential intensity
 
   use ModUtilities, ONLY: CON_stop
-  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B
+  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B, nP, nMu
   use SP_ModUnit,   ONLY: Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_, &
        NameFluxUnit, NameDiffFluxUnit, NameEnergyFluxUnit
 
@@ -433,7 +433,7 @@ contains
     ! fluxes in specified energy channels; also compute total energy flux
 
     use ModNumConst,        ONLY: cTiny
-    use SP_ModDistribution, ONLY: nP, nMu, DeltaMu, Momentum_I, &
+    use SP_ModDistribution, ONLY: DeltaMu, Momentum_I, &
          KinEnergyIo_I, Distribution_CB, search_kinetic_energy
     ! loop variables
     integer:: iLine, iVertex, iP, iFlux, iPLo, iPHi

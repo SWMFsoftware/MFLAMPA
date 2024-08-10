@@ -78,12 +78,12 @@ contains
        case('#ORIGIN')
           if(IsStandAlone) CYCLE
           call read_param_origin
-       case('#COORDSYSTEM', '#COORDINATESYSTEM', '#TESTPOS', &
-            '#CHECKGRIDSIZE', '#GRIDNODE')
+       case('#MOMENTUMGRID', '#PITCHANGLEGRID', '#CHECKGRIDSIZE', &
+            '#COORDSYSTEM', '#COORDINATESYSTEM', '#GRIDNODE', '#TESTPOS')
           ! Currently we do not need '#DOSMOOTH'
           if(.not.IsFirstSession) CYCLE
           call read_param_grid(NameCommand)
-       case('#MOMENTUMGRID', '#PITCHANGLEGRID', '#FLUXINITIAL')
+       case('#ENERGYRANGE', '#FLUXINITIAL')
           if(.not.IsFirstSession) CYCLE
           call read_param_dist(NameCommand)
        case('#CFL', '#ADVECTION', '#TRACESHOCK')

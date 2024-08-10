@@ -8,7 +8,8 @@ module SP_ModAdvanceAdvection
   ! Version: Sokolov & Roussev, Jan, 2008, SP/FLAMPA/src/ModLogAdvection.f90
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, &
+  use SP_ModGrid,         ONLY: nP
+  use SP_ModDistribution, ONLY: Distribution_CB, &
        dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
 

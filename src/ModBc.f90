@@ -4,15 +4,15 @@
 module SP_ModBc
 
   ! The module sets up boundary conditions
-  use ModNumConst,        ONLY: cPi
-  use ModCosmicRay,       ONLY: local_interstellar_spectrum,          &
+  use ModNumConst,  ONLY: cPi
+  use ModCosmicRay, ONLY: local_interstellar_spectrum, &
        TypeLisBc, UseModulationPot, ModulationPot
-  use SP_ModDistribution, ONLY: nP, nMu, Distribution_CB, Momentum_I, &
+  use SP_ModDistribution, ONLY: Distribution_CB, Momentum_I, &
        MomentumInjSi, Background_I
-  use SP_ModGrid,         ONLY: MhData_VIB, NoShock_, nWidth, T_, X_, Z_
-  use SP_ModUnit,         ONLY: kinetic_energy_to_momentum,           &
+  use SP_ModGrid,   ONLY: nP, nMu, MhData_VIB, NoShock_, nWidth, T_, X_, Z_
+  use SP_ModUnit,   ONLY: kinetic_energy_to_momentum,  &
        UnitEnergy_, UnitX_, Io2Si_V
-  use ModUtilities,       ONLY: CON_stop
+  use ModUtilities, ONLY: CON_stop
   implicit none
 
   SAVE

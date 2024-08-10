@@ -4,8 +4,8 @@
 module SP_ModTurbulence
 
   use ModConst
-  use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, MomentumInjSi
-  ! use SP_ModGrid,         ONLY: iPTest, iParticleTest
+  use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, MomentumInjSi
+  use SP_ModGrid,         ONLY: nP !iPTest, iParticleTest
 
   implicit none
 

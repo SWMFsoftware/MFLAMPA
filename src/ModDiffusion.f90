@@ -13,9 +13,10 @@ module SP_ModDiffusion
   use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: nP, SpeedSi_I, Momentum_I, &
-       MomentumInjSi, nMu, MuFace_I, DeltaMu, Distribution_CB
-  use SP_ModGrid,   ONLY: State_VIB, MHData_VIB, D_, R_, Wave1_, Wave2_
+  use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, &
+       MomentumInjSi, MuFace_I, DeltaMu, Distribution_CB
+  use SP_ModGrid,   ONLY: nP, nMu, State_VIB, MHData_VIB, &
+       D_, R_, Wave1_, Wave2_
   use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
 
@@ -131,8 +132,8 @@ contains
     ! for the two-dimensional local time step DtLocal_II array
     real    :: DtLocal_II(nX, nP)   ! Local time step for diffusion
     ! Same reason for LowerEndSpectrumIn_II and UpperEndSpectrumIn_II:
-    ! change (nP, nMu) => (nMu, nP) for a better looping order
-    real    :: LowerEndSpectrum_II(nMu, nP), UpperEndSpectrum_II(nMu, nP)
+    ! keep (nP, nMu) for a good looping order, outermost=iMu, innermost=iP
+    real    :: LowerEndSpectrum_II(nP, nMu), UpperEndSpectrum_II(nP, nMu)
     ! Logical variable for whether or not to use given lower and upper spectra
     logical :: UseLowerSpectrum = .false., UseUpperSpectrum = .false.
     ! Coefficients in the diffusion operator
@@ -170,20 +171,20 @@ contains
     ! Given Mu-averaged arrays: spread into 2 dimensions with nMu
     if(present(LowerEndSpectrumIn_I)) then
        UseLowerSpectrum = .true.
-       LowerEndSpectrum_II = spread(LowerEndSpectrumIn_I, DIM=1, NCOPIES=nMu)
+       LowerEndSpectrum_II = spread(LowerEndSpectrumIn_I, DIM=2, NCOPIES=nMu)
     end if
     if(present(UpperEndSpectrumIn_I)) then
        UseUpperSpectrum = .true.
-       UpperEndSpectrum_II = spread(UpperEndSpectrumIn_I, DIM=1, NCOPIES=nMu)
+       UpperEndSpectrum_II = spread(UpperEndSpectrumIn_I, DIM=2, NCOPIES=nMu)
     end if
     ! Given Mu-dependent arrays: transpose with a better index for the loop
     if(present(LowerEndSpectrumIn_II)) then
        UseLowerSpectrum = .true.
-       LowerEndSpectrum_II = transpose(LowerEndSpectrumIn_II)
+       LowerEndSpectrum_II = LowerEndSpectrumIn_II
     end if
     if(present(UpperEndSpectrumIn_II)) then
        UseUpperSpectrum = .true.
-       UpperEndSpectrum_II = transpose(UpperEndSpectrumIn_II)
+       UpperEndSpectrum_II = UpperEndSpectrumIn_II
     end if
 
     ! if using turbulent spectrum: set_dxx for diffusion along the field line
@@ -254,7 +255,7 @@ contains
              Main_I(1) = Main_I(1) + Aux2_I(1)
              ! ...while the given Aux2*f_0 is moved to the RHS and summed up
              ! with the source:
-             Res_I(1)  = Res_I(1) + Aux2_I(1)*LowerEndSpectrum_II(iMu, iP)
+             Res_I(1)  = Res_I(1) + Aux2_I(1)*LowerEndSpectrum_II(iP, iMu)
           end if
 
           ! For i=2, n-1:
@@ -289,7 +290,7 @@ contains
              Aux1_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)* &
                   DInnerSi_II(nX,iP)/DsMesh_I(nX)**2
              Main_I(nX)  = Main_I(nX) + Aux1_I(nX)
-             Res_I(nX)   = Res_I(nX) + Aux1_I(nX)*UpperEndSpectrum_II(iMu, iP)
+             Res_I(nX)   = Res_I(nX) + Aux1_I(nX)*UpperEndSpectrum_II(iP, iMu)
           end if
 
           ! Update the solution from f^(n) to f^(n+1):
