@@ -331,9 +331,11 @@ contains
     ! pitch-angle scattering terms, with (p**3/3, mu, s_L).
     ! Here, we diffuse the distribution function at each time step.
 
-    use ModConst,           ONLY: cProtonMass
+    use ModConst,           ONLY: cProtonMass, cRmeProton, cLightSpeed
     use SP_ModDiffusion,    ONLY: scatter_distribution
-    use SP_ModDistribution, ONLY: DeltaMu, MuFace_I, DeltaMu3_I, SpeedSi_I
+    use SP_ModDistribution, ONLY: DeltaMu, MuFace_I, DeltaMu3_I, &
+         SpeedSi_I, VolumeE_I, VolumeE3_I
+    use SP_ModUnit,         ONLY: Si2Io_V, UnitEnergy_
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -533,7 +535,7 @@ contains
 
       ! Clean the Hamiltonian function for {f_jk; H_23}_{mu, s_L}
       Hamiltonian23_N = 0.0
-      ! Calculate H_23 = Hamiltonian function for {f; H_23}_{mu, s_L}
+      ! Calculate H_23 = Hamiltonian function for {f_jk; H_23}_{mu, s_L}
       call calc_hamiltonian_23
 
     end subroutine init_states_focused
@@ -554,7 +556,7 @@ contains
       ! Clean the Hamiltonian function for {f_jk; H_12}_{p**3/3, mu},
       ! with time-dependent variables, needed to be updated at each time step
       Hamiltonian12_N = 0.0
-      ! Calculate H_12 = Hamiltonian function for {f; H_12}_{p**3/3, mu}
+      ! Calculate H_12 = Hamiltonian function for {f_jk; H_12}_{p**3/3, mu}
       call calc_hamiltonian_12
 
       ! Here we have three Lagrangian coordinates: (p**3/3, mu, s_L)
@@ -620,16 +622,20 @@ contains
     subroutine calc_hamiltonian_23
 
       ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
-      ! H_23 = (1-mu**2)*v/(2B), at the faces of mu and s_L => \tilde\deltaH
+      ! H_23 = (1-mu**2)/(2B)*Etot*(Etot**2-3*ProtonMass**2*c**4)/c**2,
+      ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
 
       ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2), 
-      ! calculated as a function of p. Note that momentum (or speed) in this
-      ! term is non-related to the Lagrangian coordinates (mu, s_L), so it
-      ! should be cell-centered, by using SpeedSi_I.
+      ! calculated as a function of p. At first, the Hamiltonian function is
+      ! H_23 = (1-mu**2)/(2B)*v, and we need to take the integral (for
+      ! averaging over) of p**3/3. Finally, we derive such a form for H_23.
+      ! Note that momentum in this term is non-related to the Lagrangian
+      ! coordinates (mu, s_L), so it should be cell-centered for p**3/3.
       do iX = 0, nX
-         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
+         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)*  &
               spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+2)* &
-              spread(SpeedSi_I*VolumeP_I, DIM=2, NCOPIES=nMu+1)
+              spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton*  &
+              Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
       end do
       ! Boundary condition of the Hamiltonian function: symmetry
       Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)

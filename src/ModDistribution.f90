@@ -43,8 +43,9 @@ module SP_ModDistribution
 
   ! speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
-       KinEnergyIo_I, VolumeP_I, Background_I
+       VolumeP_I, KinEnergyIo_I, VolumeE_I, VolumeE3_I, Background_I
   real, public :: Momentum3_I(-1:nP+1) ! P**3/3, normalized by MomentumInjSi
+  real, public :: EnergyIo_F(-1:nP+1)  ! Total energy, in the unit of IO
 
   !-----------------Grid in the momentum space---------------------------------
   ! iP     0     1                         nP   nP+1
@@ -128,22 +129,31 @@ contains
     dLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
     ! Functions to convert the grid index to momentum and energy
-    Momentum3_I(-1) = exp(-3*(0.50*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj
+    Momentum3_I(-1) = exp(-3*(0.5*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj
+    EnergyIo_F(-1) = momentum_to_energy(MomentumInjSi*exp(-0.5*dLogP)) &
+        *Si2Io_V(UnitEnergy_)
     do iP = 0, nP+1
        Momentum_I(iP)    = MomentumInjSi*exp(iP*dLogP)
+       ! For velocity = p*c**2/sqrt(p**2+(m*c**2)**2), at cell center
        SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
             momentum_to_energy(Momentum_I(iP))
+       ! For P**3/3 at faces and its volume
        Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*dLogP)
        VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
        ! Normalize kinetic energy per Unit of energy in SI unit:
        KinEnergyIo_I(iP) = momentum_to_kinetic_energy(Momentum_I(iP)) &
             *Si2Io_V(UnitEnergy_)
+       ! For total energy in IO unit, and its relevant volume:
+       EnergyIo_F(iP)    = momentum_to_energy( &
+            Momentum_I(iP)*exp(0.5*dLogP))*Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
        Momentum_I(iP)    = Momentum_I(iP)/MomentumInjSi
        Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
             (EnergyMaxIo-EnergyInjIo) &  ! Energy range
             /Momentum_I(iP)**2           ! Convert from diff flux to VDF
     end do
+    VolumeE_I  = EnergyIo_F(0:nP+1)    - EnergyIo_F(-1:nP)
+    VolumeE3_I = EnergyIo_F(0:nP+1)**3 - EnergyIo_F(-1:nP)**3
 
     ! Calculate all the mu values at cell center and faces
     do iMu = 0, nMu
