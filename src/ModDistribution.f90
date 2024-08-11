@@ -39,13 +39,15 @@ module SP_ModDistribution
 
   ! uniform distribution of pitch angle
   real, public :: DeltaMu = 2.0/nMu
-  real, public :: MuFace_I(0:nMu), Mu_I(nMu), DeltaMu3_I(nMu)
+  real, public :: Mu_F(0:nMu), Mu_C(nMu), DeltaMu3_I(nMu)
 
-  ! speed, momentum, kinetic energy at the momentum grid points
-  real, public, dimension(0:nP+1) :: SpeedSi_I, Momentum_I, &
-       VolumeP_I, KinEnergyIo_I, VolumeE_I, VolumeE3_I, Background_I
-  real, public :: Momentum3_I(-1:nP+1) ! P**3/3, normalized by MomentumInjSi
-  real, public :: EnergyIo_F(-1:nP+1)  ! Total energy, in the unit of IO
+  ! P**3/3 and total energy in the IO unit, at face center
+  real, public, dimension(-1:nP+1) :: Momentum3_F, EnergyIo_F
+  ! Speed, momentum, kinetic energy at the momentum grid points
+  real, public, dimension( 0:nP+1) :: SpeedSi_G, Momentum_G, KinEnergyIo_G
+  ! Volumes of each cell along the momentum axis
+  real, public, dimension( 0:nP+1) :: VolumeP_I, VolumeE_I, VolumeE3_I
+  real, public, dimension( 0:nP+1) :: Background_I
 
   !-----------------Grid in the momentum space---------------------------------
   ! iP     0     1                         nP   nP+1
@@ -129,38 +131,38 @@ contains
     dLogP = log(MomentumMaxSi/MomentumInjSi)/nP
 
     ! Functions to convert the grid index to momentum and energy
-    Momentum3_I(-1) = exp(-3*(0.5*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj
+    Momentum3_F(-1) = exp(-3*(0.5*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj
     EnergyIo_F(-1) = momentum_to_energy(MomentumInjSi*exp(-0.5*dLogP)) &
         *Si2Io_V(UnitEnergy_)
     do iP = 0, nP+1
-       Momentum_I(iP)    = MomentumInjSi*exp(iP*dLogP)
+       Momentum_G(iP)    = MomentumInjSi*exp(iP*dLogP)
        ! For velocity = p*c**2/sqrt(p**2+(m*c**2)**2), at cell center
-       SpeedSi_I(iP)     = Momentum_I(iP)*cLightSpeed**2/ &
-            momentum_to_energy(Momentum_I(iP))
+       SpeedSi_G(iP)     = Momentum_G(iP)*cLightSpeed**2/ &
+            momentum_to_energy(Momentum_G(iP))
        ! For P**3/3 at faces and its volume
-       Momentum3_I(iP)   = Momentum3_I(iP-1)*exp(3*dLogP)
-       VolumeP_I(iP)     = Momentum3_I(iP) - Momentum3_I(iP-1)
+       Momentum3_F(iP)   = Momentum3_F(iP-1)*exp(3*dLogP)
+       VolumeP_I(iP)     = Momentum3_F(iP) - Momentum3_F(iP-1)
        ! Normalize kinetic energy per Unit of energy in SI unit:
-       KinEnergyIo_I(iP) = momentum_to_kinetic_energy(Momentum_I(iP)) &
+       KinEnergyIo_G(iP) = momentum_to_kinetic_energy(Momentum_G(iP)) &
             *Si2Io_V(UnitEnergy_)
        ! For total energy in IO unit, and its relevant volume:
        EnergyIo_F(iP)    = momentum_to_energy( &
-            Momentum_I(iP)*exp(0.5*dLogP))*Si2Io_V(UnitEnergy_)
+            Momentum_G(iP)*exp(0.5*dLogP))*Si2Io_V(UnitEnergy_)
        ! Normalize momentum per MomentumInjSi
-       Momentum_I(iP)    = Momentum_I(iP)/MomentumInjSi
+       Momentum_G(iP)    = Momentum_G(iP)/MomentumInjSi
        Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
             (EnergyMaxIo-EnergyInjIo) &  ! Energy range
-            /Momentum_I(iP)**2           ! Convert from diff flux to VDF
+            /Momentum_G(iP)**2           ! Convert from diff flux to VDF
     end do
     VolumeE_I  = EnergyIo_F(0:nP+1)    - EnergyIo_F(-1:nP)
     VolumeE3_I = EnergyIo_F(0:nP+1)**3 - EnergyIo_F(-1:nP)**3
 
     ! Calculate all the mu values at cell center and faces
     do iMu = 0, nMu
-       MuFace_I(iMu) = -1.0 + real(iMu)*DeltaMu
+       Mu_F(iMu) = -1.0 + real(iMu)*DeltaMu
     end do
-    Mu_I = 0.5*(MuFace_I(0:nMu-1) + MuFace_I(1:nMu))
-    DeltaMu3_I = MuFace_I(1:nMu)**3.0 - MuFace_I(0:nMu-1)**3.0
+    Mu_C = 0.5*(Mu_F(0:nMu-1) + Mu_F(1:nMu))
+    DeltaMu3_I = Mu_F(1:nMu)**3 - Mu_F(0:nMu-1)**3
 
     ! Distribution function
     allocate(Distribution_CB(0:nP+1, nMu, nVertexMax, nLine), stat=iError)
@@ -258,22 +260,22 @@ contains
     real,         intent(in) :: KinEnergyIo   ! input kinetic energy, in Io
     integer,      intent(out):: iKinEnergyOut ! result: index, from 1 to nP-1
     logical,      intent(out):: IsFound       ! whether search succeeds
-    real,optional,intent(in) :: DistTimesP2_I(nP) ! VDF*Momentum_I**2 for dFlux
+    real,optional,intent(in) :: DistTimesP2_I(nP) ! VDF*Momentum_G**2 for dFlux
     real,optional,intent(out):: dFlux         ! integral flux at output index
     !--------------------------------------------------------------------------
 
-    ! Check whether physical KinEnergyIo_I covers the given kinetic energy
-    if(KinEnergyIo < KinEnergyIo_I(1) .or. KinEnergyIo > EnergyMaxIo) then
+    ! Check whether physical KinEnergyIo_G covers the given kinetic energy
+    if(KinEnergyIo < KinEnergyIo_G(1) .or. KinEnergyIo > EnergyMaxIo) then
        IsFound = .false.
        iKinEnergyOut = -1
        RETURN
     end if
 
-    ! KinEnergyIo_I covers the given kinetic energy
+    ! KinEnergyIo_G covers the given kinetic energy
     IsFound = .true.
     ! Find index of first kinetic energy in the array above KinEnergyIo
-    iKinEnergyOut = maxloc(KinEnergyIo_I(1:nP-1), DIM=1, &
-         MASK=KinEnergyIo > KinEnergyIo_I(1:nP-1))
+    iKinEnergyOut = maxloc(KinEnergyIo_G(1:nP-1), DIM=1, &
+         MASK=KinEnergyIo > KinEnergyIo_G(1:nP-1))
 
     ! Get integral flux contributed by the bin of iKinEnergyOut, if necessary
     if(present(dFlux)) then
@@ -282,15 +284,15 @@ contains
 
        ! The contrubution to integral equals:
        dFlux = &
-            (KinEnergyIo_I(iKinEnergyOut+1) - KinEnergyIo) & ! Span
+            (KinEnergyIo_G(iKinEnergyOut+1) - KinEnergyIo) & ! Span
             *0.5*(                           & ! times a half of sum of
             DistTimesP2_I(iKinEnergyOut+1) + & ! the right boundary value +
-            ((KinEnergyIo_I(iKinEnergyOut+1) & ! interpolation to EChannel:
+            ((KinEnergyIo_G(iKinEnergyOut+1) & ! interpolation to EChannel:
             - KinEnergyIo)*DistTimesP2_I(iKinEnergyOut)    & ! from iP
-            + (KinEnergyIo - KinEnergyIo_I(iKinEnergyOut)) &
+            + (KinEnergyIo - KinEnergyIo_G(iKinEnergyOut)) &
             *DistTimesP2_I(iKinEnergyOut+1)) & ! from iP+1
             / & ! per the total of interpolation weights:
-            (KinEnergyIo_I(iKinEnergyOut+1) - KinEnergyIo_I(iKinEnergyOut)))
+            (KinEnergyIo_G(iKinEnergyOut+1) - KinEnergyIo_G(iKinEnergyOut)))
     end if
 
   end subroutine search_kinetic_energy

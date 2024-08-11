@@ -11,7 +11,7 @@ module SP_ModAdvancePoisson
   use SP_ModGrid,         ONLY: nP, nMu, State_VIB
   use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
        UseUpperEndBc, UseLowerEndBc, iStart
-  use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_I, &
+  use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_F, &
        Distribution_CB, IsDistNeg, check_dist_neg, dLogP
   use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
   use ModUtilities,       ONLY: CON_stop
@@ -117,7 +117,7 @@ contains
          spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+2)
     ! Calculate 1st Hamiltonian function used in the time-dependent
     ! poisson bracket: {f_jk; p**3/3 * DeltaS/B}_{tau, p**3/3}
-    dHamiltonian01_FX    = -spread(Momentum3_I, DIM=2, NCOPIES=nX+2)* &
+    dHamiltonian01_FX    = -spread(Momentum3_F, DIM=2, NCOPIES=nX+2)* &
          spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
     ! Time initialization
     Time   = 0.0
@@ -252,7 +252,7 @@ contains
     uOverBSi_F(nX+1)   = uOverBSi_F(nX)
 
     ! Hamiltonian = -(u/B)*(p**3/3) at cell face, for {s_L, p**3/3}
-    Hamiltonian_N      = -spread(Momentum3_I, DIM=2, NCOPIES=nX+3)* &
+    Hamiltonian_N      = -spread(Momentum3_F, DIM=2, NCOPIES=nX+3)* &
          spread(uOverBSi_F, DIM=1, NCOPIES=nP+3)
 
     ! Update bc for at minimal energy, at nP = 0
@@ -333,8 +333,8 @@ contains
 
     use ModConst,           ONLY: cProtonMass, cRmeProton, cLightSpeed
     use SP_ModDiffusion,    ONLY: scatter_distribution
-    use SP_ModDistribution, ONLY: DeltaMu, MuFace_I, DeltaMu3_I, &
-         SpeedSi_I, VolumeE_I, VolumeE3_I
+    use SP_ModDistribution, ONLY: DeltaMu, Mu_F, DeltaMu3_I, &
+         VolumeE_I, VolumeE3_I
     use SP_ModUnit,         ONLY: Si2Io_V, UnitEnergy_
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
@@ -519,12 +519,12 @@ contains
          ! {f_jk; D(mu**3)*(p**3/3)*(DVx)}_{tau, p**3/3}, as \tilde\DeltaH
          dHamiltonian01_FX(:, 1:nMu, iX) = -dVolumeXDt_I(iX)* &
               spread(DeltaMu3_I, DIM=1, NCOPIES=nP+3)* &
-              spread(Momentum3_I, DIM=2, NCOPIES=nMu)
+              spread(Momentum3_F, DIM=2, NCOPIES=nMu)
          ! Calculate 2nd Hamiltonian function in the time-dependent Poisson
          ! bracket: {f_jk; mu*(1-mu**2)*(DeltaS/B)}_{tau, mu} =>
          ! {f_jk; mu*(1-mu**2)*(D(p**3/3)*DVx)}_{tau, mu} as \tilde\DeltaH
          dHamiltonian02_FY(:, 0:nMu, iX) = -dVolumeXDt_I(iX)* &
-              spread(MuFace_I*(1.0-MuFace_I**2), DIM=1, NCOPIES=nP+2)* &
+              spread(Mu_F*(1.0-Mu_F**2), DIM=1, NCOPIES=nP+2)* &
               spread(VolumeP_I, DIM=2, NCOPIES=nMu+1)
       end do
       ! BCs for time-related Hamiltonian functions: {f_jk; H}_{tau, ...}
@@ -595,8 +595,8 @@ contains
       if(UseBetatron) then
          do iX = 1, nX
             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) - &
-                 0.5*spread(MuFace_I*(1.0-MuFace_I**2), DIM=1, NCOPIES=nP+3)* &
-                 3.0*spread(Momentum3_I, DIM=2, NCOPIES=nMu+1)* &
+                 0.5*spread(Mu_F*(1.0-Mu_F**2), DIM=1, NCOPIES=nP+3)* &
+                 3.0*spread(Momentum3_F, DIM=2, NCOPIES=nMu+1)* &
                  VolumeX_I(iX)*dInvBSiDt_C(iX)/InvBSi_C(iX)
          end do
       end if
@@ -605,8 +605,8 @@ contains
       if(UseInertialForce) then
          do iX = 1, nX
             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
-                 0.5*spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+3)* &
-                 spread((Momentum3_I*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
+                 0.5*spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+3)* &
+                 spread((Momentum3_F*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
                  cProtonMass*VolumeX_I(iX)*bDuDt_C(iX)
          end do
       end if
@@ -632,9 +632,9 @@ contains
       ! Note that momentum in this term is non-related to the Lagrangian
       ! coordinates (mu, s_L), so it should be cell-centered for p**3/3.
       do iX = 0, nX
-         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)*  &
-              spread(1.0-MuFace_I**2, DIM=1, NCOPIES=nP+2)* &
-              spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton*  &
+         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
+              spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
+              spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
               Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
       end do
       ! Boundary condition of the Hamiltonian function: symmetry

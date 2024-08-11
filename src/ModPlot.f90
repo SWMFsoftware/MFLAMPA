@@ -14,7 +14,7 @@ module SP_ModPlot
        IsReadySpreadPoint, IsReadySpreadGrid
   use SP_ModChannel,       ONLY: FluxChannelInit_V, Flux_VIB,    &
        Flux0_, FluxMax_, NameFluxChannel_I, NameFluxUnit_I
-  use SP_ModDistribution,  ONLY: KinEnergyIo_I, Momentum_I, Distribution_CB
+  use SP_ModDistribution,  ONLY: KinEnergyIo_G, Momentum_G, Distribution_CB
   use SP_ModGrid,          ONLY: nVar, nMHData, nLine, nLineAll, &
        iLineAll0, search_line, MHData_VIB, State_VIB, iShock_IB, &
        nVertex_B, NameVar_V, Shock_, LagrID_, X_, Y_, Z_, R_,    &
@@ -141,7 +141,7 @@ module SP_ModPlot
   type(TypePlotFile), allocatable :: File_I(:)
 
   ! Arrays used to visualize the distribution function
-  real :: Log10Momentum_I(0:nP+1), Log10KinEnergyIo_I(0:nP+1)
+  real :: Log10Momentum_G(0:nP+1), Log10KinEnergyIo_G(0:nP+1)
   real :: Log10Si2IoFlux
 
   ! auxilary array, used to write data on a sphere
@@ -643,8 +643,8 @@ contains
     if(.not.DoInit) RETURN
     DoInit = .false.
     ! Array for plotting distribution function
-    Log10Momentum_I    = log10(Momentum_I)
-    Log10KinEnergyIo_I = log10(KinEnergyIo_I)
+    Log10Momentum_G    = log10(Momentum_G)
+    Log10KinEnergyIo_G = log10(KinEnergyIo_G)
     Log10Si2IoFlux     = log10(Si2Io_V(UnitFlux_))
 
     ! Finalize setting output files:
@@ -747,7 +747,7 @@ contains
     ! write the output data
 
     use SP_ModChannel,      ONLY: get_integral_flux
-    use SP_ModDistribution, ONLY: Mu_I
+    use SP_ModDistribution, ONLY: Mu_C
     use SP_ModTime,         ONLY: IsSteadyState
     use SP_ModGrid,         ONLY: Used_B
 
@@ -1382,7 +1382,7 @@ contains
       ! index of the last particle on the field line
       integer :: iEnd
       ! scale and conversion factor
-      real    :: Scale_I(0:nP+1)
+      real    :: Scale_G(0:nP+1)
       ! index for the length or distance axis
       integer :: iDistance
       ! timetag
@@ -1397,9 +1397,9 @@ contains
       ! set the momentum or kinetic energy axis (first axis)
       select case(File_I(iFile) % iScale)
       case(Momentum_)
-         Scale_I = Log10Momentum_I
+         Scale_G = Log10Momentum_G
       case(Energy_)
-         Scale_I = Log10KinEnergyIo_I
+         Scale_G = Log10KinEnergyIo_G
       end select
 
       ! set the index for the distance axis (second axis)
@@ -1447,12 +1447,12 @@ contains
          case(DEFIo_)
             File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:iEnd) =      &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:iEnd) + &
-                 2.0*reshape(spread(Log10Momentum_I, DIM=2,         &
+                 2.0*reshape(spread(Log10Momentum_G, DIM=2,         &
                  NCOPIES=nMu*iEnd), [nP+2, nMu, iEnd]) + Log10Si2IoFlux
          case(DEFSi_)
             File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:iEnd) =      &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:iEnd) + &
-                 2.0*reshape(spread(Log10Momentum_I, DIM=2,         &
+                 2.0*reshape(spread(Log10Momentum_G, DIM=2,         &
                  NCOPIES=nMu*iEnd), [nP+2, nMu, iEnd])
          end select
 
@@ -1468,7 +1468,7 @@ contains
                  nDimIn         = 2, &
                  TimeIn         = SPTime,  &
                  nStepIn        = iIter,   &
-                 Coord1In_I     = Scale_I, &
+                 Coord1In_I     = Scale_G, &
                  Coord2In_I     = State_VIB(iDistance, 1:iEnd, iLine), &
                  NameVarIn      = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
@@ -1484,8 +1484,8 @@ contains
                  nDimIn         = 3, &
                  TimeIn         = SPTime,  &
                  nStepIn        = iIter,   &
-                 Coord1In_I     = Scale_I, &
-                 Coord2In_I     = Mu_I,    &
+                 Coord1In_I     = Scale_G, &
+                 Coord2In_I     = Mu_C,    &
                  Coord3In_I     = State_VIB(iDistance, 1:iEnd, iLine), &
                  NameVarIn      = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
@@ -1520,7 +1520,7 @@ contains
       ! interpolation weight
       real    :: Weight
       ! scale and conversion factor
-      real    :: Scale_I(0:nP+1)
+      real    :: Scale_G(0:nP+1)
       ! skip a field line not reaching radius of output sphere
       logical :: DoPrint_I(nLineAll)
       ! timetag
@@ -1537,9 +1537,9 @@ contains
       ! set the momentum or kinetic energy axis (first axis)
       select case(File_I(iFile) % iScale)
       case(Momentum_)
-         Scale_I = Log10Momentum_I
+         Scale_G = Log10Momentum_G
       case(Energy_)
-         Scale_I = Log10KinEnergyIo_I
+         Scale_G = Log10KinEnergyIo_G
       end select
 
       ! determine string for the saved filename
@@ -1591,11 +1591,11 @@ contains
             ! do nothing
          case(DEFIo_)
             File_I(iFile) % Buffer_II = File_I(iFile) % Buffer_II + &
-                 2.0*reshape(spread(Log10Momentum_I, DIM=2, &
+                 2.0*reshape(spread(Log10Momentum_G, DIM=2, &
                  NCOPIES=nMu*nLineAll), [nP+2, nMu, nLineAll]) + Log10Si2IoFlux
          case(DEFSi_)
             File_I(iFile) % Buffer_II = File_I(iFile) % Buffer_II + &
-                 2.0*reshape(spread(Log10Momentum_I, DIM=2, &
+                 2.0*reshape(spread(Log10Momentum_G, DIM=2, &
                  NCOPIES=nMu*nLineAll), [nP+2, nMu, nLineAll])
          end select
       end if
@@ -1633,7 +1633,7 @@ contains
                  nDimIn        = 2, &
                  TimeIn        = SPTime,  &
                  nStepIn       = iIter,   &
-                 Coord1In_I    = Scale_I, &
+                 Coord1In_I    = Scale_G, &
                  Coord2In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)), &
                  NameVarIn     = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
@@ -1651,8 +1651,8 @@ contains
                  nDimIn        = 3, &
                  TimeIn        = SPTime,  &
                  nStepIn       = iIter,   &
-                 Coord1In_I    = Scale_I, &
-                 Coord2In_I    = Mu_I,    &
+                 Coord1In_I    = Scale_G, &
+                 Coord2In_I    = Mu_C,    &
                  Coord3In_I    = real(pack(iNodeIndex_I, MASK=DoPrint_I)), &
                  NameVarIn     = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
@@ -1685,7 +1685,7 @@ contains
       ! interpolation weight
       real    :: Weight
       ! scale and conversion factor
-      real    :: Scale_I(0:nP+1)
+      real    :: Scale_G(0:nP+1)
       ! scale and conversion factor
       real, allocatable :: SPTime_I(:)
       ! skip a field line if it fails to reach radius of output sphere
@@ -1709,9 +1709,9 @@ contains
       ! set the momentum or kinetic energy axis (first axis)
       select case(File_I(iFile) % iScale)
       case(Momentum_)
-         Scale_I = Log10Momentum_I
+         Scale_G = Log10Momentum_G
       case(Energy_)
-         Scale_I = Log10KinEnergyIo_I
+         Scale_G = Log10KinEnergyIo_G
       end select
 
       ! determine string for the saved filename
@@ -1826,12 +1826,12 @@ contains
          case(DEFIo_)
             File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, nTimeSaved) = &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, nTimeSaved) + &
-                 2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=nMu) + &
+                 2.0*spread(Log10Momentum_G, DIM=2, NCOPIES=nMu) + &
                  Log10Si2IoFlux
          case(DEFSi_)
             File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, nTimeSaved) = &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, nTimeSaved) + &
-                 2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=nMu)
+                 2.0*spread(Log10Momentum_G, DIM=2, NCOPIES=nMu)
          end select
 
          ! reprint data to file
@@ -1846,7 +1846,7 @@ contains
                  nDimIn        = 2, &
                  TimeIn        = SPTime,   &
                  nStepIn       = iIter,    &
-                 Coord1In_I    = Scale_I,  &
+                 Coord1In_I    = Scale_G,  &
                  Coord2In_I    = SPTime_I, &
                  NameVarIn     = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
@@ -1862,8 +1862,8 @@ contains
                  nDimIn        = 3, &
                  TimeIn        = SPTime,   &
                  nStepIn       = iIter,    &
-                 Coord1In_I    = Scale_I,  &
-                 Coord2In_I    = Mu_I,     &
+                 Coord1In_I    = Scale_G,  &
+                 Coord2In_I    = Mu_C,     &
                  Coord3In_I    = SPTime_I, &
                  NameVarIn     = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
@@ -1903,7 +1903,7 @@ contains
       character(len=500) :: StringHeader
       character(len=4)   :: TypeDistr
       ! scale and conversion factor
-      real    :: Scale_I(0:nP+1)
+      real    :: Scale_G(0:nP+1)
 
       ! radial distance, longitude and latitude of satellite
       real    :: rSat, LonSat, LatSat
@@ -1937,9 +1937,9 @@ contains
       ! set the momentum or kinetic energy axis
       select case(File_I(iFile) % iScale)
       case(Momentum_)
-         Scale_I = Log10Momentum_I
+         Scale_G = Log10Momentum_G
       case(Energy_)
-         Scale_I = Log10KinEnergyIo_I
+         Scale_G = Log10KinEnergyIo_G
       end select
 
       ! set the file name: saved cdf/def/DEF (f or f*p**2, in which unit)
@@ -2154,11 +2154,11 @@ contains
             case(DEFIo_)
                File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) = Log10Si2IoFlux + &
                     File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) + &
-                    2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=nMu)
+                    2.0*spread(Log10Momentum_G, DIM=2, NCOPIES=nMu)
             case(DEFSi_)
                File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) = &
                     File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) + &
-                    2.0*spread(Log10Momentum_I, DIM=2, NCOPIES=nMu)
+                    2.0*spread(Log10Momentum_G, DIM=2, NCOPIES=nMu)
             end select
 
          end if TRI_INTERPOLATE
@@ -2173,7 +2173,7 @@ contains
                  nDimIn         = 1, &
                  TimeIn         = SPTime, &
                  nStepIn        = iIter, &
-                 Coord1In_I     = Scale_I, &
+                 Coord1In_I     = Scale_G, &
                  NameVarIn      = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
                  trim(File_I(iFile) % NameAuxPlot), &
@@ -2187,8 +2187,8 @@ contains
                  nDimIn         = 2, &
                  TimeIn         = SPTime, &
                  nStepIn        = iIter, &
-                 Coord1In_I     = Scale_I, &
-                 Coord2In_I     = Mu_I, &
+                 Coord1In_I     = Scale_G, &
+                 Coord2In_I     = Mu_C, &
                  NameVarIn      = &
                  trim(File_I(iFile) % NameVarPlot) // ' ' // &
                  trim(File_I(iFile) % NameAuxPlot), &

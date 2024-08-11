@@ -13,8 +13,8 @@ module SP_ModDiffusion
   use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, &
-       MomentumInjSi, MuFace_I, DeltaMu, Distribution_CB
+  use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, &
+       MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
   use SP_ModGrid,   ONLY: nP, nMu, State_VIB, MHData_VIB, &
        D_, R_, Wave1_, Wave2_
   use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
@@ -221,7 +221,7 @@ contains
     else
        ! Add v (= p*c**2 / E_total in the relativistic case) and p**(1/3)
        DInnerSi_II = spread(CoefLambdaxx_I(1:nX), DIM=2, NCOPIES=NP) &
-            * spread(SpeedSi_I(1:nP)*Momentum_I(1:nP)**(1.0/3),      &
+            * spread(SpeedSi_G(1:nP)*Momentum_G(1:nP)**(1.0/3),      &
             DIM=1, NCOPIES=NX)
        DInnerSi_II = max(DInnerSi_II, &
             DiffCoeffMinSi/spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=NP))
@@ -329,7 +329,7 @@ contains
 
     ! Calculate factorized diffusion coefficient: (1-mu**2) * mu**(2.0/3.0)
     LowerLimMu = (1.0 - DeltaMu**2)*abs(DeltaMu)**(2.0/3.0)
-    FactorMu_F = (1.0 - MuFace_I**2)*abs(MuFace_I)**(2.0/3.0)
+    FactorMu_F = (1.0 - Mu_F**2)*abs(Mu_F)**(2.0/3.0)
 
     ! Get the Alfven wave speed for each s_L
     AlfvenSpeed_I = BSi_I/sqrt(cMu*nSi_I*cAtomicMass)
@@ -340,19 +340,17 @@ contains
           ! For each pitch angle, set DMuMu and solve VDF for mu scattering
           ! Meanwhile, we control whether we floor the value of D_mumu or not
           iMuswitch = 0
-          if(.not.any(SpeedSi_I(iP)*abs(MuFace_I) >= &
-               10.0*AlfvenSpeed_I(iX))) then
-             iMuswitch = minloc(MuFace_I, DIM=1, MASK= &
-                  SpeedSi_I(iP)*abs(MuFace_I) < 10.0*AlfvenSpeed_I(iX))
-          end if
+          if(.not.any(SpeedSi_G(iP)*abs(Mu_F) >= 10.0*AlfvenSpeed_I(iX))) &
+             iMuswitch = minloc(Mu_F, DIM=1, MASK= &
+                  SpeedSi_G(iP)*abs(Mu_F) < 10.0*AlfvenSpeed_I(iX))
 
-          where(SpeedSi_I(iP)*abs(MuFace_I) >= 10.0*AlfvenSpeed_I(iX))
+          where(SpeedSi_G(iP)*abs(Mu_F) >= 10.0*AlfvenSpeed_I(iX))
              ! Set Dmumu where mu is large enough
-             DMuMu_I = SpeedSi_I(iP)/(CoefLambdaMuMu_I(iX)* &
-                  Momentum_I(iP))*FactorMu_F*DtOverDMu2
+             DMuMu_I = SpeedSi_G(iP)/(CoefLambdaMuMu_I(iX)* &
+                  Momentum_G(iP))*FactorMu_F*DtOverDMu2
           elsewhere
              ! Set the lower limit of D_mumu when |mu| is close to zero
-             DMuMu_I = SpeedSi_I(iP)/CoefLambdaMuMu_I(iX)* &
+             DMuMu_I = SpeedSi_G(iP)/CoefLambdaMuMu_I(iX)* &
                   max(FactorMu_F(iMuswitch), LowerLimMu)*DtOverDMu2
           end where
 

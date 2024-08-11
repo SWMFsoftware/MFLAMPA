@@ -4,7 +4,7 @@
 module SP_ModTurbulence
 
   use ModConst
-  use SP_ModDistribution, ONLY: SpeedSi_I, Momentum_I, MomentumInjSi
+  use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, MomentumInjSi
   use SP_ModGrid,         ONLY: nP !iPTest, iParticleTest
 
   implicit none
@@ -264,10 +264,10 @@ contains
 
     ! The resonant wave number, kr = e*B/p in the SI unit
     !--------------------------------------------------------------------------
-    kRSi = cElectronCharge*BSi/(Momentum_I(iP)*MomentumInjSi)
+    kRSi = cElectronCharge*BSi/(Momentum_G(iP)*MomentumInjSi)
 
     ! Calculate D_{xx}: KRes-dependent part
-    Dxx = BSi**2*SpeedSi_I(iP)/(cMu*cPi)*(AK_II(iP,iX)-BK_II(iP,iX)*kRSi**2)
+    Dxx = BSi**2*SpeedSi_G(iP)/(cMu*cPi)*(AK_II(iP,iX)-BK_II(iP,iX)*kRSi**2)
 
   end function Dxx_s
   !============================================================================
@@ -290,11 +290,11 @@ contains
     ! The resonant wave number, kr = e*B/p in the SI unit
     !--------------------------------------------------------------------------
     kRSi_II = cElectronCharge*spread(BSi_I, DIM=2, NCOPIES=nP)  &
-         /spread(Momentum_I(1:nP)*MomentumInjSi, DIM=1, NCOPIES=nX)
+         /spread(Momentum_G(1:nP)*MomentumInjSi, DIM=1, NCOPIES=nX)
 
     ! Calculate D_{xx}: KRes-dependent part
     Dxx_II = spread(BSi_I**2, DIM=2, NCOPIES=nP)*   &
-         spread(SpeedSi_I(1:nP), DIM=1, NCOPIES=nX) &
+         spread(SpeedSi_G(1:nP), DIM=1, NCOPIES=nX) &
          /(cMu*cPi)*(AK_II(1:nP,1:nX)-BK_II(1:nP,1:nX)*kRSi_II**2)
 
   end function Dxx_mat

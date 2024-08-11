@@ -140,7 +140,7 @@ contains
                   StringEChannel_I(1) // " at EChannel ", iFlux)
           end select
 
-          ! 2) Low energy bound: do not know KinEnergyIo_I(1) (min value) here
+          ! 2) Low energy bound: do not know KinEnergyIo_G(1) (min value) here
           read(StringEChannel_I(2), *) EChannelLoIo_I(iFlux)
           if(EChannelLoIo_I(iFlux) < 0.0) call CON_stop(NameSub // &
                ": Energy channel lower bound should not be negative.")
@@ -201,7 +201,7 @@ contains
 
     use ModConst,           ONLY: cMeV
     use ModUtilities,       ONLY: check_allocate
-    use SP_ModDistribution, ONLY: KinEnergyIo_I, &
+    use SP_ModDistribution, ONLY: KinEnergyIo_G, &
          EnergyInjIo, EnergyMaxIo, FluxInitIo
     use SP_ModProc,         ONLY: iError
     use SP_ModSize,         ONLY: nVertexMax
@@ -236,10 +236,10 @@ contains
        ! else: we specify nFluxChannelSat > 0, summed later
 
        ! Convert units for self-defined energy channels, and the lower
-       ! and upper bounds should fall between KinEnergyIo_I(1) and EnergyMaxIo
-       EChannelLoIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_I(1), &
+       ! and upper bounds should fall between KinEnergyIo_G(1) and EnergyMaxIo
+       EChannelLoIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_G(1), &
             EChannelLoIo_I*cMeV*Si2Io_V(UnitEnergy_)))
-       EChannelHiIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_I(1), &
+       EChannelHiIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_G(1), &
             EChannelHiIo_I*cMeV*Si2Io_V(UnitEnergy_)))
     else
        ! No self-defined channels
@@ -288,7 +288,7 @@ contains
        FluxLastSat_ = FluxChannelSat_I(iSat)%nFluxChannel
 
        ! Allocate the energy channels, names, and units
-       ! Lower bound: from 0 => physical KinEnergyIo_I(1) in code
+       ! Lower bound: from 0 => physical KinEnergyIo_G(1) in code
        ! Upper bound: to +\infty => physical EnergyMaxIo in code
        if(allocated(FluxChannelSat_I(iSat)%EChannelLoIo_I)) &
             deallocate(FluxChannelSat_I(iSat)%EChannelLoIo_I)
@@ -322,12 +322,12 @@ contains
        end select
 
        ! Convert energy channel units: MeV to SI to Io, and the lower
-       ! and upper bounds should fall between KinEnergyIo_I(1) and EnergyMaxIo
+       ! and upper bounds should fall between KinEnergyIo_G(1) and EnergyMaxIo
        FluxChannelSat_I(iSat)%EChannelLoIo_I = &
-            MIN(EnergyMaxIo, MAX(KinEnergyIo_I(1), &
+            MIN(EnergyMaxIo, MAX(KinEnergyIo_G(1), &
             FluxChannelSat_I(iSat)%EChannelLoIo_I*cMeV*Si2Io_V(UnitEnergy_)))
        FluxChannelSat_I(iSat)%EChannelHiIo_I = &
-            MIN(EnergyMaxIo, MAX(KinEnergyIo_I(1), &
+            MIN(EnergyMaxIo, MAX(KinEnergyIo_G(1), &
             FluxChannelSat_I(iSat)%EChannelHiIo_I*cMeV*Si2Io_V(UnitEnergy_)))
 
        ! Finally sum for nFluxChannel
@@ -433,11 +433,11 @@ contains
     ! fluxes in specified energy channels; also compute total energy flux
 
     use ModNumConst,        ONLY: cTiny
-    use SP_ModDistribution, ONLY: DeltaMu, Momentum_I, &
-         KinEnergyIo_I, Distribution_CB, search_kinetic_energy
+    use SP_ModDistribution, ONLY: DeltaMu, Momentum_G, &
+         KinEnergyIo_G, Distribution_CB, search_kinetic_energy
     ! loop variables
     integer:: iLine, iVertex, iP, iFlux, iPLo, iPHi
-    ! VDF*Momentum_I**2, VDF*Momentum_I**2*KinEnergy
+    ! VDF*Momentum_G**2, VDF*Momentum_G**2*KinEnergy
     real   :: DistTimesP2_I(1:nP), DistTimesP2E_I(1:nP)
     ! increments of each bin for particle and energy fluxes
     real   :: dFlux_I(1:nP-1), dEFlux_I(1:nP-1)
@@ -454,13 +454,13 @@ contains
        do iVertex = 1, nVertex_B(iLine)
           ! Calculate intermediate variables
           DistTimesP2_I = sum(Distribution_CB(1:nP, 1:nMu, iVertex, iLine), &
-               DIM=2)*DeltaMu*0.5 * Momentum_I(1:nP)**2
-          DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_I(1:nP)
+               DIM=2)*DeltaMu*0.5 * Momentum_G(1:nP)**2
+          DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_G(1:nP)
           ! Increment of particle and energy fluxes
           ! Integration loop with midpoint rule
-          dFlux_I  = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))* &
+          dFlux_I  = 0.5*(KinEnergyIo_G(2:nP) - KinEnergyIo_G(1:nP-1))* &
                (DistTimesP2_I(1:nP-1) + DistTimesP2_I(2:nP))
-          dEFlux_I = 0.5*(KinEnergyIo_I(2:nP) - KinEnergyIo_I(1:nP-1))* &
+          dEFlux_I = 0.5*(KinEnergyIo_G(2:nP) - KinEnergyIo_G(1:nP-1))* &
                (DistTimesP2E_I(1:nP-1) + DistTimesP2E_I(2:nP))
 
           ! Calculate and store the total particle and energy fluxes
@@ -485,7 +485,7 @@ contains
              end if
 
              ! 2) For the flux from EnergyHi to EnergyMax
-             if(abs(EChannelHiIo_I(iFlux)-KinEnergyIo_I(nP)) < cTiny) then
+             if(abs(EChannelHiIo_I(iFlux)-KinEnergyIo_G(nP)) < cTiny) then
                 FluxHi_I(iFlux) = 0.0
              else
                 ! Get the partial flux increments

@@ -7,7 +7,7 @@ module SP_ModBc
   use ModNumConst,  ONLY: cPi
   use ModCosmicRay, ONLY: local_interstellar_spectrum, &
        TypeLisBc, UseModulationPot, ModulationPot
-  use SP_ModDistribution, ONLY: Distribution_CB, Momentum_I, &
+  use SP_ModDistribution, ONLY: Distribution_CB, Momentum_G, &
        MomentumInjSi, Background_I
   use SP_ModGrid,   ONLY: nP, nMu, MhData_VIB, NoShock_, nWidth, T_, X_, Z_
   use SP_ModUnit,   ONLY: kinetic_energy_to_momentum,  &
@@ -164,16 +164,16 @@ contains
        XyzSi_D = MhData_VIB(X_:Z_,iEnd,iLine)*Io2Si_V(UnitX_)
        call local_interstellar_spectrum(&
             nP = nP,                         &  ! # of grid points
-            MomentumSi_I = Momentum_I(1:nP)* &
+            MomentumSi_I = Momentum_G(1:nP)* &
             MomentumInjSi,                   &  ! momentum (SI) in grid points
             XyzSi_D = XyzSi_D,               &  ! Coords
             DistTimesP2Si_I = UpperEndBc_I)
        ! Now, in UpperEndBc_I there is Distribution[Si]*Momentum[Si]**2
-       ! Our Momentum_I is MomentumSi_I/MomentumInjSi
-       ! So, UpperEndBc_I is Distribution[Si]*MomentumInjSi**2*Momentum_I**2
+       ! Our Momentum_G is MomentumSi_I/MomentumInjSi
+       ! So, UpperEndBc_I is Distribution[Si]*MomentumInjSi**2*Momentum_G**2
        ! The distribution used in our code is
        ! Distribution[Si]*MomentumInjSi**2*Io2Si_V(UnitEnergy_)
-       UpperEndBc_I = (UpperEndBc_I/Momentum_I(1:nP)**2)*Io2Si_V(UnitEnergy_)
+       UpperEndBc_I = (UpperEndBc_I/Momentum_G(1:nP)**2)*Io2Si_V(UnitEnergy_)
     end select
   end subroutine set_upper_end_bc
   !============================================================================
@@ -191,7 +191,7 @@ contains
        LowerEndBc_I = Background_I
     case('inject')
        LowerEndBc_I = Distribution_CB(0, 1, 1, iLine) &
-            /Momentum_I(0:nP+1)**SpectralIndex
+            /Momentum_G(0:nP+1)**SpectralIndex
     case default
        call CON_stop(NameSub//&
             ': Unknown type of lower end BC '//TypeLowerEndBc)
@@ -206,7 +206,7 @@ contains
     !--------------------------------------------------------------------------
     ! Set the left boundary condition of VDF for diffusion
     Distribution_CB(1:nP+1, 1, 1, iLine) = &
-         Distribution_CB(0, 1, 1, iLine)/Momentum_I(1:nP+1)**SpectralIndex
+         Distribution_CB(0, 1, 1, iLine)/Momentum_G(1:nP+1)**SpectralIndex
   end subroutine set_lower_end_vdf
   !============================================================================
   subroutine set_VDF2(iLine, nX, VDF_G)
