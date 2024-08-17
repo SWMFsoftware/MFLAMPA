@@ -8,7 +8,7 @@ module SP_ModAdvancePoisson
   ! See https://doi.org/10.1016/j.jcp.2023.111923
 
   use SP_ModSize,         ONLY: nVertexMax
-  use SP_ModGrid,         ONLY: nP, nMu, State_VIB
+  use SP_ModGrid,         ONLY: nP, iProcPStart, iProcPEnd, nMu, State_VIB
   use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
        UseUpperEndBc, UseLowerEndBc, iStart
   use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_F, &
@@ -120,7 +120,7 @@ contains
     dHamiltonian01_FX    = -spread(Momentum3_F, DIM=2, NCOPIES=nX+2)* &
          spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
     ! Time initialization
-    Time   = 0.0
+    Time = 0.0
 
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -164,19 +164,19 @@ contains
           if(UseUpperEndBc) then
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
-                     UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
+                     LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0), &
+                     UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
+                     UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, &
-                     nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0))
+                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
+                     LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
@@ -275,19 +275,19 @@ contains
        if(UseUpperEndBc) then
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, &
-                  nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
-                  UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I, &
+                  LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0), &
+                  UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
           else
              ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, &
-                  nSi_I, BSi_I, UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I, &
+                  UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, &
-                  nSi_I, BSi_I, LowerEndSpectrumIn_I=VDF_G(1:nP, 0))
+             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I, &
+                  LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0))
           else
              ! with no lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I)
@@ -437,19 +437,23 @@ contains
           if(UseUpperEndBc) then
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I,  &
-                     BSi_I, LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0), &
-                     UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
+                call diffuse_distribution(iLine, nX, iShock,  &
+                     Dt, nSi_I, BSi_I, LowerEndSpectrumIn_II= &
+                     VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),  &
+                     UpperEndSpectrumIn_II=                   &
+                     VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I,  &
-                     BSi_I, UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
+                call diffuse_distribution(iLine, nX, iShock,  &
+                     Dt, nSi_I, BSi_I, UpperEndSpectrumIn_II= &
+                     VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, &
-                     BSi_I, LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0))
+                call diffuse_distribution(iLine, nX, iShock,  &
+                     Dt, nSi_I, BSi_I, LowerEndSpectrumIn_II= &
+                     VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)

@@ -8,7 +8,7 @@ module SP_ModAdvanceAdvection
   ! Version: Sokolov & Roussev, Jan, 2008, SP/FLAMPA/src/ModLogAdvection.f90
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModGrid,         ONLY: nP
+  use SP_ModGrid,         ONLY: nP, iProcPStart, iProcPEnd
   use SP_ModDistribution, ONLY: Distribution_CB, &
        dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
@@ -60,7 +60,7 @@ contains
     ! How many steps should be done to the CFL criterion is fulfilled
     nStep = 1 + int(maxval(abs(FermiFirst_I(iStart:nX)))/Cfl)
     ! Check if the number of time steps is positive:
-    if(nStep < 1)call CON_stop(NameSub//': nStep <= 0????')
+    if(nStep < 1) call CON_stop(NameSub//': nStep <= 0????')
 
     ! reduce time step and first-order Fermi acceleration
     Dt = DtProgress/nStep
@@ -82,7 +82,7 @@ contains
        do iVertex = iStart, nX
           ! first check if the VDF includes negative values
           call check_dist_neg(NameSub, iVertex, iVertex, iLine)
-          if(IsDistNeg)RETURN
+          if(IsDistNeg) RETURN
           ! then advance via advection
           call advance_log_advection(FermiFirst_I(iVertex), &
                1, 1, Distribution_CB(0:nP+1,1,iVertex,iLine))
@@ -97,21 +97,25 @@ contains
                 ! with lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, &
                      nSi_I, BSi_I, LowerEndSpectrumIn_I = max(   &
-                     LowerEndBc_I(1:nP), Background_I(1:nP)),    &
+                     LowerEndBc_I(iProcPStart:iProcPEnd),        &
+                     Background_I(iProcPStart:iProcPEnd)),       &
                      UpperEndSpectrumIn_I = max(                 &
-                     UpperEndBc_I(1:nP), Background_I(1:nP)))
+                     UpperEndBc_I(iProcPStart:iProcPEnd),        &
+                     Background_I(iProcPStart:iProcPEnd)))
              else
                 ! with upper end BC but no lower end BC
                 call diffuse_distribution(iLine, nX, iShock, Dt, &
                      nSi_I, BSi_I, UpperEndSpectrumIn_I = max(   &
-                     UpperEndBc_I(1:nP), Background_I(1:nP)))
+                     UpperEndBc_I(iProcPStart:iProcPEnd),        &
+                     Background_I(iProcPStart:iProcPEnd)))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
                 call diffuse_distribution(iLine, nX, iShock, Dt, &
                      nSi_I, BSi_I, LowerEndSpectrumIn_I = max(   &
-                     LowerEndBc_I(1:nP), Background_I(1:nP)))
+                     LowerEndBc_I(iProcPStart:iProcPEnd),        &
+                     Background_I(iProcPStart:iProcPEnd)))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
@@ -119,7 +123,7 @@ contains
           end if
           ! Check if the VDF includes negative values after diffusion
           call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
-          if(IsDistNeg)RETURN
+          if(IsDistNeg) RETURN
        end if
     end do STEP
   end subroutine advect_via_log

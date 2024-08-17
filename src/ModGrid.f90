@@ -14,7 +14,8 @@ module SP_ModGrid
   use ModUtilities, ONLY: CON_stop
   use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
-  use SP_ModProc,   ONLY: iProc
+  use SP_ModProc,   ONLY: nProc, iProc, iError,        &
+       nProcSameLine, iProcSameLine0, iProcSameLine_I
 
   implicit none
 
@@ -56,6 +57,17 @@ module SP_ModGrid
   ! processor. For iLine = 1:nLine, iLineAll = iLineAll0+1:iNodeLast.
   integer, public :: nLine
 
+  ! If there are extra nodes, we will do MPI along the momentum grid for some
+  ! processors, i.e., use multiple processors to run on the same field line.
+  ! For the extra nodes:
+  ! All nodes are enumerated. We use at least nProcSameLine = nProc/nLineAll
+  ! processors for each field line. For the first nProc-nProcSameLine*nLineAll
+  ! processors, there is one more processor for MPI along the momentum grid.
+  ! There will be two index here: iProcPStart and iProcPEnd. The worst case
+  ! is that iProcPStart == iProcPEnd when nProc == nP*nLineAll, so when nProc
+  ! is greater than nP*nLineAll, there will be an error.
+  integer, public :: iProcPStart, iProcPEnd
+
   ! Number of particles (vertexes, Lagrangian meshes) per line (line):
   integer, public, pointer :: nVertex_B(:)
 
@@ -71,7 +83,7 @@ module SP_ModGrid
 
   ! Information about the magnetic field line foot point:
   ! the Lagrangian (0) and Cartesian (1:3) coordinates, and
-  integer, public, parameter :: &! init length of segment 1-2:
+  integer, public, parameter:: & ! init length of segment 1-2:
        Length_ = 4               ! control appending new particles
   real, public, pointer :: FootPoint_VB(:,:)
 
@@ -154,7 +166,7 @@ module SP_ModGrid
   ! integer:: nSmooth = -1
 
   ! Test position and momentum
-  integer, public :: iPTest =1, iParticleTest = 99, iNodeTest = 1
+  integer, public :: iPTest = 1, iParticleTest = 99, iNodeTest = 1
 
   ! Shock algorithm parameters:
   real,    public, parameter :: dLogRhoThreshold = 0.01
@@ -164,7 +176,6 @@ contains
   subroutine read_param(NameCommand)
 
     use ModReadParam, ONLY: read_var
-    use SP_ModProc,   ONLY: iProc
     character(len=*), intent(in):: NameCommand      ! From PARAM.in
     integer :: nPCheck = nP, nMuCheck = nMu         ! Check nP and nMu
     integer :: nParticleCheck, nLonCheck, nLatCheck ! Check nLon/nLat/nParticle
@@ -228,25 +239,66 @@ contains
 
     ! allocate the grid used in this model
     use ModUtilities, ONLY: check_allocate
-    use SP_ModProc,   ONLY: nProc, iError
-
-    integer:: iNodeLast
+    integer :: iNodeLast                 ! last line on this node
+    integer :: nPlusProcLine, iProcLine0 ! processors for this line
+    integer :: iProcSameLineStart        ! iProc starting working on the line
+    integer :: iiProc                    ! loop variable
 
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
     if(.not.DoInit) RETURN
     DoInit = .false.
 
-    ! distribute nodes between processors
-    if(nLineAll < nProc) call CON_stop(NameSub//&
-         ': There are more processors than field lines')
-    iLineAll0 = (iProc*nLineAll)/nProc
-    iNodeLast = ((iProc+1)*nLineAll)/nProc
-    nLine = iNodeLast - iLineAll0
-
-    ! check consistency
+    ! check consistency of nLat and nLon
     if(nLat <= 0 .or. nLon <= 0) &
          call CON_stop(NameSub//': Origin surface grid is invalid')
+    ! check consistency of nP and nMu
+    if(nP <= 0 .or. nMu <= 0) &
+         call CON_stop(NameSub//': Momentum and/or Mu grids are invalid')
+
+    ! distribute nodes and even mometum grids between processors
+    iLineAll0 = ( iProc   *nLineAll)/nProc
+    iNodeLast = ((iProc+1)*nLineAll)/nProc
+    nLine     = max(1, iNodeLast-iLineAll0)
+    if(nLineAll >= nProc) then
+       iProcPStart = 1
+       iProcPEnd = nP
+    else
+       ! there are at least nProc/nLineAll processors for the same field line
+       nProcSameLine = nProc/nLineAll
+       ! count how many lines are with one more processor
+       nPlusProcLine = nProc-nProcSameLine*nLineAll
+
+       ! get the number and index of processors working on this field line
+       ! for the first nPlusLine processors, there is one more processor
+       ! and then get the index of the processor working on this field line
+       if(iProc < nPlusProcLine*(nProcSameLine+1)) then
+          nProcSameLine = nProcSameLine+1
+          iProcLine0 = mod(iProc,nProcSameLine)
+       else
+          iProcLine0 = mod(iProc-nPlusProcLine*(nProcSameLine+1),nProcSameLine)
+       end if
+
+       ! manipulate for each field line
+       if(nProcSameLine <= nP) then
+          ! save the processors working on this field line when nProcSameLine>1
+          if(nProcSameLine > 1) then
+             iProcSameLine0 = iProcLine0
+             allocate(iProcSameLine_I(nProcSameLine))
+             iProcSameLineStart = iProc-iProcLine0
+             do iiProc = iProcSameLineStart, iProcSameLineStart+nProcSameLine-1
+                iProcSameLine_I(iiProc-iProcSameLineStart+1) = iiProc
+             end do
+          end if
+          ! split the momentum grid based on iProcLine: get Start & End indices
+          iProcPStart = 1 + (iProcLine0*nP)/nProcSameLine
+          iProcPEnd   = ((iProcLine0+1)*nP)/nProcSameLine
+       else
+          ! now there are more processors than the number of momentum grid
+          call CON_stop(NameSub//&
+               ': There are more processors than field lines by momentum grid')
+       end if
+    end if
 
     ! allocate data and grid containers
     allocate(iShock_IB(nShockParam, nLine), stat=iError)

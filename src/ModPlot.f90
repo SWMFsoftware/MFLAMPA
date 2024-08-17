@@ -748,8 +748,9 @@ contains
 
     use SP_ModChannel,      ONLY: get_integral_flux
     use SP_ModDistribution, ONLY: Mu_C
-    use SP_ModTime,         ONLY: IsSteadyState
     use SP_ModGrid,         ONLY: Used_B
+    use SP_ModProc,         ONLY: nProcSameLine, iProcSameLine0
+    use SP_ModTime,         ONLY: IsSteadyState
 
     logical, intent(in), optional:: IsInitialOutputIn
 
@@ -850,6 +851,10 @@ contains
       character(len=15) :: StringTime
       character(len=*), parameter:: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data in the first processor for this field line.
+      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      
       ! Update number of time tags and write to tag list file
       if(iProc==0) then
          ! increase the file counter
@@ -1161,6 +1166,10 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_mh_time'
       !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data in the first processor for this field line.
+      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      
       nMhdVar   = File_I(iFile) % nMhdVar
       nExtraVar = File_I(iFile) % nExtraVar
       nFluxVar  = File_I(iFile) % nFluxVar
@@ -1302,6 +1311,7 @@ contains
            EChannelLoIo_I, EChannelHiIo_I
       use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
       use SP_ModUnit,         ONLY: NameEnergyFluxUnit
+
       ! header for the file
       character(len=200) :: StringHeader, StringColumn
       ! loop variable
@@ -1389,6 +1399,9 @@ contains
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_1d'
       !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data in the first processor for this field line.
+      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
 
       ! set header
       StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
@@ -1527,6 +1540,9 @@ contains
       character(len=15):: StringTime
       character(len=*), parameter:: NameSub = 'write_distr_2d'
       !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data in the first processor for this field line.
+      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
 
       ! set header
       StringHeader = &
@@ -1699,6 +1715,9 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_distr_time'
       !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data in the first processor for this field line.
+      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
 
       ! set header
       StringHeader = &
@@ -1933,6 +1952,9 @@ contains
       integer :: iStencil_I(3)
       real    :: Weight_I(3)
       !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data in the first processor for this field line.
+      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
 
       ! set the momentum or kinetic energy axis
       select case(File_I(iFile) % iScale)
