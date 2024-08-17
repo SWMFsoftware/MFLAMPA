@@ -29,8 +29,9 @@ module SP_ModAdvancePoisson
   public:: advect_via_poisson_parker   ! Time-accurate advance through given Dt
   public:: iterate_poisson_parker      ! Local time-stepping for steady states
   ! For solving the focused transport equation with pitch angles
-  public:: calc_states_poisson_focused ! Calculate the states for multi-P.B.
+  public:: calc_states_poisson_focused ! Calculate states for the focused Eqn.
   public:: advect_via_poisson_focused  ! Time-accurate advance through given Dt
+  public:: iterate_poisson_focused     ! Local time-stepping for steady states
 
   ! Whether to include the betatron acceleration in focused transport equation
   logical, public :: UseBetatron = .false.
@@ -93,8 +94,8 @@ contains
     ! Prediction for the next time step:
     real :: DtNext
 
-    ! Now this is the particle-number-conservative advection scheme
-    character(len=*), parameter:: NameSub = 'advect_via_single_poisson'
+    ! Now, time-accurate Poisson bracket advection scheme for Parker Eqn.
+    character(len=*), parameter:: NameSub = 'advect_via_poisson_parker'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
 
@@ -196,7 +197,7 @@ contains
   !============================================================================
   subroutine iterate_poisson_parker(iLine, nX, iShock, CflIn, BSi_I, nSi_I)
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, s_L)
-    ! Diffuse the distribution function at each time step
+    ! First advect and then diffuse the VDF by splitting method
 
     use SP_ModGrid, ONLY: D_, U_
     use SP_ModUnit, ONLY: UnitX_, Io2Si_V
@@ -222,8 +223,8 @@ contains
     ! Time step
     real :: Dt_C(nP, nX)
 
-    ! Now particle-number-conservative advection scheme for steady-state soln.
-    character(len=*), parameter:: NameSub = 'iterate_single_poisson'
+    ! Now, steady-state Poisson bracket advection scheme for Parker Eqn.
+    character(len=*), parameter:: NameSub = 'iterate_poisson_parker'
     !--------------------------------------------------------------------------
 
     ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
@@ -380,8 +381,8 @@ contains
     ! Prediction of next time step:
     real    :: DtNext
 
-    ! Now this is the particle-number-conservative advection scheme with mu
-    character(len=*), parameter:: NameSub = 'advect_via_triple_poisson'
+    ! Now, time-accurate Poisson bracket advection scheme for focused Eqn.
+    character(len=*), parameter:: NameSub = 'advect_via_poisson_focused'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
     InvtFinal = 1.0/tFinal
@@ -648,6 +649,75 @@ contains
     end subroutine calc_hamiltonian_23
     !==========================================================================
   end subroutine advect_via_poisson_focused
+  !============================================================================
+  subroutine iterate_poisson_focused(iLine, nX, iShock, CflIn, BSi_I, nSi_I)
+    ! Advect via Possion Bracket scheme to the steady state: (p**3/3, mu, s_L)
+    ! First advect and then diffuse the VDF by splitting method
+
+    use SP_ModGrid, ONLY: D_, U_
+    use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+    ! INPUTS:
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: nX            ! Number of meshes along s_L axis
+    real,    intent(in) :: CflIn         ! Input CFL number
+    ! Input variables for diffusion
+    real,    intent(in) :: BSi_I(nX), nSi_I(nX)
+    real                :: uSi_I(nX-1), DsSi_I(nX-1)
+    ! Volume_G: global space volume = product of distance in each dimension
+    real :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
+    ! VolumeX_I: geometric volume = distance between two geometric faces
+    real :: VolumeX_I(0:nX+1)
+    ! u/B variable at face
+    real :: uOverBSi_F(-1:nX+1)
+    ! Hamiltonian at cell face
+    real :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
+    real :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1)
+    real :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
+    ! Extended array for distribution function
+    real :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
+    ! Advection term
+    real :: Source_C(nP, nMu, nX)
+    ! Time step
+    real :: Dt_C(nP, nMu, nX)
+
+    ! Now, steady-state Poisson bracket advection scheme for focused Eqn.
+    character(len=*), parameter:: NameSub = 'iterate_poisson_focused'
+    !--------------------------------------------------------------------------
+
+    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
+    DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
+    ! Initialize arrays
+    VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
+    VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(0)      = VolumeX_I(1)
+    VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
+    VolumeX_I(nX+1)   = VolumeX_I(nX)
+
+    ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
+    ! u/B with the index of "i" is the value at the face between
+    ! the mesh "i" and "i+1"
+    ! uSi_I with the index of "i" is the value at the face between
+    ! the mesh "i" and "i+1"
+    uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+    ! Average 1/B and multiply by uSi
+    uOverBSi_F(1:nX-1) = (0.5/BSi_I(2:nX) + 0.5/BSi_I(1:nX-1))*uSi_I(1:nX-1)
+    uOverBSi_F(0 )     = uSi_I(1)/BSi_I(1)
+    uOverBSi_F(-1)     = uOverBSi_F(0)
+    uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
+    uOverBSi_F(nX+1)   = uOverBSi_F(nX)
+
+    ! Check if the VDF includes negative values
+    call check_dist_neg(NameSub, 1, nX, iLine)
+    if(IsDistNeg) RETURN
+
+    ! Diffuse the distribution function
+    if(UseDiffusion) then
+       ! Check if the VDF includes negative values after diffusion
+       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+       if(IsDistNeg) RETURN
+    end if
+
+  end subroutine iterate_poisson_focused
   !============================================================================
 end module SP_ModAdvancePoisson
 !==============================================================================

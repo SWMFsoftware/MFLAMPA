@@ -51,6 +51,8 @@ contains
     ! Lagrangian derivatives, accounting for 1st order Fermi acceleration,
     ! which is responsible for advection in momentum space
     real    :: FermiFirst_I(1:nX)
+
+    ! Now, time-accurate advection scheme by logarithm for Parker Eqn.
     character(len=*), parameter:: NameSub = 'advect_via_log'
     !--------------------------------------------------------------------------
     IsDistNeg = .false.

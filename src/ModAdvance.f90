@@ -234,11 +234,12 @@ contains
   end subroutine advance
   !============================================================================
   subroutine iterate_steady_state
-    ! advance the solution of the diffusive kinetic equation:
+    ! advance sol. of the diffusive kinetic equation (from Parker Eqn.):
     !     f_t+[(1/3)*(d(ln rho)/dt]*f_{ln p}=B*d/ds[D/B*df/ds]
     ! with accounting for diffusion and first-order Fermi acceleration
 
-    use SP_ModAdvancePoisson, ONLY: iterate_poisson_parker
+    use SP_ModAdvancePoisson, ONLY: iterate_poisson_parker, &
+         iterate_poisson_focused
     ! Loop variable
     integer :: iLine
     ! For a given line: nVertex_B, iShock_IB:
@@ -253,7 +254,7 @@ contains
        ! the active particles on the line
        iEnd = nVertex_B(iLine)
 
-       ! Various data along the line in SI units. Temperature is in the unit
+       ! get data along the line in SI units: Temperature is in the unit
        ! of kinetic energy, all others are in SI units.
        BSi_I(1:iEnd) = State_VIB(   B_, 1:iEnd, iLine)
        ! nSi is needed to set up the distribution at the injection.
@@ -261,15 +262,21 @@ contains
        ! find how far shock has travelled on this line
        iShock = iShock_IB(Shock_, iLine)
 
-       ! First, set the diffusion coefficient, from the
+       ! first, set the diffusion coefficient, from the
        ! given formulae or from the turbulent specrtum, if known
        if(UseDiffusion) call set_diffusion_coef(iLine, iEnd, &
             iShock, BSi_I(1:iEnd))
        ! Poisson bracket scheme: particle-number-conservative
-       call iterate_poisson_parker(iLine, iEnd, iShock, Cfl, &
-            BSi_I(1:iEnd), nSi_I(1:iEnd))
+       if(IsMuAvg) then
+          ! Single Poisson bracket: Parker transport equation
+          call iterate_poisson_parker(iLine, iEnd, iShock, Cfl, &
+               BSi_I(1:iEnd), nSi_I(1:iEnd))
+       else
+          call iterate_poisson_focused(iLine, iEnd, iShock, Cfl, &
+               BSi_I(1:iEnd), nSi_I(1:iEnd))
+       end if
 
-       ! For any scheme, check if any VDF along this line is negative
+       ! for any scheme, check if any VDF along this line is negative
        if(IsDistNeg) CYCLE LINE
     end do LINE
 
