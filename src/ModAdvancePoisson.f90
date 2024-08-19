@@ -165,22 +165,22 @@ contains
           if(UseUpperEndBc) then
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
+                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt,&
                      LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0), &
                      UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
+                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt,&
                      UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I,&
+                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt,&
                      LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0))
              else
                 ! with no lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
+                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt)
              end if
           end if
           ! Check if the VDF includes negative values after diffusion
@@ -208,14 +208,14 @@ contains
     ! Input variables for diffusion
     real,    intent(in) :: BSi_I(nX), nSi_I(nX)
     real                :: uSi_I(nX-1), DsSi_I(nX-1)
-    ! Volume_G: global space volume = product of distance in each dimension
+    ! Volume_G: total control volume at the end of each iteration
     real :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real :: VolumeX_I(0:nX+1)
-    ! u/B variable at face
+    ! u/B variable at face of s_L
     real :: uOverBSi_F(-1:nX+1)
-    ! Hamiltonian at cell face
-    real :: Hamiltonian_N(-1:nP+1, -1:nX+1)
+    ! Hamiltonian at cell face: p**3/3 and s_L
+    real :: Hamiltonian12_N(-1:nP+1, -1:nX+1)
     ! Extended array for distribution function
     real :: VDF_G(-1:nP+2, -1:nX+2)
     ! Advection term
@@ -252,8 +252,8 @@ contains
     uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
     uOverBSi_F(nX+1)   = uOverBSi_F(nX)
 
-    ! Hamiltonian = -(u/B)*(p**3/3) at cell face, for {s_L, p**3/3}
-    Hamiltonian_N      = -spread(Momentum3_F, DIM=2, NCOPIES=nX+3)* &
+    ! Hamiltonian_12 = -(u/B)*(p**3/3) at cell face, for {p**3/3, s_L}
+    Hamiltonian12_N    = -spread(Momentum3_F, DIM=2, NCOPIES=nX+3)* &
          spread(uOverBSi_F, DIM=1, NCOPIES=nP+3)
 
     ! Update bc for at minimal energy, at nP = 0
@@ -261,7 +261,7 @@ contains
     ! Update Bc for VDF
     call set_VDF(iLine, nX, VDF_G)
     call explicit(nP, nX, VDF_G, Volume_G, Source_C, &
-         Hamiltonian12_N=Hamiltonian_N, CFLIn=CflIn, &
+         Hamiltonian12_N=Hamiltonian12_N, CFLIn=CflIn, &
          IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
@@ -276,22 +276,26 @@ contains
        if(UseUpperEndBc) then
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I, &
+             call diffuse_distribution(iLine, nX, iShock, &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :), &
                   LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0), &
                   UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
           else
              ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I, &
+             call diffuse_distribution(iLine, nX, iShock, &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :), &
                   UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I, &
+             call diffuse_distribution(iLine, nX, iShock, &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :), &
                   LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0))
           else
              ! with no lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock, Dt_C, nSi_I, BSi_I)
+             call diffuse_distribution(iLine, nX, iShock, &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :))
           end if
        end if
        ! Check if the VDF includes negative values after diffusion
@@ -439,32 +443,31 @@ contains
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock,  &
-                     Dt, nSi_I, BSi_I, LowerEndSpectrumIn_II= &
+                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_II= &
                      VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),  &
                      UpperEndSpectrumIn_II=                   &
                      VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
              else
                 ! with upper end BC but no lower end BC
                 call diffuse_distribution(iLine, nX, iShock,  &
-                     Dt, nSi_I, BSi_I, UpperEndSpectrumIn_II= &
+                     nSi_I, BSi_I, Dt, UpperEndSpectrumIn_II= &
                      VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
                 call diffuse_distribution(iLine, nX, iShock,  &
-                     Dt, nSi_I, BSi_I, LowerEndSpectrumIn_II= &
+                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_II= &
                      VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0))
              else
                 ! with no lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, Dt, nSi_I, BSi_I)
+                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt)
              end if
           end if
           ! Check if the VDF includes negative values after spatial diffusion
           call check_dist_neg(NameSub//' after spatial diffusion',1,nX,iLine)
           if(IsDistNeg) RETURN
        end if
-       ! ------------ Thank you! ------------
 
        ! Update time
        Time = Time + Dt
@@ -663,7 +666,7 @@ contains
     ! Input variables for diffusion
     real,    intent(in) :: BSi_I(nX), nSi_I(nX)
     real                :: uSi_I(nX-1), DsSi_I(nX-1)
-    ! Volume_G: global space volume = product of distance in each dimension
+    ! Volume_G: total control volume at the end of each iteration
     real :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real :: VolumeX_I(0:nX+1)
@@ -706,14 +709,69 @@ contains
     uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
     uOverBSi_F(nX+1)   = uOverBSi_F(nX)
 
+    ! Update bc for at minimal energy, at nP = 0
+    call set_momentum_bc(iLine, nX, nSi_I, iShock)
+    ! Update Bc for VDF
+    call set_VDF(iLine, nX, VDF_G)
+    call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
+         Hamiltonian12_N=Hamiltonian12_N, &
+         Hamiltonian13_N=Hamiltonian13_N, &
+         Hamiltonian23_N=Hamiltonian23_N, &
+         CFLIn=CflIn, IsSteadyState=.true., DtOut_C=Dt_C)
+
+    ! Update velocity distribution function
+    Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
+         Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
+         Source_C(1:nP, 1:nMu, iStart:nX)
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
 
-    ! Diffuse the distribution function
+    ! ------------ Future Work ------------
+    ! This is the first version of draft implementing multi-Poisson-bracket
+    ! scheme in SP/MFLAMPA made by Weihao Liu. It needs more development
+    ! in the future. Here, we will also include some scattering functions.
+    ! (Clearly, UseDiffusion and diffuse_distrition is missing here.)
+    ! Moreover, the structure should be optimized, with some bugs fixed.
+    ! One can refer to test_multi_poisson in share/Library/test/
+    ! One should specify the TypeScatter in the PARAM.in file.
+    ! We will work on this further later since it is more advanced.
+    ! For pitch angle scattering
+    ! if(UseMuScattering) then
+    !    call scatter_distribution(iLine, nX, Dt_C, nSi_I, BSi_I)
+    !    ! Check if the VDF includes negative values after mu scattering
+    !    call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
+    !    if(IsDistNeg) RETURN
+    ! end if
     if(UseDiffusion) then
-       ! Check if the VDF includes negative values after diffusion
-       call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
+       ! For spatial diffusion
+       if(UseUpperEndBc) then
+          if(UseLowerEndBc) then
+             ! with lower or upper end BCs
+             call diffuse_distribution(iLine, nX, iShock,    &
+                  nSi_I, BSi_I, Dt_C, LowerEndSpectrumIn_II= &
+                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),    &
+                  UpperEndSpectrumIn_II=                     &
+                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
+          else
+             ! with upper end BC but no lower end BC
+             call diffuse_distribution(iLine, nX, iShock,    &
+                  nSi_I, BSi_I, Dt_C, UpperEndSpectrumIn_II= &
+                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
+          end if
+       else
+          if(UseLowerEndBc) then
+             ! with lower end BC but no upper end BC
+             call diffuse_distribution(iLine, nX, iShock,    &
+                  nSi_I, BSi_I, Dt_C, LowerEndSpectrumIn_II= &
+                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0))
+          else
+             ! with no lower or upper end BCs
+             call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt_C)
+          end if
+       end if
+       ! Check if the VDF includes negative values after spatial diffusion
+       call check_dist_neg(NameSub//' after spatial diffusion',1,nX,iLine)
        if(IsDistNeg) RETURN
     end if
 

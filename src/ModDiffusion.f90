@@ -43,8 +43,9 @@ module SP_ModDiffusion
   public          :: read_param, diffuse_distribution, &
        scatter_distribution, set_diffusion_coef
   interface diffuse_distribution
-     module procedure diffuse_distribution_s   ! Global time step Dt, nMu>=1
-     module procedure diffuse_distribution_arr ! DtLocal_I array, nMu>=1
+     module procedure diffuse_distribution_s   ! Global time step Dt
+     module procedure diffuse_distribution_arr ! DtLocal for (nP, nX)
+     module procedure diffuse_distribution_c   ! DtLocal for (nP, nMu, nX)
   end interface diffuse_distribution
 
 contains
@@ -81,8 +82,8 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine diffuse_distribution_s(iLine, nX, iShock, Dt, &
-       nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+  subroutine diffuse_distribution_s(iLine, nX, iShock, nSi_I, &
+       BSi_I, Dt, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
        LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
     ! diffuse the distribution function with scalar/global Dt, with
     ! the pitch-angle-averaged or dependent lower and upper spectra
@@ -90,26 +91,59 @@ contains
     ! Variables as inputs
     ! input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
-    real, intent(in) :: Dt          ! Time step for diffusion
+    ! Number density and magnetic field strength at the end of this iteration
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    ! Scalar time step for diffusion
+    real, intent(in) :: Dt
     ! Given spectrum at low end (flare acceleration) and upper end (GCRs)
     real, intent(in), optional, dimension(iProcPStart:iProcPEnd) :: &
          LowerEndSpectrumIn_I, UpperEndSpectrumIn_I   ! Mu-averaged
     real, intent(in), optional, dimension(iProcPStart:iProcPEnd, nMu) :: &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II ! Mu-dependent
     ! LOCAL VARS
-    real :: DtFake_C(iProcPStart:iProcPEnd, nX)
+    real :: DtFake_C(iProcPStart:iProcPEnd, nMu, nX)
     !--------------------------------------------------------------------------
     DtFake_C = Dt
 
-    call diffuse_distribution_arr(iLine, nX, iShock, DtFake_C, &
-         nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+    call diffuse_distribution_c(iLine, nX, &
+         iShock, nSi_I, BSi_I, DtFake_C, &
+         LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
 
   end subroutine diffuse_distribution_s
   !============================================================================
-  subroutine diffuse_distribution_arr(iLine, nX, iShock, DtLocalIn_II, &
-       nSi_I, BSi_I, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+  subroutine diffuse_distribution_arr(iLine, nX, iShock, nSi_I, &
+       BSi_I, DtLocal_II, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+       LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
+    ! diffuse the distribution function with scalar/global Dt, with
+    ! the pitch-angle-averaged or dependent lower and upper spectra
+
+    ! Variables as inputs
+    ! input Line, End (for how many particles), and Shock indices
+    integer, intent(in) :: iLine, nX, iShock
+    ! Number density and magnetic field strength at the end of this iteration
+    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    ! Local time step for diffusion: Only with nP and nX
+    real, intent(in) :: DtLocal_II(iProcPStart:iProcPEnd, nX)
+    ! Given spectrum at low end (flare acceleration) and upper end (GCRs)
+    real, intent(in), optional, dimension(iProcPStart:iProcPEnd) :: &
+         LowerEndSpectrumIn_I, UpperEndSpectrumIn_I   ! Mu-averaged
+    real, intent(in), optional, dimension(iProcPStart:iProcPEnd, nMu) :: &
+         LowerEndSpectrumIn_II, UpperEndSpectrumIn_II ! Mu-dependent
+    ! LOCAL VARS
+    real :: DtFake_C(iProcPStart:iProcPEnd, nMu, nX)
+    !--------------------------------------------------------------------------
+    DtFake_C = spread(DtLocal_II, DIM=2, NCOPIES=nMu)
+
+    call diffuse_distribution_c(iLine, nX, &
+         iShock, nSi_I, BSi_I, DtFake_C, &
+         LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
+         LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
+
+  end subroutine diffuse_distribution_arr
+  !============================================================================
+  subroutine diffuse_distribution_c(iLine, nX, iShock, nSi_I, BSi_I, &
+       DtLocalIn_III, LowerEndSpectrumIn_I, UpperEndSpectrumIn_I, &
        LowerEndSpectrumIn_II, UpperEndSpectrumIn_II)
     ! diffuse the distribution function with vector/local Dt
 
@@ -119,22 +153,23 @@ contains
     use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
-    ! input Line, End (for how many particles), and Shock indices
+    ! Input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
-    ! Local time step for diffusion
-    real, intent(in) :: DtLocalIn_II(iProcPStart:iProcPEnd, nX)
+    ! Number density and magnetic field strength at the end of this iteration
     real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    ! Local time step for diffusion: with nP, nMu and nX
+    real, intent(in) :: DtLocalIn_III(iProcPStart:iProcPEnd, nMu, nX)
     ! Given spectrum at low end (flare acceleration) and upper end (GCRs)
-    real, intent(in), optional, dimension(iProcPStart:iProcPEnd) :: &
+    real, optional, intent(in), dimension(iProcPStart:iProcPEnd) :: &
          LowerEndSpectrumIn_I, UpperEndSpectrumIn_I   ! Mu-averaged
-    real, intent(in), optional, dimension(iProcPStart:iProcPEnd, nMu) :: &
+    real, optional, intent(in), dimension(iProcPStart:iProcPEnd, nMu) :: &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II ! Mu-dependent
     ! Variables declared in this subroutine
     integer :: iP, iMu, iiProc                        ! Loop variables
     ! For an optimized loop, we need to change the index order by
-    ! (iProcPStart:iProcPEnd, nX) into by (nX, iProcPStart:iProcPEnd)
-    ! for the two-dimensional local time step DtLocal_II array
-    real    :: DtLocal_II(nX, iProcPStart:iProcPEnd)  ! Local time stepping
+    ! (iProcPStart:iProcPEnd,nMu,nX) into by (nX,iProcPStart:iProcPEnd,nMu)
+    ! for the three-dimensional local time step DtLocal_III array
+    real :: DtLocal_III(nX, iProcPStart:iProcPEnd, nMu) ! Local time stepping
     ! Same reason for LowerEndSpectrumIn_II and UpperEndSpectrumIn_II: keep
     ! (iProcPStart:iProcPEnd, nMu) as a good looping order, out=iMu, in=iP
     real, dimension(iProcPStart:iProcPEnd, nMu) :: &
@@ -168,11 +203,14 @@ contains
     real :: iSub
     !--------------------------------------------------------------------------
     ! diffusion along the field line
-    ! Set up the local time step: the reason is that, we loop through
-    ! each iX at the fixed iP, so we will visit each DtLocal_II(iX, iP)
-    ! in the loop with the inner-most iX and outer-most iP. It will
-    ! visit and put the data in cache that are stored adjacently.
-    DtLocal_II = transpose(DtLocalIn_II)
+    ! Set up the local time step: the reason is that, we loop through each
+    ! iX at fixed iP and iMu, so we will visit each DtLocal_III(iX,iP,iMu)
+    ! in the loop with the inner-most index iX, intermediate loop index iP,
+    ! and the outer-most index iMu. It will visit and put the data in cache
+    ! that are stored adjacently.
+    do iMu = 1, nMu
+        DtLocal_III(:, :, iMu) = transpose(DtLocalIn_III(:, iMu, :))
+    end do
 
     ! Get LowerEndSpectrum_II and/or UpperEndSpectrum_II if given
     ! Given Mu-averaged arrays: spread into 2 dimensions with nMu
@@ -247,7 +285,7 @@ contains
           Main_I = 1.0; Lower_I = 0.0; Upper_I = 0.0
 
           ! For i=1:
-          Aux1_I(1)  = DtLocal_II(1,iP)*DOuterSi_I(1)*   &
+          Aux1_I(1)  = DtLocal_III(1,iP,iMu)*DOuterSi_I(1)*   &
                0.5*(DInnerSi_II(1,iP) + DInnerSi_II(2,iP))/DsMesh_I(2)**2
           Main_I(1)  = Main_I(1) + Aux1_I(1)
           Upper_I(1) = -Aux1_I(1)
@@ -257,7 +295,7 @@ contains
              ! f^(n+1)_1-Dt*DOuter_I/DsFace_I*(&
              !     DInner_(3/2)*(f^(n+1)_2-f^(n+1)_1)/DsMesh_(2)-&
              !     DInner_(1/2)*(f^(n+1)_1 -f_0/DsMesh_(1))=f^n_1
-             Aux2_I(1) = DtLocal_II(1,iP)*DOuterSi_I(1)  &
+             Aux2_I(1) = DtLocal_III(1,iP,iMu)*DOuterSi_I(1) &
                   *DInnerSi_II(1,iP)/DsMesh_I(2)**2
              ! With these regards, Aux2 is added to Main_I(1)...
              Main_I(1) = Main_I(1) + Aux2_I(1)
@@ -267,10 +305,10 @@ contains
           end if
 
           ! For i=2, n-1:
-          Aux1_I(2:nX-1) = DtLocal_II(2:nX-1,iP)*DOuterSi_I(2:nX-1)* &
+          Aux1_I(2:nX-1) = DtLocal_III(2:nX-1,iP,iMu)*DOuterSi_I(2:nX-1)* &
                0.5*(DInnerSi_II(2:nX-1,iP) + DInnerSi_II(3:nX, iP))/ &
                (DsMesh_I(3:nX)*DsFace_I(2:nX-1))
-          Aux2_I(2:nX-1) = DtLocal_II(2:nX-1,iP)*DOuterSi_I(2:nX-1)* &
+          Aux2_I(2:nX-1) = DtLocal_III(2:nX-1,iP,iMu)*DOuterSi_I(2:nX-1)* &
                0.5*(DInnerSi_II(1:nX-2,iP) + DInnerSi_II(2:nX-1,iP))/&
                (DsMesh_I(2:nX-1)*DsFace_I(2:nX-1))
           Main_I(2:nX-1)  = Main_I(2:nX-1) + Aux1_I(2:nX-1) + Aux2_I(2:nX-1)
@@ -291,11 +329,11 @@ contains
           ! Main_I(n) = 1; Lower_I(n) = 0 (equivalently to doing nothing)
           ! For backward compatibility, please keep UseUpperEndBc=.false.
           if(UseUpperSpectrum) then
-             Aux2_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)*0.5* &
+             Aux2_I(nX)  = DtLocal_III(nX,iP,iMu)*DOuterSi_I(nX)*0.5* &
                   (DInnerSi_II(nX-1,iP) + DInnerSi_II(nX,iP))/DsMesh_I(nX)**2
              Main_I(nX)  = Main_I(nX) + Aux2_I(nX)
              Lower_I(nX) = -Aux2_I(nX)
-             Aux1_I(nX)  = DtLocal_II(nX,iP)*DOuterSi_I(nX)* &
+             Aux1_I(nX)  = DtLocal_III(nX,iP,iMu)*DOuterSi_I(nX)* &
                   DInnerSi_II(nX,iP)/DsMesh_I(nX)**2
              Main_I(nX)  = Main_I(nX) + Aux1_I(nX)
              Res_I(nX)   = Res_I(nX) + Aux1_I(nX)*UpperEndSpectrum_II(iP, iMu)
@@ -340,7 +378,7 @@ contains
        end if
     end if
 
-  end subroutine diffuse_distribution_arr
+  end subroutine diffuse_distribution_c
   !===========================================================================
   subroutine scatter_distribution(iLine, nX, Dt, nSi_I, BSi_I)
     ! Calculate scatter: \deltaf/\deltat = (Dmumu*f_mu)_mu
