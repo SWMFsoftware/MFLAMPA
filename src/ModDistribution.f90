@@ -42,7 +42,7 @@ module SP_ModDistribution
   real, public :: Mu_F(0:nMu), Mu_C(nMu), DeltaMu3_I(nMu)
 
   ! P**3/3 and total energy in the IO unit, at face center
-  real, public, dimension(-1:nP+1) :: Momentum3_F, EnergyIo_F
+  real, public, dimension(-1:nP+1) :: Momentum3_F, EnergyIo_F, GammaLorentz_F
   ! Speed, momentum, kinetic energy at the momentum grid points
   real, public, dimension( 0:nP+1) :: SpeedSi_G, Momentum_G, KinEnergyIo_G
   ! Volumes of each cell along the momentum axis
@@ -106,7 +106,7 @@ contains
   !============================================================================
   subroutine init
 
-    use ModConst,     ONLY: cLightSpeed
+    use ModConst,     ONLY: cLightSpeed, cRmeProton
     use ModUtilities, ONLY: check_allocate
     use SP_ModProc,   ONLY: iError
     use SP_ModUnit,   ONLY: kinetic_energy_to_momentum, momentum_to_energy, &
@@ -132,8 +132,7 @@ contains
 
     ! Functions to convert the grid index to momentum and energy
     Momentum3_F(-1) = exp(-3*(0.5*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj
-    EnergyIo_F(-1) = momentum_to_energy(MomentumInjSi*exp(-0.5*dLogP)) &
-        *Si2Io_V(UnitEnergy_)
+    EnergyIo_F(-1) = momentum_to_energy(MomentumInjSi*exp(-0.5*dLogP))
     do iP = 0, nP+1
        Momentum_G(iP)    = MomentumInjSi*exp(iP*dLogP)
        ! For velocity = p*c**2/sqrt(p**2+(m*c**2)**2), at cell center
@@ -145,15 +144,16 @@ contains
        ! Normalize kinetic energy per Unit of energy in SI unit:
        KinEnergyIo_G(iP) = momentum_to_kinetic_energy(Momentum_G(iP)) &
             *Si2Io_V(UnitEnergy_)
-       ! For total energy in IO unit, and its relevant volume:
-       EnergyIo_F(iP)    = momentum_to_energy( &
-            Momentum_G(iP)*exp(0.5*dLogP))*Si2Io_V(UnitEnergy_)
+       ! For total energy in Si unit temporarily and in IO unit later
+       EnergyIo_F(iP)    = momentum_to_energy(Momentum_G(iP)*exp(0.5*dLogP))
        ! Normalize momentum per MomentumInjSi
        Momentum_G(iP)    = Momentum_G(iP)/MomentumInjSi
        Background_I(iP)  = FluxInitIo*Io2Si_V(UnitFlux_)/ & ! Integral flux SI
             (EnergyMaxIo-EnergyInjIo) &  ! Energy range
             /Momentum_G(iP)**2           ! Convert from diff flux to VDF
     end do
+    GammaLorentz_F = EnergyIo_F/cRmeProton
+    EnergyIo_F = EnergyIo_F*Si2Io_V(UnitEnergy_)
     VolumeE_I  = EnergyIo_F(0:nP+1)    - EnergyIo_F(-1:nP)
     VolumeE3_I = EnergyIo_F(0:nP+1)**3 - EnergyIo_F(-1:nP)**3
 

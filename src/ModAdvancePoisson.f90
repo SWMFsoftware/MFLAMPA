@@ -40,7 +40,7 @@ module SP_ModAdvancePoisson
   ! Whether to include the pitch angle scattering term
   logical, public :: UseMuScattering = .false.
   ! Time derivative over DtFull (linear interpolation for time):
-  real, public, dimension(nVertexMax) :: bDuDt_C
+  real, public, dimension(nVertexMax) :: DbuDt_C
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -81,7 +81,7 @@ contains
     ! Volume_G: total control volume at the end of each iteration
     ! dVolumeDt_G: total control time derivative
     real, dimension(0:nP+1, 0:nX+1) :: VolumeOld_G, Volume_G, dVolumeDt_G
-    ! DeltaHamiltonian for {tau, p**3/3} => \tilde Hamiltonian
+    ! DeltaHamiltonian for {tau, p**3/3} => \tilde\deltaH
     real :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
     ! Extended array for distribution function
     real :: VDF_G(-1:nP+2, -1:nX+2)
@@ -227,18 +227,6 @@ contains
     character(len=*), parameter:: NameSub = 'iterate_poisson_parker'
     !--------------------------------------------------------------------------
 
-    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
-    ! Initialize arrays
-    VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
-    VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
-    VolumeX_I(0)      = VolumeX_I(1)
-    VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
-    VolumeX_I(nX+1)   = VolumeX_I(nX)
-    ! Calculate total control volume
-    Volume_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
-         spread(VolumeX_I, DIM=1, NCOPIES=nP+2)
-
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
     ! uSi_I with the index of "i" is the value at the face between
     ! the mesh "i" and "i+1"
@@ -251,6 +239,18 @@ contains
     uOverBSi_F(-1)     = uOverBSi_F(0)
     uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
     uOverBSi_F(nX+1)   = uOverBSi_F(nX)
+
+    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
+    DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
+    ! Initialize arrays
+    VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
+    VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(0)      = VolumeX_I(1)
+    VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
+    VolumeX_I(nX+1)   = VolumeX_I(nX)
+    ! Calculate total control volume
+    Volume_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+         spread(VolumeX_I, DIM=1, NCOPIES=nP+2)
 
     ! Hamiltonian_12 = -(u/B)*(p**3/3) at cell face, for {p**3/3, s_L}
     Hamiltonian12_N    = -spread(Momentum3_F, DIM=2, NCOPIES=nX+3)* &
@@ -320,8 +320,8 @@ contains
     if(.not.UseInertialForce) RETURN
 
     ! Now we use the inertial force in focused transport equation
-    ! Calculate b*Du/Dt, for Dt in nProgress, i.e., DtFull
-    bDuDt_C(1:nX) = (State_VIB(U_, 1:nX, iLine) - &
+    ! Calculate D(\vec{b}*\vec{u})/Dt, for Dt in nProgress, i.e., DtFull
+    DbuDt_C(1:nX) = (State_VIB(U_, 1:nX, iLine) - &
          State_VIB(UOld_, 1:nX, iLine))/DtFull
 
   end subroutine calc_states_poisson_focused
@@ -339,7 +339,7 @@ contains
     use ModConst,           ONLY: cProtonMass, cRmeProton, cLightSpeed
     use SP_ModDiffusion,    ONLY: scatter_distribution
     use SP_ModDistribution, ONLY: DeltaMu, Mu_F, DeltaMu3_I, &
-         VolumeE_I, VolumeE3_I
+         GammaLorentz_F, VolumeE_I, VolumeE3_I
     use SP_ModUnit,         ONLY: Si2Io_V, UnitEnergy_
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
@@ -368,7 +368,7 @@ contains
     ! Poisson bracket with regard to the first and second VARs
     ! considering the case when there are more than one Poisson bracket
     ! and when there is a Poisson bracket with respect to the time
-    ! Finally we integrate over the other VARs to get \tilde Hamiltonian
+    ! Finally we integrate over the other VARs to get \tilde\deltaH
     real    :: dHamiltonian01_FX(-1:nP+1,  0:nMu+1,  0:nX+1) ! {tau, p**3/3}
     real    :: dHamiltonian02_FY( 0:nP+1, -1:nMu+1,  0:nX+1) ! {tau, mu}
     real    :: Hamiltonian12_N  (-1:nP+1, -1:nMu+1,  0:nX+1) ! {p**3/3, mu}
@@ -423,15 +423,6 @@ contains
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg) RETURN
 
-       ! ------------ Future Work ------------
-       ! This is the first version of draft implementing multi-Poisson-bracket
-       ! scheme in SP/MFLAMPA made by Weihao Liu. It needs more development
-       ! in the future. Here, we will also include some scattering functions.
-       ! (Clearly, UseDiffusion and diffuse_distrition is missing here.)
-       ! Moreover, the structure should be optimized, with some bugs fixed.
-       ! One can refer to test_multi_poisson in share/Library/test/
-       ! One should specify the TypeScatter in the PARAM.in file.
-       ! We will work on this further later since it is more advanced.
        ! For pitch angle scattering
        if(UseMuScattering) then
           call scatter_distribution(iLine, nX, nSi_I, BSi_I, Dt)
@@ -616,7 +607,8 @@ contains
             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
                  0.5*spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+3)* &
                  spread((Momentum3_F*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
-                 cProtonMass*VolumeX_I(iX)*bDuDt_C(iX)
+                 spread(GammaLorentz_F, DIM=2, NCOPIES=nMu+1)* &
+                 cProtonMass*VolumeX_I(iX)*DbuDt_C(iX)
          end do
       end if
 
@@ -658,9 +650,10 @@ contains
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, mu, s_L)
     ! First advect and then diffuse the VDF by splitting method
 
-    use ModConst,           ONLY: cRmeProton, cLightSpeed
+    use ModConst,           ONLY: cProtonMass, cRmeProton, cLightSpeed
     use SP_ModDiffusion,    ONLY: scatter_distribution
-    use SP_ModDistribution, ONLY: DeltaMu, Mu_F, VolumeE_I, VolumeE3_I
+    use SP_ModDistribution, ONLY: DeltaMu, Mu_F, &
+         GammaLorentz_F, VolumeE_I, VolumeE3_I
     use SP_ModGrid,         ONLY: D_, U_
     use SP_ModUnit,         ONLY: Io2Si_V, Si2Io_V, UnitX_, UnitEnergy_
     ! INPUTS:
@@ -675,14 +668,16 @@ contains
     ! Inverse magetic field: cell- and face-centered values
     real    :: InvBSi_C(nX), InvBSi_F(0:nX)
     ! Array for u/B=\vec{u}*\vec{B}/|B|**2 and distance between adjacent meshes
-    real    :: uSi_I(nX-1), DsSi_I(nX-1)
+    real    :: uSi_I(nX-1)
+    ! Array for d(\vec{b}*\vec{u})/d(s_L), for the inertial force
+    real    :: DbuDsSi_I(0:nX+1)
     ! Volume_G: total control volume at the end of each iteration
     real    :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real    :: VolumeX_I(0:nX+1)
     ! u/B variable at face
     real    :: uOverBSi_F(-1:nX+1)
-    ! Hamiltonian functions at cell face => \tilde Hamiltonian
+    ! Hamiltonian functions at cell face => \tilde\deltaH
     real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1) ! {p**3/3, mu}
     real    :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1) ! {p**3/3, s_L}
     real    :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1) ! {mu, s_L}
@@ -697,62 +692,10 @@ contains
     character(len=*), parameter:: NameSub = 'iterate_poisson_focused'
     !--------------------------------------------------------------------------
 
-    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! Initialize arrays
-    VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
-    VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
-    VolumeX_I(0)      = VolumeX_I(1)
-    VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
-    VolumeX_I(nX+1)   = VolumeX_I(nX)
-
-    ! Calculate total control volume
-    do iX = 0, nX+1
-       Volume_G(:, :, iX) = VolumeX_I(iX)*DeltaMu* &
-            spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
-    end do
-
-    ! Magnetic-field-related variables:
-    ! Cell-centered 1/B
-    InvBSi_C    = 1.0/BSi_I
-    ! Face-centered 1/B
-    InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
-    InvBSi_F(0 )     = InvBSi_C(1 ) - (InvBSi_C(2 ) - InvBSi_C(1   ))*0.5
-    InvBSi_F(nX)     = InvBSi_C(nX) + (InvBSi_C(nX) - InvBSi_C(nX-1))*0.5
-
-    ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
-    ! uSi_I with the index of "i" is the value at the face between
-    ! the mesh "i" and "i+1"
-    uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
-    ! u/B with the index of "i" is the value at the face between
-    ! the mesh "i" and "i+1"
-    ! Average 1/B and multiply by uSi
-    uOverBSi_F(1:nX-1) = (0.5/BSi_I(2:nX) + 0.5/BSi_I(1:nX-1))*uSi_I(1:nX-1)
-    uOverBSi_F(0 )     = uSi_I(1)/BSi_I(1)
-    uOverBSi_F(-1)     = uOverBSi_F(0)
-    uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
-    uOverBSi_F(nX+1)   = uOverBSi_F(nX)
-
-    ! Calculate the Hamiltonian function for {f_jk, H_13}_{p**3/3, s_L}:
-    ! H_13 = -(u/B)*(p**3/3),
-    ! at the faces of p**3/3 and s_L, and cell center of mu => \tilde\deltaH
-    do iX = -1, nX+1
-       Hamiltonian13_N(:, :, iX) = -DeltaMu* &
-            spread(Momentum3_F, DIM=2, NCOPIES=nMu+2)*uOverBSi_F(iX)
-    end do
-
-    ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
-    ! H_23 = (1-mu**2)/(2B)*(dEtot**3-3*ProtonMass**2*c**4*dEtot)/(3*c**2),
-    ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
-    do iX = 0, nX
-       Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
-            spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
-            spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
-            Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
-    end do
-    ! Boundary condition of the Hamiltonian function: symmetry
-    Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
-    Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
+    call init_states_focused
+    ! Calculate Hamiltonian functions
+    call calc_hamiltonians
 
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -772,15 +715,6 @@ contains
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
 
-    ! ------------ Future Work ------------
-    ! This is the first version of draft implementing multi-Poisson-bracket
-    ! scheme in SP/MFLAMPA made by Weihao Liu. It needs more development
-    ! in the future. Here, we will also include some scattering functions.
-    ! (Clearly, UseDiffusion and diffuse_distrition is missing here.)
-    ! Moreover, the structure should be optimized, with some bugs fixed.
-    ! One can refer to test_multi_poisson in share/Library/test/
-    ! One should specify the TypeScatter in the PARAM.in file.
-    ! We will work on this further later since it is more advanced.
     ! For pitch angle scattering
     if(UseMuScattering) then
        call scatter_distribution(iLine, nX, nSi_I, &
@@ -825,6 +759,126 @@ contains
        if(IsDistNeg) RETURN
     end if
 
+  contains
+    !==========================================================================
+    subroutine init_states_focused
+
+      ! Initialize states: 1/B, u/B, VolumeX_I and Volume_G arrays
+
+      use ModNumConst, ONLY: cTiny
+      ! Mesh spacing.
+      real :: DsMesh_I(1:nX-1)
+      !------------------------------------------------------------------------
+
+      ! Magnetic-field-related variables:
+      ! Cell-centered 1/B
+      InvBSi_C = 1.0/BSi_I
+      ! Face-centered 1/B
+      InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
+      InvBSi_F(0 )     = InvBSi_C(1 ) - 0.5*(InvBSi_C(2 ) - InvBSi_C(1   ))
+      InvBSi_F(nX)     = InvBSi_C(nX) + 0.5*(InvBSi_C(nX) - InvBSi_C(nX-1))
+
+      ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
+      ! uSi_I with the index of "i" is the value at the face between
+      ! the mesh "i" and "i+1"
+      uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+      ! u/B with the index of "i" is the value at the face between
+      ! the mesh "i" and "i+1"
+      ! Average 1/B and multiply by uSi
+      uOverBSi_F(1:nX-1) = uSi_I(1:nX-1)*InvBSi_F(1:nX-1)
+      uOverBSi_F(0 )     = uSi_I(1)*InvBSi_F(0)
+      uOverBSi_F(-1)     = uOverBSi_F(0)
+      uOverBSi_F(nX)     = uSi_I(nX-1)*InvBSi_F(nX)
+      uOverBSi_F(nX+1)   = uOverBSi_F(nX)
+
+      ! In M-FLAMPA DsMesh_I(i) is the distance between centers of meshes
+      ! i and i+1. Therefore,
+      DsMesh_I(1:nX-1) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
+
+      ! Calculate geometric volume
+      VolumeX_I(2:nX-1) = DsMesh_I(2:nX-1)*InvBSi_C(2:nX-1)
+      VolumeX_I(1)      = DsMesh_I(1)*InvBSi_C(1)
+      VolumeX_I(0)      = VolumeX_I(1)
+      VolumeX_I(nX)     = DsMesh_I(nX-1)*InvBSi_C(nX)
+      VolumeX_I(nX+1)   = VolumeX_I(nX)
+
+      ! Calculate total control volume
+      do iX = 0, nX+1
+         Volume_G(:, :, iX) = VolumeX_I(iX)*DeltaMu* &
+              spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
+      end do
+
+      ! Calculate d(\vec{b}*\vec{u})/d(s_L), for the inertial force
+      if(UseInertialForce) then
+         DbuDsSi_I(2:nX-1)  = (uSi_I(2:nX-1) - uSi_I(1:nX-2))/DsMesh_I(2:nX-1)
+         DbuDsSi_I(0:1)     = DbuDsSi_I(2)
+         DbuDsSi_I(nX:nX+1) = DbuDsSi_I(nX-1)
+      end if
+
+    end subroutine init_states_focused
+    !==========================================================================
+    subroutine calc_hamiltonians
+
+      ! Calculate Hamiltonian functions: {f_jk; H_(..)}_{..., ...}
+      ! where Coor1 is p**3/3, Coor2 is mu, and Coor3 is s_L.
+      !------------------------------------------------------------------------
+
+      ! Clean the Hamiltonian function for {f_jk; H_12}_{p**3/3, mu}
+      Hamiltonian12_N = 0.0
+      ! Calculate the Hamiltonian function for {f_jk, H_12}_{p**3/3, mu}:
+      ! We split into two terms for
+      !     (1) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
+      !        p**3/3 * 3*DeltaS/B * [d(1/B)/d(s_L)]/(1/B) }_{p**3/3, mu}; and
+      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 *
+      !        ProtonMass * u/B * d(\vec{b}*\vec{u})/d(s_L) }_{p**3/3, mu},
+      ! then summed as H_12, at the faces of p**3/3 and mu => \tilde\deltaH
+
+       ! For the betatron acceleration
+       if(UseBetatron) then
+          do iX = 1, nX
+             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX)
+             ! Include the betatron acceleration expression here
+          end do
+       end if
+
+      ! For the inertial force
+      if(UseInertialForce) then
+         do iX = 0, nX+1
+            Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
+                 0.5*spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+3)* &
+                 spread((Momentum3_F*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
+                 spread(GammaLorentz_F, DIM=2, NCOPIES=nMu+1)* &
+                 cProtonMass*VolumeX_I(iX)*DbuDsSi_I(iX)
+         end do
+      end if
+
+      ! Boundary condition of Hamiltonian function
+      Hamiltonian12_N(:,    -1,    :) = Hamiltonian12_N(:,     1,  :)
+      Hamiltonian12_N(:, nMu+1,    :) = Hamiltonian12_N(:, nMu-1,  :)
+
+      ! Calculate the Hamiltonian function for {f_jk, H_13}_{p**3/3, s_L}:
+      ! H_13 = -(u/B)*(p**3/3),
+      ! at the faces of p**3/3 and s_L, and cell center of mu => \tilde\deltaH
+      do iX = -1, nX+1
+         Hamiltonian13_N(:, :, iX) = -DeltaMu* &
+              spread(Momentum3_F, DIM=2, NCOPIES=nMu+2)*uOverBSi_F(iX)
+      end do
+
+      ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
+      ! H_23 = (1-mu**2)/(2B)*(dEtot**3-3*ProtonMass**2*c**4*dEtot)/(3*c**2),
+      ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
+      do iX = 0, nX
+         Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
+              spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
+              spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
+              Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
+      end do
+      ! Boundary condition of the Hamiltonian function: symmetry
+      Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
+      Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
+
+    end subroutine calc_hamiltonians
+    !==========================================================================
   end subroutine iterate_poisson_focused
   !============================================================================
 end module SP_ModAdvancePoisson
