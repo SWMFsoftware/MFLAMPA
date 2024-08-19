@@ -81,7 +81,7 @@ contains
     ! Volume_G: total control volume at the end of each iteration
     ! dVolumeDt_G: total control time derivative
     real, dimension(0:nP+1, 0:nX+1) :: VolumeOld_G, Volume_G, dVolumeDt_G
-    ! DeltaHamiltonian
+    ! DeltaHamiltonian for {tau, p**3/3} => \tilde Hamiltonian
     real :: dHamiltonian01_FX(-1:nP+1, 0:nX+1)
     ! Extended array for distribution function
     real :: VDF_G(-1:nP+2, -1:nX+2)
@@ -240,11 +240,11 @@ contains
          spread(VolumeX_I, DIM=1, NCOPIES=nP+2)
 
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
-    ! u/B with the index of "i" is the value at the face between
-    ! the mesh "i" and "i+1"
     ! uSi_I with the index of "i" is the value at the face between
     ! the mesh "i" and "i+1"
     uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+    ! u/B with the index of "i" is the value at the face between
+    ! the mesh "i" and "i+1"
     ! Average 1/B and multiply by uSi
     uOverBSi_F(1:nX-1) = (0.5/BSi_I(2:nX) + 0.5/BSi_I(1:nX-1))*uSi_I(1:nX-1)
     uOverBSi_F(0 )     = uSi_I(1)/BSi_I(1)
@@ -365,13 +365,14 @@ contains
     real, dimension(0:nP+1, 0:nMu+1, 0:nX+1) :: &
          VolumeStart_G, Volume_G, dVolumeDt_G
     ! ------------ Hamiltonian functions ------------
-    ! Poisson bracket with regard to the first and second vars
+    ! Poisson bracket with regard to the first and second VARs
     ! considering the case when there are more than one Poisson bracket
     ! and when there is a Poisson bracket with respect to the time
-    real    :: dHamiltonian01_FX(-1:nP+1,  0:nMu+1, 0:nX+1)
-    real    :: dHamiltonian02_FY( 0:nP+1, -1:nMu+1, 0:nX+1)
-    real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
-    real    :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
+    ! Finally we integrate over the other VARs to get \tilde Hamiltonian
+    real    :: dHamiltonian01_FX(-1:nP+1,  0:nMu+1,  0:nX+1) ! {tau, p**3/3}
+    real    :: dHamiltonian02_FY( 0:nP+1, -1:nMu+1,  0:nX+1) ! {tau, mu}
+    real    :: Hamiltonian12_N  (-1:nP+1, -1:nMu+1,  0:nX+1) ! {p**3/3, mu}
+    real    :: Hamiltonian23_N  ( 0:nP+1, -1:nMu+1, -1:nX+1) ! {mu, s_L}
     ! Extended array for distribution function
     real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
     ! Advection term
@@ -630,7 +631,7 @@ contains
     subroutine calc_hamiltonian_23
 
       ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
-      ! H_23 = (1-mu**2)/(2B)*Etot*(Etot**2-3*ProtonMass**2*c**4)/c**2,
+      ! H_23 = (1-mu**2)/(2B)*(dEtot**3-3*ProtonMass**2*c**4*dEtot)/(3*c**2),
       ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
 
       ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2), 
@@ -657,10 +658,11 @@ contains
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, mu, s_L)
     ! First advect and then diffuse the VDF by splitting method
 
+    use ModConst,           ONLY: cRmeProton, cLightSpeed
     use SP_ModDiffusion,    ONLY: scatter_distribution
-    use SP_ModDistribution, ONLY: DeltaMu
+    use SP_ModDistribution, ONLY: DeltaMu, Mu_F, VolumeE_I, VolumeE3_I
     use SP_ModGrid,         ONLY: D_, U_
-    use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
+    use SP_ModUnit,         ONLY: Io2Si_V, Si2Io_V, UnitX_, UnitEnergy_
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -670,6 +672,8 @@ contains
     ! Extended arrays for implementation of the Poisson bracket scheme
     ! Loop variables
     integer :: iX
+    ! Inverse magetic field: cell- and face-centered values
+    real    :: InvBSi_C(nX), InvBSi_F(0:nX)
     ! Array for u/B=\vec{u}*\vec{B}/|B|**2 and distance between adjacent meshes
     real    :: uSi_I(nX-1), DsSi_I(nX-1)
     ! Volume_G: total control volume at the end of each iteration
@@ -678,10 +682,10 @@ contains
     real    :: VolumeX_I(0:nX+1)
     ! u/B variable at face
     real    :: uOverBSi_F(-1:nX+1)
-    ! Hamiltonian at cell face
-    real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
-    real    :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1)
-    real    :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
+    ! Hamiltonian functions at cell face => \tilde Hamiltonian
+    real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1) ! {p**3/3, mu}
+    real    :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1) ! {p**3/3, s_L}
+    real    :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1) ! {mu, s_L}
     ! Extended array for distribution function
     real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
     ! Advection term
@@ -708,18 +712,47 @@ contains
             spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
     end do
 
+    ! Magnetic-field-related variables:
+    ! Cell-centered 1/B
+    InvBSi_C    = 1.0/BSi_I
+    ! Face-centered 1/B
+    InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
+    InvBSi_F(0 )     = InvBSi_C(1 ) - (InvBSi_C(2 ) - InvBSi_C(1   ))*0.5
+    InvBSi_F(nX)     = InvBSi_C(nX) + (InvBSi_C(nX) - InvBSi_C(nX-1))*0.5
+
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
-    ! u/B with the index of "i" is the value at the face between
-    ! the mesh "i" and "i+1"
     ! uSi_I with the index of "i" is the value at the face between
     ! the mesh "i" and "i+1"
     uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+    ! u/B with the index of "i" is the value at the face between
+    ! the mesh "i" and "i+1"
     ! Average 1/B and multiply by uSi
     uOverBSi_F(1:nX-1) = (0.5/BSi_I(2:nX) + 0.5/BSi_I(1:nX-1))*uSi_I(1:nX-1)
     uOverBSi_F(0 )     = uSi_I(1)/BSi_I(1)
     uOverBSi_F(-1)     = uOverBSi_F(0)
     uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
     uOverBSi_F(nX+1)   = uOverBSi_F(nX)
+
+    ! Calculate the Hamiltonian function for {f_jk, H_13}_{p**3/3, s_L}:
+    ! H_13 = -(u/B)*(p**3/3),
+    ! at the faces of p**3/3 and s_L, and cell center of mu => \tilde\deltaH
+    do iX = -1, nX+1
+       Hamiltonian13_N(:, :, iX) = -DeltaMu* &
+            spread(Momentum3_F, DIM=2, NCOPIES=nMu+2)*uOverBSi_F(iX)
+    end do
+
+    ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
+    ! H_23 = (1-mu**2)/(2B)*(dEtot**3-3*ProtonMass**2*c**4*dEtot)/(3*c**2),
+    ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
+    do iX = 0, nX
+       Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
+            spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
+            spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
+            Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
+    end do
+    ! Boundary condition of the Hamiltonian function: symmetry
+    Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
+    Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
 
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
