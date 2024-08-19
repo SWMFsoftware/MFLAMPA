@@ -235,7 +235,7 @@ contains
     VolumeX_I(0)      = VolumeX_I(1)
     VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
     VolumeX_I(nX+1)   = VolumeX_I(nX)
-    ! Phase volume: initial values
+    ! Calculate total control volume
     Volume_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
          spread(VolumeX_I, DIM=1, NCOPIES=nP+2)
 
@@ -368,10 +368,10 @@ contains
     ! Poisson bracket with regard to the first and second vars
     ! considering the case when there are more than one Poisson bracket
     ! and when there is a Poisson bracket with respect to the time
-    real :: dHamiltonian01_FX(-1:nP+1,  0:nMu+1, 0:nX+1)
-    real :: dHamiltonian02_FY( 0:nP+1, -1:nMu+1, 0:nX+1)
-    real :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
-    real :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
+    real    :: dHamiltonian01_FX(-1:nP+1,  0:nMu+1, 0:nX+1)
+    real    :: dHamiltonian02_FY( 0:nP+1, -1:nMu+1, 0:nX+1)
+    real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
+    real    :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
     ! Extended array for distribution function
     real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
     ! Advection term
@@ -433,7 +433,7 @@ contains
        ! We will work on this further later since it is more advanced.
        ! For pitch angle scattering
        if(UseMuScattering) then
-          call scatter_distribution(iLine, nX, Dt, nSi_I, BSi_I)
+          call scatter_distribution(iLine, nX, nSi_I, BSi_I, Dt)
           ! Check if the VDF includes negative values after mu scattering
           call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
           if(IsDistNeg) RETURN
@@ -513,7 +513,7 @@ contains
       InvBSi_F(0 )     = InvBSi_C(1 ) - (InvBSi_C(2 ) - InvBSi_C(1   ))*0.5
       InvBSi_F(nX)     = InvBSi_C(nX) + (InvBSi_C(nX) - InvBSi_C(nX-1))*0.5
 
-      ! Calculate total control volumes and time-related Hamiltonian functions
+      ! Calculate total control volume and time-related Hamiltonian functions
       do iX = 0, nX+1
          ! Total control volume at the very beginning
          VolumeStart_G(:, :, iX) = VolumeXStart_I(iX)*DeltaMu* &
@@ -657,31 +657,37 @@ contains
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, mu, s_L)
     ! First advect and then diffuse the VDF by splitting method
 
-    use SP_ModGrid, ONLY: D_, U_
-    use SP_ModUnit, ONLY: UnitX_, Io2Si_V
+    use SP_ModDiffusion,    ONLY: scatter_distribution
+    use SP_ModDistribution, ONLY: DeltaMu
+    use SP_ModGrid,         ONLY: D_, U_
+    use SP_ModUnit,         ONLY: UnitX_, Io2Si_V
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in) :: BSi_I(nX), nSi_I(nX)
-    real                :: uSi_I(nX-1), DsSi_I(nX-1)
+    ! Extended arrays for implementation of the Poisson bracket scheme
+    ! Loop variables
+    integer :: iX
+    ! Array for u/B=\vec{u}*\vec{B}/|B|**2 and distance between adjacent meshes
+    real    :: uSi_I(nX-1), DsSi_I(nX-1)
     ! Volume_G: total control volume at the end of each iteration
-    real :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
+    real    :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
-    real :: VolumeX_I(0:nX+1)
+    real    :: VolumeX_I(0:nX+1)
     ! u/B variable at face
-    real :: uOverBSi_F(-1:nX+1)
+    real    :: uOverBSi_F(-1:nX+1)
     ! Hamiltonian at cell face
-    real :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
-    real :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1)
-    real :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
+    real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1)
+    real    :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1)
+    real    :: Hamiltonian23_N( 0:nP+1, -1:nMu+1, -1:nX+1)
     ! Extended array for distribution function
-    real :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
+    real    :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
     ! Advection term
-    real :: Source_C(nP, nMu, nX)
+    real    :: Source_C(nP, nMu, nX)
     ! Time step
-    real :: Dt_C(nP, nMu, nX)
+    real    :: Dt_C(nP, nMu, nX)
 
     ! Now, steady-state Poisson bracket advection scheme for focused Eqn.
     character(len=*), parameter:: NameSub = 'iterate_poisson_focused'
@@ -695,6 +701,12 @@ contains
     VolumeX_I(0)      = VolumeX_I(1)
     VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
     VolumeX_I(nX+1)   = VolumeX_I(nX)
+
+    ! Calculate total control volume
+    do iX = 0, nX+1
+       Volume_G(:, :, iX) = VolumeX_I(iX)*DeltaMu* &
+            spread(VolumeP_I, DIM=2, NCOPIES=nMu+2)
+    end do
 
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
     ! u/B with the index of "i" is the value at the face between
@@ -737,41 +749,46 @@ contains
     ! One should specify the TypeScatter in the PARAM.in file.
     ! We will work on this further later since it is more advanced.
     ! For pitch angle scattering
-    ! if(UseMuScattering) then
-    !    call scatter_distribution(iLine, nX, Dt_C, nSi_I, BSi_I)
-    !    ! Check if the VDF includes negative values after mu scattering
-    !    call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
-    !    if(IsDistNeg) RETURN
-    ! end if
+    if(UseMuScattering) then
+       call scatter_distribution(iLine, nX, nSi_I, &
+            BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :))
+       ! Check if the VDF includes negative values after mu scattering
+       call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
+       if(IsDistNeg) RETURN
+    end if
     if(UseDiffusion) then
        ! For spatial diffusion
        if(UseUpperEndBc) then
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock,    &
-                  nSi_I, BSi_I, Dt_C, LowerEndSpectrumIn_II= &
-                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),    &
-                  UpperEndSpectrumIn_II=                     &
+             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :),      &
+                  LowerEndSpectrumIn_II=                         &
+                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),        &
+                  UpperEndSpectrumIn_II=                         &
                   VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
           else
              ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, iShock,    &
-                  nSi_I, BSi_I, Dt_C, UpperEndSpectrumIn_II= &
+             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :),      &
+                  UpperEndSpectrumIn_II=                         &
                   VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, iShock,    &
-                  nSi_I, BSi_I, Dt_C, LowerEndSpectrumIn_II= &
+             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :),      &
+                  LowerEndSpectrumIn_II=                         &
                   VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0))
           else
              ! with no lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt_C)
+             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :))
           end if
        end if
        ! Check if the VDF includes negative values after spatial diffusion
-       call check_dist_neg(NameSub//' after spatial diffusion',1,nX,iLine)
+       call check_dist_neg(NameSub//' after spatial diffusion', 1, nX, iLine)
        if(IsDistNeg) RETURN
     end if
 
