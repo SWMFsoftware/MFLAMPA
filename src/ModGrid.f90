@@ -365,8 +365,8 @@ contains
        iEnd = nVertex_B(iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = MhData_VIB(Rho_, 1:iEnd, iLine)
-       State_VIB(UOld_, 1:iEnd, iLine) = State_VIB(U_, 1:iEnd, iLine)
-       State_VIB(BOld_, 1:iEnd, iLine) = State_VIB(B_, 1:iEnd, iLine)
+       State_VIB(UOld_, 1:iEnd-1, iLine) = State_VIB(U_, 1:iEnd-1, iLine)
+       State_VIB(BOld_, 1:iEnd, iLine)   = State_VIB(B_, 1:iEnd, iLine)
        ! reset variables read from file or received via coupler
        MhData_VIB(1:nMhData, 1:iEnd, iLine) = 0.0
     end do
@@ -399,9 +399,9 @@ contains
              ! vector from X_:Z_(iVertex) to X_:Z_(iVertex+1)
              ! which is the direction of the magnetic field at the face
              if(State_VIB(D_, iVertex, iLine) > 0.0)then
-                State_VIB(U_,iVertex, iLine) = 0.50*&
+                State_VIB(U_, iVertex, iLine) = 0.50*&
                      sum( (MhData_VIB(Ux_:Uz_,iVertex,iLine) & ! 0.5(u_{i+1}&
-                     + MhData_VIB(Ux_:Uz_,iVertex+1,iLine) )*& ! +u_i)\cdot
+                     + MhData_VIB(Ux_:Uz_,iVertex+1,iLine) )*& ! +u_i) \cdot
                      (MhData_VIB(X_:Z_, iVertex+1,iLine) &! (X_:Z_(iVertex+1)-&
                      - MhData_VIB(X_:Z_, iVertex, iLine)) ) & ! X_:Z_(iVertex))
                      /State_VIB(D_, iVertex, iLine)
@@ -432,7 +432,7 @@ contains
                   State_VIB(S_, iVertex-1, iLine) + &
                   State_VIB(D_, iVertex-1, iLine)
           end if
-          ! Heliocentric Distance
+          ! Heliocentric distance
           State_VIB(R_, iVertex, iLine) = &
                norm2(MhData_VIB(X_:Z_, iVertex, iLine))
        end do

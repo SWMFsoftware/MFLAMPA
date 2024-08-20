@@ -111,7 +111,7 @@ contains
             /State_VIB(B_, 1, iLine)
        Mass_C(iEnd)     = DsSi_I(iEnd-1)*MhData_VIB(Rho_,iEnd,iLine)&
             /State_VIB(B_, iEnd, iLine)
-       ! For focused transport equation: 
+       ! For focused transport equation:
        ! initialize states for the multiple Poisson bracket scheme
        if(UsePoissonBracket .and. .not.IsMuAvg) &
             call calc_states_poisson_focused(iLine, iEnd, DtFull)
@@ -246,8 +246,8 @@ contains
     integer :: iEnd, iShock
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     LINE:do iLine = 1, nLine
        ! go line by line and iterate the solution
        if(.not.Used_B(iLine)) CYCLE LINE

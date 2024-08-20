@@ -202,7 +202,7 @@ contains
     ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
-    real :: DsMesh_I(2:nX), DsFace_I(2:nX-1)
+    real :: DsMeshSi_I(1:nX-1), DsFaceSi_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
     real :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     ! Auxiliary arrays for the tri-diagonal arrays
@@ -243,26 +243,26 @@ contains
     ! if using turbulent spectrum: set_dxx for diffusion along the field line
     if(UseTurbulentSpectrum) call set_dxx(nX, BSi_I(1:nX))
 
-    ! In M-FLAMPA DsMesh_I(i) is the distance between centers of meshes
-    ! i-1 and i. Therefore,
-    DsMesh_I(2:nX) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
-
+    ! In M-FLAMPA DsMeshSi_I(i) is the distance between centers of meshes
+    ! i and i+1. Therefore,
+    DsMeshSi_I(1:nX-1) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
     ! Within the framework of finite volume method, the cell volume
     ! is used, which is proportional to the distance between the faces
     ! bounding the volume with an index, i, which is half of sum of
-    ! distance between meshes i-1 and i (i.e. DsMesh_I(i) and that
-    ! between meshes i and i+1, which is DsMesh_I(i+1):
-    DsFace_I(2:nX-1) = 0.5*(DsMesh_I(3:nX)+DsMesh_I(2:nX-1))
+    ! distance between meshes i-1 and i, i.e. DsMeshSi_I(i-1), and that
+    ! between meshes i and i+1, which is DsMeshSi_I(i):
+    DsFaceSi_I(2:nX-1) = 0.5*(DsMeshSi_I(1:nX-2)+DsMeshSi_I(2:nX-1))
+
     ! In flux coordinates, the control volume associated with the given
     ! cell has a cross-section equal to (Magnetic Flux)/B, where the flux
     ! is a constant along the magnetic field line, set to one hereafter.
     ! Therefore, the diffusion equation has a following form:
-    ! (DsFace_I/BSi_I)*(f^(n+1) - f^n) = Flux_(i-1/2) - Flux_(i+1/2),
+    ! (DsFaceSi_I/BSi_I)*(f^(n+1) - f^n) = Flux_(i-1/2) - Flux_(i+1/2),
     ! where the particle density flux should be multiplied by the
     ! cross-section area too (magnetic flux factor is one!):
     !  Flux_(i-1/2) = (diffusion coefficient)_(i-1/2)/B_(i-1/2)*&
     !                 (f^(n+1)_(i-1) - f^(n+1)_i),
-    !  The multiplier, DsFace_I/BSi_I, is denoted as DsFace_i/DOuter_i
+    !  The multiplier, DsFaceSi_I/BSi_I, is denoted as DsFaceSi_I/DOuter_I
     !  The face-centered combination,
 
     ! For each momentum, the dependence of the diffusion coefficient
@@ -283,7 +283,7 @@ contains
     MU:do iMu = 1, nMu
        MOMENTUM:do iP = iProcPStart, iProcPEnd
           ! Now, we solve the matrix equation
-          ! f^(n+1)_i-Dt*DOuter_I/DsFace_I*(&
+          ! f^(n+1)_i-Dt*DOuter_I/DsFaceSi_I*(&
           !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
           !     DInner_(i-1/2)*(f^(n+1)_i -f^(n+1)_(i-1)/DsMesh_(i ))=f^n_i
           ! Set source term in the RHS:
@@ -293,17 +293,17 @@ contains
 
           ! For i=1:
           Aux1_I(1)  = DtLocal_C(1,iP,iMu)*DOuterSi_I(1)*   &
-               0.5*(DInnerSi_II(1,iP) + DInnerSi_II(2,iP))/DsMesh_I(2)**2
+               0.5*(DInnerSi_II(1,iP) + DInnerSi_II(2,iP))/DsMeshSi_I(1)**2
           Main_I(1)  = Main_I(1) + Aux1_I(1)
           Upper_I(1) = -Aux1_I(1)
           if(UseLowerSpectrum) then
              ! With the given value for f_0 behind the boundary,
              ! the above scheme reads:
-             ! f^(n+1)_1-Dt*DOuter_I/DsFace_I*(&
+             ! f^(n+1)_1-Dt*DOuter_I/DsFaceSi_I*(&
              !     DInner_(3/2)*(f^(n+1)_2-f^(n+1)_1)/DsMesh_(2)-&
              !     DInner_(1/2)*(f^(n+1)_1 -f_0/DsMesh_(1))=f^n_1
              Aux2_I(1) = DtLocal_C(1,iP,iMu)*DOuterSi_I(1) &
-                  *DInnerSi_II(1,iP)/DsMesh_I(2)**2
+                  *DInnerSi_II(1,iP)/DsMeshSi_I(1)**2
              ! With these regards, Aux2 is added to Main_I(1)...
              Main_I(1) = Main_I(1) + Aux2_I(1)
              ! ...while the given Aux2*f_0 is moved to the RHS and summed up
@@ -314,18 +314,18 @@ contains
           ! For i=2, n-1:
           Aux1_I(2:nX-1) = DtLocal_C(2:nX-1,iP,iMu)*DOuterSi_I(2:nX-1)* &
                0.5*(DInnerSi_II(2:nX-1,iP) + DInnerSi_II(3:nX, iP))/ &
-               (DsMesh_I(3:nX)*DsFace_I(2:nX-1))
+               (DsMeshSi_I(2:nX-1)*DsFaceSi_I(2:nX-1))
           Aux2_I(2:nX-1) = DtLocal_C(2:nX-1,iP,iMu)*DOuterSi_I(2:nX-1)* &
                0.5*(DInnerSi_II(1:nX-2,iP) + DInnerSi_II(2:nX-1,iP))/&
-               (DsMesh_I(2:nX-1)*DsFace_I(2:nX-1))
+               (DsMeshSi_I(1:nX-2)*DsFaceSi_I(2:nX-1))
           Main_I(2:nX-1)  = Main_I(2:nX-1) + Aux1_I(2:nX-1) + Aux2_I(2:nX-1)
           Upper_I(2:nX-1) = -Aux1_I(2:nX-1)
           Lower_I(2:nX-1) = -Aux2_I(2:nX-1)
 
           ! For i=n:
           ! Version before Nov. 2023:
-          ! Aux2 = Dt*DOuter_I(n)*0.50*(DInner_I(n-1) + DInner_I(n))/&
-          !     DsMesh_I(n)**2
+          ! Aux2 = Dt*DOuter_I(n)*0.5*(DInner_I(n-1) + DInner_I(n))/ &
+          !     DsMeshSi_I(n-1)**2
           !
           ! After Nov. 2023: set free escaping at outer boundary for now
           ! Aux2 = 0.0
@@ -337,11 +337,11 @@ contains
           ! For backward compatibility, please keep UseUpperEndBc=.false.
           if(UseUpperSpectrum) then
              Aux2_I(nX)  = DtLocal_C(nX,iP,iMu)*DOuterSi_I(nX)*0.5* &
-                  (DInnerSi_II(nX-1,iP) + DInnerSi_II(nX,iP))/DsMesh_I(nX)**2
+                  (DInnerSi_II(nX-1,iP)+DInnerSi_II(nX,iP))/DsMeshSi_I(nX-1)**2
              Main_I(nX)  = Main_I(nX) + Aux2_I(nX)
              Lower_I(nX) = -Aux2_I(nX)
              Aux1_I(nX)  = DtLocal_C(nX,iP,iMu)*DOuterSi_I(nX)* &
-                  DInnerSi_II(nX,iP)/DsMesh_I(nX)**2
+                  DInnerSi_II(nX,iP)/DsMeshSi_I(nX-1)**2
              Main_I(nX)  = Main_I(nX) + Aux1_I(nX)
              Res_I(nX)   = Res_I(nX) + Aux1_I(nX)*UpperEndSpectrum_II(iP, iMu)
           end if

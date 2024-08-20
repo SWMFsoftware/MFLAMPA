@@ -854,7 +854,7 @@ contains
       ! If there are more than one processors working on the same field line,
       ! we only save the data in the first processor for this field line.
       if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
-      
+
       ! Update number of time tags and write to tag list file
       if(iProc==0) then
          ! increase the file counter
@@ -1166,10 +1166,11 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_mh_time'
       !------------------------------------------------------------------------
+
       ! If there are more than one processors working on the same field line,
       ! we only save the data in the first processor for this field line.
       if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
-      
+
       nMhdVar   = File_I(iFile) % nMhdVar
       nExtraVar = File_I(iFile) % nExtraVar
       nFluxVar  = File_I(iFile) % nFluxVar

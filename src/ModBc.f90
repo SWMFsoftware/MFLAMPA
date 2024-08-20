@@ -121,8 +121,8 @@ contains
     integer :: iVertex     ! loop variable
     real    :: MomentumSi  ! Momentum for the thermal energy k_BTi
     real    :: CoefInjLocal, DistributionBc
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     do iVertex = 1, iEnd
        ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
        ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(1/2)/p_inj)^5

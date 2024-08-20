@@ -207,7 +207,11 @@ contains
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
     real,    intent(in) :: BSi_I(nX), nSi_I(nX)
-    real                :: uSi_I(nX-1), DsSi_I(nX-1)
+    ! Extended arrays for implementation of the Poisson bracket scheme
+    ! Array for u/B=\vec{u}*\vec{B}/|B|**2 and distance between adjacent meshes
+    real :: uSi_F(1:nX-1), DsMeshSi_I(1:nX-1)
+    ! Array of 1/B at the cell- and face-center
+    real :: InvBSi_C(nX), InvBSi_F(nX)
     ! Volume_G: total control volume at the end of each iteration
     real :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
@@ -228,25 +232,30 @@ contains
     !--------------------------------------------------------------------------
 
     ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
-    ! uSi_I with the index of "i" is the value at the face between
+    ! uSi_F with the index of "i" is the value at the face between
     ! the mesh "i" and "i+1"
-    uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+    uSi_F(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+    ! Calculate 1/B at cell- and face-center
+    InvBSi_C = 1.0/BSi_I
+    InvBSi_F(1:nX-1) = 0.5*(InvBSi_C(1:nX-1) + InvBSi_C(2:nX))
+
     ! u/B with the index of "i" is the value at the face between
     ! the mesh "i" and "i+1"
-    ! Average 1/B and multiply by uSi
-    uOverBSi_F(1:nX-1) = (0.5/BSi_I(2:nX) + 0.5/BSi_I(1:nX-1))*uSi_I(1:nX-1)
-    uOverBSi_F(0 )     = uSi_I(1)/BSi_I(1)
+    ! Average 1/B and multiply by uSi at face centers
+    uOverBSi_F(1:nX-1) = uSi_F(1:nX-1)*InvBSi_F(1:nX-1)
+    uOverBSi_F(0 )     = uSi_F(1)*InvBSi_C(1)
     uOverBSi_F(-1)     = uOverBSi_F(0)
-    uOverBSi_F(nX)     = uSi_I(nX-1)/BSi_I(nX)
+    uOverBSi_F(nX)     = uSi_F(nX-1)*InvBSi_C(nX)
     uOverBSi_F(nX+1)   = uOverBSi_F(nX)
 
-    ! In M-FLAMPA DsSi_I(i) is the distance between meshes i and i+1
-    DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
+    ! In M-FLAMPA DsMeshSi_I(i) is the distance between meshes i and i+1
+    DsMeshSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! Initialize arrays
-    VolumeX_I(2:nX-1) = 0.5*(DsSi_I(2:nX-1) + DsSi_I(1:nX-2))/BSi_I(2:nX-1)
-    VolumeX_I(1)      = DsSi_I(1)/BSi_I(1)
+    VolumeX_I(2:nX-1) = InvBSi_C(2:nX-1)* &
+         0.5*(DsMeshSi_I(2:nX-1) + DsMeshSi_I(1:nX-2))
+    VolumeX_I(1)      = InvBSi_C(1)*DsMeshSi_I(1)
     VolumeX_I(0)      = VolumeX_I(1)
-    VolumeX_I(nX)     = DsSi_I(nX-1)/BSi_I(nX)
+    VolumeX_I(nX)     = InvBSi_C(nX)*DsMeshSi_I(nX-1)
     VolumeX_I(nX+1)   = VolumeX_I(nX)
     ! Calculate total control volume
     Volume_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
@@ -316,13 +325,18 @@ contains
     real,    intent(in) :: DtFull
     ! Calculate values with time derivatives: Use linear interpolation later
     ! to get the data of each time step from every to consecutive files
+    real :: DbuDt_F(1:nX-1)
     !--------------------------------------------------------------------------
     if(.not.UseInertialForce) RETURN
 
     ! Now we use the inertial force in focused transport equation
-    ! Calculate D(\vec{b}*\vec{u})/Dt, for Dt in nProgress, i.e., DtFull
-    DbuDt_C(1:nX) = (State_VIB(U_, 1:nX, iLine) - &
-         State_VIB(UOld_, 1:nX, iLine))/DtFull
+    ! Calculate D(\vec{b}*\vec{u})/DtFull, for Dt in nProgress at face center
+    DbuDt_F(1:nX-1) = (State_VIB(U_, 1:nX-1, iLine) - &
+         State_VIB(UOld_, 1:nX-1, iLine))/DtFull
+    ! Then we interpolate this term to the cell center
+    DbuDt_C(2:nX-1) = 0.5*(DbuDt_F(1:nX-2) + DbuDt_F(2:nX-1))
+    DbuDt_C(1)      = DbuDt_F(1)    - (DbuDt_C(2)    - DbuDt_F(1))
+    DbuDt_C(nX)     = DbuDt_F(nX-1) + (DbuDt_F(nX-1) - DbuDt_C(nX-1))
 
   end subroutine calc_states_poisson_focused
   !============================================================================
@@ -587,9 +601,10 @@ contains
       ! We split into two terms for
       !     (1) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
       !        p**3/3 * 3*DeltaS/B * [D(1/B)/Dt]/(1/B) }_{p**3/3, mu}; and
-      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 *
+      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 * GammaLorentz *
       !        ProtonMass * DeltaS/B * D(\vec{b}*\vec{u})/Dt }_{p**3/3, mu},
       ! then summed as H_12, at the faces of p**3/3 and mu => \tilde\deltaH
+      !------------------------------------------------------------------------
 
       ! For the betatron acceleration
       if(UseBetatron) then
@@ -597,7 +612,7 @@ contains
             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) - &
                  0.5*spread(Mu_F*(1.0-Mu_F**2), DIM=1, NCOPIES=nP+3)* &
                  3.0*spread(Momentum3_F, DIM=2, NCOPIES=nMu+1)* &
-                 VolumeX_I(iX)*dInvBSiDt_C(iX)/InvBSi_C(iX)
+                 dInvBSiDt_C(iX)/InvBSi_C(iX)*VolumeX_I(iX)
          end do
       end if
 
@@ -608,7 +623,7 @@ contains
                  0.5*spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+3)* &
                  spread((Momentum3_F*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
                  spread(GammaLorentz_F, DIM=2, NCOPIES=nMu+1)* &
-                 cProtonMass*VolumeX_I(iX)*DbuDt_C(iX)
+                 cProtonMass*DbuDt_C(iX)*VolumeX_I(iX)
          end do
       end if
 
@@ -626,18 +641,20 @@ contains
       ! H_23 = (1-mu**2)/(2B)*(dEtot**3-3*ProtonMass**2*c**4*dEtot)/(3*c**2),
       ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
 
-      ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2), 
+      ! Considering the law of relativity, v = p*c**2/sqrt(p**2+(m*c**2)**2),
       ! calculated as a function of p. At first, the Hamiltonian function is
       ! H_23 = (1-mu**2)/(2B)*v, and we need to take the integral (for
       ! averaging over) of p**3/3. Finally, we derive such a form for H_23.
       ! Note that momentum in this term is non-related to the Lagrangian
       ! coordinates (mu, s_L), so it should be cell-centered for p**3/3.
+      !------------------------------------------------------------------------
       do iX = 0, nX
          Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
               spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
               spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
               Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
       end do
+
       ! Boundary condition of the Hamiltonian function: symmetry
       Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
       Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
@@ -667,16 +684,18 @@ contains
     integer :: iX
     ! Inverse magetic field: cell- and face-centered values
     real    :: InvBSi_C(nX), InvBSi_F(0:nX)
-    ! Array for u/B=\vec{u}*\vec{B}/|B|**2 and distance between adjacent meshes
-    real    :: uSi_I(nX-1)
-    ! Array for d(\vec{b}*\vec{u})/d(s_L), for the inertial force
-    real    :: DbuDsSi_I(0:nX+1)
+    ! Array for u/B=\vec{u}*\vec{B}/|B|**2 at face-center
+    real    :: uSi_F(nX-1)
+    ! Array for cell- and face-center spacing
+    real    :: DsMeshSi_I(1:nX-1), DsFaceSi_I(nX)
+    ! Array for d(\vec{b}*\vec{u})/d(s_L) for the inertial force at cell center
+    real    :: DbuDsSi_C(0:nX+1)
     ! Volume_G: total control volume at the end of each iteration
     real    :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real    :: VolumeX_I(0:nX+1)
-    ! u/B variable at face
-    real    :: uOverBSi_F(-1:nX+1)
+    ! u/B variable at cell- and face-center
+    real    :: uOverBSi_F(-1:nX+1), uOverBSi_C(0:nX+1)
     ! Hamiltonian functions at cell face => \tilde\deltaH
     real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1) ! {p**3/3, mu}
     real    :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1) ! {p**3/3, s_L}
@@ -766,12 +785,9 @@ contains
       ! Initialize states: 1/B, u/B, VolumeX_I and Volume_G arrays
 
       use ModNumConst, ONLY: cTiny
-      ! Mesh spacing.
-      real :: DsMesh_I(1:nX-1)
-      !------------------------------------------------------------------------
-
       ! Magnetic-field-related variables:
       ! Cell-centered 1/B
+      !------------------------------------------------------------------------
       InvBSi_C = 1.0/BSi_I
       ! Face-centered 1/B
       InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
@@ -779,28 +795,37 @@ contains
       InvBSi_F(nX)     = InvBSi_C(nX) + 0.5*(InvBSi_C(nX) - InvBSi_C(nX-1))
 
       ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
-      ! uSi_I with the index of "i" is the value at the face between
+      ! uSi_F with the index of "i" is the value at the face between
       ! the mesh "i" and "i+1"
-      uSi_I(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
+      uSi_F(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
       ! u/B with the index of "i" is the value at the face between
       ! the mesh "i" and "i+1"
-      ! Average 1/B and multiply by uSi
-      uOverBSi_F(1:nX-1) = uSi_I(1:nX-1)*InvBSi_F(1:nX-1)
-      uOverBSi_F(0 )     = uSi_I(1)*InvBSi_F(0)
+      ! Average 1/B and multiply by uSi, at face centers
+      uOverBSi_F(1:nX-1) = uSi_F(1:nX-1)*InvBSi_F(1:nX-1)
+      uOverBSi_F(0 )     = uSi_F(1)*InvBSi_F(0)
       uOverBSi_F(-1)     = uOverBSi_F(0)
-      uOverBSi_F(nX)     = uSi_I(nX-1)*InvBSi_F(nX)
+      uOverBSi_F(nX)     = uSi_F(nX-1)*InvBSi_F(nX)
       uOverBSi_F(nX+1)   = uOverBSi_F(nX)
+      ! Interpolate to get u/B at cell centers
+      uOverBSi_C(0:nX+1) = 0.5*(uOverBSi_F(-1:nX) + uOverBSi_F(0:nX+1))
 
-      ! In M-FLAMPA DsMesh_I(i) is the distance between centers of meshes
+      ! In M-FLAMPA DsMeshSi_I(i) is the distance between centers of meshes
       ! i and i+1. Therefore,
-      DsMesh_I(1:nX-1) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
+      DsMeshSi_I(1:nX-1) = max(State_VIB(D_, 1:nX-1, iLine)* &
+           Io2Si_V(UnitX_), cTiny)
+      ! Within the framework of finite volume method, the cell volume
+      ! is used, which is proportional to the distance between the faces
+      ! bounding the volume with an index, i, which is half of sum of
+      ! distance between meshes i-1 and i, i.e. DsMeshSi_I(i-1), and that
+      ! between meshes i and i+1, which is DsMeshSi_I(i):
+      DsFaceSi_I(2:nX-1) = 0.5*(DsMeshSi_I(1:nX-2)+DsMeshSi_I(2:nX-1))
+      DsFaceSi_I(1)      = DsMeshSi_I(1)
+      DsFaceSi_I(nX)     = DsMeshSi_I(nX-1)
 
-      ! Calculate geometric volume
-      VolumeX_I(2:nX-1) = DsMesh_I(2:nX-1)*InvBSi_C(2:nX-1)
-      VolumeX_I(1)      = DsMesh_I(1)*InvBSi_C(1)
-      VolumeX_I(0)      = VolumeX_I(1)
-      VolumeX_I(nX)     = DsMesh_I(nX-1)*InvBSi_C(nX)
-      VolumeX_I(nX+1)   = VolumeX_I(nX)
+      ! Calculate geometric volume, with one ghost cell at each side
+      VolumeX_I(1:nX) = InvBSi_C(2:nX-1)*DsFaceSi_I(2:nX-1)
+      VolumeX_I(0)    = VolumeX_I(1)
+      VolumeX_I(nX+1) = VolumeX_I(nX)
 
       ! Calculate total control volume
       do iX = 0, nX+1
@@ -810,9 +835,11 @@ contains
 
       ! Calculate d(\vec{b}*\vec{u})/d(s_L), for the inertial force
       if(UseInertialForce) then
-         DbuDsSi_I(2:nX-1)  = (uSi_I(2:nX-1) - uSi_I(1:nX-2))/DsMesh_I(2:nX-1)
-         DbuDsSi_I(0:1)     = DbuDsSi_I(2)
-         DbuDsSi_I(nX:nX+1) = DbuDsSi_I(nX-1)
+         DbuDsSi_C(2:nX-1) = (uSi_F(2:nX-1) - uSi_F(1:nX-2))/DsFaceSi_I(2:nX-1)
+         DbuDsSi_C(1)  = DbuDsSi_C(2)    - (DbuDsSi_C(3)    - DbuDsSi_C(2))
+         DbuDsSi_C(nX) = DbuDsSi_C(nX-1) + (DbuDsSi_C(nX-1) - DbuDsSi_C(nX-2))
+         DbuDsSi_C(0)      = DbuDsSi_C(1)
+         DbuDsSi_C(nX+1)   = DbuDsSi_C(nX)
       end if
 
     end subroutine init_states_focused
@@ -829,17 +856,17 @@ contains
       ! We split into two terms for
       !     (1) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
       !        p**3/3 * 3*DeltaS/B * [d(1/B)/d(s_L)]/(1/B) }_{p**3/3, mu}; and
-      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 *
+      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 * GammaLorentz *
       !        ProtonMass * u/B * d(\vec{b}*\vec{u})/d(s_L) }_{p**3/3, mu},
       ! then summed as H_12, at the faces of p**3/3 and mu => \tilde\deltaH
 
-       ! For the betatron acceleration
-       if(UseBetatron) then
-          do iX = 1, nX
-             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX)
-             ! Include the betatron acceleration expression here
-          end do
-       end if
+      ! For the betatron acceleration
+      if(UseBetatron) then
+         do iX = 1, nX
+            Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX)
+            ! Include the betatron acceleration expression here
+         end do
+      end if
 
       ! For the inertial force
       if(UseInertialForce) then
@@ -848,13 +875,13 @@ contains
                  0.5*spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+3)* &
                  spread((Momentum3_F*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
                  spread(GammaLorentz_F, DIM=2, NCOPIES=nMu+1)* &
-                 cProtonMass*VolumeX_I(iX)*DbuDsSi_I(iX)
+                 cProtonMass*uOverBSi_C(iX)*DbuDsSi_C(iX)*VolumeX_I(iX)
          end do
       end if
 
       ! Boundary condition of Hamiltonian function
-      Hamiltonian12_N(:,    -1,    :) = Hamiltonian12_N(:,     1,  :)
-      Hamiltonian12_N(:, nMu+1,    :) = Hamiltonian12_N(:, nMu-1,  :)
+      Hamiltonian12_N(:,    -1, :) = Hamiltonian12_N(:,     1, :)
+      Hamiltonian12_N(:, nMu+1, :) = Hamiltonian12_N(:, nMu-1, :)
 
       ! Calculate the Hamiltonian function for {f_jk, H_13}_{p**3/3, s_L}:
       ! H_13 = -(u/B)*(p**3/3),

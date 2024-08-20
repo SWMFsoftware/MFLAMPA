@@ -5,7 +5,7 @@ module SP_ModTurbulence
 
   use ModConst
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, MomentumInjSi
-  use SP_ModGrid,         ONLY: nP, iProcPStart, iProcPEnd !iPTest, iParticleTest
+  use SP_ModGrid, ONLY: nP, iProcPStart, iProcPEnd ! iPTest, iParticleTest
 
   implicit none
 
