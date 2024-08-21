@@ -112,14 +112,14 @@ contains
     ! Time derivative
     dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)/tFinal
     ! Total control volume: initial and time derivative
-    Volume_G             = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+    Volume_G(0:nP+1, 0:nX+1)    = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
          spread(VolumeXStart_I, DIM=1, NCOPIES=nP+2)
-    dVolumeDt_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+    dVolumeDt_G(0:nP+1, 0:nX+1) = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
          spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+2)
     ! Calculate 1st Hamiltonian function used in the time-dependent
     ! poisson bracket: {f_jk; p**3/3 * DeltaS/B}_{tau, p**3/3}
-    dHamiltonian01_FX    = -spread(Momentum3_F, DIM=2, NCOPIES=nX+2)* &
-         spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
+    dHamiltonian01_FX(-1:nP+1, 0:nX+1) = -spread(Momentum3_F, DIM=2, &
+         NCOPIES=nX+2)* spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
     ! Time initialization
     Time = 0.0
 
@@ -236,7 +236,7 @@ contains
     ! the mesh "i" and "i+1"
     uSi_F(1:nX-1) = State_VIB(U_, 1:nX-1, iLine)
     ! Calculate 1/B at cell- and face-center
-    InvBSi_C = 1.0/BSi_I
+    InvBSi_C         = 1.0/BSi_I
     InvBSi_F(1:nX-1) = 0.5*(InvBSi_C(1:nX-1) + InvBSi_C(2:nX))
 
     ! u/B with the index of "i" is the value at the face between
@@ -258,12 +258,12 @@ contains
     VolumeX_I(nX)     = InvBSi_C(nX)*DsMeshSi_I(nX-1)
     VolumeX_I(nX+1)   = VolumeX_I(nX)
     ! Calculate total control volume
-    Volume_G          = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
+    Volume_G(0:nP+1, 0:nX+1) = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
          spread(VolumeX_I, DIM=1, NCOPIES=nP+2)
 
     ! Hamiltonian_12 = -(u/B)*(p**3/3) at cell face, for {p**3/3, s_L}
-    Hamiltonian12_N    = -spread(Momentum3_F, DIM=2, NCOPIES=nX+3)* &
-         spread(uOverBSi_F, DIM=1, NCOPIES=nP+3)
+    Hamiltonian12_N(-1:nP+1, -1:nX+1) = -spread(Momentum3_F, DIM=2, &
+         NCOPIES=nX+3)* spread(uOverBSi_F, DIM=1, NCOPIES=nP+3)
 
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
@@ -286,25 +286,25 @@ contains
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, &
-                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :), &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nX), &
                   LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0), &
                   UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
           else
              ! with upper end BC but no lower end BC
              call diffuse_distribution(iLine, nX, iShock, &
-                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :), &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nX), &
                   UpperEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, nX+1))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
              call diffuse_distribution(iLine, nX, iShock, &
-                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :), &
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nX), &
                   LowerEndSpectrumIn_I=VDF_G(iProcPStart:iProcPEnd, 0))
           else
              ! with no lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, &
-                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, :))
+                  nSi_I, BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nX))
           end if
        end if
        ! Check if the VDF includes negative values after diffusion
@@ -503,7 +503,7 @@ contains
       VolumeXEnd_I(0)      = VolumeXEnd_I(1)
       VolumeXEnd_I(nX+1)   = VolumeXEnd_I(nX)
       ! Time derivative: D(1/n)/Dt
-      dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)*InvtFinal
+      dVolumeXDt_I(0:nX+1) = (VolumeXEnd_I - VolumeXStart_I)*InvtFinal
 
       ! Magnetic-field-related variables:
       ! Start cell-centered 1/B
@@ -513,7 +513,7 @@ contains
       ! Time derivative: D(1/B)/Dt
       dInvBSiDt_C = (InvBSi_I - InvBOldSi_I)*InvtFinal
       ! Averaged 1/B over the whole time step
-      InvBSi_C    = 0.5*(InvBOldSi_I + InvBSi_I)
+      InvBSi_C(1:nX)   = 0.5*(InvBOldSi_I + InvBSi_I)
       ! End Face-centered 1/B
       InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
       InvBSi_F(0 )     = InvBSi_C(1 ) - (InvBSi_C(2 ) - InvBSi_C(1   ))*0.5
@@ -627,7 +627,7 @@ contains
          end do
       end if
 
-      ! Boundary condition of Hamiltonian function
+      ! Boundary condition of Hamiltonian_12 function: ghost cells and symmetry
       Hamiltonian12_N(:,     :,    0) = Hamiltonian12_N(:,     :,  1)
       Hamiltonian12_N(:,     :, nX+1) = Hamiltonian12_N(:,     :, nX)
       Hamiltonian12_N(:,    -1,    :) = Hamiltonian12_N(:,     1,  :)
@@ -651,13 +651,16 @@ contains
       do iX = 0, nX
          Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
               spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
-              spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
-              Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
+              spread((VolumeE3_I - 3.0*VolumeE_I*(cRmeProton* &
+              Si2Io_V(UnitEnergy_))**2)/(3.0*cProtonMass* &
+              cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
       end do
 
-      ! Boundary condition of the Hamiltonian function: symmetry
-      Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
-      Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
+      ! Boundary condition of Hamiltonian_23 function: ghost cells and symmetry
+      Hamiltonian23_N(:,     :,   -1) = Hamiltonian23_N(:,     :,  1)
+      Hamiltonian23_N(:,     :, nX+1) = Hamiltonian23_N(:,     :, nX)
+      Hamiltonian23_N(:,    -1,    :) = Hamiltonian23_N(:,     1,  :)
+      Hamiltonian23_N(:, nMu+1,    :) = Hamiltonian23_N(:, nMu-1,  :)
 
     end subroutine calc_hamiltonian_23
     !==========================================================================
@@ -685,17 +688,19 @@ contains
     ! Inverse magetic field: cell- and face-centered values
     real    :: InvBSi_C(nX), InvBSi_F(0:nX)
     ! Array for u/B=\vec{u}*\vec{B}/|B|**2 at face-center
-    real    :: uSi_F(nX-1)
+    real    :: uSi_F(1:nX-1)
     ! Array for cell- and face-center spacing
     real    :: DsMeshSi_I(1:nX-1), DsFaceSi_I(nX)
     ! Array for d(\vec{b}*\vec{u})/d(s_L) for the inertial force at cell center
-    real    :: DbuDsSi_C(0:nX+1)
+    real    :: DbuDsSi_C(nX)
     ! Volume_G: total control volume at the end of each iteration
     real    :: Volume_G(0:nP+1, 0:nMu+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real    :: VolumeX_I(0:nX+1)
+    ! VolumeInvB_I = 1/B at right face - left face
+    real    :: VolumeInvB_I(nX)
     ! u/B variable at cell- and face-center
-    real    :: uOverBSi_F(-1:nX+1), uOverBSi_C(0:nX+1)
+    real    :: uOverBSi_F(-1:nX+1), uOverBSi_C(nX)
     ! Hamiltonian functions at cell face => \tilde\deltaH
     real    :: Hamiltonian12_N(-1:nP+1, -1:nMu+1,  0:nX+1) ! {p**3/3, mu}
     real    :: Hamiltonian13_N(-1:nP+1,  0:nMu+1, -1:nX+1) ! {p**3/3, s_L}
@@ -737,7 +742,7 @@ contains
     ! For pitch angle scattering
     if(UseMuScattering) then
        call scatter_distribution(iLine, nX, nSi_I, &
-            BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :))
+            BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nMu, 1:nX))
        ! Check if the VDF includes negative values after mu scattering
        call check_dist_neg(NameSub//' after mu scattering', 1, nX, iLine)
        if(IsDistNeg) RETURN
@@ -747,30 +752,30 @@ contains
        if(UseUpperEndBc) then
           if(UseLowerEndBc) then
              ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
-                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :),      &
-                  LowerEndSpectrumIn_II=                         &
-                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),        &
-                  UpperEndSpectrumIn_II=                         &
+             call diffuse_distribution(iLine, nX, iShock, nSi_I,   &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nMu, 1:nX), &
+                  LowerEndSpectrumIn_II=                           &
+                  VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0),          &
+                  UpperEndSpectrumIn_II=                           &
                   VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
           else
              ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
-                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :),      &
-                  UpperEndSpectrumIn_II=                         &
+             call diffuse_distribution(iLine, nX, iShock, nSi_I,   &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nMu, 1:nX), &
+                  UpperEndSpectrumIn_II=                           &
                   VDF_G(iProcPStart:iProcPEnd, 1:nMu, nX+1))
           end if
        else
           if(UseLowerEndBc) then
              ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, iShock, nSi_I, &
-                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :),      &
-                  LowerEndSpectrumIn_II=                         &
+             call diffuse_distribution(iLine, nX, iShock, nSi_I,   &
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nMu, 1:nX), &
+                  LowerEndSpectrumIn_II=                           &
                   VDF_G(iProcPStart:iProcPEnd, 1:nMu, 0))
           else
              ! with no lower or upper end BCs
              call diffuse_distribution(iLine, nX, iShock, nSi_I, &
-                  BSi_I, Dt_C(iProcPStart:iProcPEnd, :, :))
+                  BSi_I, Dt_C(iProcPStart:iProcPEnd, 1:nMu, 1:nX))
           end if
        end if
        ! Check if the VDF includes negative values after spatial diffusion
@@ -793,6 +798,8 @@ contains
       InvBSi_F(1:nX-1) = (InvBSi_C(2:nX) + InvBSi_C(1:nX-1))*0.5
       InvBSi_F(0 )     = InvBSi_C(1 ) - 0.5*(InvBSi_C(2 ) - InvBSi_C(1   ))
       InvBSi_F(nX)     = InvBSi_C(nX) + 0.5*(InvBSi_C(nX) - InvBSi_C(nX-1))
+      ! Volume of 1/B: Delta(1/B) = 1/B at right face - left face
+      VolumeInvB_I(1:nX) = InvBSi_F(1:nX) - InvBSi_F(0:nX-1)
 
       ! Calculate u/B = \vec{u}*\vec{B} / |\vec{B}|**2 at cell face
       ! uSi_F with the index of "i" is the value at the face between
@@ -807,7 +814,7 @@ contains
       uOverBSi_F(nX)     = uSi_F(nX-1)*InvBSi_F(nX)
       uOverBSi_F(nX+1)   = uOverBSi_F(nX)
       ! Interpolate to get u/B at cell centers
-      uOverBSi_C(0:nX+1) = 0.5*(uOverBSi_F(-1:nX) + uOverBSi_F(0:nX+1))
+      uOverBSi_C(1:nX)   = 0.5*(uOverBSi_F(0:nX-1) + uOverBSi_F(1:nX))
 
       ! In M-FLAMPA DsMeshSi_I(i) is the distance between centers of meshes
       ! i and i+1. Therefore,
@@ -823,7 +830,7 @@ contains
       DsFaceSi_I(nX)     = DsMeshSi_I(nX-1)
 
       ! Calculate geometric volume, with one ghost cell at each side
-      VolumeX_I(1:nX) = InvBSi_C(2:nX-1)*DsFaceSi_I(2:nX-1)
+      VolumeX_I(1:nX) = InvBSi_C*DsFaceSi_I(1:nX)
       VolumeX_I(0)    = VolumeX_I(1)
       VolumeX_I(nX+1) = VolumeX_I(nX)
 
@@ -838,8 +845,6 @@ contains
          DbuDsSi_C(2:nX-1) = (uSi_F(2:nX-1) - uSi_F(1:nX-2))/DsFaceSi_I(2:nX-1)
          DbuDsSi_C(1)  = DbuDsSi_C(2)    - (DbuDsSi_C(3)    - DbuDsSi_C(2))
          DbuDsSi_C(nX) = DbuDsSi_C(nX-1) + (DbuDsSi_C(nX-1) - DbuDsSi_C(nX-2))
-         DbuDsSi_C(0)      = DbuDsSi_C(1)
-         DbuDsSi_C(nX+1)   = DbuDsSi_C(nX)
       end if
 
     end subroutine init_states_focused
@@ -853,24 +858,36 @@ contains
       ! Clean the Hamiltonian function for {f_jk; H_12}_{p**3/3, mu}
       Hamiltonian12_N = 0.0
       ! Calculate the Hamiltonian function for {f_jk, H_12}_{p**3/3, mu}:
-      ! We split into two terms for
-      !     (1) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
-      !        p**3/3 * 3*DeltaS/B * [d(1/B)/d(s_L)]/(1/B) }_{p**3/3, mu}; and
-      !     (2) inertial force: {f_jk; (1-mu**2)/2 * p**2 * GammaLorentz *
+      ! We split into three terms for
+      !     (1) adiabatic cooling/heating and focusing terms:
+      !        {f_jk; mu*(1-mu**2)/2 * p**3/3 * (rho*u/B)_jk *
+      !        d(1/rho)/d(s_L) }_{p**3/3, mu}; and
+      !     (2) betatron acceleration: {f_jk; -mu*(1-mu**2)/2 *
+      !        p**3/3 * 3*u/B * [d(1/B)/d(s_L)]/(1/B) }_{p**3/3, mu}; and
+      !     (3) inertial force: {f_jk; (1-mu**2)/2 * p**2 * GammaLorentz *
       !        ProtonMass * u/B * d(\vec{b}*\vec{u})/d(s_L) }_{p**3/3, mu},
       ! then summed as H_12, at the faces of p**3/3 and mu => \tilde\deltaH
+
+      ! For adiabatic cooling/heating and focusing terms:
+      do iX = 1, nX
+         Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
+              0.5*spread(Mu_F*(1.0-Mu_F**2), DIM=1, NCOPIES=nP+3)* &
+              3.0*spread(Momentum3_F, DIM=2, NCOPIES=nMu+1)*uOverBSi_C(iX)
+      end do
 
       ! For the betatron acceleration
       if(UseBetatron) then
          do iX = 1, nX
-            Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX)
-            ! Include the betatron acceleration expression here
+            Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) - &
+                 0.5*spread(Mu_F*(1.0-Mu_F**2), DIM=1, NCOPIES=nP+3)* &
+                 3.0*spread(Momentum3_F, DIM=2, NCOPIES=nMu+1)* &
+                 uOverBSi_C(iX)/InvBSi_F(iX)*VolumeInvB_I(iX)
          end do
       end if
 
       ! For the inertial force
       if(UseInertialForce) then
-         do iX = 0, nX+1
+         do iX = 1, nX
             Hamiltonian12_N(:, 0:nMu, iX) = Hamiltonian12_N(:, 0:nMu, iX) + &
                  0.5*spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+3)* &
                  spread((Momentum3_F*3.0)**(2.0/3.0), DIM=2, NCOPIES=nMu+1)* &
@@ -879,10 +896,15 @@ contains
          end do
       end if
 
-      ! Boundary condition of Hamiltonian function
-      Hamiltonian12_N(:,    -1, :) = Hamiltonian12_N(:,     1, :)
-      Hamiltonian12_N(:, nMu+1, :) = Hamiltonian12_N(:, nMu-1, :)
+      ! Boundary condition of Hamiltonian_12 function: ghost cells and symmetry
+      Hamiltonian12_N(:,     :,    0) = Hamiltonian12_N(:,     :,  1)
+      Hamiltonian12_N(:,     :, nX+1) = Hamiltonian12_N(:,     :, nX)
+      Hamiltonian12_N(:,    -1,    :) = Hamiltonian12_N(:,     1,  :)
+      Hamiltonian12_N(:, nMu+1,    :) = Hamiltonian12_N(:, nMu-1,  :)
 
+      !------------------------------------------------------------------------
+      ! Clean the Hamiltonian function for {f_jk; H_13}_{p**3/3, s_L}
+      Hamiltonian13_N = 0.0
       ! Calculate the Hamiltonian function for {f_jk, H_13}_{p**3/3, s_L}:
       ! H_13 = -(u/B)*(p**3/3),
       ! at the faces of p**3/3 and s_L, and cell center of mu => \tilde\deltaH
@@ -891,18 +913,25 @@ contains
               spread(Momentum3_F, DIM=2, NCOPIES=nMu+2)*uOverBSi_F(iX)
       end do
 
+      !------------------------------------------------------------------------
+      ! Clean the Hamiltonian function for {f_jk; H_23}_{mu, s_L}
+      Hamiltonian23_N = 0.0
       ! Calculate the Hamiltonian function for {f_jk, H_23}_{mu, s_L}:
       ! H_23 = (1-mu**2)/(2B)*(dEtot**3-3*ProtonMass**2*c**4*dEtot)/(3*c**2),
       ! at the faces of mu and s_L, and cell center of p**3/3 => \tilde\deltaH
       do iX = 0, nX
          Hamiltonian23_N(:, 0:nMu, iX) = 0.5*InvBSi_F(iX)* &
               spread(1.0-Mu_F**2, DIM=1, NCOPIES=nP+2)* &
-              spread((VolumeE3_I-3.0*VolumeE_I*cRmeProton* &
-              Si2Io_V(UnitEnergy_))/(3.0*cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
+              spread((VolumeE3_I - 3.0*VolumeE_I*(cRmeProton* &
+              Si2Io_V(UnitEnergy_))**2)/(3.0*cProtonMass* &
+              cLightSpeed**2), DIM=2, NCOPIES=nMu+1)
       end do
-      ! Boundary condition of the Hamiltonian function: symmetry
-      Hamiltonian23_N(:,    -1, :) = Hamiltonian23_N(:,     1, :)
-      Hamiltonian23_N(:, nMu+1, :) = Hamiltonian23_N(:, nMu-1, :)
+
+      ! Boundary condition of Hamiltonian_23 function: ghost cells and symmetry
+      Hamiltonian23_N(:,     :,   -1) = Hamiltonian23_N(:,     :,  1)
+      Hamiltonian23_N(:,     :, nX+1) = Hamiltonian23_N(:,     :, nX)
+      Hamiltonian23_N(:,    -1,    :) = Hamiltonian23_N(:,     1,  :)
+      Hamiltonian23_N(:, nMu+1,    :) = Hamiltonian23_N(:, nMu-1,  :)
 
     end subroutine calc_hamiltonians
     !==========================================================================
