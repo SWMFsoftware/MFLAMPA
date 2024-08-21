@@ -406,6 +406,12 @@ contains
                      - MhData_VIB(X_:Z_, iVertex, iLine)) ) & ! X_:Z_(iVertex))
                      /State_VIB(D_, iVertex, iLine)
              else
+                write(*,*)'----- Diagnostic Information -----'
+                write(*,*)'iEnd =', iEnd, 'iLine=', iLine
+                write(*,*)'iVertex=', iVertex
+                write(*,*)'Xyz (iVertex)=', MHData_VIB(X_:Z_,iVertex,iLine)
+                write(*,*)'iVertex+1=',  iVertex+1
+                write(*,*)'Xyz (iVertex+1)=', MHData_VIB(X_:Z_,iVertex+1,iLine)
                 call CON_stop(NameSub//': zero size of mesh')
              end if
           end if

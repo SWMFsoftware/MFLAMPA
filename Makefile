@@ -17,20 +17,38 @@ help:
 	@echo ' '
 	@echo '    <default> ${DEFAULT_TARGET} in stand alone mode'
 	@echo ' '
+	@echo '    BLESS=        (update the reference outputs or just compare)'
 	@echo '    help          (show makefile option list)'
 	@echo '    install       (install MFLAMPA)'
 	@echo ' '
-	@echo '    LIB           (Component library libSP for SWMF)'
+	@echo '    LIB           (component library libSP for SWMF)'
 	@echo '    MFLAMPA       (make MFLAMPA.exe)'
+	@echo '    MPIRUN=       (specify processor number and run tests serially)'
 	@echo '    NOMPI         (NOMPI library for compilation without MPI)'
 	@echo ' '
 	@echo '    rundir        (create run directory for standalone or SWMF)'
 	@echo '    rundir RUNDIR=run_test (create run directory run_test)'
 	@echo ' '
 	@echo '    test          (run all tests)'
+	@echo '    test_show     (show all tests)'
+	@echo '    TESTDIR=      (specify test directory)'
 	@echo ' '
 	@echo '    clean         (remove temp files like: *~ *.o etc)'
 	@echo '    distclean     (equivalent to ./Config.pl -uninstall)'
+
+# Menu of all test details
+test_show:
+	@echo ' '
+	@echo '  You can "make test_*" the following:'
+	@echo ' '
+	@echo '  In night test'
+	@echo '    test_mflampa  (test M-FLAMPA with upwind scheme)'
+	@echo '    test_poisson  (test time-accurate Poisson bracket scheme)'
+	@echo '    test_steady   (test steady-state Poisson bracket scheme)'
+	@echo ' '
+	@echo '  Not in night test'
+	@echo '    test_spectra  (test the spectra outputs in M-FLAMPA)'
+	@echo '    test_mpi      (test when nProc > nLineAll in M-FLAMPA)'
 
 install: src/ModSize.f90
 
@@ -84,7 +102,6 @@ allclean:
 	cd Doc/Tex; $(MAKE) cleanpdf
 
 # Testing
-
 TESTDIR = run_test
 BLESS=NO
 
@@ -95,16 +112,21 @@ test:
 	-@(${MAKE} test_steady TESTDIR=run_steady)
 	ls -l test*.diff
 
-# Same for all tests
+# Same for tests without pitch angle dependency
 test_compile:
 	./Config.pl -g=20000
+	${MAKE}
+
+# Same for tests with pitch angle dependency
+test_compile_mu:
+	./Config.pl -g=20000,100,5
 	${MAKE}
 
 # Same for all tests
 test_run:
 	cd ${TESTDIR}; ${MPIRUN} ./MFLAMPA.exe | tee runlog
 
-#### MFLAMPA test
+### MFLAMPA test ###
 test_mflampa:
 	@echo "test_mflampa_compile..." > test_mflampa.diff
 	${MAKE} test_mflampa_compile
@@ -134,8 +156,7 @@ test_mflampa_check:
 		> test_mflampa.diff
 	ls -l test_mflampa.diff
 
-#### Poisson test
-
+### Poisson test ###
 test_poisson:
 	@echo "test_poisson_compile..." > test_poisson.diff
 	${MAKE} test_poisson_compile
@@ -165,8 +186,7 @@ test_poisson_check:
 		> test_poisson.diff
 	ls -l test_poisson.diff
 
-#### Steady state test
-
+### Steady state test ###
 test_steady:
 	@echo "test_steady_compile..." > test_steady.diff
 	${MAKE} test_steady_compile
@@ -203,8 +223,7 @@ test_steady_check:
 		> test_steady.diff
 	ls -l test_steady.diff
 
-#### Spectra output test
-
+### Spectra output test ###
 test_spectra:
 	@echo "test_spectra..." > test_spectra.diff
 	${MAKE} test_spectra_compile
@@ -241,3 +260,54 @@ test_spectra_check:
 		data/output/test_mflampa/Distr_poisson_data.ref.gz \
 		> test_spectra.diff
 	ls -l test_spectra.diff
+
+### MPI test: nProc > nLineAll, take test_poisson as an example ###
+### Here we use 3*1 (nLat*nLon) field lines and 8 processors (nProc)  ###
+test_mpi:
+	@echo "test_mpi..." > test_mpi.diff
+	${MAKE} test_mpi_compile
+	@echo "test_mpi_prerundir..." >> test_mpi.diff
+	${MAKE} test_mpi_prerundir
+	@echo "test_mpi_prerun..." >> test_mpi.diff
+	${MAKE} test_mpi_prerun
+	@echo "test_mpi_reference..." >> test_mpi.diff
+	${MAKE} test_mpi_reference
+	@echo "test_mpi_rundir..." >> test_mpi.diff
+	${MAKE} test_mpi_rundir
+	@echo "test_mpi_run..." >> test_mpi.diff
+	${MAKE} test_mpi_run
+	@echo "test_mpi_check..." >> test_mpi.diff
+	${MAKE} test_mpi_check
+
+test_mpi_compile: test_compile
+
+test_mpi_prerundir: test_poisson_rundir
+
+test_mpi_prerun: test_poisson_run
+
+test_mpi_reference:
+	cat ${TESTDIR}/SP/IO2/MH_data_*00{1,2,3}_001{.out,*n000006.out} \
+		> ${TESTDIR}/SP/IO2/MH_data.outs
+	${SCRIPTDIR}/DiffNum.pl -BLESS=YES -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/MH_data.outs \
+		data/output/test_mflampa/MH_poisson_mpi3_data.ref.gz \
+		> test_mpi.diff
+
+test_mpi_rundir:
+	rm -rf ${TESTDIR}
+	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
+	cp -rf ${DIR}/GM/BATSRUS/data/TRAJECTORY ./
+	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test.mpi PARAM.in
+	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
+
+test_mpi_run:
+	cd ${TESTDIR}; mpiexec -np 8 ./MFLAMPA.exe | tee runlog
+
+test_mpi_check:
+	cat ${TESTDIR}/SP/IO2/MH_data_*00{1,2,3}_001{.out,*n000006.out} \
+		> ${TESTDIR}/SP/IO2/MH_data.outs
+	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/MH_data.outs \
+		data/output/test_mflampa/MH_poisson_mpi3_data.ref.gz \
+		> test_mpi.diff
+	ls -l test_mpi.diff
