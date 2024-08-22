@@ -8,7 +8,7 @@ module SP_ModAdvanceAdvection
   ! Version: Sokolov & Roussev, Jan, 2008, SP/FLAMPA/src/ModLogAdvection.f90
 
   use ModUtilities,       ONLY: CON_stop
-  use SP_ModGrid,         ONLY: nP, iProcPStart, iProcPEnd
+  use SP_ModGrid,         ONLY: nP
   use SP_ModDistribution, ONLY: Distribution_CB, &
        dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
@@ -87,7 +87,7 @@ contains
           if(IsDistNeg) RETURN
           ! then advance via advection
           call advance_log_advection(FermiFirst_I(iVertex), &
-               1, 1, Distribution_CB(0:nP+1,1,iVertex,iLine))
+               1, 1, Distribution_CB(0:nP+1, 1, iVertex, iLine))
        end do
 
        ! compute diffusion along the field line
@@ -97,27 +97,23 @@ contains
              call set_upper_end_bc(iLine, nX)
              if(UseLowerEndBc) then
                 ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock,  &
-                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I=  &
-                     max(LowerEndBc_I(iProcPStart:iProcPEnd), &
-                     Background_I(iProcPStart:iProcPEnd)),    &
-                     UpperEndSpectrumIn_I = max(              &
-                     UpperEndBc_I(iProcPStart:iProcPEnd),     &
-                     Background_I(iProcPStart:iProcPEnd)))
+                call diffuse_distribution(iLine, nX, iShock, &
+                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I= &
+                     max(LowerEndBc_I(1:nP), Background_I(1:nP)), &
+                     UpperEndSpectrumIn_I= max(              &
+                     UpperEndBc_I(1:nP), Background_I(1:nP)))
              else
                 ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock,  &
-                     nSi_I, BSi_I, Dt, UpperEndSpectrumIn_I=  &
-                     max(UpperEndBc_I(iProcPStart:iProcPEnd), &
-                     Background_I(iProcPStart:iProcPEnd)))
+                call diffuse_distribution(iLine, nX, iShock, &
+                     nSi_I, BSi_I, Dt, UpperEndSpectrumIn_I= &
+                     max(UpperEndBc_I(1:nP), Background_I(1:nP)))
              end if
           else
              if(UseLowerEndBc) then
                 ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock,  &
-                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I=  &
-                     max(LowerEndBc_I(iProcPStart:iProcPEnd), &
-                     Background_I(iProcPStart:iProcPEnd)))
+                call diffuse_distribution(iLine, nX, iShock, &
+                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I= &
+                     max(LowerEndBc_I(1:nP), Background_I(1:nP)))
              else
                 ! with no lower or upper end BCs
                 call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt)

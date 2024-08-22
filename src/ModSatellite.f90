@@ -156,7 +156,7 @@ contains
     end if
 
     ! Tell all processors the maximum number of points
-    call MPI_Bcast(MaxPoint, 1, MPI_INTEGER, 0, iComm, iError)
+    call MPI_BCAST(MaxPoint, 1, MPI_INTEGER, 0, iComm, iError)
 
     ! allocate arrays depending on number of points
     allocate(Time_I(MaxPoint), Xyz_DI(nDim, MaxPoint))
@@ -215,14 +215,14 @@ contains
        end if
 
        ! Tell the number of points to the other processors
-       call MPI_Bcast(nPoint, 1, MPI_INTEGER, 0, iComm, iError)
+       call MPI_BCAST(nPoint, 1, MPI_INTEGER, 0, iComm, iError)
        nPointTraj_I(iSat) = nPoint
 
        ! Tell the other processors the satellite time
-       call MPI_Bcast(Time_I, nPoint, MPI_REAL, 0, iComm, iError)
+       call MPI_BCAST(Time_I, nPoint, MPI_REAL, 0, iComm, iError)
 
        ! Tell the other processors the coordinates
-       call MPI_Bcast(Xyz_DI, nDim*nPoint, MPI_REAL, 0, iComm, iError)
+       call MPI_BCAST(Xyz_DI, nDim*nPoint, MPI_REAL, 0, iComm, iError)
 
        ! Store time and positions for satellite iSat on all PE-s
        TimeSat_II(1:nPoint, iSat) = Time_I(1:nPoint)

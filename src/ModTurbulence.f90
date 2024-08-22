@@ -5,7 +5,7 @@ module SP_ModTurbulence
 
   use ModConst
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, MomentumInjSi
-  use SP_ModGrid, ONLY: nP, iProcPStart, iProcPEnd ! iPTest, iParticleTest
+  use SP_ModGrid, ONLY: nP ! iPTest, iParticleTest
 
   implicit none
 
@@ -276,9 +276,9 @@ contains
     integer,intent(in) :: nX
     real,   intent(in) :: BSi_I(1:nX)
 
-    real    :: kRSi_II(1:nX, iProcPStart:iProcPEnd)
+    real    :: kRSi_II(nX, nP)
     logical :: DoTestMe =.false.
-    real    :: Dxx_II(1:nX, iProcPStart:iProcPEnd)
+    real    :: Dxx_II(nX, nP)
 
     ! The coefficient of a spatial diffusion along the magnetic field is
     ! given by a formula in the SI unit:
@@ -290,13 +290,12 @@ contains
     ! The resonant wave number, kr = e*B/p in the SI unit
     !--------------------------------------------------------------------------
     kRSi_II = cElectronCharge*spread(BSi_I, DIM=2, NCOPIES=nP)/spread( &
-         Momentum_G(iProcPStart:iProcPEnd)*MomentumInjSi, DIM=1, NCOPIES=nX)
+         Momentum_G(1:nP)*MomentumInjSi, DIM=1, NCOPIES=nX)
 
     ! Calculate D_{xx}: KRes-dependent part
-    Dxx_II = spread(BSi_I**2, DIM=2, NCOPIES=iProcPEnd-iProcPStart+1)* &
-         spread(SpeedSi_G(iProcPStart:iProcPEnd), DIM=1, NCOPIES=nX)/ &
-         (cMu*cPi)*(AK_II(iProcPStart:iProcPEnd,1:nX) - &
-         BK_II(iProcPStart:iProcPEnd,1:nX)*kRSi_II**2)
+    Dxx_II = spread(BSi_I**2, DIM=2, NCOPIES=nP)* &
+         spread(SpeedSi_G(1:nP), DIM=1, NCOPIES=nX)/ &
+         (cMu*cPi)*(AK_II(1:nP,1:nX) - BK_II(1:nP,1:nX)*kRSi_II**2)
 
   end function Dxx_mat
   !============================================================================

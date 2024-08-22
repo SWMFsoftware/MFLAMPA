@@ -31,7 +31,7 @@ MH_data_e20120123/MH_data.H
 #CHECKGRIDSIZE
 20000		nVertexMax
 3			nLat
-3			nLon
+1			nLon
 
 #READMHDATA
 T			DoReadMhData

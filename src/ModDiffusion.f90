@@ -15,9 +15,9 @@ module SP_ModDiffusion
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, &
        MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
-  use SP_ModGrid,   ONLY: nP, iProcPStart, iProcPEnd, nMu, &
-       State_VIB, MHData_VIB, D_, R_, Wave1_, Wave2_
-  use SP_ModUnit,   ONLY: UnitX_, Io2Si_V
+  use SP_ModGrid,   ONLY: nP, nMu, State_VIB, &
+       MHData_VIB, D_, R_, Wave1_, Wave2_
+  use SP_ModUnit,   ONLY: Io2Si_V, UnitX_
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -99,16 +99,16 @@ contains
     ! input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
     ! Number density and magnetic field strength at the end of this iteration
-    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    real, intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Scalar time step for diffusion
     real, intent(in) :: Dt
     ! Given spectrum at low end (flare acceleration) and upper end (GCRs)
-    real, intent(in), optional, dimension(iProcPStart:iProcPEnd) :: &
+    real, intent(in), optional, dimension(nP) :: &
          LowerEndSpectrumIn_I, UpperEndSpectrumIn_I   ! Mu-averaged
-    real, intent(in), optional, dimension(iProcPStart:iProcPEnd, nMu) :: &
+    real, intent(in), optional, dimension(nP, nMu) :: &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II ! Mu-dependent
     ! LOCAL VARS
-    real :: DtFake_C(iProcPStart:iProcPEnd, nMu, nX)
+    real :: DtFake_C(nP, nMu, nX)
     !--------------------------------------------------------------------------
     DtFake_C = Dt
 
@@ -129,16 +129,16 @@ contains
     ! input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
     ! Number density and magnetic field strength at the end of this iteration
-    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    real, intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Local time step for diffusion: Only with nP and nX
-    real, intent(in) :: DtLocal_II(iProcPStart:iProcPEnd, nX)
+    real, intent(in) :: DtLocal_II(nP, nX)
     ! Given spectrum at low end (flare acceleration) and upper end (GCRs)
-    real, intent(in), optional, dimension(iProcPStart:iProcPEnd) :: &
+    real, intent(in), optional, dimension(nP) :: &
          LowerEndSpectrumIn_I, UpperEndSpectrumIn_I   ! Mu-averaged
-    real, intent(in), optional, dimension(iProcPStart:iProcPEnd, nMu) :: &
+    real, intent(in), optional, dimension(nP, nMu) :: &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II ! Mu-dependent
     ! LOCAL VARS
-    real :: DtFake_C(iProcPStart:iProcPEnd, nMu, nX)
+    real :: DtFake_C(nP, nMu, nX)
     !--------------------------------------------------------------------------
     DtFake_C = spread(DtLocal_II, DIM=2, NCOPIES=nMu)
 
@@ -156,39 +156,36 @@ contains
     ! pitch-angle-dependent local time step, and lower and upper spectra
 
     use ModMpi
-    use SP_ModProc, ONLY: iComm, iProc, iError, iCommSameLine, &
-         nProcSameLine, iProcSameLine0, iProcSameLine_I
     use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
 
     ! Variables as inputs
     ! Input Line, End (for how many particles), and Shock indices
     integer, intent(in) :: iLine, nX, iShock
     ! Number density and magnetic field strength at the end of this iteration
-    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    real, intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Local time step for diffusion: with nP, nMu and nX
-    real, intent(in) :: DtLocalIn_C(iProcPStart:iProcPEnd, nMu, nX)
+    real, intent(in) :: DtLocalIn_C(nP, nMu, nX)
     ! Given spectrum at low end (flare acceleration) and upper end (GCRs)
-    real, optional, intent(in), dimension(iProcPStart:iProcPEnd) :: &
+    real, optional, intent(in), dimension(nP) :: &
          LowerEndSpectrumIn_I, UpperEndSpectrumIn_I   ! Mu-averaged
-    real, optional, intent(in), dimension(iProcPStart:iProcPEnd, nMu) :: &
+    real, optional, intent(in), dimension(nP, nMu) :: &
          LowerEndSpectrumIn_II, UpperEndSpectrumIn_II ! Mu-dependent
     ! Variables declared in this subroutine
-    integer :: iP, iMu, iiProc                        ! Loop variables
+    integer :: iP, iMu                                ! Loop variables
     ! For an optimized loop, we need to change the index order by
-    ! (iProcPStart:iProcPEnd,nMu,nX) into by (nX,iProcPStart:iProcPEnd,nMu)
-    ! for the three-dimensional local time step DtLocal_III array
-    real :: DtLocal_C(nX, iProcPStart:iProcPEnd, nMu) ! Local time stepping
+    ! (nP, nMu, nX) into by (nX, nP, nMu) for the
+    ! three-dimensional local time step DtLocal_III array
+    real :: DtLocal_C(nX, nP, nMu)                    ! Local time stepping
     ! Same reason for LowerEndSpectrumIn_II and UpperEndSpectrumIn_II: keep
-    ! (iProcPStart:iProcPEnd, nMu) as a good looping order, out=iMu, in=iP
-    real, dimension(iProcPStart:iProcPEnd, nMu) :: &
-         LowerEndSpectrum_II, UpperEndSpectrum_II
+    ! (nP, nMu) as a good looping order, outermost=iMu, innermost=iP
+    real, dimension(nP, nMu) :: LowerEndSpectrum_II, UpperEndSpectrum_II
     ! Logical variable for whether or not to use given lower and upper spectra
     logical :: UseLowerSpectrum = .false., UseUpperSpectrum = .false.
     ! Coefficients in the diffusion operator
     ! df/dt = DOuter * d(DInner * df/dx)/dx
     ! DOuter = BSi in the cell center
     ! DInner = DiffusionCoefficient/BSi at the face
-    real :: DInnerSi_II(nX, iProcPStart:iProcPEnd)    ! Calculate only once
+    real :: DInnerSi_II(nX, nP)                       ! Calculate only once
     ! Lower limit to floor the spatial diffusion coefficient For a
     ! given spatial and temporal resolution, the value of the
     ! diffusion coefficient should be artificially increased to get
@@ -207,8 +204,6 @@ contains
     real :: Main_I(nX), Upper_I(nX), Lower_I(nX), Res_I(nX)
     ! Auxiliary arrays for the tri-diagonal arrays
     real :: Aux1_I(nX), Aux2_I(nX)
-    ! For sub-communicator split (same field line), so-called "color" in MPI
-    integer :: iSub
     !--------------------------------------------------------------------------
     ! diffusion along the field line
     ! Set up the local time step: the reason is that, we loop through each
@@ -269,19 +264,18 @@ contains
     ! on momentum is D \propto r_L*v \propto Momentum**2/TotalEnergy
     if(UseTurbulentSpectrum) then
        DInnerSi_II = Dxx(nX, BSi_I(1:nX))/ &
-            spread(BSi_I(1:nX), DIM=2, NCOPIES=iProcPEnd-iProcPStart+1)
+            spread(BSi_I(1:nX), DIM=2, NCOPIES=nP)
     else
        ! Add v (= p*c**2 / E_total in the relativistic case) and p**(1/3)
-       DInnerSi_II = spread(CoefLambdaxx_I(1:nX), DIM=2, &
-            NCOPIES=iProcPEnd-iProcPStart+1)* &
-            spread(SpeedSi_G(iProcPStart:iProcPEnd)* &
-            Momentum_G(iProcPStart:iProcPEnd)**(1.0/3), DIM=1, NCOPIES=nX)
-       DInnerSi_II = max(DInnerSi_II, DiffCoeffMinSi/spread( &
-            DOuterSi_I(1:nX), DIM=2, NCOPIES=iProcPEnd-iProcPStart+1))
+       DInnerSi_II = spread(CoefLambdaxx_I(1:nX), DIM=2, NCOPIES=nP)* &
+            spread(Momentum_G(1:nP)**(1.0/3)* &
+            SpeedSi_G(1:nP), DIM=1, NCOPIES=nX)
+       DInnerSi_II = max(DInnerSi_II, DiffCoeffMinSi/ &
+            spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP))
     end if
 
     MU:do iMu = 1, nMu
-       MOMENTUM:do iP = iProcPStart, iProcPEnd
+       MOMENTUM:do iP = 1, nP
           ! Now, we solve the matrix equation
           ! f^(n+1)_i-Dt*DOuter_I/DsFaceSi_I*(&
           !     DInner_(i+1/2)*(f^(n+1)_(i+1)-f^(n+1)_i)/DsMesh_(i+1)-&
@@ -352,39 +346,6 @@ contains
        end do MOMENTUM
     end do MU
 
-    ! Broadcast the distribution function to all processors
-    if(nProcSameLine>1) then
-       Distribution_CB(          1:iProcPStart-1, :, 1:nX, iLine) = 0.0
-       Distribution_CB(iProcPEnd+1:nP           , :, 1:nX, iLine) = 0.0
-       if(iProc>=iProcSameLine_I(1) .and. &
-            iProc<=iProcSameLine_I(nProcSameLine)) then
-          iSub = 1             ! subset processes are marked with 1
-       else
-          iSub = MPI_UNDEFINED ! other processes are excluded
-       end if
-       ! Create a new communicator for the subset
-       call MPI_COMM_SPLIT(iComm, iSub, iProcSameLine0, iCommSameLine, iError)
-
-       if(iSub==1) then
-          ! Get the subset communicator size and rank
-          call MPI_Comm_size(iCommSameLine, nProcSameLine, iError)
-          call MPI_Comm_rank(iCommSameLine, iProcSameLine0, iError)
-          ! Gather the data for the first processor within the subset
-          if(iProcSameLine0==0) then
-             call MPI_Reduce(MPI_IN_PLACE, &
-                  Distribution_CB(1:nP,:,1:nX,iLine), &
-                  nP*nMu*nX, MPI_REAL, MPI_Sum, 0, iCommSameLine, iError)
-          else
-             call MPI_Reduce(Distribution_CB(1:nP,:,1:nX,iLine), &
-                  Distribution_CB(1:nP,:,1:nX,iLine), &
-                  nP*nMu*nX, MPI_REAL, MPI_Sum, 0, iCommSameLine, iError)
-          end if
-          ! Share the data within the subset
-          call MPI_Bcast(Distribution_CB(1:nP,:,1:nX,iLine), &
-               nP*nMu*nX, MPI_REAL, 0, iCommSameLine, iError)
-       end if
-    end if
-
   end subroutine diffuse_distribution_c
   !============================================================================
   subroutine scatter_distribution_s(iLine, nX, nSi_I, BSi_I, Dt)
@@ -394,11 +355,11 @@ contains
     ! input Line and End index (for how many particles)
     integer, intent(in) :: iLine, nX
     ! Number density and magnetic field strength at the end of this iteration
-    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    real, intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Scalar time step for diffusion
     real, intent(in) :: Dt
     ! LOCAL VARs
-    real :: DtFake_C(iProcPStart:iProcPEnd, nMu, nX)
+    real :: DtFake_C(nP, nMu, nX)
     !--------------------------------------------------------------------------
     DtFake_C = Dt
 
@@ -411,16 +372,14 @@ contains
 
     use ModMpi
     use ModConst,   ONLY: cAtomicMass
-    use SP_ModProc, ONLY: iComm, iProc, iError, iCommSameLine, &
-         nProcSameLine, iProcSameLine0, iProcSameLine_I
 
     ! Variables as inputs
     ! input Line and End index (for how many particles)
     integer, intent(in) :: iLine, nX
     ! Number density and magnetic field strength at the end of this iteration
-    real, intent(in) :: nSi_I(1:nX), BSi_I(1:nX)
+    real, intent(in) :: nSi_I(nX), BSi_I(nX)
     ! Scalar time step for diffusion
-    real, intent(in) :: DtLocal_C(iProcPStart:iProcPEnd, nMu, nX)
+    real, intent(in) :: DtLocal_C(nP, nMu, nX)
     ! LOCAL VARs
     ! For each fixed iMu and iX, we calculate Dmumu, the coefficient of
     ! diffusion about the pitch angle = v/lambda_mumu*(1-mu**2)*mu**(2.0/3.0)
@@ -431,12 +390,10 @@ contains
     real    :: Main_I(nMu), Upper_I(nMu), Lower_I(nMu), Res_I(nMu)
     ! Physical VARs
     real    :: LowerLimMu           ! Lower limit of Factor_mu
-    real    :: DtOverDMu2_C(iProcPStart:iProcPEnd, 0:nMu, nX) ! Dt/DeltaMu**2
+    real    :: DtOverDMu2_C(nP, 0:nMu, nX) ! Dt/DeltaMu**2
     real    :: AlfvenSpeed_I(nX)    ! Alfven wave speed
     integer :: iP, iX               ! Loop variables
     integer :: iMuSwitch            ! Control parameter for mu
-    ! For sub-communicator split (same field line), so-called "color" in MPI
-    integer :: iSub
     !--------------------------------------------------------------------------
     DtOverDMu2_C(:, 1:nMu, :) = DtLocal_C/DeltaMu**2 ! Dt/DeltaMu**2
     DtOverDMu2_C(:, 0, :) = DtOverDMu2_C(:, 1, :)    ! Bc
@@ -450,7 +407,7 @@ contains
 
     ! Calculate the effect of scatter along mu axis for each fixed iX and iP
     SPACELOC:do iX = 1, nX
-       MOMENTUM:do iP = iProcPStart, iProcPEnd
+       MOMENTUM:do iP = 1, nP
           ! For each pitch angle, set DMuMu and solve VDF for mu scattering
           ! Meanwhile, we control whether we floor the value of D_mumu or not
           iMuSwitch = 0
@@ -480,39 +437,6 @@ contains
                Distribution_CB(iP, 1:nMu, iX, iLine))
        end do MOMENTUM
     end do SPACELOC
-
-    ! Broadcast the distribution function to all processors
-    if(nProcSameLine>1) then
-       Distribution_CB(          1:iProcPStart-1, :, 1:nX, iLine) = 0.0
-       Distribution_CB(iProcPEnd+1:nP           , :, 1:nX, iLine) = 0.0
-       if(iProc>=iProcSameLine_I(1) .and. &
-            iProc<=iProcSameLine_I(nProcSameLine)) then
-          iSub = 1             ! subset processes are marked with 1
-       else
-          iSub = MPI_UNDEFINED ! other processes are excluded
-       end if
-       ! Create a new communicator for the subset
-       call MPI_COMM_SPLIT(iComm, iSub, iProcSameLine0, iCommSameLine, iError)
-
-       if(iSub==1) then
-          ! Get the subset communicator size and rank
-          call MPI_Comm_size(iCommSameLine, nProcSameLine, iError)
-          call MPI_Comm_rank(iCommSameLine, iProcSameLine0, iError)
-          ! Gather the data for the first processor within the subset
-          if(iProcSameLine0==0) then
-             call MPI_Reduce(MPI_IN_PLACE, &
-                  Distribution_CB(1:nP,:,1:nX,iLine), &
-                  nP*nMu*nX, MPI_REAL, MPI_Sum, 0, iCommSameLine, iError)
-          else
-             call MPI_Reduce(Distribution_CB(1:nP,:,1:nX,iLine), &
-                  Distribution_CB(1:nP,:,1:nX,iLine), &
-                  nP*nMu*nX, MPI_REAL, MPI_Sum, 0, iCommSameLine, iError)
-          end if
-          ! Share the data within the subset
-          call MPI_Bcast(Distribution_CB(1:nP,:,1:nX,iLine), &
-               nP*nMu*nX, MPI_REAL, 0, iCommSameLine, iError)
-       end if
-    end if
 
   end subroutine scatter_distribution_c
   !============================================================================

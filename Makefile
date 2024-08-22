@@ -286,7 +286,7 @@ test_mpi_prerundir: test_poisson_rundir
 test_mpi_prerun: test_poisson_run
 
 test_mpi_reference:
-	cat ${TESTDIR}/SP/IO2/MH_data_*00{1,2,3}_001{.out,*n000006.out} \
+	cat ${TESTDIR}/SP/IO2/MH_data_*001_00{1,2,3}{.out,*n000006.out} \
 		> ${TESTDIR}/SP/IO2/MH_data.outs
 	${SCRIPTDIR}/DiffNum.pl -BLESS=YES -t -r=1e-6 -a=1e-6 \
 		${TESTDIR}/SP/IO2/MH_data.outs \
@@ -304,7 +304,7 @@ test_mpi_run:
 	cd ${TESTDIR}; mpiexec -np 8 ./MFLAMPA.exe | tee runlog
 
 test_mpi_check:
-	cat ${TESTDIR}/SP/IO2/MH_data_*00{1,2,3}_001{.out,*n000006.out} \
+	cat ${TESTDIR}/SP/IO2/MH_data_*001_00{1,2,3}{.out,*n000006.out} \
 		> ${TESTDIR}/SP/IO2/MH_data.outs
 	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
 		${TESTDIR}/SP/IO2/MH_data.outs \

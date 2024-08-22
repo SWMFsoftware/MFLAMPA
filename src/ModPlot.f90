@@ -746,10 +746,11 @@ contains
 
     ! write the output data
 
+    use ModMpi
     use SP_ModChannel,      ONLY: get_integral_flux
     use SP_ModDistribution, ONLY: Mu_C
     use SP_ModGrid,         ONLY: Used_B
-    use SP_ModProc,         ONLY: nProcSameLine, iProcSameLine0
+    use SP_ModProc,         ONLY: iComm, nProc, iError
     use SP_ModTime,         ONLY: IsSteadyState
 
     logical, intent(in), optional:: IsInitialOutputIn
@@ -849,11 +850,12 @@ contains
       real :: Param_I(LagrID_:StartJulian_)
       ! timetag
       character(len=15) :: StringTime
+
       character(len=*), parameter:: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
-      ! we only save the data in the first processor for this field line.
-      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
       ! Update number of time tags and write to tag list file
       if(iProc==0) then
@@ -951,9 +953,7 @@ contains
       ! single file is created for all field lines, name format is
       ! MH_data_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
 
-      use ModMpi
       use ModCoordTransform, ONLY: xyz_to_rlonlat
-      use SP_ModProc,        ONLY: iComm, nProc, iError
 
       ! name of the output file
       character(len=100):: NameFile
@@ -985,8 +985,10 @@ contains
       integer, parameter:: AngleSpread_= StartTime_ + 4
       integer :: nParam
       real    :: Param_I(1:AngleSpread_)
+
       character(len=*), parameter:: NameSub = 'write_mh_2d'
       !------------------------------------------------------------------------
+
       nExtraVar = File_I(iFile)%nExtraVar
       nMhdVar   = File_I(iFile)%nMhdVar
       nFluxVar  = File_I(iFile)%nFluxVar
@@ -1065,19 +1067,19 @@ contains
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
-            call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum, &
+            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
+                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_SUM, &
                  0, iComm, iError)
-            call MPI_Reduce(MPI_IN_PLACE, DoPrint_I, &
-                 nLineAll, MPI_Logical, MPI_Land, &
+            call MPI_REDUCE(MPI_IN_PLACE, DoPrint_I, &
+                 nLineAll, MPI_LOGICAL, MPI_LAND, &
                  0, iComm, iError)
          else
-            call MPI_Reduce(File_I(iFile) % Buffer_II, &
+            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
                  File_I(iFile) % Buffer_II, &
-                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_Sum, &
+                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_SUM, &
                  0, iComm, iError)
-            call MPI_Reduce(DoPrint_I, DoPrint_I, &
-                 nLineAll, MPI_Logical, MPI_Land, &
+            call MPI_REDUCE(DoPrint_I, DoPrint_I, &
+                 nLineAll, MPI_LOGICAL, MPI_LAND, &
                  0, iComm, iError)
          end if
       end if
@@ -1166,10 +1168,9 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_mh_time'
       !------------------------------------------------------------------------
-
       ! If there are more than one processors working on the same field line,
-      ! we only save the data in the first processor for this field line.
-      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
       nMhdVar   = File_I(iFile) % nMhdVar
       nExtraVar = File_I(iFile) % nExtraVar
@@ -1398,11 +1399,12 @@ contains
       integer :: iDistance
       ! timetag
       character(len=15):: StringTime
+
       character(len=*), parameter:: NameSub = 'write_distr_1d'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
-      ! we only save the data in the first processor for this field line.
-      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
       ! set header
       StringHeader = 'MFLAMPA: Distribution data along a field line, with ' &
@@ -1517,9 +1519,6 @@ contains
       ! separate file is created for each field line, and the name format is:
       ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
-      use SP_ModProc, ONLY: iComm, nProc, iError
-      use ModMpi
-
       ! name of the output file
       character(len=100) :: NameFile
       ! header of the output file
@@ -1539,11 +1538,9 @@ contains
       logical :: DoPrint_I(nLineAll)
       ! timetag
       character(len=15):: StringTime
+
       character(len=*), parameter:: NameSub = 'write_distr_2d'
       !------------------------------------------------------------------------
-      ! If there are more than one processors working on the same field line,
-      ! we only save the data in the first processor for this field line.
-      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
 
       ! set header
       StringHeader = &
@@ -1620,19 +1617,19 @@ contains
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
-            call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 (nP+2)*nMu*nLineAll, MPI_REAL, MPI_Sum, &
+            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
+                 (nP+2)*nMu*nLineAll, MPI_REAL, MPI_SUM, &
                  0, iComm, iError)
-            call MPI_Reduce(MPI_IN_PLACE, DoPrint_I, &
-                 nLineAll, MPI_Logical, MPI_Land, &
+            call MPI_REDUCE(MPI_IN_PLACE, DoPrint_I, &
+                 nLineAll, MPI_LOGICAL, MPI_LAND, &
                  0, iComm, iError)
          else
-            call MPI_Reduce(File_I(iFile) % Buffer_II, &
+            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
                  File_I(iFile) % Buffer_II, &
-                 (nP+2)*nMu*nLineAll, MPI_REAL, MPI_Sum, &
+                 (nP+2)*nMu*nLineAll, MPI_REAL, MPI_SUM, &
                  0, iComm, iError)
-            call MPI_Reduce(DoPrint_I, DoPrint_I, &
-                 nLineAll, MPI_Logical, MPI_Land, &
+            call MPI_REDUCE(DoPrint_I, DoPrint_I, &
+                 nLineAll, MPI_LOGICAL, MPI_LAND, &
                  0, iComm, iError)
          end if
       end if
@@ -1717,8 +1714,8 @@ contains
       character(len=*), parameter:: NameSub = 'write_distr_time'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
-      ! we only save the data in the first processor for this field line.
-      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
       ! set header
       StringHeader = &
@@ -1909,13 +1906,11 @@ contains
       ! separate file is created for each satellite, and the name format is:
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
-      use ModMpi
       use ModCoordTransform,       ONLY: xyz_to_rlonlat
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
            find_triangle_orig, find_triangle_sph
       use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
            NameFileSat_I, set_satellite_positions, DoTrackSatellite_I
-      use SP_ModProc,              ONLY: iComm, nProc, iError
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -1952,10 +1947,12 @@ contains
       integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
       integer :: iStencil_I(3)
       real    :: Weight_I(3)
+
+      character(len=*), parameter:: NameSub = 'write_distr_traj'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
-      ! we only save the data in the first processor for this field line.
-      if(nProcSameLine > 1 .and. .not.iProcSameLine0==0) RETURN
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
       ! set the momentum or kinetic energy axis
       select case(File_I(iFile) % iScale)
@@ -2032,23 +2029,23 @@ contains
             ! Gather interpolated coordinates on the source processor
             if(nProc > 1)then
                if(iProc == 0)then
-                  call MPI_Reduce(MPI_IN_PLACE, Xyz_DI,     &
-                       3*nLineAll, MPI_REAL, MPI_Sum,       &
+                  call MPI_REDUCE(MPI_IN_PLACE, Xyz_DI,     &
+                       3*nLineAll, MPI_REAL, MPI_SUM,       &
                        0, iComm, iError)
-                  call MPI_Reduce(MPI_IN_PLACE,             &
+                  call MPI_REDUCE(MPI_IN_PLACE,             &
                        Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
-                       MPI_REAL, MPI_Sum, 0, iComm, iError)
-                  call MPI_Reduce(MPI_IN_PLACE, DoReachR_I, &
+                       MPI_REAL, MPI_SUM, 0, iComm, iError)
+                  call MPI_REDUCE(MPI_IN_PLACE, DoReachR_I, &
                        nLineAll, MPI_LOGICAL, MPI_LOR,      &
                        0, iComm, iError)
                else
-                  call MPI_Reduce(Xyz_DI, Xyz_DI,           &
-                       3*nLineAll, MPI_REAL, MPI_Sum,       &
+                  call MPI_REDUCE(Xyz_DI, Xyz_DI,           &
+                       3*nLineAll, MPI_REAL, MPI_SUM,       &
                        0, iComm, iError)
-                  call MPI_Reduce(Log10DistR_IIB,           &
+                  call MPI_REDUCE(Log10DistR_IIB,           &
                        Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
-                       MPI_REAL, MPI_Sum, 0, iComm, iError)
-                  call MPI_Reduce(DoReachR_I, DoReachR_I,   &
+                       MPI_REAL, MPI_SUM, 0, iComm, iError)
+                  call MPI_REDUCE(DoReachR_I, DoReachR_I,   &
                        nLineAll, MPI_LOGICAL, MPI_LOR,      &
                        0, iComm, iError)
                end if
@@ -2077,12 +2074,12 @@ contains
             end if
 
             ! broadcast the coordinates and flags to all processors
-            call MPI_Bcast(XyzReachR_DI, 3*(nLineAll+2), &
+            call MPI_BCAST(XyzReachR_DI, 3*(nLineAll+2), &
                  MPI_REAL, 0, iComm, iError)
-            call MPI_Bcast(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
+            call MPI_BCAST(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
                  MPI_REAL, 0, iComm, iError)
-            call MPI_Bcast(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
-            call MPI_Bcast(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
+            call MPI_BCAST(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
+            call MPI_BCAST(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
 
             if(UsePoleTri)then
                ! Add two grid nodes at the poles:
@@ -2223,9 +2220,6 @@ contains
     !==========================================================================
     subroutine write_flux_2d
 
-      use SP_ModProc, ONLY: iComm, nProc, iError
-      use ModMpi
-
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
       ! single file is created for all field lines, name format is
       ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
@@ -2250,6 +2244,7 @@ contains
       real :: Param_I(1:StartJulian_)
       ! timetag
       character(len=15):: StringTime
+
       character(len=*), parameter:: NameSub = 'write_flux_2d'
       !------------------------------------------------------------------------
       nFlux = File_I(iFile) % nFluxVar
@@ -2304,14 +2299,14 @@ contains
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
-            call MPI_Reduce(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
+            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
                  nFlux * nSpreadLon * nSpreadLat, &
-                 MPI_REAL, MPI_Sum, 0, iComm, iError)
+                 MPI_REAL, MPI_SUM, 0, iComm, iError)
          else
-            call MPI_Reduce(File_I(iFile) % Buffer_II, &
+            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
                  File_I(iFile) % Buffer_II, &
                  nFlux * nSpreadLon * nSpreadLat, &
-                 MPI_REAL, MPI_Sum, 0, iComm, iError)
+                 MPI_REAL, MPI_SUM, 0, iComm, iError)
          end if
       end if
 
@@ -2350,9 +2345,6 @@ contains
     !==========================================================================
     subroutine write_flux_time
 
-      use SP_ModProc, ONLY: iComm, nProc, iError
-      use ModMpi
-
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
       ! single time series file is created for all field line, name format is
       ! Flux_R=<Radius [AU]>_Lon=<Longitude[deg]>_Lat=<Latitude[deg]>.{out/dat}
@@ -2389,7 +2381,12 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_flux_time'
       !------------------------------------------------------------------------
-      nFluxVar= File_I(iFile)%nFluxVar
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
+
+      nFluxVar = File_I(iFile) % nFluxVar
+
       ! set header
       StringHeader = &
            'MFLAMPA: flux data on a sphere at fixed heliocentric distance; '//&
@@ -2476,13 +2473,13 @@ contains
       ! gather interpolated data on the source processor
       if(nProc > 1)then
          if(iProc==0)then
-            call MPI_Reduce(MPI_IN_PLACE, &
+            call MPI_REDUCE(MPI_IN_PLACE, &
                  File_I(iFile) % Buffer_II(1, nDataLine, 1), &
-                 nFluxVar, MPI_REAL, MPI_Sum, 0, iComm, iError)
+                 nFluxVar, MPI_REAL, MPI_SUM, 0, iComm, iError)
          else
-            call MPI_Reduce(File_I(iFile) % Buffer_II(1, nDataLine, 1), &
+            call MPI_REDUCE(File_I(iFile) % Buffer_II(1, nDataLine, 1), &
                  File_I(iFile) % Buffer_II(1, nDataLine, 1), &
-                 nFluxVar, MPI_REAL, MPI_Sum, 0, iComm, iError)
+                 nFluxVar, MPI_REAL, MPI_SUM, 0, iComm, iError)
          end if
       end if
 

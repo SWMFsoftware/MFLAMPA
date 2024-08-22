@@ -4,7 +4,7 @@
 program MFLAMPA
 
   use ModKind,      ONLY: Real8_
-  use SP_ModProc,   ONLY: iProc, nProc, iComm, iError
+  use SP_ModProc,   ONLY: iComm, nProc, iProc, iError
   use ModUtilities, ONLY: remove_file, touch_file
   use SP_ModTime,   ONLY: iIter, init_time  => init
   use SP_ModPlot,   ONLY:        init_plot  => init
@@ -38,7 +38,7 @@ program MFLAMPA
   CpuTimeStart = MPI_WTIME()
 
   ! Delete MFLAMPA.SUCCESS and MFLAMPA.STOP files if found
-  if(iProc==0)then
+  if(iProc==0) then
      call remove_file('MFLAMPA.SUCCESS')
      call remove_file('MFLAMPA.STOP')
   end if
@@ -121,8 +121,7 @@ program MFLAMPA
   if(iProc==0) call touch_file('MFLAMPA.SUCCESS')
 
   ! Finalize MPI
-  call MPI_Finalize(iError)
-
+  call MPI_FINALIZE(iError)
 contains
   !============================================================================
   function stop_condition_true() result(IsStopCondition)

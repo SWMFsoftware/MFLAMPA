@@ -16,16 +16,13 @@ module SP_ModProc
   integer :: iProc  = -1
   ! Error message
   integer :: iError = -1
-
-  ! Processors needed to work on the same field line, if nProc > nLine
-  ! For communicators on the same field line
-  integer :: iCommSameLine = -1
-  ! Total processor number in iCommSameLine, on the same field line
-  integer :: nProcSameLine = -1
-  ! Processor index (from 0) on the same field line
-  integer :: iProcSameLine0 = -1
-  ! Processor index (Not from 0, but just iProc) on field line
-  integer, allocatable :: iProcSameLine_I(:)
-
+contains
+  !============================================================================
+  subroutine warn_more_proc
+    ! Show WARNING message when there are more processors than field lines
+    !--------------------------------------------------------------------------
+    write(*,*) "WARNING: More processors than field lines."
+  end subroutine warn_more_proc
+  !============================================================================
 end module SP_ModProc
 !==============================================================================
