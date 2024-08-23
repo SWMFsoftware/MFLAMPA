@@ -14,7 +14,7 @@ module SP_ModGrid
   use ModUtilities, ONLY: CON_stop
   use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
-  use SP_ModProc,   ONLY: iComm, nProc, iProc, iError
+  use SP_ModProc,   ONLY: nProc, iProc, iError
 
   implicit none
 
@@ -28,7 +28,6 @@ module SP_ModGrid
   public:: init_stand_alone    ! Initialize arrays on the grid
   public:: copy_old_state      ! save old arrays before getting new ones
   public:: get_other_state_var ! Auxiliary components of state vector
-  public:: get_shock_location  ! finds shock location on all lines
   public:: search_line         ! find particle index corresponding to radius
   public:: nP                  ! Total number of points in the momentum grid
   public:: nMu                 ! Number of points in the pitch angle (mu) grid
@@ -255,11 +254,13 @@ contains
        ! we also send the warning message for this over-request
        nLine = 1
        if(iProc < nLineAll) then
-         iLineAll0 = iProc
+          iLineAll0 = iProc
        else
-         iLineAll0 = nLineAll-1
-         call warn_more_proc
-         write(*,*) "Here we keep iProc's >", nLineAll, 'on the last line.'
+          ! Some work/trial has been done, but just partially. One can refer
+          ! to the code version (915'th commit) on August 22, 2024.
+          iLineAll0 = nLineAll-1
+          call warn_more_proc
+          write(*,*) "Here we keep iProc's >", nLineAll, 'on the last line.'
        end if
     end if
 
@@ -408,46 +409,6 @@ contains
     end do
 
   end subroutine get_other_state_var
-  !============================================================================
-  subroutine get_shock_location
-
-    use SP_ModSize, ONLY: nVertexMax
-    ! find location of a shock wave on a given line (line)
-    ! shock front is assumed to be location of max log(Rho/RhoOld)
-    real :: dLogRho_I(1:nVertexMax)
-    ! Do not search too close to the Sun
-    real, parameter :: RShockMin = 1.20  ! *RSun
-    integer         :: iShockMin
-    ! Do not search too close to the heliosphere boundary
-    integer:: iShockMax
-    ! Misc
-    integer:: iShockCandidate
-    integer:: iLine, iEnd
-    !--------------------------------------------------------------------------
-    do iLine = 1, nLine
-       if(.not.Used_B(iLine))then
-          iShock_IB(Shock_,iLine) = NoShock_
-          CYCLE
-       end if
-
-       ! shock front is assumed to be location of max log(Rho/RhoOld);
-       ! divergence of plasma velocity propto dLogRho
-       iEnd = nVertex_B(iLine)
-       dLogRho_I(1:iEnd) = log(MhData_VIB(Rho_,1:iEnd,iLine)/&
-            State_VIB(RhoOld_,1:iEnd,iLine))
-
-       ! shock never moves back
-       iShockMin = max(iShock_IB(ShockOld_, iLine), 1 + nWidth)
-       iShockMax = iEnd - nWidth - 1
-       iShockCandidate = iShockMin - 1 + maxloc(&
-            DLogRho_I(   iShockMin:iShockMax), DIM=1, MASK = &
-            State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
-            DLogRho_I(   iShockMin:iShockMax)       > dLogRhoThreshold)
-       if(iShockCandidate >= iShockMin)&
-            iShock_IB(Shock_, iLine) = iShockCandidate
-    end do
-
-  end subroutine get_shock_location
   !============================================================================
   subroutine search_line(iLine, Radius, iXOut, IsFound, Weight)
 

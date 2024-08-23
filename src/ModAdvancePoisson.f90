@@ -211,7 +211,7 @@ contains
     ! Input variables for diffusion
     real,    intent(in) :: BSi_I(nX), nSi_I(nX)
     ! Extended arrays for implementation of the Poisson bracket scheme
-    ! Array for u/B=\vec{u}*\vec{B}/|B|**2 and distance between adjacent meshes
+    ! Array for u=\vec{u}*\vec{B}/|B| and distance between adjacent meshes
     real :: uSi_F(1:nX-1), DsMeshSi_I(1:nX-1)
     ! Array of 1/B at the cell- and face-center
     real :: InvBSi_C(nX), InvBSi_F(nX)
@@ -219,7 +219,7 @@ contains
     real :: Volume_G(0:nP+1, 0:nX+1)
     ! VolumeX_I: geometric volume = distance between two geometric faces
     real :: VolumeX_I(0:nX+1)
-    ! u/B variable at face of s_L
+    ! u/B=\vec{u}*\vec{B}/|B|**2 variable at face of s_L
     real :: uOverBSi_F(-1:nX+1)
     ! Hamiltonian at cell face: p**3/3 and s_L
     real :: Hamiltonian12_N(-1:nP+1, -1:nX+1)

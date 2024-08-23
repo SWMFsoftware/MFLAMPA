@@ -223,10 +223,10 @@ contains
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: advance, DoTraceShock, iterate_steady_state
+    use SP_ModAdvance,       ONLY: advance, DoTraceShock, &
+         get_shock_location, iterate_steady_state
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
-    use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state,  &
-         get_shock_location
+    use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
     use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
