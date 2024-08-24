@@ -42,10 +42,6 @@ module SP_ModPlot
   ! If true the time tag format is YYYYMMDDHHMMSS
   logical, public:: UseDateTime = .false.
 
-  ! If we use poles in triangulation
-  logical, public:: UsePoleTri   = .false.
-  logical, public:: UsePlanarTri = .true.
-
   character(len=*), parameter, public :: NameMHData    = "MH_data"
   character(len=*), parameter, public :: NameDistrData = "Distr"
   character(len=*), parameter, public :: NameFluxData  = "Flux"
@@ -348,10 +344,6 @@ contains
              File_I(iFile) % IsFirstCall = .true.
           case(DistrTraj_)
              call process_distr
-             ! get pole triangulartion flag
-             call read_var('UsePoleTriangulation', UsePoleTri)
-             ! get the triangulation approach flag
-             call read_var('UsePlanarTriangles', UsePlanarTri)
           case(Flux2D_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -1909,6 +1901,7 @@ contains
       use ModCoordTransform,       ONLY: xyz_to_rlonlat
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
            find_triangle_orig, find_triangle_sph
+      use SP_ModGrid,              ONLY: UsePoleTri, UsePlanarTri
       use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
            NameFileSat_I, set_satellite_positions, DoTrackSatellite_I
 
@@ -1934,17 +1927,18 @@ contains
       ! index of particle just above the radius
       integer :: iAbove
       ! xyz coordinates of all intersection point or average direction
-      real    :: Xyz_DI(X_:Z_, nLineAll)
+      real    :: XyzUnit_DI(X_:Z_, nLineAll)
       real    :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
       ! useful intersection points on a unit sphere
       ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
-      real    :: XyzReachR_DI(X_:Z_, 1:nLineAll+2)
+      real    :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
       integer :: iReachR, nReachR
       real    :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
       ! arrays to construct a triangular mesh on a sphere
       integer :: nTriMesh, lidTri, ridTri
-      logical :: IsTriangleFound
       integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
+      ! variables for interpolation in a triangular mesh
+      logical :: IsTriangleFound
       integer :: iStencil_I(3)
       real    :: Weight_I(3)
 
@@ -1995,9 +1989,9 @@ contains
          ! We then first have a radial interpolation at rSat
          ! reset the output buffer, coordinates, flags, and log(Distribution)
          File_I(iFile) % Buffer_II = 0.0
-         Xyz_DI = 0.0; Log10DistR_IIB = 0.0
+         XyzUnit_DI = 0.0; Log10DistR_IIB = 0.0
          DoReachR_I = .false.
-         XyzReachR_DI = 0.0; Log10DistReachR_IIB = 0.0
+         XyzReachRUnit_DI = 0.0; Log10DistReachR_IIB = 0.0
 
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
@@ -2005,31 +1999,31 @@ contains
 
             ! go over all lines on the processor and find the point of
             ! intersection with output sphere if present
-            do iLine = 1, nLine
-               if(.not.Used_B(iLine)) CYCLE
+            LINE:do iLine = 1, nLine
+               if(.not.Used_B(iLine)) CYCLE LINE
                iLineAll = iLineAll0 + iLine
 
-               ! find the particle just above the given radius
+               ! Find the particle just above the given radius
                call search_line(iLine, rSat, &
                     iAbove, DoReachR_I(iLineAll), Weight)
                DoReachR_I(iLineAll) = DoReachR_I(iLineAll) .and. iAbove /= 1
                ! if no intersection found -> proceed to the next line
-               if(.not.DoReachR_I(iLineAll)) CYCLE
+               if(.not.DoReachR_I(iLineAll)) CYCLE LINE
 
-               ! Found intersection -> get POS & log10(f[Io]) at that location
+               ! Found intersection => get POS & log10(f[Io]) at that location
                ! Find coordinates and log(Distribution) at intersection
-               Xyz_DI(:, iLineAll) = ( &
+               XyzUnit_DI(:, iLineAll) = ( &
                     MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) +  &
                     MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight )/rSat
                Log10DistR_IIB(:, :, iLineAll) = ( &
                     log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
                     log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
-            end do
+            end do LINE
 
             ! Gather interpolated coordinates on the source processor
-            if(nProc > 1)then
-               if(iProc == 0)then
-                  call MPI_REDUCE(MPI_IN_PLACE, Xyz_DI,     &
+            if(nProc > 1) then
+               if(iProc == 0) then
+                  call MPI_REDUCE(MPI_IN_PLACE, XyzUnit_DI, &
                        3*nLineAll, MPI_REAL, MPI_SUM,       &
                        0, iComm, iError)
                   call MPI_REDUCE(MPI_IN_PLACE,             &
@@ -2039,7 +2033,7 @@ contains
                        nLineAll, MPI_LOGICAL, MPI_LOR,      &
                        0, iComm, iError)
                else
-                  call MPI_REDUCE(Xyz_DI, Xyz_DI,           &
+                  call MPI_REDUCE(XyzUnit_DI, XyzUnit_DI,   &
                        3*nLineAll, MPI_REAL, MPI_SUM,       &
                        0, iComm, iError)
                   call MPI_REDUCE(Log10DistR_IIB,           &
@@ -2057,7 +2051,7 @@ contains
                nReachR = count(DoReachR_I)
                if(nReachR == nLineAll) then
                   ! For most cases, the satellite used falls in 1.1-240 AU
-                  XyzReachR_DI(:, 2:nLineAll+1) = Xyz_DI
+                  XyzReachRUnit_DI(:, 2:nLineAll+1) = XyzUnit_DI
                   Log10DistReachR_IIB(:, :, 2:nLineAll+1) = Log10DistR_IIB
                else
                   ! Otherwise, we will spend some time reorganizing the points
@@ -2065,28 +2059,29 @@ contains
                   do iLineAll = 1, nLineAll
                      if(DoReachR_I(iLineAll)) then
                         iReachR = iReachR + 1
-                        XyzReachR_DI(:, iReachR) = Xyz_DI(:, iLineAll)
-                        Log10DistReachR_IIB(:, :, iReachR) =   &
+                        XyzReachRUnit_DI(:, iReachR) = XyzUnit_DI(:, iLineAll)
+                        Log10DistReachR_IIB(:, :, iReachR) = &
                              Log10DistR_IIB(:, :, iLineAll)
                      end if
                   end do
                end if
             end if
 
-            ! broadcast the coordinates and flags to all processors
-            call MPI_BCAST(XyzReachR_DI, 3*(nLineAll+2), &
+            ! Broadcast the coordinates and flags to all processors
+            call MPI_BCAST(XyzReachRUnit_DI, 3*(nLineAll+2), &
                  MPI_REAL, 0, iComm, iError)
             call MPI_BCAST(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
                  MPI_REAL, 0, iComm, iError)
             call MPI_BCAST(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
             call MPI_BCAST(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
 
-            if(UsePoleTri)then
+            ! For poles
+            if(UsePoleTri) then
                ! Add two grid nodes at the poles:
                lidTri = 1
                ridTri = nReachR + 2
-               XyzReachR_DI(:, lidTri) = [0.0, 0.0, -1.0]
-               XyzReachR_DI(:, ridTri) = [0.0, 0.0, +1.0]
+               XyzReachRUnit_DI(:, lidTri) = [0.0, 0.0, -1.0]
+               XyzReachRUnit_DI(:, ridTri) = [0.0, 0.0, +1.0]
             else
                lidTri = 2
                ridTri = nReachR + 1
@@ -2098,14 +2093,14 @@ contains
             if(allocated(iList_I))    deallocate(iList_I)
             if(allocated(iPointer_I)) deallocate(iPointer_I)
             if(allocated(iEnd_I))     deallocate(iEnd_I)
-            allocate(iList_I(6*(nTriMesh-2)),      &
+            allocate(iList_I(6*(nTriMesh-2)), &
                  iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
             iList_I = 0; iPointer_I = 0; iEnd_I = 0
             ! Construct the Triangular mesh used for interpolation
-            call trmesh(nTriMesh,                  &
-                 XyzReachR_DI(X_, lidTri:ridTri),  &
-                 XyzReachR_DI(Y_, lidTri:ridTri),  &
-                 XyzReachR_DI(Z_, lidTri:ridTri),  &
+            call trmesh(nTriMesh,                     &
+                 XyzReachRUnit_DI(X_, lidTri:ridTri), &
+                 XyzReachRUnit_DI(Y_, lidTri:ridTri), &
+                 XyzReachRUnit_DI(Z_, lidTri:ridTri), &
                  iList_I, iPointer_I, iEnd_I, iError)
             if(iError /= 0) then
                write(*,*) NameSub//': Triangilation failed of ', &
@@ -2115,18 +2110,18 @@ contains
 
             ! Find the triangle where the satellite locates
             if(UsePlanarTri) then
-               call find_triangle_orig(                &
-                    XyzSat_DI(:, iSat)/rSat, nTriMesh, &
-                    XyzReachR_DI(:, lidTri:ridTri),    &
-                    iList_I, iPointer_I, iEnd_I,       &
+               call find_triangle_orig(                 &
+                    XyzSat_DI(:, iSat)/rSat, nTriMesh,  &
+                    XyzReachRUnit_DI(:, lidTri:ridTri), &
+                    iList_I, iPointer_I, iEnd_I,        &
                     Weight_I, IsTriangleFound, iStencil_I)
             else
-               call find_triangle_sph(                 &
-                    XyzSat_DI(:, iSat)/rSat, nTriMesh, &
-                    XyzReachR_DI(:, lidTri:ridTri),    &
-                    iList_I, iPointer_I, iEnd_I,       &
-                    Weight_I(1), Weight_I(2),          &
-                    Weight_I(3), IsTriangleFound,      &
+               call find_triangle_sph(                  &
+                    XyzSat_DI(:, iSat)/rSat, nTriMesh,  &
+                    XyzReachRUnit_DI(:, lidTri:ridTri), &
+                    iList_I, iPointer_I, iEnd_I,        &
+                    Weight_I(1), Weight_I(2),           &
+                    Weight_I(3), IsTriangleFound,       &
                     iStencil_I(1), iStencil_I(2), iStencil_I(3))
             end if
             if(.not.IsTriangleFound) then
@@ -2146,7 +2141,7 @@ contains
                        iList_I    = iList_I,    &
                        iPointer_I = iPointer_I, &
                        iEnd_I     = iEnd_I,     &
-                       Xyz_DI     = XyzReachR_DI(:, lidTri:ridTri),  &
+                       Xyz_DI     = XyzReachRUnit_DI(:, lidTri:ridTri), &
                        nVar       = nP+2,       &
                        State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
                   ! South:
@@ -2156,7 +2151,7 @@ contains
                        iList_I    = iList_I,    &
                        iPointer_I = iPointer_I, &
                        iEnd_I     = iEnd_I,     &
-                       Xyz_DI     = XyzReachR_DI(:, lidTri:ridTri),  &
+                       Xyz_DI     = XyzReachRUnit_DI(:, lidTri:ridTri), &
                        nVar       = nP+2,       &
                        State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
                end do

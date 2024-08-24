@@ -80,6 +80,10 @@ default			TypeLisBc
 T			UseModulationPot
 534.7			ModulationPot
 
+#TRIANGULATION
+F				UsePoleTriangulation
+T				UsePlanarTriangles
+
 #SATELLITE
 4			nSatellite
 HGR			TypeCoordSystem
@@ -102,8 +106,6 @@ distr2d energy def ascii		StringPlot
 distrtime energy def ascii		StringPlot
 215.0			Radius
 distrtraj energy def ascii		StringPlot
-F				UsePoleTriangulation
-T				UsePlanarTriangles
 
 #SCALETURBULENCE
 constant		ScaleTurbulenceType

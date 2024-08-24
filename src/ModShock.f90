@@ -18,10 +18,11 @@ module SP_ModShock
 
   ! Public members:
   public:: read_param           ! Read parameters
-  public:: init                ! Initialize arrays on the grid
+  public:: init                 ! Initialize arrays on the grid
   public:: get_divU             ! get divergence of velocity \vec{u}
   public:: get_shock_location   ! finds shock location on all lines
   public:: steepen_shock        ! steepen the density profile at the shock
+  public:: get_shock_skeleton   ! shock surface skeleton for visualization
 
   ! If the shock wave is traced, the advance algorithms are modified
   logical, public :: DoTraceShock = .true.
@@ -209,9 +210,9 @@ contains
     DsSi_I(1:nX-1) = State_VIB(D_, 1:nX-1, iLine)*Io2Si_V(UnitX_)
     ! get dLogRho_I if given; otherwise = -divU
     if(present(dLogRhoIn_I)) then
-        dLogRho_I = dLogRhoIn_I
+       dLogRho_I = dLogRhoIn_I
     else
-        dLogRho_I = -divU_II(1:nX, iLine)
+       dLogRho_I = -divU_II(1:nX, iLine)
     end if
 
     ! find the excess of dLogRho within the shock compared
@@ -240,15 +241,152 @@ contains
     ! pre shock part
     BSi_I(iShock+1:iShock+nShockWidth  ) = &
          minval(BSi_I(iShock+1:iShock+nShockWidth))
-    
+
     ! update dLogRhoIn (if given) and divU
     if(present(dLogRhoIn_I)) then
-        dLogRhoIn_I = dLogRho_I
-        divU_II(1:nX, iLine) = -dLogRhoIn_I
+       dLogRhoIn_I = dLogRho_I
+       divU_II(1:nX, iLine) = -dLogRhoIn_I
     else
-        divU_II(1:nX, iLine) = -dLogRho_I
+       divU_II(1:nX, iLine) = -dLogRho_I
     end if
 
   end subroutine steepen_shock
+  !============================================================================
+  subroutine get_shock_skeleton
+
+    ! get the shock wave front surface skeleton for visualization
+    use ModCoordTransform,       ONLY: xyz_to_rlonlat
+    use ModMpi
+    use ModTriangulateSpherical, ONLY: trmesh
+    use SP_ModGrid,              ONLY: nLineAll, iLineAll0, &
+         X_, Y_, Z_, UsePoleTri
+    use SP_ModProc,              ONLY: iComm, nProc, iProc, iError
+    use SP_ModUnit,              ONLY: Io2Si_V, UnitX_
+
+    ! Effective points for the shock surface
+    integer :: nShockEff
+    integer :: iShockEff_I(1:nLineAll)
+    ! Parameters for the shock coordinates
+    integer, parameter :: RShock_ = 1, LonShock_ = 2, LatShock_ = 3
+    ! Spatial coordinates of the field lines
+    real, dimension(X_:Z_, 1:nLineAll) :: XyzShockUnit_DG
+    real, dimension(RShock_:LatShock_, 1:nLineAll) :: rlonlatShock_DG
+    real, dimension(RShock_:LatShock_, 1:nLineAll+2) :: XyzShockEffUnit_DG
+
+    ! Loop variables
+    integer :: iLine, iLineAll, iShockEff
+    ! Arrays to construct a triangular mesh on a sphere
+    integer :: nTriMesh, lidTri, ridTri
+    integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
+
+    character(len=*), parameter:: NameSub = 'get_shock_skeleton'
+    !--------------------------------------------------------------------------
+    ! If there are more than one processors working on the same field line,
+    ! we only save the data for the first nLineAll processors.
+    if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
+
+    ! Initialization
+    XyzShockUnit_DG = 0.0; rlonlatShock_DG = 0.0
+    XyzShockEffUnit_DG = 0.0; iShockEff_I = 0
+    ! Find how many points are effective for the shock front
+    nShockEff = count(iShock_IB(Shock_, 1:nLine)>1 .and. Used_B(1:nLine))
+
+    ! Get the shock front location on all processors
+    LINE:do iLine = 1, nLine
+       if(.not.Used_B(iLine)) CYCLE LINE
+       iLineAll = iLineAll0 + iLine
+
+       ! Find how far shock has travelled on this line
+       iShockEff_I(iLineAll) = iShock_IB(Shock_, iLine)
+       ! Find the location of the shock front on this field line
+       XyzShockUnit_DG(:, iLineAll) = &
+            MHData_VIB(X_:Z_, iShockEff_I(iLineAll), iLine)
+       ! Transform to spherical coordinates
+       call xyz_to_rlonlat(XyzShockUnit_DG(:, iLineAll), &
+            rlonlatShock_DG(RShock_,   iLineAll), &
+            rlonlatShock_DG(LonShock_, iLineAll), &
+            rlonlatShock_DG(LatShock_, iLineAll))
+
+       ! Project to unit sphere
+       XyzShockUnit_DG(:, iLineAll) = XyzShockUnit_DG(:, iLineAll)/ &
+            rlonlatShock_DG(RShock_, iLineAll)
+    end do LINE
+    ! Check correctness
+    if(nShockEff /= count(iShockEff_I>1)) call CON_Stop(NameSub// &
+         ': Incorrect effective nshock points on the processor.')
+
+    ! Gather interpolated coordinates on the source processor
+    if(nProc > 1) then
+       if(iProc == 0) then
+          call MPI_REDUCE(MPI_IN_PLACE, iShockEff_I, &
+               nLineAll, MPI_INTEGER, MPI_SUM, 0, iComm, iError)
+          call MPI_REDUCE(MPI_IN_PLACE, XyzShockUnit_DG, &
+               3*nLineAll, MPI_REAL, MPI_SUM, 0, iComm, iError)
+          call MPI_REDUCE(MPI_IN_PLACE, nShockEff, &
+               1, MPI_INTEGER, MPI_SUM, 0, iComm, iError)
+       else
+          call MPI_REDUCE(iShockEff_I, iShockEff_I, &
+               nLineAll, MPI_INTEGER, MPI_SUM, 0, iComm, iError)
+          call MPI_REDUCE(XyzShockUnit_DG, XyzShockUnit_DG, &
+               3*nLineAll, MPI_REAL, MPI_SUM, 0, iComm, iError)
+          call MPI_REDUCE(nShockEff, nShockEff, &
+               1, MPI_INTEGER, MPI_SUM, 0, iComm, iError)
+       end if
+    end if
+    ! Check correctness
+    if(nShockEff /= count(iShockEff_I>1)) call CON_Stop(NameSub// &
+         ': Incorrect effective nshock points on the processor.')
+
+    ! Send useful interpolated coordinates to the source processor
+    if(iProc == 0) then
+       if(nShockEff == nLineAll) then
+          ! for all field lines, we get the effective shock surface
+          XyzShockEffUnit_DG(:, 2:nLineAll+1) = XyzShockUnit_DG
+       else
+          ! Otherwise, we will spend some time reorganizing the points
+          iShockEff = 1
+          do iLineAll = 1, nLineAll
+             if(iShockEff_I(iLineAll) > 1) then
+                iShockEff = iShockEff + 1
+                XyzShockEffUnit_DG(:, iShockEff) = &
+                     XyzShockUnit_DG(:, iLineAll)
+             end if
+          end do
+       end if
+    end if
+    ! Broadcast the coordinates and flags to all processors
+    call MPI_BCAST(XyzShockEffUnit_DG, 3*(nLineAll+2), &
+         MPI_REAL, 0, iComm, iError)
+
+    ! For poles
+    if(UsePoleTri) then
+       ! Add two grid nodes at the poles:
+       lidTri = 1
+       ridTri = nShockEff + 2
+       XyzShockEffUnit_DG(:, lidTri) = [0.0, 0.0, -1.0]
+       XyzShockEffUnit_DG(:, ridTri) = [0.0, 0.0, +1.0]
+    else
+       lidTri = 2
+       ridTri = nShockEff + 1
+    end if
+
+    nTriMesh = ridTri - lidTri + 1
+    ! Allocate and initialize arrays for triangulation and
+    ! interpolation; if allocated, first deallocate them
+    if(allocated(iList_I))    deallocate(iList_I)
+    if(allocated(iPointer_I)) deallocate(iPointer_I)
+    if(allocated(iEnd_I))     deallocate(iEnd_I)
+    allocate(iList_I(6*(nTriMesh-2)), &
+         iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
+    iList_I = 0; iPointer_I = 0; iEnd_I = 0
+    ! Construct the Triangular mesh used for interpolation
+    call trmesh(nTriMesh,                       &
+         XyzShockEffUnit_DG(X_, lidTri:ridTri), &
+         XyzShockEffUnit_DG(Y_, lidTri:ridTri), &
+         XyzShockEffUnit_DG(Z_, lidTri:ridTri), &
+         iList_I, iPointer_I, iEnd_I, iError)
+    if(iError /= 0) call CON_Stop(NameSub//': Triangilation failed.')
+
+  end subroutine get_shock_skeleton
   !============================================================================
 end module SP_ModShock

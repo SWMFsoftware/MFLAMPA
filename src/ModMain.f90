@@ -80,7 +80,8 @@ contains
           if(IsStandAlone) CYCLE
           call read_param_origin
        case('#MOMENTUMGRID', '#PITCHANGLEGRID', '#CHECKGRIDSIZE', &
-            '#COORDSYSTEM', '#COORDINATESYSTEM', '#GRIDNODE', '#TESTPOS')
+            '#COORDSYSTEM', '#COORDINATESYSTEM', '#GRIDNODE', &
+            '#TESTPOS', '#TRIANGULATION')
           ! Currently we do not need '#DOSMOOTH'
           if(.not.IsFirstSession) CYCLE
           call read_param_grid(NameCommand)

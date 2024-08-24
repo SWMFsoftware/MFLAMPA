@@ -353,6 +353,22 @@ This command can only be used in the first session.
 Set the numbers for test node, position, and momentum.
 </command>
 
+<command name="TRIANGULATION" if="$_IsFirstSession">
+  <parameter name="UsePoleTriangulation"  type="logical" default="F" />
+  <parameter name="UsePlanarTriangles"  type="logical" default="T" />
+
+#TESTPOS
+F			UsePoleTriangulation
+T			UsePlanarTriangles
+
+This command can only be used in the first session.
+
+Set options when making TRIANGULATION: (1) whether we manually include
+the north and south poles. Recommended to do if there are too few points;
+(2) whether we use planar or spherical triangles. Recommended to have
+spherical triangles if we set a specific radius.
+</command>
+
 <command name="SPREADGRID">
   <parameter name="nSpreadLon"  type="integer" min="1" default="3" />
   <parameter name="nSpreadLat"  type="integer" min="1" default="3" />
@@ -978,10 +994,6 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
                 min="-90.0" max="90.0" default="0.0"/>
         </if>
       </if>
-      <if expr="$KindData eq distrtraj">
-        <parameter name="UsePoleTriangulation" type="logical" default="T" />
-        <parameter name="UsePlanarTriangles" type="logical" default="T" />
-      </if>
     </for>
 
 #SAVEPLOT
@@ -998,8 +1010,6 @@ distr2d energy def idl		StringPlot
 distrtime energy def idl		StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
 distrtraj def energy idl		StringPlot
-T				UsePoleTriangulation
-T				UsePlanarTriangles
 flux2d flux ascii		StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
 fluxtime flux ascii		StringPlot
@@ -1047,7 +1057,10 @@ For "distr2d", the StringPlot format is basically the same as it is in
 to specify the radius for interpolating and saving the distribution function.
 This is also applicable to the parameters used for "distrtime".
 
-If using "distraj", one should also specify "#SATELLITE" before these lines.
+If using "distraj", one should also specify "#SATELLITE" and reset,
+"#TRIANGULATION" including 'UsePoleTriangulation' (default = F) and
+'UsePlanarTriangles' (default = T) before these lines.
+
 In StringPlot, the first identifier is always a type of plot, the last
 identifier is a type of file, and the string variables in between denote the
 list of plot variables extra to the MHD ones.
