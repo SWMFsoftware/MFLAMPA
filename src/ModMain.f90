@@ -180,6 +180,7 @@ contains
     use SP_ModPlot,          ONLY: init_plot       => init
     use SP_ModReadMhData,    ONLY: init_mhdata     => init
     use SP_ModRestart,       ONLY: read_restart
+    use SP_ModShock,         ONLY: init_shock      => init
     use SP_ModTurbulence,    ONLY: init_turbulence => init, &
          UseTurbulentSpectrum
     use SP_ModUnit,          ONLY: init_unit       => init
@@ -192,6 +193,8 @@ contains
        write(*,'(a)')'SP: initialize'
        write(*,'(a)')'SP: '
     end if
+    ! Initialize the shock-relevant variables: divU
+    call init_shock
     ! Initialize and convert energy units (eV, keV, MeV, GeV, TeV)
     call init_unit
     ! Allocate distribution function and set uniform background
@@ -217,7 +220,7 @@ contains
     ! finalize the model
     character(len=*), parameter:: NameSub = 'finalize'
     !--------------------------------------------------------------------------
-    if(IsStandAlone)call stand_alone_final_restart
+    if(IsStandAlone) call stand_alone_final_restart
     call finalize_plot
     call finalize_mhdata
     ! call finalize_turbulence
@@ -232,7 +235,7 @@ contains
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
     use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
-    use SP_ModShock,         ONLY: DoTraceShock, get_shock_location
+    use SP_ModShock,         ONLY: DoTraceShock, get_divU, get_shock_location
     use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
@@ -275,7 +278,10 @@ contains
        ! if no new background data loaded, don't advance in time
        if(DataInputTime <= SPTime) RETURN
        ! if tracing shock, get the shock location for each field line
-       if(DoTraceShock) call get_shock_location
+       if(DoTraceShock) then
+          call get_divU
+          call get_shock_location
+       end if
        ! run the model
        if(DoRun) call advance(min(DataInputTime, TimeLimit))
     end if

@@ -6,9 +6,9 @@ module SP_ModAdvance
   ! The module contains methods for advancing the solution in time
   use SP_ModDiffusion,    ONLY: UseDiffusion, set_diffusion_coef
   use SP_ModDistribution, ONLY: IsDistNeg
-  use SP_ModGrid,         ONLY: nLine, Used_B, nVertex_B, State_VIB, &
-       MHData_VIB, Rho_, B_, iShock_IB, Shock_, ShockOld_, IsMuAvg
-  use SP_ModShock,        ONLY: DoTraceShock
+  use SP_ModGrid,         ONLY: nLine, Used_B, nVertex_B, &
+       State_VIB, MHData_VIB, Rho_, B_, iShock_IB, Shock_, IsMuAvg
+  use SP_ModShock,        ONLY: DoTraceShock, nShockWidth, steepen_shock
   use SP_ModSize,         ONLY: nVertexMax
   use ModUtilities,       ONLY: CON_stop
 
@@ -66,10 +66,9 @@ contains
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson,   ONLY: advect_via_poisson_parker, &
          calc_states_poisson_focused, advect_via_poisson_focused
-    use SP_ModGrid,             ONLY: D_, RhoOld_, BOld_
-    use SP_ModShock,            ONLY: dLogRhoThreshold, nShockWidth
+    use SP_ModGrid,             ONLY: D_, RhoOld_, BOld_, ShockOld_
     use SP_ModTime,             ONLY: SPTime
-    use SP_ModUnit, ONLY: Io2Si_V, UnitX_
+    use SP_ModUnit,             ONLY: Io2Si_V, UnitX_
 
     real, intent(in):: TimeLimit
     ! Loop variable
@@ -91,7 +90,6 @@ contains
     real    :: DsSi_I(1:nVertexMax-1)
     ! Lagrangian derivatives
     real, dimension(1:nVertexMax) :: dLogRho_I
-
     !--------------------------------------------------------------------------
     DtFull = TimeLimit - SPTime
 
@@ -153,10 +151,11 @@ contains
                State_VIB(BOld_, 1:iEnd, iLine))
           dLogRho_I(1:iEnd) = log(nSi_I(1:iEnd)/nOldSi_I(1:iEnd))
 
-          ! trace shock position and steepen the shock
+          ! Trace shock position and steepen the shock
           iShock = iShockOld + iProgress
           if(iShock < iEnd-nShockWidth .and. iShock > nShockWidth &
-               .and. DoTraceShock) call steepen_shock
+               .and. DoTraceShock) call steepen_shock( &
+               iLine, iEnd, iShock, BSi_I(1:iEnd), dLogRho_I(1:iEnd))
 
           ! Advection (2 different schemes) and Diffusion
           ! First, set the diffusion coefficient, from the
@@ -164,7 +163,7 @@ contains
           if(UseDiffusion) call set_diffusion_coef(iLine, iEnd, &
                iShock, BSi_I(1:iEnd))
           if(UsePoissonBracket) then
-             ! Poisson bracket scheme: particle-number-conservative
+             ! Poisson bracket scheme: 2nd order, particle number conserves
              if(IsMuAvg) then
                 ! Single Poisson bracket: Parker transport equation
                 call advect_via_poisson_parker(iLine, iEnd, &
@@ -193,44 +192,6 @@ contains
        end do PROGRESS
     end do LINE
 
-  contains
-    !==========================================================================
-    subroutine steepen_shock
-      ! change the density profile near the shock front so it
-      ! becomes steeper for the current line
-
-      real :: dLogRhoExcess_I(iShock-nShockWidth:iShock+nShockWidth-1)
-      real :: dLogRhoExcessIntegral
-      ! find the excess of dLogRho within the shock compared
-      ! to background averaged over length
-      !------------------------------------------------------------------------
-      dLogRhoExcess_I = max(0.5*( &
-           dLogRho_I(iShock-nShockWidth  :iShock+nShockWidth-1) + &
-           dLogRho_I(iShock-nShockWidth+1:iShock+nShockWidth  )) - &
-           dLogRhoThreshold, 0.0)
-      ! A jump (dLogRhoExcess>0) in velocity accross the shock wave * \Delta t
-      dLogRhoExcessIntegral = sum(dLogRhoExcess_I*&
-           DsSi_I(iShock-nShockWidth:iShock+nShockWidth-1))
-
-      ! check for zero excess
-      if(dLogRhoExcessIntegral == 0.0) RETURN
-      ! nullify excess within the smoothed shock
-      dLogRho_I(iShock-nShockWidth:iShock+nShockWidth) = min( &
-           dLogRhoThreshold, dLogRho_I(iShock-nShockWidth:iShock+nShockWidth))
-      ! ... and concentrate it at the shock front, applying the whole jump
-      ! in the velocity at a single grid point
-      dLogRho_I(iShock) = dLogRhoThreshold + &
-           dLogRhoExcessIntegral/DsSi_I(iShock)
-      ! also, sharpen the magnetic field magnitude
-      ! post shock part
-      BSi_I(iShock+1-nShockWidth:iShock+1) = &
-           maxval(BSi_I(iShock+1-nShockWidth:iShock+1))
-      ! pre shock part
-      BSi_I(iShock+1:iShock+nShockWidth  ) = &
-           minval(BSi_I(iShock+1:iShock+nShockWidth))
-
-    end subroutine steepen_shock
-    !==========================================================================
   end subroutine advance
   !============================================================================
   subroutine iterate_steady_state
@@ -246,8 +207,8 @@ contains
     integer :: iEnd, iShock
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I
-
     !--------------------------------------------------------------------------
+
     LINE:do iLine = 1, nLine
        ! go line by line and iterate the solution
        if(.not.Used_B(iLine)) CYCLE LINE
@@ -262,6 +223,9 @@ contains
        ! find how far shock has travelled on this line
        iShock = iShock_IB(Shock_, iLine)
        ! trace shock position and steepen the shock
+       if(iShock < iEnd-nShockWidth .and. iShock > nShockWidth &
+            .and. DoTraceShock) call steepen_shock( &
+            iLine, iEnd, iShock, BSi_I(1:iEnd))
 
        ! first, set the diffusion coefficient, from the
        ! given formulae or from the turbulent specrtum, if known

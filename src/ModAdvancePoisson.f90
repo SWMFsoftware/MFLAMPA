@@ -66,7 +66,7 @@ contains
     ! diffuse the distribution function at each time step
 
     ! INPUTS:
-    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock front
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
     real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
@@ -205,7 +205,7 @@ contains
     use SP_ModGrid, ONLY: D_, U_
     use SP_ModUnit, ONLY: UnitX_, Io2Si_V
     ! INPUTS:
-    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock front
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
@@ -359,7 +359,7 @@ contains
          GammaLorentz_F, VolumeE_I, VolumeE3_I
     use SP_ModUnit,         ONLY: Si2Io_V, UnitEnergy_
     ! INPUTS:
-    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock front
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
     real,    intent(in) :: tFinal        ! Time interval to advance through
     real,    intent(in) :: CflIn         ! Input CFL number
@@ -679,7 +679,7 @@ contains
     use SP_ModGrid,         ONLY: D_, U_
     use SP_ModUnit,         ONLY: Io2Si_V, Si2Io_V, UnitX_, UnitEnergy_
     ! INPUTS:
-    integer, intent(in) :: iLine, iShock ! Indices of line and shock
+    integer, intent(in) :: iLine, iShock ! Indices of line and shock front
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
     real,    intent(in) :: CflIn         ! Input CFL number
     ! Input variables for diffusion
