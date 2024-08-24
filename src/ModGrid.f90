@@ -156,10 +156,6 @@ module SP_ModGrid
 
   ! Test position and momentum
   integer, public :: iPTest = 1, iParticleTest = 99, iNodeTest = 1
-
-  ! Shock algorithm parameters:
-  real,    public, parameter :: dLogRhoThreshold = 0.01
-  integer, public, parameter :: nWidth = 50
 contains
   !============================================================================
   subroutine read_param(NameCommand)

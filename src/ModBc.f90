@@ -9,7 +9,8 @@ module SP_ModBc
        TypeLisBc, UseModulationPot, ModulationPot
   use SP_ModDistribution, ONLY: Distribution_CB, Momentum_G, &
        MomentumInjSi, Background_I
-  use SP_ModGrid,   ONLY: nP, nMu, MhData_VIB, NoShock_, nWidth, T_, X_, Z_
+  use SP_ModGrid,   ONLY: nP, nMu, MhData_VIB, NoShock_, T_, X_, Z_
+  use SP_ModShock,  ONLY: nShockWidth
   use SP_ModUnit,   ONLY: kinetic_energy_to_momentum,  &
        UnitEnergy_, UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
@@ -137,8 +138,8 @@ contains
             * nSi_I(iVertex)/MomentumSi**3          &
             * (MomentumSi/MomentumInjSi)**SpectralIndex
 
-       if(iShock /= NoShock_ .and. iVertex <= iShock + nWidth .and.  &
-            iVertex >= iShock - nWidth) CoefInjLocal = CoefInj
+       if(iShock /= NoShock_ .and. iVertex <= iShock + nShockWidth .and.  &
+            iVertex >= iShock - nShockWidth) CoefInjLocal = CoefInj
 
        Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
     end do

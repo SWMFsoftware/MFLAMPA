@@ -26,6 +26,7 @@ OBJECTS = \
 	ModReadMhData.o \
 	ModRestart.o \
 	ModSatellite.o \
+	ModShock.o \
 	ModSize.o \
 	ModTime.o \
 	ModTestFunc.o \

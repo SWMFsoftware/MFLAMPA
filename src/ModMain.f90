@@ -47,6 +47,7 @@ contains
     use SP_ModReadMHData,     ONLY: read_param_mhdata     => read_param
     use SP_ModRestart,        ONLY: read_param_restart    => read_param
     use SP_ModSatellite,      ONLY: read_param_satellite  => read_param
+    use SP_ModShock,          ONLY: read_param_shock      => read_param
     use SP_ModTestFunc,       ONLY: read_param_testfunc   => read_param
     use SP_ModTime,           ONLY: read_param_time       => read_param
     use SP_ModTiming,         ONLY: read_param_timing     => read_param
@@ -86,7 +87,7 @@ contains
        case('#ENERGYRANGE', '#FLUXINITIAL')
           if(.not.IsFirstSession) CYCLE
           call read_param_dist(NameCommand)
-       case('#CFL', '#ADVECTION', '#TRACESHOCK')
+       case('#CFL', '#ADVECTION')
           call read_param_adv(NameCommand)
        case('#FOCUSEDTRANSPORT')
           call read_param_focused(NameCommand)
@@ -106,6 +107,8 @@ contains
        case('#SATELLITE')
           if(.not.IsFirstSession) CYCLE
           call read_param_satellite(NameCommand)
+       case('#TRACESHOCK')
+          call read_param_shock(NameCommand)
        case('#TURBULENTSPECTRUM')
           call read_param_turbulence(NameCommand)
        case('#PARTICLEENERGYUNIT')
@@ -223,13 +226,13 @@ contains
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: advance, DoTraceShock, &
-         get_shock_location, iterate_steady_state
+    use SP_ModAdvance,       ONLY: advance, iterate_steady_state
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
     use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
     use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
+    use SP_ModShock,         ONLY: DoTraceShock, get_shock_location
     use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
@@ -271,6 +274,7 @@ contains
        call get_other_state_var
        ! if no new background data loaded, don't advance in time
        if(DataInputTime <= SPTime) RETURN
+       ! if tracing shock, get the shock location for each field line
        if(DoTraceShock) call get_shock_location
        ! run the model
        if(DoRun) call advance(min(DataInputTime, TimeLimit))
