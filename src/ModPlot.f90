@@ -66,7 +66,9 @@ module SP_ModPlot
        DistrTraj_ = 6, & ! along the specified spacecraft trajectory
                                 ! Flux
        Flux2D_    = 7, & ! at a given radius on rectangular Lon-Lat grid
-       FluxTime_  = 8    ! at a given radius as time series on Lon-Lat grid
+       FluxTime_  = 8, & ! at a given radius as time series on Lon-Lat grid
+                                ! Shock Skeleton
+       ShockSkeleton_ = 9! stencils at each time step
   ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
@@ -243,6 +245,8 @@ contains
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
+          case('shockskeleton')
+             File_I(iFile) % iKindData = ShockSkeleton_
           case default
              call CON_stop(NameSub//&
                   ": kind of data isn't properly set in PARAM.in")
@@ -377,6 +381,8 @@ contains
              File_I(iFile) % Lat = File_I(iFile) % Lat * cDegToRad
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
+          case(ShockSkeleton_)
+             call process_shock
           end select
        end do ! iPlot
        ! Check consistency: only 1 MH1D file can be requested
@@ -618,6 +624,17 @@ contains
 
     end subroutine process_distr
     !==========================================================================
+    subroutine process_shock
+
+      ! process output parameters for shock skeleton
+      !------------------------------------------------------------------------
+      File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot) // &
+           ' iListShock iPointerShock iEndShock'
+      File_I(iFile) % StringHeaderAux = &
+           trim(File_I(iFile) % StringHeaderAux) // ' [1] [1] [1]'
+
+    end subroutine process_shock
+    !==========================================================================
   end subroutine read_param
   !============================================================================
   subroutine init
@@ -812,6 +829,8 @@ contains
           call write_flux_2d
        case(FluxTime_)
           call write_flux_time
+       case(ShockSkeleton_)
+          call write_shock_skeleton
        end select
     end do
   contains
@@ -2532,6 +2551,52 @@ contains
 
     end subroutine write_flux_time
     !==========================================================================
+    subroutine write_shock_skeleton
+
+      ! write output with shock surface skeleton in the format to
+      ! be read and visualized by IDL/TECPLOT; name format is
+      ! MH_data_shock_t<ddhhmmss>_n<iIter>.{out/dat}
+
+      use SP_ModShock, ONLY: XyzShockEffUnit_DG, IsShockTriMade, &
+           nShockTriMesh, iListShock_I, iPointerShock_I, iEndShock_I
+
+      ! name of the output file
+      character(len=100):: NameFile
+      ! header of the output file
+      character(len=500):: StringHeader
+      ! timetag
+      character(len=15)  :: StringTime
+
+      character(len=*), parameter:: NameSub = 'write_shock_skeleton'
+      !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
+
+      ! header for the output file
+      StringHeader = &
+           'MFLAMPA: shock surface skeleton; '// &
+           trim(File_I(iFile)%StringHeaderAux)
+
+      ! set the file name (not use make_file_name, not increse complexity)
+      write(NameFile,'(a)') trim(NameFile)//trim(NameMHData)//'_shock'
+      if(UseDateTime)then
+         call get_date_time_string(SPTime, StringTime)
+         write(NameFile,'(a,i6.6)') &
+              trim(NameFile)//'_e'//StringTime//'_n', iIter
+      else
+         call get_time_string(SPTime, StringTime(1:8))
+         write(NameFile,'(a,i6.6)') &
+              trim(NameFile)//'_t'//StringTime(1:8)//'_n', iIter
+      end if
+      write(NameFile,'(a)') trim(NameFile)// &
+         trim(File_I(iFile)%NameFileExtension)
+
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0.0
+
+    end subroutine write_shock_skeleton
+    !==========================================================================
   end subroutine save_plot_all
   !============================================================================
   subroutine finalize
@@ -2633,7 +2698,7 @@ contains
     !--------------------------------------------------------------------------
     write(NameOut,'(a)') trim(NamePlotDir)//trim(StringBase)
 
-    if(present(Radius)) write(NameOut,'(a,i4.4,f0.2)')   &
+    if(present(Radius)) write(NameOut,'(a,i4.4,f0.2)') &
          trim(NameOut)//'_R=', int(Radius), Radius - int(Radius)
 
     if(present(Longitude) .and. present(Latitude))then
@@ -2675,11 +2740,11 @@ contains
     if(present(iIter))then
        if(UseDateTime)then
           call get_date_time_string(SPTime, StringTime)
-          write(NameOut,'(a,i6.6)')  &
+          write(NameOut,'(a,i6.6)') &
                trim(NameOut)//'_e'//StringTime//'_n', iIter
        else
           call get_time_string(SPTime, StringTime(1:8))
-          write(NameOut,'(a,i6.6)')  &
+          write(NameOut,'(a,i6.6)') &
                trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
        end if
     end if

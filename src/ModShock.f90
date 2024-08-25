@@ -5,10 +5,10 @@ module SP_ModShock
 
   ! This module contains subroutines for determining the shock location,
   ! and steepening the density and magnetic field strength at shock front.
-  use SP_ModGrid,      ONLY: nLine, Used_B, nVertex_B, &
+  use SP_ModGrid,   ONLY: nLine, nLineAll, Used_B, nVertex_B, &
        State_VIB, MhData_VIB, iShock_IB, NoShock_, Shock_, ShockOld_
-  use SP_ModSize,      ONLY: nVertexMax
-  use ModUtilities,    ONLY: CON_stop
+  use SP_ModSize,   ONLY: nVertexMax
+  use ModUtilities, ONLY: CON_stop
 
   implicit none
 
@@ -32,6 +32,16 @@ module SP_ModShock
   ! Shock algorithm parameters:
   real,    public, parameter :: dLogRhoThreshold = 0.01
   integer, public, parameter :: nShockWidth = 50
+
+  ! Parameters for the shock coordinates
+  integer, parameter :: RShock_ = 1, LonShock_ = 2, LatShock_ = 3
+  ! Shock skeleton for visualization
+  real,    public, allocatable :: XyzShockEffUnit_DG(:, :)
+  ! Arrays to construct a triangular mesh on a sphere
+  logical, public :: IsShockTriMade = .false.
+  integer, public :: nShockTriMesh, lidShockTri, ridShockTri
+  integer, public, allocatable :: &
+       iListShock_I(:), iPointerShock_I(:), iEndShock_I(:)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -61,6 +71,10 @@ contains
     if(allocated(divU_II)) deallocate(divU_II)
     allocate(divU_II(1:nVertexMax, 1:nLine))
     call check_allocate(iError, 'divU_II')
+
+    if(allocated(XyzShockEffUnit_DG)) deallocate(XyzShockEffUnit_DG)
+    allocate(XyzShockEffUnit_DG(RShock_:LatShock_, 1:nLineAll+2))
+    call check_allocate(iError, 'XyzShockEffUnit_DG')
 
   end subroutine init
   !============================================================================
@@ -258,7 +272,7 @@ contains
     use ModCoordTransform,       ONLY: xyz_to_rlonlat
     use ModMpi
     use ModTriangulateSpherical, ONLY: trmesh
-    use SP_ModGrid,              ONLY: nLineAll, iLineAll0, X_, Y_, Z_
+    use SP_ModGrid,              ONLY: iLineAll0, X_, Y_, Z_
     use SP_ModProc,              ONLY: iComm, nProc, iProc, iError
     use SP_ModSatellite,         ONLY: UsePoleTri
     use SP_ModUnit,              ONLY: Io2Si_V, UnitX_
@@ -266,19 +280,11 @@ contains
     ! Effective points for the shock surface
     integer :: nShockEff
     integer :: iShockEff_I(1:nLineAll)
-    ! Parameters for the shock coordinates
-    integer, parameter :: RShock_ = 1, LonShock_ = 2, LatShock_ = 3
     ! Spatial coordinates of the field lines
     real, dimension(X_:Z_, 1:nLineAll) :: XyzShockUnit_DG
     real, dimension(RShock_:LatShock_, 1:nLineAll) :: rlonlatShock_DG
-    real, dimension(RShock_:LatShock_, 1:nLineAll+2) :: XyzShockEffUnit_DG
-
     ! Loop variables
     integer :: iLine, iLineAll, iShockEff
-    ! Arrays to construct a triangular mesh on a sphere
-    integer :: nShockTriMesh, lidShockTri, ridShockTri
-    integer, allocatable :: iListShock_I(:), iPointerShock_I(:), iEndShock_I(:)
-    logical :: IsShockTriMade = .false.
 
     character(len=*), parameter:: NameSub = 'get_shock_skeleton'
     !--------------------------------------------------------------------------
