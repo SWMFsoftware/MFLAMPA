@@ -156,10 +156,6 @@ module SP_ModGrid
 
   ! Test position and momentum
   integer, public :: iPTest = 1, iParticleTest = 99, iNodeTest = 1
-
-  ! If we use poles in triangulation
-  logical, public:: UsePoleTri   = .false.
-  logical, public:: UsePlanarTri = .true.
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -218,11 +214,6 @@ contains
        call read_var('iNodeTest',     iNodeTest)
        call read_var('iParticleTest', iParticleTest)
        call read_var('iPTest',        iPTest)
-    case('#TRIANGULATION')
-       ! get pole triangulartion flag
-       call read_var('UsePoleTriangulation', UsePoleTri)
-       ! get the triangulation approach flag
-       call read_var('UsePlanarTriangles', UsePlanarTri)
     case default
        call CON_stop(NameSub//' Unknown command '//NameCommand)
     end select

@@ -15,6 +15,7 @@ module SP_ModSatellite
   private ! Except
 
   public:: read_param                 ! read satellite-related parameters
+  public:: init                       ! Initialize for satellite triangulation
   public:: read_satellite_input_files ! read satellite trajectories
   public:: set_satellite_positions    ! set satellite positions
 
@@ -47,6 +48,16 @@ module SP_ModSatellite
 
   ! Unlike ModSatellite in BATSRUS, here the saveplot frequencyis controlled
   ! by #NOUTPUT in SP_ModPlot so we do not read StartTime/EndTime/DtTraj.
+
+  ! If we use poles in triangulation
+  logical, public :: UsePoleTri   = .false.
+  logical, public :: UsePlanarTri = .true.
+  real,    public, parameter :: iSouthPoleTri_ = -1, iNorthPoleTri_ = -2
+
+  ! Variables for interpolation in a triangular mesh
+  logical, public, allocatable :: IsTriangleFoundSat_I(:) ! if we find tri.
+  integer, public, allocatable :: iStencilOrigSat_II(:,:) ! orig. sat stencils
+  real,    public, allocatable :: WeightSat_II(:,:) ! weights for interpolation
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -89,6 +100,11 @@ contains
           if(l2+1 <= 0) l2 = len_trim(NameFileSat_I(iSat))
           NameSat_I(iSat) = NameFileSat_I(iSat)(l1:l2)
        end do
+    case('#TRIANGULATION')
+       ! get pole triangulartion flag
+       call read_var('UsePoleTriangulation', UsePoleTri)
+       ! get the triangulation approach flag
+       call read_var('UsePlanarTriangles', UsePlanarTri)
     case default
        call CON_stop(NameSub//' unknown command='//NameCommand)
     end select
@@ -96,6 +112,22 @@ contains
     call test_stop(NameSub, DoTest)
 
   end subroutine read_param
+  !============================================================================
+  subroutine init
+    ! Initialize arrays for satellite triangulation
+
+    use SP_ModSize, ONLY: nDim
+    !--------------------------------------------------------------------------
+    if(.not.UseSatellite) RETURN
+
+    if(allocated(IsTriangleFoundSat_I)) deallocate(IsTriangleFoundSat_I)
+    allocate(IsTriangleFoundSat_I(nSat))
+    if(allocated(iStencilOrigSat_II)) deallocate(iStencilOrigSat_II)
+    allocate(iStencilOrigSat_II(nDim, nSat))
+    if(allocated(WeightSat_II)) deallocate(WeightSat_II)
+    allocate(WeightSat_II(nDim, nSat))
+
+  end subroutine init
   !============================================================================
   subroutine read_satellite_input_files
 

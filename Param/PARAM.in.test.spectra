@@ -93,7 +93,7 @@ HGR			TypeCoordSystem
 ../TRAJECTORY/solo.dat		NameTrajectoryFile
 
 #SAVEPLOT
-7			nFileOut
+8			nFileOut
 mh1d flux ascii		StringPlot
 mh2d flux ascii		StringPlot
 215.0			Radius

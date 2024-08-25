@@ -5,10 +5,10 @@ module SP_ModShock
 
   ! This module contains subroutines for determining the shock location,
   ! and steepening the density and magnetic field strength at shock front.
-  use SP_ModGrid,   ONLY: nLine, Used_B, nVertex_B, State_VIB, &
-       MhData_VIB, iShock_IB, NoShock_, Shock_, ShockOld_
-  use SP_ModSize,   ONLY: nVertexMax
-  use ModUtilities, ONLY: CON_stop
+  use SP_ModGrid,      ONLY: nLine, Used_B, nVertex_B, &
+       State_VIB, MhData_VIB, iShock_IB, NoShock_, Shock_, ShockOld_
+  use SP_ModSize,      ONLY: nVertexMax
+  use ModUtilities,    ONLY: CON_stop
 
   implicit none
 
@@ -258,9 +258,9 @@ contains
     use ModCoordTransform,       ONLY: xyz_to_rlonlat
     use ModMpi
     use ModTriangulateSpherical, ONLY: trmesh
-    use SP_ModGrid,              ONLY: nLineAll, iLineAll0, &
-         X_, Y_, Z_, UsePoleTri
+    use SP_ModGrid,              ONLY: nLineAll, iLineAll0, X_, Y_, Z_
     use SP_ModProc,              ONLY: iComm, nProc, iProc, iError
+    use SP_ModSatellite,         ONLY: UsePoleTri
     use SP_ModUnit,              ONLY: Io2Si_V, UnitX_
 
     ! Effective points for the shock surface
@@ -276,8 +276,9 @@ contains
     ! Loop variables
     integer :: iLine, iLineAll, iShockEff
     ! Arrays to construct a triangular mesh on a sphere
-    integer :: nTriMesh, lidTri, ridTri
-    integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
+    integer :: nShockTriMesh, lidShockTri, ridShockTri
+    integer, allocatable :: iListShock_I(:), iPointerShock_I(:), iEndShock_I(:)
+    logical :: IsShockTriMade = .false.
 
     character(len=*), parameter:: NameSub = 'get_shock_skeleton'
     !--------------------------------------------------------------------------
@@ -361,31 +362,44 @@ contains
     ! For poles
     if(UsePoleTri) then
        ! Add two grid nodes at the poles:
-       lidTri = 1
-       ridTri = nShockEff + 2
-       XyzShockEffUnit_DG(:, lidTri) = [0.0, 0.0, -1.0]
-       XyzShockEffUnit_DG(:, ridTri) = [0.0, 0.0, +1.0]
+       lidShockTri = 1
+       ridShockTri = nShockEff + 2
+       XyzShockEffUnit_DG(:, lidShockTri) = [0.0, 0.0, -1.0]
+       XyzShockEffUnit_DG(:, ridShockTri) = [0.0, 0.0, +1.0]
     else
-       lidTri = 2
-       ridTri = nShockEff + 1
+       lidShockTri = 2
+       ridShockTri = nShockEff + 1
     end if
 
-    nTriMesh = ridTri - lidTri + 1
-    ! Allocate and initialize arrays for triangulation and
-    ! interpolation; if allocated, first deallocate them
-    if(allocated(iList_I))    deallocate(iList_I)
-    if(allocated(iPointer_I)) deallocate(iPointer_I)
-    if(allocated(iEnd_I))     deallocate(iEnd_I)
-    allocate(iList_I(6*(nTriMesh-2)), &
-         iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
-    iList_I = 0; iPointer_I = 0; iEnd_I = 0
-    ! Construct the Triangular mesh used for interpolation
-    call trmesh(nTriMesh,                       &
-         XyzShockEffUnit_DG(X_, lidTri:ridTri), &
-         XyzShockEffUnit_DG(Y_, lidTri:ridTri), &
-         XyzShockEffUnit_DG(Z_, lidTri:ridTri), &
-         iList_I, iPointer_I, iEnd_I, iError)
-    if(iError /= 0) call CON_Stop(NameSub//': Triangilation failed.')
+    ! How many points get involved for mesh triangulation
+    nShockTriMesh = ridShockTri - lidShockTri + 1
+    if(nShockTriMesh >= 3) then
+       ! Enough points for mesh triangulation
+
+       ! Allocate and initialize arrays for triangulation and
+       ! interpolation; if allocated, first deallocate them
+       if(allocated(iListShock_I))    deallocate(iListShock_I)
+       if(allocated(iPointerShock_I)) deallocate(iPointerShock_I)
+       if(allocated(iEndShock_I))     deallocate(iEndShock_I)
+       allocate(iListShock_I(6*(nShockTriMesh-2)), &
+            iPointerShock_I(6*(nShockTriMesh-2)), &
+            iEndShock_I(nShockTriMesh))
+       iListShock_I = 0; iPointerShock_I = 0; iEndShock_I = 0
+
+       ! Construct the Triangular mesh used for interpolation
+       call trmesh(nShockTriMesh,                           &
+            XyzShockEffUnit_DG(X_, lidShockTri:ridShockTri), &
+            XyzShockEffUnit_DG(Y_, lidShockTri:ridShockTri), &
+            XyzShockEffUnit_DG(Z_, lidShockTri:ridShockTri), &
+            iListShock_I, iPointerShock_I, iEndShock_I, iError)
+       if(iError /= 0) call CON_Stop(NameSub//': Triangilation failed.')
+
+       ! Then we claim that we made mesh triangulation
+       IsShockTriMade = .true.
+    else
+       ! Not enough points for mesh triangulation
+       IsShockTriMade = .false.
+    end if
 
   end subroutine get_shock_skeleton
   !============================================================================

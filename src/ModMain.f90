@@ -80,8 +80,7 @@ contains
           if(IsStandAlone) CYCLE
           call read_param_origin
        case('#MOMENTUMGRID', '#PITCHANGLEGRID', '#CHECKGRIDSIZE', &
-            '#COORDSYSTEM', '#COORDINATESYSTEM', '#GRIDNODE', &
-            '#TESTPOS', '#TRIANGULATION')
+            '#COORDSYSTEM', '#COORDINATESYSTEM', '#GRIDNODE', '#TESTPOS')
           ! Currently we do not need '#DOSMOOTH'
           if(.not.IsFirstSession) CYCLE
           call read_param_grid(NameCommand)
@@ -105,7 +104,7 @@ contains
           call read_param_mhdata(NameCommand)
        case('#VERBOSE')
           call read_param_testfunc(NameCommand)
-       case('#SATELLITE')
+       case('#SATELLITE', '#TRIANGULATION')
           if(.not.IsFirstSession) CYCLE
           call read_param_satellite(NameCommand)
        case('#TRACESHOCK')
@@ -181,6 +180,7 @@ contains
     use SP_ModPlot,          ONLY: init_plot       => init
     use SP_ModReadMhData,    ONLY: init_mhdata     => init
     use SP_ModRestart,       ONLY: read_restart
+    use SP_ModSatellite,     ONLY: init_sat        => init
     use SP_ModShock,         ONLY: init_shock      => init
     use SP_ModTurbulence,    ONLY: init_turbulence => init, &
          UseTurbulentSpectrum
@@ -194,6 +194,8 @@ contains
        write(*,'(a)')'SP: initialize'
        write(*,'(a)')'SP: '
     end if
+    ! Initialize the stencils for satellites if needed
+    call init_sat
     ! Initialize the shock-relevant variables: divU
     call init_shock
     ! Initialize and convert energy units (eV, keV, MeV, GeV, TeV)
@@ -236,7 +238,8 @@ contains
     use SP_ModReadMhData,    ONLY: read_mh_data
     use SP_ModRestart,       ONLY: check_save_restart
     use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
-    use SP_ModShock,         ONLY: DoTraceShock, get_divU, get_shock_location
+    use SP_ModShock,         ONLY: DoTraceShock, get_divU, &
+         get_shock_location, get_shock_skeleton
     use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
@@ -282,6 +285,7 @@ contains
        if(DoTraceShock) then
           call get_divU
           call get_shock_location
+          call get_shock_skeleton
        end if
        ! run the model
        if(DoRun) call advance(min(DataInputTime, TimeLimit))

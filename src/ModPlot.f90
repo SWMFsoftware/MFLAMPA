@@ -1901,9 +1901,11 @@ contains
       use ModCoordTransform,       ONLY: xyz_to_rlonlat
       use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
            find_triangle_orig, find_triangle_sph
-      use SP_ModGrid,              ONLY: UsePoleTri, UsePlanarTri
-      use SP_ModSatellite,         ONLY: nSat, XyzSat_DI, NameSat_I, &
-           NameFileSat_I, set_satellite_positions, DoTrackSatellite_I
+      use SP_ModSatellite,         ONLY: nSat, NameFileSat_I, &
+           NameSat_I, XyzSat_DI, set_satellite_positions,     &
+           DoTrackSatellite_I, UsePoleTri, UsePlanarTri,      &
+           iSouthPoleTri_, iNorthPoleTri_, WeightSat_II,      &
+           IsTriangleFoundSat_I, iStencilOrigSat_II
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -1917,6 +1919,8 @@ contains
       real    :: rSat, LonSat, LatSat
       ! interpolation weight (in radial direction)
       real    :: Weight
+      ! index of particle just above the radius
+      integer :: iAbove
       ! skip a field line not reaching radius of output sphere
       logical :: DoReachR_I(nLineAll)
 
@@ -1924,14 +1928,13 @@ contains
       integer :: iLine, iSat, iMu, i
       ! indexes of corresponding node, latitude and longitude
       integer :: iLineAll
-      ! index of particle just above the radius
-      integer :: iAbove
       ! xyz coordinates of all intersection point or average direction
       real    :: XyzUnit_DI(X_:Z_, nLineAll)
       real    :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
       ! useful intersection points on a unit sphere
       ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
       real    :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
+      integer :: iLineReach_I(1:nLineAll+2)
       integer :: iReachR, nReachR
       real    :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
       ! arrays to construct a triangular mesh on a sphere
@@ -1990,7 +1993,7 @@ contains
          ! reset the output buffer, coordinates, flags, and log(Distribution)
          File_I(iFile) % Buffer_II = 0.0
          XyzUnit_DI = 0.0; Log10DistR_IIB = 0.0
-         DoReachR_I = .false.
+         DoReachR_I = .false.; iLineReach_I = 0
          XyzReachRUnit_DI = 0.0; Log10DistReachR_IIB = 0.0
 
          ! If we can track the satellite: we do triangulation and interpolation
@@ -2052,6 +2055,9 @@ contains
                if(nReachR == nLineAll) then
                   ! For most cases, the satellite used falls in 1.1-240 AU
                   XyzReachRUnit_DI(:, 2:nLineAll+1) = XyzUnit_DI
+                  do iLineAll = 1, nLineAll
+                     iLineReach_I(iLineAll+1) = iLineAll
+                  end do
                   Log10DistReachR_IIB(:, :, 2:nLineAll+1) = Log10DistR_IIB
                else
                   ! Otherwise, we will spend some time reorganizing the points
@@ -2060,6 +2066,7 @@ contains
                      if(DoReachR_I(iLineAll)) then
                         iReachR = iReachR + 1
                         XyzReachRUnit_DI(:, iReachR) = XyzUnit_DI(:, iLineAll)
+                        iLineReach_I(iReachR) = iLineAll
                         Log10DistReachR_IIB(:, :, iReachR) = &
                              Log10DistR_IIB(:, :, iLineAll)
                      end if
@@ -2070,6 +2077,8 @@ contains
             ! Broadcast the coordinates and flags to all processors
             call MPI_BCAST(XyzReachRUnit_DI, 3*(nLineAll+2), &
                  MPI_REAL, 0, iComm, iError)
+            call MPI_BCAST(iLineReach_I, nLineAll+2, &
+                 MPI_INTEGER, 0, iComm, iError)
             call MPI_BCAST(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
                  MPI_REAL, 0, iComm, iError)
             call MPI_BCAST(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
@@ -2082,6 +2091,8 @@ contains
                ridTri = nReachR + 2
                XyzReachRUnit_DI(:, lidTri) = [0.0, 0.0, -1.0]
                XyzReachRUnit_DI(:, ridTri) = [0.0, 0.0, +1.0]
+               iLineReach_I(lidTri) = iSouthPoleTri_
+               iLineReach_I(ridTri) = iNorthPoleTri_
             else
                lidTri = 2
                ridTri = nReachR + 1
@@ -2130,6 +2141,15 @@ contains
                     XyzSat_DI(:, iSat), ' of ', trim(NameSat_I(iSat))
                EXIT TRI_INTERPOLATE
             end if
+
+            ! Save IsTriangleFound, iStencil, and Weights
+            IsTriangleFoundSat_I(iSat) = IsTriangleFound
+            do i = 1, 3
+               ! iStencil_I counts from lidTri
+               iStencilOrigSat_II(i, iSat) = &
+                    iLineReach_I(lidTri-1+iStencil_I(i))
+            end do
+            WeightSat_II(:, iSat) = Weight_I
 
             ! Fix states (log10 distribution) at the polar nodes
             if(UsePoleTri) then
