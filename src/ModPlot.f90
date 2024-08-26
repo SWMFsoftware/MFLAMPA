@@ -1355,7 +1355,7 @@ contains
 
       use SP_ModChannel,      ONLY: nFluxChannel, nFluxChannelSat, &
            FluxFirst_, FluxLast_, EFlux_, NameChannelSource_I,     &
-           EChannelLoIo_I, EChannelHiIo_I
+           EChannelLoIo_I, EChannelHiIo_I, EChannelMidIo_I
       use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
       use SP_ModUnit,         ONLY: NameEnergyFluxUnit
 
@@ -1378,11 +1378,13 @@ contains
            'MFLAMPA: all flux channels in MH_data; nFluxChannel=', &
            nFluxChannel, 'nFluxChannelSat=', nFluxChannelSat
       StringColumn = 'FluxChannel   ChannelSource   EnergyLow' // &
-           '   EnergyHigh   EnergyUnit   FluxChannelUnit'
+           '   EnergyHigh   EnergyGeoMean   EnergyUnit   FluxChannelUnit'
       ! set string format
       StringFormatEChannel = 'es12.4'
-      StringFormatLine = '(a14,1X,a12,1X,'//trim(StringFormatEChannel)//&
-           ',1X,'//trim(StringFormatEChannel)//',2X,a3,2X,a12)'
+      StringFormatLine = '(a14,1X,a12,1X,'// &
+           trim(StringFormatEChannel)//',1X,'// &
+           trim(StringFormatEChannel)//',1X,'// &
+           trim(StringFormatEChannel)//',4X,a3,3X,a12)'
 
       ! open the file
       call open_file(file=trim(NamePlotDir)//trim(NameEChannelFile), &
@@ -1395,6 +1397,7 @@ contains
       write(UnitTmp_,trim(StringFormatLine)) &
            trim(NameFluxChannel_I(Flux0_)), "General", &
            EnergyInjIo, EnergyMaxIo, &
+           sqrt(EnergyInjIo*EnergyMaxIo), &
            trim(NameEnergyUnit), trim(NameFluxUnit)
       ! write the flux channel list info, line by line
       do iFlux = FluxFirst_, FluxLast_
@@ -1402,12 +1405,14 @@ contains
               trim(NameFluxChannel_I(iFlux)), &
               trim(NameChannelSource_I(iFlux)), &
               EChannelLoIo_I(iFlux), EChannelHiIo_I(iFlux), &
+              EChannelMidIo_I(iFlux), &
               trim(NameEnergyUnit), trim(NameFluxUnit_I(iFlux))
       end do
       ! write eflux info
       write(UnitTmp_,trim(StringFormatLine)) &
            trim(NameFluxChannel_I(EFlux_)), "General", &
            EnergyInjIo, EnergyMaxIo, &
+           sqrt(EnergyInjIo*EnergyMaxIo), &
            trim(NameEnergyUnit), trim(NameEnergyFluxUnit)
 
       ! close the file
@@ -2599,7 +2604,7 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! timetag
-      character(len=15)  :: StringTime
+      character(len=15):: StringTime
 
       character(len=*), parameter:: NameSub = 'write_shock_2d'
       !------------------------------------------------------------------------
@@ -2638,7 +2643,7 @@ contains
       ! header of the output file
       character(len=500):: StringHeader
       ! timetag
-      character(len=15)  :: StringTime
+      character(len=15):: StringTime
       ! loop variables
       integer :: iLine
 
@@ -2654,7 +2659,7 @@ contains
            trim(File_I(iFile)%StringHeaderAux)
 
       ! at first call, remove files if they exist to reset time series output
-      if(File_I(iFile) % IsFirstCall)then
+      if(File_I(iFile) % IsFirstCall) then
          ! mark that the 1st call has already happened
          File_I(iFile) % IsFirstCall = .false.
          ! go over list of lines and remove file for each one

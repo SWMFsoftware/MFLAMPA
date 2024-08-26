@@ -39,19 +39,22 @@ module SP_ModChannel
      ! Satellite flux type
      integer:: iKindFlux
      ! Energy channels: Lo & Hi bounds, first in the unit of MeV
-     real, allocatable, dimension(:):: EChannelLoIo_I, EChannelHiIo_I
+     real, allocatable, dimension(:):: &
+          EChannelLoIo_I, &      ! Low bound
+          EChannelHiIo_I, &      ! High bound
+          EChannelMidIo_I        ! Middle value
   end type FluxChannelSat
 
   ! All plot files
   type(FluxChannelSat), public, allocatable :: FluxChannelSat_I(:)
   integer, parameter :: &
-       FluxChannelSELF_ = 0, & ! Self-defined
-       FluxChannelGOES_ = 1, & ! GOES
-       FluxChannelERNE_ = 2, & ! SOHO/ERNE
-       FluxChannelEPAM_ = 3    ! ACE/EPAM
+       FluxChannelSELF_ = 0, &   ! Self-defined
+       FluxChannelGOES_ = 1, &   ! GOES
+       FluxChannelERNE_ = 2, &   ! SOHO/ERNE
+       FluxChannelEPAM_ = 3      ! ACE/EPAM
   integer, parameter :: &
-       FluxInt_  = 1, &         ! Integral intensity
-       FluxDiff_ = 2            ! Differential intensity
+       FluxInt_  = 1, &          ! Integral intensity
+       FluxDiff_ = 2             ! Differential intensity
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_     = 0 ! Total particle flux
@@ -70,7 +73,8 @@ module SP_ModChannel
 
   ! Energy channels of the instrument, or defined by users
   integer, public, allocatable, dimension(:) :: EChannelType_I
-  real,    public, allocatable, dimension(:) :: EChannelLoIo_I, EChannelHiIo_I
+  real,    public, allocatable, dimension(:) :: &
+       EChannelLoIo_I, EChannelHiIo_I, EChannelMidIo_I
   ! Energy channel bin, for get_integral_flux
   real,            allocatable, dimension(:) :: InvEChannelBinIo_I
   ! Energy channel names and units
@@ -117,10 +121,12 @@ contains
        if(allocated(EChannelType_I)) deallocate(EChannelType_I)
        if(allocated(EChannelLoIo_I)) deallocate(EChannelLoIo_I)
        if(allocated(EChannelHiIo_I)) deallocate(EChannelHiIo_I)
+       if(allocated(EChannelMidIo_I)) deallocate(EChannelMidIo_I)
        if(allocated(NameChannelSource_I)) deallocate(NameChannelSource_I)
        allocate(EChannelType_I(FluxFirst_:FluxLast_), &
             EChannelLoIo_I(FluxFirst_:FluxLast_), &
             EChannelHiIo_I(FluxFirst_:FluxLast_), &
+            EChannelMidIo_I(FluxFirst_:FluxLast_), &
             NameChannelSource_I(FluxFirst_:FluxLast_))
        ! Get the input EChannelIo_I in the unit of MeV
        do iFlux = FluxFirst_, FluxLast_
@@ -150,6 +156,10 @@ contains
           if(EChannelHiIo_I(iFlux) < EChannelLoIo_I(iFlux)) &
                call CON_stop(NameSub // ": Energy channel upper bound" // &
                " should not be less than lower bound.")
+
+          ! 4) Get the temporary middle energy
+          EChannelMidIo_I(iFlux) = sqrt( &
+               EChannelLoIo_I(iFlux)*EChannelHiIo_I(iFlux))
 
           ! last but not least, name the flux channel source
           NameChannelSource_I(iFlux) = "Self-Defined"
@@ -212,7 +222,8 @@ contains
     ! Tmp VARs
     integer :: nFluxChannelTmp = 0
     integer, allocatable, dimension(:) :: EChannelTypeTmp_I
-    real,    allocatable, dimension(:) :: EChannelLoIoTmp_I, EChannelHiIoTmp_I
+    real,    allocatable, dimension(:) :: &
+         EChannelLoIoTmp_I, EChannelHiIoTmp_I, EChannelMidIoTmp_I
     character(len=20), allocatable, dimension(:) :: NameChannelSourceTmp_I
     ! local NameFluxChannel, saved the channel index
     character(len=2) :: NameFluxChannel
@@ -241,6 +252,7 @@ contains
             EChannelLoIo_I*cMeV*Si2Io_V(UnitEnergy_)))
        EChannelHiIo_I = MIN(EnergyMaxIo, MAX(KinEnergyIo_G(1), &
             EChannelHiIo_I*cMeV*Si2Io_V(UnitEnergy_)))
+       EChannelMidIo_I = sqrt(EChannelLoIo_I*EChannelHiIo_I)
     else
        ! No self-defined channels
        nFluxChannel = 0
@@ -268,13 +280,15 @@ contains
        allocate(NameChannelSourceTmp_I(FluxFirst_:nFluxChannelTmp), &
             EChannelTypeTmp_I(FluxFirst_:nFluxChannelTmp), &
             EChannelLoIoTmp_I(FluxFirst_:nFluxChannelTmp), &
-            EChannelHiIoTmp_I(FluxFirst_:nFluxChannelTmp))
+            EChannelHiIoTmp_I(FluxFirst_:nFluxChannelTmp), &
+            EChannelMidIoTmp_I(FluxFirst_:nFluxChannelTmp))
        NameChannelSourceTmp_I = NameChannelSource_I
        EChannelTypeTmp_I = EChannelType_I
        EChannelLoIoTmp_I = EChannelLoIo_I
        EChannelHiIoTmp_I = EChannelHiIo_I
+       EChannelMidIoTmp_I = EChannelMidIo_I
        deallocate(NameChannelSource_I, EChannelType_I, &
-            EChannelLoIo_I, EChannelHiIo_I)
+            EChannelLoIo_I, EChannelHiIo_I, EChannelMidIo_I)
     end if
 
     ! Next we initialize the details for nFluxChannelSat
@@ -290,12 +304,16 @@ contains
        ! Allocate the energy channels, names, and units
        ! Lower bound: from 0 => physical KinEnergyIo_G(1) in code
        ! Upper bound: to +\infty => physical EnergyMaxIo in code
+       ! Middle: geometric mean of lower and upper bound
        if(allocated(FluxChannelSat_I(iSat)%EChannelLoIo_I)) &
             deallocate(FluxChannelSat_I(iSat)%EChannelLoIo_I)
        allocate(FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_:FluxLastSat_))
        if(allocated(FluxChannelSat_I(iSat)%EChannelHiIo_I)) &
             deallocate(FluxChannelSat_I(iSat)%EChannelHiIo_I)
        allocate(FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_))
+       if(allocated(FluxChannelSat_I(iSat)%EChannelMidIo_I)) &
+            deallocate(FluxChannelSat_I(iSat)%EChannelMidIo_I)
+       allocate(FluxChannelSat_I(iSat)%EChannelMidIo_I(FluxFirst_:FluxLastSat_))
 
        ! Get the energy channels, names, and units (still in MeV now)
        select case(FluxChannelSat_I(iSat) % iKindSat)
@@ -330,6 +348,11 @@ contains
             MIN(EnergyMaxIo, MAX(KinEnergyIo_G(1), &
             FluxChannelSat_I(iSat)%EChannelHiIo_I*cMeV*Si2Io_V(UnitEnergy_)))
 
+       ! Get the middle energy
+       FluxChannelSat_I(iSat)%EChannelMidIo_I = sqrt( &
+            FluxChannelSat_I(iSat)%EChannelLoIo_I * &
+            FluxChannelSat_I(iSat)%EChannelHiIo_I)
+
        ! Finally sum for nFluxChannel
        nFluxChannel = nFluxChannel + FluxChannelSat_I(iSat)%nFluxChannel
     end do
@@ -344,7 +367,8 @@ contains
        allocate(NameChannelSource_I(FluxFirst_:FluxLast_), &
             EChannelType_I(FluxFirst_:FluxLast_), &
             EChannelLoIo_I(FluxFirst_:FluxLast_), &
-            EChannelHiIo_I(FluxFirst_:FluxLast_))
+            EChannelHiIo_I(FluxFirst_:FluxLast_), &
+            EChannelMidIo_I(FluxFirst_:FluxLast_))
 
        ! For the first a few channels: self-defined energy channels
        if(nFluxChannelTmp > 0) then
@@ -353,11 +377,12 @@ contains
           EChannelType_I(FluxFirst_:iFlux) = EChannelTypeTmp_I
           EChannelLoIo_I(FluxFirst_:iFlux) = EChannelLoIoTmp_I
           EChannelHiIo_I(FluxFirst_:iFlux) = EChannelHiIoTmp_I
+          EChannelMidIo_I(FluxFirst_:iFlux) = EChannelMidIoTmp_I
           ! Ready for the satellite energy channel assignments
           iFlux = iFlux + 1
 
           deallocate(NameChannelSourceTmp_I, EChannelTypeTmp_I, &
-               EChannelLoIoTmp_I, EChannelHiIoTmp_I)
+               EChannelLoIoTmp_I, EChannelHiIoTmp_I, EChannelMidIoTmp_I)
        else
           iFlux = FluxFirst_
        end if
@@ -376,6 +401,9 @@ contains
           EChannelHiIo_I(iFlux:iFlux-1+ &
                FluxChannelSat_I(iSat)%nFluxChannel) = &
                FluxChannelSat_I(iSat)%EChannelHiIo_I
+          EChannelMidIo_I(iFlux:iFlux-1+ &
+               FluxChannelSat_I(iSat)%nFluxChannel) = &
+               FluxChannelSat_I(iSat)%EChannelMidIo_I
           iFlux = iFlux + FluxChannelSat_I(iSat)%nFluxChannel
        end do
     end if
