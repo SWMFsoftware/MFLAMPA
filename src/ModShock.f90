@@ -6,7 +6,8 @@ module SP_ModShock
   ! This module contains subroutines for determining the shock location,
   ! and steepening the density and magnetic field strength at shock front.
   use SP_ModGrid,   ONLY: nLine, nLineAll, Used_B, nVertex_B, &
-       State_VIB, MhData_VIB, iShock_IB, NoShock_, Shock_, ShockOld_
+       NameVar_V, LagrID_, X_, Z_, State_VIB, MhData_VIB, &
+       iShock_IB, NoShock_, Shock_, ShockOld_
   use SP_ModSize,   ONLY: nVertexMax
   use ModUtilities, ONLY: CON_stop
 
@@ -33,8 +34,41 @@ module SP_ModShock
   real,    public, parameter :: dLogRhoThreshold = 0.01
   integer, public, parameter :: nShockWidth = 50
 
+  ! Information about the shock:
+  ! the Lagrangian Shock ID (0) and 3D (1:3) coordinates, and
+  integer, public, parameter:: & ! init length of segment 1-2:
+       LengthShock_ = 4          ! control appending new particles
+
   ! Parameters for the shock coordinates
-  integer, parameter :: RShock_ = 1, LonShock_ = 2, LatShock_ = 3
+  integer, public, parameter :: nShockVar = 7, &
+       ShockID_  = 0, & ! Shock index
+       XShock_   = 1, & ! Shock X coordinates
+       YShock_   = 2, & ! Shock Y coordinates
+       ZShock_   = 3, & ! Shock Z coordinates
+       RShock_   = 4, & ! Shock radial distance
+       LonShock_ = 5, & ! Shock longitude
+       LatShock_ = 6    ! Shock latitude
+
+  ! Shock variable names
+  character(len=10), public, parameter:: NameVarShock_V(ShockID_:LatShock_) &
+       = ['ShockID   ', &
+       'XShock    ', &
+       'YShock    ', &
+       'ZShock    ', &
+       'RShock    ', &
+       'LonShock  ', &
+       'LatShock  ']
+
+  ! Unit for all the shock variables: Length is in the unit of Rsun
+  character(len=6), public :: NameVarShockUnit_V(ShockID_:LatShock_) = [&
+       'none  ', &
+       'RSun  ', &
+       'RSun  ', &
+       'RSun  ', &
+       'RSun  ', &
+       'Deg   ', &
+       'Deg   ']
+
   ! Shock skeleton for visualization
   real,    public, allocatable :: XyzShockEffUnit_DG(:, :)
   ! Arrays to construct a triangular mesh on a sphere
@@ -272,7 +306,7 @@ contains
     use ModCoordTransform,       ONLY: xyz_to_rlonlat
     use ModMpi
     use ModTriangulateSpherical, ONLY: trmesh
-    use SP_ModGrid,              ONLY: iLineAll0, X_, Y_, Z_
+    use SP_ModGrid,              ONLY: iLineAll0
     use SP_ModProc,              ONLY: iComm, nProc, iProc, iError
     use SP_ModSatellite,         ONLY: UsePoleTri
     use SP_ModUnit,              ONLY: Io2Si_V, UnitX_
@@ -281,7 +315,7 @@ contains
     integer :: nShockEff
     integer :: iShockEff_I(1:nLineAll)
     ! Spatial coordinates of the field lines
-    real, dimension(X_:Z_, 1:nLineAll) :: XyzShockUnit_DG
+    real, dimension(XShock_:ZShock_, 1:nLineAll) :: XyzShockUnit_DG
     real, dimension(RShock_:LatShock_, 1:nLineAll) :: rlonlatShock_DG
     ! Loop variables
     integer :: iLine, iLineAll, iShockEff
@@ -306,16 +340,17 @@ contains
        ! Find how far shock has travelled on this line
        iShockEff_I(iLineAll) = iShock_IB(Shock_, iLine)
        ! Find the location of the shock front on this field line
-       XyzShockUnit_DG(:, iLineAll) = &
+       XyzShockUnit_DG(XShock_:ZShock_, iLineAll) = &
             MHData_VIB(X_:Z_, iShockEff_I(iLineAll), iLine)
        ! Transform to spherical coordinates
-       call xyz_to_rlonlat(XyzShockUnit_DG(:, iLineAll), &
+       call xyz_to_rlonlat(XyzShockUnit_DG(XShock_:ZShock_, iLineAll), &
             rlonlatShock_DG(RShock_,   iLineAll), &
             rlonlatShock_DG(LonShock_, iLineAll), &
             rlonlatShock_DG(LatShock_, iLineAll))
 
        ! Project to unit sphere
-       XyzShockUnit_DG(:, iLineAll) = XyzShockUnit_DG(:, iLineAll)/ &
+       XyzShockUnit_DG(XShock_:ZShock_, iLineAll) = &
+            XyzShockUnit_DG(XShock_:ZShock_, iLineAll)/ &
             rlonlatShock_DG(RShock_, iLineAll)
     end do LINE
     ! Check correctness
@@ -348,15 +383,15 @@ contains
     if(iProc == 0) then
        if(nShockEff == nLineAll) then
           ! for all field lines, we get the effective shock surface
-          XyzShockEffUnit_DG(:, 2:nLineAll+1) = XyzShockUnit_DG
+          XyzShockEffUnit_DG(XShock_:ZShock_, 2:nLineAll+1) = XyzShockUnit_DG
        else
           ! Otherwise, we will spend some time reorganizing the points
           iShockEff = 1
           do iLineAll = 1, nLineAll
              if(iShockEff_I(iLineAll) > 1) then
                 iShockEff = iShockEff + 1
-                XyzShockEffUnit_DG(:, iShockEff) = &
-                     XyzShockUnit_DG(:, iLineAll)
+                XyzShockEffUnit_DG(XShock_:ZShock_, iShockEff) = &
+                     XyzShockUnit_DG(XShock_:ZShock_, iLineAll)
              end if
           end do
        end if
@@ -370,8 +405,8 @@ contains
        ! Add two grid nodes at the poles:
        lidShockTri = 1
        ridShockTri = nShockEff + 2
-       XyzShockEffUnit_DG(:, lidShockTri) = [0.0, 0.0, -1.0]
-       XyzShockEffUnit_DG(:, ridShockTri) = [0.0, 0.0, +1.0]
+       XyzShockEffUnit_DG(XShock_:ZShock_, lidShockTri) = [0.0, 0.0, -1.0]
+       XyzShockEffUnit_DG(XShock_:ZShock_, ridShockTri) = [0.0, 0.0, +1.0]
     else
        lidShockTri = 2
        ridShockTri = nShockEff + 1
@@ -394,9 +429,9 @@ contains
 
        ! Construct the Triangular mesh used for interpolation
        call trmesh(nShockTriMesh,                           &
-            XyzShockEffUnit_DG(X_, lidShockTri:ridShockTri), &
-            XyzShockEffUnit_DG(Y_, lidShockTri:ridShockTri), &
-            XyzShockEffUnit_DG(Z_, lidShockTri:ridShockTri), &
+            XyzShockEffUnit_DG(XShock_, lidShockTri:ridShockTri), &
+            XyzShockEffUnit_DG(YShock_, lidShockTri:ridShockTri), &
+            XyzShockEffUnit_DG(ZShock_, lidShockTri:ridShockTri), &
             iListShock_I, iPointerShock_I, iEndShock_I, iError)
        if(iError /= 0) call CON_Stop(NameSub//': Triangilation failed.')
 

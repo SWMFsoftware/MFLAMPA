@@ -58,17 +58,18 @@ module SP_ModPlot
                                 ! Background mhd data
        MH1D_      = 0, & ! along each line
        MH2D_      = 1, & ! at given radius as Lon-Lat plot
-       MHTime_    = 2, & ! at given radius as time series for lines
+       MHTime_    = 2, & ! at given radius as time series for field lines
                                 ! Distribution
        Distr1D_   = 3, & ! along each line
        Distr2D_   = 4, & ! at given radius as Lon-Lat plot
-       DistrTime_ = 5, & ! at given radius as time series for lines
+       DistrTime_ = 5, & ! at given radius as time series for field lines
        DistrTraj_ = 6, & ! along the specified spacecraft trajectory
                                 ! Flux
        Flux2D_    = 7, & ! at a given radius on rectangular Lon-Lat grid
        FluxTime_  = 8, & ! at a given radius as time series on Lon-Lat grid
                                 ! Shock Skeleton
-       ShockSkeleton_ = 9! stencils at each time step
+       Shock2D_   = 9, & ! shock stencils as Lon-Lat plot at each time step
+       ShockTime_ = 10   ! shock stencils saved as time series for field lines
   ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
@@ -245,8 +246,10 @@ contains
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
-          case('shockskeleton')
-             File_I(iFile) % iKindData = ShockSkeleton_
+          case('shock2d')
+             File_I(iFile) % iKindData = Shock2D_
+          case('shocktime')
+             File_I(iFile) % iKindData = ShockTime_
           case default
              call CON_stop(NameSub//&
                   ": kind of data isn't properly set in PARAM.in")
@@ -381,8 +384,12 @@ contains
              File_I(iFile) % Lat = File_I(iFile) % Lat * cDegToRad
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
-          case(ShockSkeleton_)
+          case(Shock2D_)
              call process_shock
+          case(ShockTime_)
+             call process_shock
+             ! reset indicator of the first call
+             File_I(iFile) % IsFirstCall = .true.
           end select
        end do ! iPlot
        ! Check consistency: only 1 MH1D file can be requested
@@ -499,6 +506,7 @@ contains
 
       ! only 1 variable (at most) is printed
       !------------------------------------------------------------------------
+
       File_I(iFile) % nMhdVar = 0
       if(IsMuAvg) then
          ! Do not save Mu
@@ -627,11 +635,35 @@ contains
     subroutine process_shock
 
       ! process output parameters for shock skeleton
+      use SP_ModShock, ONLY: ShockID_, XShock_, YShock_, ZShock_, &
+           LengthShock_, NameVarShock_V, NameVarShockUnit_V
+      ! loop variables
+      integer :: iVar
+      ! only location and physical variables at the shock surface are printed
       !------------------------------------------------------------------------
-      File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot) // &
-           ' iListShock iPointerShock iEndShock'
-      File_I(iFile) % StringHeaderAux = &
-           trim(File_I(iFile) % StringHeaderAux) // ' [1] [1] [1]'
+      File_I(iFile) % nMhdVar = 0
+      File_I(iFile) % nExtraVar = LengthShock_
+
+      ! reset
+      File_I(iFile) % DoPlot_V   = .false.
+      File_I(iFile) % DoPlotFlux = .false.
+      File_I(iFile)%DoPlotSpread = .false.
+
+      ! Save X_:Z_ for Shock, and iShock
+      do iVar = ShockID_, ZShock_
+         File_I(iFile)%NameVarPlot = trim(File_I(iFile)%NameVarPlot) // &
+              trim(NameVarShock_V(iVar))
+         select case(File_I(iFile)%TypeFile)
+         case('tec', 'tcp')
+            File_I(iFile)%NameVarPlot = &
+                 trim(File_I(iFile)%NameVarPlot)//'_['//&
+                 trim(NameVarShockUnit_V(iVar))//']'
+         case default
+            File_I(iFile)%StringHeaderAux = &
+                 trim(File_I(iFile)%StringHeaderAux)//&
+                 ' '//trim(NameVarShockUnit_V(iVar))
+         end select
+      end do
 
     end subroutine process_shock
     !==========================================================================
@@ -829,8 +861,10 @@ contains
           call write_flux_2d
        case(FluxTime_)
           call write_flux_time
-       case(ShockSkeleton_)
-          call write_shock_skeleton
+       case(Shock2D_)
+          call write_shock_2d
+       case(ShockTime_)
+          call write_shock_time
        end select
     end do
   contains
@@ -1528,7 +1562,7 @@ contains
 
       ! write output with 2D Distribution in the format read by IDL/TECPLOT;
       ! separate file is created for each field line, and the name format is:
-      ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
+      ! Distr_<cdf/def/DEF>_R=<Radius [AU]>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -1695,7 +1729,7 @@ contains
 
       ! write output w/time series Distribution in format read by IDL/TECPLOT;
       ! separate file is created for each field line, and the name format is:
-      ! Distr_R=<Radius [AU]>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
+      ! Distr_<cdf/def/DEF>_R=<Radius [AU]>_<iLon>_<iLat>.{out/dat}
       ! the file has no timetag as it is updated during the run
 
       ! name of the output file
@@ -2551,7 +2585,7 @@ contains
 
     end subroutine write_flux_time
     !==========================================================================
-    subroutine write_shock_skeleton
+    subroutine write_shock_2d
 
       ! write output with shock surface skeleton in the format to
       ! be read and visualized by IDL/TECPLOT; name format is
@@ -2567,7 +2601,7 @@ contains
       ! timetag
       character(len=15)  :: StringTime
 
-      character(len=*), parameter:: NameSub = 'write_shock_skeleton'
+      character(len=*), parameter:: NameSub = 'write_shock_2d'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
       ! we only save the data for the first nLineAll processors.
@@ -2578,24 +2612,68 @@ contains
            'MFLAMPA: shock surface skeleton; '// &
            trim(File_I(iFile)%StringHeaderAux)
 
-      ! set the file name (not use make_file_name, not increse complexity)
-      write(NameFile,'(a)') trim(NameFile)//trim(NameMHData)//'_shock'
-      if(UseDateTime)then
-         call get_date_time_string(SPTime, StringTime)
-         write(NameFile,'(a,i6.6)') &
-              trim(NameFile)//'_e'//StringTime//'_n', iIter
-      else
-         call get_time_string(SPTime, StringTime(1:8))
-         write(NameFile,'(a,i6.6)') &
-              trim(NameFile)//'_t'//StringTime(1:8)//'_n', iIter
-      end if
-      write(NameFile,'(a)') trim(NameFile)// &
-         trim(File_I(iFile)%NameFileExtension)
+      ! set the file name
+      call make_file_shock_name( &
+           StringBase    = NameMHData,                      &
+           iIter         = iIter,                           &
+           NameExtension = File_I(iFile)%NameFileExtension, &
+           NameOut       = NameFile)
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0.0
 
-    end subroutine write_shock_skeleton
+    end subroutine write_shock_2d
+    !==========================================================================
+    subroutine write_shock_time
+
+      ! write output w/time series of the shock surface skeleton in the
+      ! format to be read and visualized by IDL/TECPLOT; name format is
+      ! MH_data_shock_<iLon>_<iLat>.{out/dat}
+
+      use SP_ModShock, ONLY: XyzShockEffUnit_DG, IsShockTriMade, &
+           nShockTriMesh, iListShock_I, iPointerShock_I, iEndShock_I
+
+      ! name of the output file
+      character(len=100):: NameFile
+      ! header of the output file
+      character(len=500):: StringHeader
+      ! timetag
+      character(len=15)  :: StringTime
+      ! loop variables
+      integer :: iLine
+
+      character(len=*), parameter:: NameSub = 'write_shock_time'
+      !------------------------------------------------------------------------
+      ! If there are more than one processors working on the same field line,
+      ! we only save the data for the first nLineAll processors.
+      if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
+
+      ! header for the output file
+      StringHeader = &
+           'MFLAMPA: shock surface evolved along a field line; '// &
+           trim(File_I(iFile)%StringHeaderAux)
+
+      ! at first call, remove files if they exist to reset time series output
+      if(File_I(iFile) % IsFirstCall)then
+         ! mark that the 1st call has already happened
+         File_I(iFile) % IsFirstCall = .false.
+         ! go over list of lines and remove file for each one
+         do iLine = 1, nLine
+            if(.not.Used_B(iLine)) CYCLE
+            ! set the file name
+            call make_file_shock_name( &
+                 StringBase    = NameMHData,                      &
+                 iLine         = iLine,                           &
+                 NameExtension = File_I(iFile)%NameFileExtension, &
+                 NameOut       = NameFile)
+            call remove_file(NameFile)
+         end do
+      end if
+
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0.0
+
+    end subroutine write_shock_time
     !==========================================================================
   end subroutine save_plot_all
   !============================================================================
@@ -2752,6 +2830,51 @@ contains
     write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)
 
   end subroutine make_file_name
+  !============================================================================
+  subroutine make_file_shock_name(StringBase, &
+       iLine, iIter, NameExtension, NameOut)
+
+    ! creates a string with file name for the shock and stores in NameOut;
+    ! result is as follows:
+    !   StringBase_Shock[_???_???][_t?_n?].NameExtension
+    ! parts in [] are written if present: Radius, iLineAll, iIter
+    use SP_ModGrid, ONLY: iblock_to_lon_lat
+    character(len=*),   intent(in) :: StringBase
+    integer, optional,  intent(in) :: iLine
+    integer, optional,  intent(in) :: iIter
+    character(len=*),   intent(in) :: NameExtension
+    character(len=100), intent(out):: NameOut
+
+    ! timetag
+    character(len=15)  :: StringTime
+    ! write format
+    character(len=100) :: StringFmt
+    ! lon, lat indexes corresponding to iLineAll
+    integer:: iLon, iLat
+
+    !--------------------------------------------------------------------------
+    write(NameOut,'(a)') trim(NamePlotDir)//trim(StringBase)//'_Shock'
+
+    if(present(iLine))then
+       call iblock_to_lon_lat(iLine, iLon, iLat)
+       write(NameOut,'(a,i3.3,a,i3.3)') trim(NameOut)//'_',iLon,'_',iLat
+    end if
+
+    if(present(iIter))then
+       if(UseDateTime)then
+          call get_date_time_string(SPTime, StringTime)
+          write(NameOut,'(a,i6.6)') &
+               trim(NameOut)//'_e'//StringTime//'_n', iIter
+       else
+          call get_time_string(SPTime, StringTime(1:8))
+          write(NameOut,'(a,i6.6)') &
+               trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
+       end if
+    end if
+
+    write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)
+
+  end subroutine make_file_shock_name
   !============================================================================
 end module SP_ModPlot
 !==============================================================================
