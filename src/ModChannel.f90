@@ -40,21 +40,43 @@ module SP_ModChannel
      integer:: iKindFlux
      ! Energy channels: Lo & Hi bounds, first in the unit of MeV
      real, allocatable, dimension(:):: &
-          EChannelLoIo_I, &      ! Low bound
-          EChannelHiIo_I, &      ! High bound
-          EChannelMidIo_I        ! Middle value
+          EChannelLoIo_I, &   ! Low bound
+          EChannelHiIo_I, &   ! High bound
+          EChannelMidIo_I     ! Middle value
   end type FluxChannelSat
 
   ! All plot files
   type(FluxChannelSat), public, allocatable :: FluxChannelSat_I(:)
   integer, parameter :: &
-       FluxChannelSELF_ = 0, &   ! Self-defined
-       FluxChannelGOES_ = 1, &   ! GOES
-       FluxChannelERNE_ = 2, &   ! SOHO/ERNE
-       FluxChannelEPAM_ = 3      ! ACE/EPAM
+       FluxChannelSELF_      =  0, &  ! Self-defined
+       FluxChannelGOESInt_   =  1, &  ! GOES integral flux
+       FluxChannelGOES08_    =  2, &  ! GOES-08 differential flux
+       FluxChannelGOES08S14_ =  3, &  ! GOES-08 differential flux, calibrated
+       FluxChannelGOES10_    =  4, &  ! GOES-10 differential flux
+       FluxChannelGOES11_    =  5, &  ! GOES-11 differential flux
+       FluxChannelGOES11S14_ =  6, &  ! GOES-11 differential flux, calibrated
+       FluxChannelGOES12_    =  7, &  ! GOES-12 differential flux
+       FluxChannelGOES13_    =  8, &  ! GOES-13 differential flux
+       FluxChannelGOES13S14_ =  9, &  ! GOES-13 differential flux, calibrated
+       FluxChannelGOES13B17_ = 10, &  ! GOES-13 differential flux, calibrated
+       FluxChannelGOES14_    = 11, &  ! GOES-14 differential flux
+       FluxChannelGOES14S14_ = 12, &  ! GOES-14 differential flux, calibrated
+       FluxChannelGOES15_    = 13, &  ! GOES-15 differential flux
+       FluxChannelGOES15S14_ = 14, &  ! GOES-15 differential flux, calibrated
+       FluxChannelGOES15B17_ = 15, &  ! GOES-15 differential flux, calibrated
+       FluxChannelGOES16_    = 16, &  ! GOES-16 differential flux
+       FluxChannelGOES17_    = 17, &  ! GOES-17 differential flux
+       FluxChannelGOES18_    = 18, &  ! GOES-18 differential flux
+       FluxChannelERNE_      = 19, &  ! SOHO/ERNE
+       FluxChannelEPHIN_     = 20, &  ! SOHO/EPHIN
+       FluxChannelEPAM_      = 21, &  ! ACE/EPAM
+       FluxChannelGME_       = 22, &  ! IMP-8/GME
+       FluxChannelLET_       = 23, &  ! STEREO-A/B LET
+       FluxChannelHET_       = 24, &  ! STEREO-A/B HET
+       FluxChannelSEPT_      = 25     ! STEREO-A/B SEPT
   integer, parameter :: &
-       FluxInt_  = 1, &          ! Integral intensity
-       FluxDiff_ = 2             ! Differential intensity
+       FluxInt_  = 1, &    ! Integral intensity
+       FluxDiff_ = 2       ! Differential intensity
 
   ! Total integral (simulated) particle flux
   integer, parameter, public :: Flux0_     = 0 ! Total particle flux
@@ -186,15 +208,81 @@ contains
           FluxChannelSat_I(iSat) % NameSat = trim(NameSat)
 
           select case(trim(FluxChannelSat_I(iSat) % NameSat))
-          case('GOES')
-             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES_
+          case('GOES', 'GOES_Int', 'GOES_Integral')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOESInt_
              FluxChannelSat_I(iSat) % nFluxChannel = 6
+          case('GOES-08', 'GOES-08_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES08_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-08S14', 'GOES-08S14_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES08S14_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-10', 'GOES-10_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES10_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-11', 'GOES-11_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES11_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-11S14', 'GOES-11S14_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES11S14_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-12', 'GOES-12_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES12_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-13', 'GOES-13_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES13_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-13S14', 'GOES-13S14_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES13S14_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-13B17', 'GOES-13B17_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES13B17_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-14', 'GOES-14_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES14_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-14S14', 'GOES-14_S14Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES14S14_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-15', 'GOES-15_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES15_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-15S14', 'GOES-15S14_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES15S14_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-15B17', 'GOES-15B17_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES15B17_
+             FluxChannelSat_I(iSat) % nFluxChannel = 10
+          case('GOES-16', 'GOES-16_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES16_
+             FluxChannelSat_I(iSat) % nFluxChannel = 14
+          case('GOES-17', 'GOES-17_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES17_
+             FluxChannelSat_I(iSat) % nFluxChannel = 14
+          case('GOES-18', 'GOES-18_Differential')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGOES18_
+             FluxChannelSat_I(iSat) % nFluxChannel = 14
           case('ERNE', 'SOHO/ERNE')
              FluxChannelSat_I(iSat) % iKindSat = FluxChannelERNE_
              FluxChannelSat_I(iSat) % nFluxChannel = 20
+          case('EPHIN', 'SOHO/EPHIN')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelEPHIN_
+             FluxChannelSat_I(iSat) % nFluxChannel = 4
           case('EPAM', 'ACE/EPAM')
              FluxChannelSat_I(iSat) % iKindSat = FluxChannelEPAM_
              FluxChannelSat_I(iSat) % nFluxChannel = 8
+          case('GME', 'IMP8/GME', 'IMP-8/GME')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelGME_
+             FluxChannelSat_I(iSat) % nFluxChannel = 30
+          case('LET', 'STAB/LET')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelLET_
+             FluxChannelSat_I(iSat) % nFluxChannel = 12
+          case('HET', 'STAB/HET')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelHET_
+             FluxChannelSat_I(iSat) % nFluxChannel = 11
+          case('SEPT', 'STAB/SEPT')
+             FluxChannelSat_I(iSat) % iKindSat = FluxChannelSEPT_
+             FluxChannelSat_I(iSat) % nFluxChannel = 32
           case default
              FluxChannelSat_I(iSat) % iKindSat = -1
              FluxChannelSat_I(iSat) % nFluxChannel = 0
@@ -268,7 +356,7 @@ contains
        if(.not.allocated(FluxChannelSat_I) .and. nFluxChannelSat>0) then
           allocate(FluxChannelSat_I(1:nFluxChannelSat))
           FluxChannelSat_I(1) % NameSat = 'GOES'
-          FluxChannelSat_I(1) % iKindSat = FluxChannelGOES_
+          FluxChannelSat_I(1) % iKindSat = FluxChannelGOESInt_
           FluxChannelSat_I(1) % nFluxChannel = 6
        end if
     end if
@@ -317,12 +405,78 @@ contains
 
        ! Get the energy channels, names, and units (still in MeV now)
        select case(FluxChannelSat_I(iSat) % iKindSat)
-       case(FluxChannelGOES_)
+       case(FluxChannelGOESInt_)
+          ! GOES nominal integral flux
           FluxChannelSat_I(iSat)%iKindFlux = FluxInt_
           FluxChannelSat_I(iSat)%EChannelLoIo_I = [5, 10, 30, 50, 60, 100]
           FluxChannelSat_I(iSat)%EChannelHiIo_I = &
                EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV
+       case(FluxChannelGOES08_, FluxChannelGOES10_, &
+            FluxChannelGOES11_, FluxChannelGOES12_)
+          ! GOES-08, 10, 11, and 12 differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [4.0, 9.0, 15.0, 40.0, &
+               80.0, 165.0, 350.0, 420.0, 510.0, 700.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [9.0, 15.0, 44.0, 80.0, &
+               165.0, 500.0, 420.0, 510.0, 700.0, &
+               EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV]
+       case(FluxChannelGOES08S14_)
+          ! GOES-08 calibrated differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [4.0, 7.4, 13.3, 37.0, &
+               91.5, 119.0, 350.0, 420.0, 510.0, 700.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [7.9, 15.0, 21.3, 53.6, &
+               113.0, 179.0, 420.0, 510.0, 700.0, &
+               EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV]
+       case(FluxChannelGOES11S14_)
+          ! GOES-11 calibrated differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [5.0, 9.4, 16.7, 32.5, &
+               89.8, 120.0, 350.0, 420.0, 510.0, 700.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [7.9, 15.9, 23.2, 56.4, &
+               114.0, 186.0, 420.0, 510.0, 700.0, &
+               EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV]
+       case(FluxChannelGOES13_, FluxChannelGOES14_, FluxChannelGOES15_)
+          ! GOES-13, 14, and 15 differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [4.2, 8.7, 15.0, 38.0, &
+               84.0, 110.0, 330.0, 420.0, 510.0, 700.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [8.7, 14.5, 40.0, 82.0, &
+               200.0, 900.0, 420.0, 510.0, 700.0, &
+               EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV]
+       case(FluxChannelGOES13S14_, FluxChannelGOES14S14_, &
+            FluxChannelGOES15S14_)
+          ! GOES-13, 14, and 15 calibrated differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [5.0, 9.4, 16.7, 32.5, &
+               89.8, 120.0, 330.0, 420.0, 510.0, 700.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [7.9, 15.9, 23.2, 56.4, &
+               114.0, 186.0, 420.0, 510.0, 700.0, &
+               EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV]
+       case(FluxChannelGOES13B17_)
+          ! GOES-13 calibrated (Bruno 17) differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [5.0, 9.4, 16.7, 32.5, &
+               93.3, 146.7, 273.9, 330.0, 418.7, 852.6]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [7.9, 15.9, 23.2, 56.4, &
+               129.1, 205.6, 387.5, 458.0, 566.0, 1081.2]
+       case(FluxChannelGOES15B17_)
+          ! GOES-15 calibrated (Bruno 17) differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [5.0, 9.4, 16.7, 32.5, &
+               97.9, 145.0, 240.4, 325.3, 420.4, 878.6]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [7.9, 15.9, 23.2, 56.4, &
+               135.3, 202.3, 335.6, 464.6, 573.1, 1230.0]
+       case(FluxChannelGOES16_, FluxChannelGOES17_, FluxChannelGOES18_)
+          ! GOES-16, 17, and 18 differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [1.02, 1.9, 2.31, 3.4, &
+               5.84, 11.64, 24.9, 40.3, 83.7, 99.9, 115.0, 160.0, 276.0, 500.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [1.86, 2.3, 3.34, 6.48, &
+               11.0, 23.27, 38.1, 73.4, 98.5, 118.0, 143.0, 242.0, 404.0, &
+               EnergyMaxIo*Io2Si_V(UnitEnergy_)/cMeV]
        case(FluxChannelERNE_)
+          ! SOHO/ERNE (LED + HED) differential flux
           FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
           FluxChannelSat_I(iSat)%EChannelLoIo_I = [1.3, 1.6, 2.0, 2.5, &
                3.2, 4.0, 5.0, 6.4, 8.0, 10.0, 13.0, 16.0, 20.0, 25.0, &
@@ -330,13 +484,58 @@ contains
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
                FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 130.0
-       case(FluxChannelEPAM_)
+       case(FluxChannelEPHIN_)
+          ! SOHO/EPHIN differential flux
           FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
-          FluxChannelSat_I(iSat)%EChannelLoIo_I = &
-               [0.046, 0.067, 0.115, 0.193, 0.315, 0.580, 1.06, 1.88]
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [4.3, 7.8, 25.0, 40.9]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
+               FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
+          FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 53.0
+       case(FluxChannelEPAM_)
+          ! ACE/EPRM differential flux for protons
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [0.046, 0.067, 0.115, &
+               0.193, 0.315, 0.580, 1.06, 1.88]
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
                FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
           FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 4.70
+       case(FluxChannelGME_)
+          ! IMP-8/GME (LED + MED) differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [0.88, 1.15, 1.43, 1.79, &
+               2.27, 3.03, 4.20, 4.94, 5.96, 7.25, 8.65, 11.1, 13.6, 16.1, &
+               18.7, 19.8, 24.2, 28.7, 35.2, 42.9, 51.0, 63.2, 87.0, 92.5, &
+               107.0, 121.0, 154.0, 178.0, 230.0, 327.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [1.15, 1.43, 1.79, 2.27, &
+               3.03, 4.20, 4.94, 5.96, 7.25, 8.64, 11.1, 13.6, 16.1, 18.7, &
+               22.5, 24.2, 28.7, 35.2, 42.9, 51.0, 63.2, 81.0, 92.5, 107.0, &
+               121.0, 154.0, 178.0, 230.0, 327.0, 485.0]
+       case(FluxChannelLET_)
+          ! STEREO-AB/LET differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [1.8, 2.2, 2.7, 3.2, &
+               3.6, 4.0, 4.5, 5.0, 6.0, 8.0, 10.0, 12.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
+               FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
+          FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 15.0
+       case(FluxChannelHET_)
+          ! STEREO-AB/HET differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [13.6, 14.9, 17.0, 20.8, &
+               23.8, 26.3, 29.5, 33.4, 35.5, 40.0, 60.0]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I = [15.1, 17.1, 19.3, 23.8, &
+               26.4, 29.7, 33.4, 35.8, 40.5, 60.0, 100.0]
+       case(FluxChannelSEPT_)
+          ! STEREO-AB/SEPT differential flux
+          FluxChannelSat_I(iSat)%iKindFlux = FluxDiff_
+          FluxChannelSat_I(iSat)%EChannelLoIo_I = [0.0258, 0.0546, 0.0838, &
+               0.0926, 0.101, 0.109, 0.121, 0.137, 0.155, 0.174, 0.195, &
+               0.219, 0.246, 0.275, 0.311, 0.350, 0.391, 0.439, 0.495, &
+               0.556, 0.623, 0.701, 0.786, 0.853, 0.902, 1.046, 1.248, &
+               1.402, 1.577, 1.767, 1.982, 2.510]
+          FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxFirst_:FluxLastSat_-1) = &
+               FluxChannelSat_I(iSat)%EChannelLoIo_I(FluxFirst_+1:FluxLastSat_)
+          FluxChannelSat_I(iSat)%EChannelHiIo_I(FluxLastSat_) = 3.586
        end select
 
        ! Convert energy channel units: MeV to SI to Io, and the lower
