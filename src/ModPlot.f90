@@ -771,11 +771,11 @@ contains
        case(Shock2D_)
           ! extra space reserved for line index
           allocate(File_I(iFile) % Buffer_II( &
-               File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar, 1:nLineAll, 1))
+               File_I(iFile)%nExtraVar, 1:nLineAll, 1))
        case(ShockTime_)
           ! extra space reserved for line index
           allocate(File_I(iFile) % Buffer_II( &
-               File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar, 1, 1))
+               1+File_I(iFile)%nExtraVar, 1, 1))
        end select
     end do
 
@@ -956,6 +956,8 @@ contains
       nMhdVar   = File_I(iFile) % nMhdVar
       nExtraVar = File_I(iFile) % nExtraVar
       nFluxVar  = File_I(iFile) % nFluxVar
+
+      ! header for the output file
       StringHeader = 'MFLAMPA: data along a field line; '//&
            'Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
@@ -1015,7 +1017,7 @@ contains
               File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar, &
               1:iEnd, 1),&
               ParamIn_I     = Param_I(LagrID_:StartJulian_))
-      end do
+      end do !  iLine
 
     end subroutine write_mh_1d
     !==========================================================================
@@ -1352,6 +1354,7 @@ contains
          Param_I(StartTime_)  = StartTime
          ! start time in Julian date
          Param_I(StartJulian_)= StartTimeJulian
+
          ! reprint data to file
          call save_plot_file(&
               NameFile      = NameFile, &
@@ -1370,7 +1373,7 @@ contains
               VarIn_VI      = &
               File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar, &
               1:nDataLine, 1))
-      end do
+      end do !  iLine
 
     end subroutine write_mh_time
     !==========================================================================
@@ -1584,7 +1587,7 @@ contains
                  VarIn_III      = &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:iEnd))
          end if
-      end do
+      end do !  iLine
 
     end subroutine write_distr_1d
     !==========================================================================
@@ -1669,7 +1672,7 @@ contains
          File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, iLineAll) = log10( &
               Distribution_CB(0:nP+1, 1:nMu, iAbove-1, iLine) * (1-Weight) + &
               Distribution_CB(0:nP+1, 1:nMu, iAbove,   iLine) *    Weight)
-      end do
+      end do !  iLine
 
       ! account for the requested output, only on the source processor
       if(iProc==0)then
@@ -1963,7 +1966,7 @@ contains
          end if
          ! may need to deallocate SPTime_I
          if(allocated(SPTime_I)) deallocate(SPTime_I)
-      end do
+      end do !  iLine
 
     end subroutine write_distr_time
     !==========================================================================
@@ -2102,7 +2105,7 @@ contains
                Log10DistR_IIB(:, :, iLineAll) = ( &
                     log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
                     log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
-            end do LINE
+            end do LINE !  iLine
 
             ! Gather interpolated coordinates on the source processor
             if(nProc > 1) then
@@ -2388,7 +2391,7 @@ contains
                  Flux_VIB(Flux0_+iFlux-1, iAbove,   iLine) *    Weight  -   &
                  FluxChannelInit_V(Flux0_+iFlux-1))
          end do
-      end do
+      end do !  iLine
 
       ! gather interpolated data on the source processor
       if(nProc > 1)then
@@ -2560,7 +2563,7 @@ contains
               Flux_VIB(Flux0_:FluxMax_, iAbove-1, iLine) * (1-Weight) + &
               Flux_VIB(Flux0_:FluxMax_, iAbove,   iLine) *    Weight  - &
               FluxChannelInit_V(Flux0_:FluxMax_))
-      end do
+      end do !  iLine
 
       ! gather interpolated data on the source processor
       if(nProc > 1)then
@@ -2699,16 +2702,16 @@ contains
          end if
       end if
 
+      ! convert angles
+      File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
+           LatShock_-ShockID_+1], :, 1) = &
+           File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
+           LatShock_-ShockID_+1], :, 1) * cRadToDeg
+
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
       ! start time in Julian date
       Param_I(StartJulian_) = StartTimeJulian
-
-      ! convert angles
-      File_I(iFile) % Buffer_II( &
-           [LonShock_-ShockID_+1,LatShock_-ShockID_+1], :, 1) = &
-           File_I(iFile) % Buffer_II( &
-           [LonShock_-ShockID_+1,LatShock_-ShockID_+1], :, 1) * cRadToDeg
 
       ! print data to file
       if(iProc==0)&
@@ -2735,15 +2738,31 @@ contains
       ! format to be read and visualized by IDL/TECPLOT; name format is
       ! MH_data_shock_<iLon>_<iLat>.{out/dat}
 
-      use SP_ModShock, ONLY: XyzShockEffUnit_DG, IsShockTriMade, &
-           nShockTriMesh, iListShock_I, iPointerShock_I, iEndShock_I
+      use ModCoordTransform, ONLY: xyz_to_rlonlat
+      use SP_ModShock,       ONLY: ShockID_, XShock_, ZShock_, &
+           RShock_, LonShock_, LatShock_
 
       ! name of the output file
       character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer :: iLine
+      integer :: iLine, iVarPlot, iVarIndex
+      ! for better readability
+      integer :: nExtraVar
+      ! index of shock location on the field line
+      integer :: iShock
+      ! size of the already written data
+      integer :: nDataLine
+      ! current size of the buffer
+      integer :: nBufferSize
+      ! whether the output file already exists
+      logical :: IsPresent
+      ! additional parameters
+      integer, parameter:: StartTime_  = 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      integer :: nParam
+      real    :: Param_I(1:StartJulian_)
 
       character(len=*), parameter:: NameSub = 'write_shock_time'
       !------------------------------------------------------------------------
@@ -2751,10 +2770,14 @@ contains
       ! we only save the data for the first nLineAll processors.
       if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
+      nExtraVar = File_I(iFile) % nExtraVar
+      nParam = StartJulian_
+
       ! header for the output file
       StringHeader = &
-           'MFLAMPA: shock surface evolved along a field line; '// &
-           trim(File_I(iFile)%StringHeaderAux)
+           'MFLAMPA: shock surface evolved along a field line; '//&
+           '; Coordindate system: '//trim(TypeCoordSystem)// &
+           '; '//trim(File_I(iFile)%StringHeaderAux)
 
       ! at first call, remove files if they exist to reset time series output
       if(File_I(iFile) % IsFirstCall) then
@@ -2775,6 +2798,96 @@ contains
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0.0
+
+      ! go over all lines on the processor and find the shock index
+      do iLine = 1, nLine
+         if(.not.Used_B(iLine)) CYCLE
+
+         ! set the file name
+         call make_file_shock_name( &
+              StringBase    = NameMHData,                      &
+              iLine         = iLine,                           &
+              NameExtension = File_I(iFile)%NameFileExtension, &
+              NameOut       = NameFile)
+
+         ! if file already exists -> read its content
+         nDataLine = 0
+         inquire(FILE=NameFile, EXIST=IsPresent)
+         if(IsPresent) then
+            ! first, determine its size
+            call read_plot_file(&
+                 NameFile   = NameFile, &
+                 TypeFileIn = File_I(iFile) % TypeFile, &
+                 n1Out      = nDataLine)
+            ! if buffer is too small then reallocate it
+            nBufferSize = ubound(File_I(iFile)%Buffer_II, DIM=2)
+            if(nBufferSize < nDataLine + 1) then
+               deallocate(File_I(iFile) % Buffer_II)
+               allocate(File_I(iFile) % Buffer_II( &
+                    1+nExtraVar, 2*nBufferSize, 1))
+            end if
+
+            ! read the data itself
+            call read_plot_file(&
+                 NameFile   = NameFile,                  &
+                 TypeFileIn = File_I(iFile) % TypeFile,  &
+                 Coord1Out_I= File_I(iFile) % Buffer_II(1+nExtraVar, :, 1), &
+                 VarOut_VI  = File_I(iFile) % Buffer_II(1:nExtraVar, :, 1))
+         end if
+
+         ! add new data
+         nDataLine = nDataLine + 1
+         ! put time into buffer
+         File_I(iFile) % Buffer_II(1+nExtraVar, nDataLine, 1) = SPTime
+         ! get shock location
+         ! For ShockID_:
+         iVarPlot = 1
+         iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
+         iShock = iShock_IB(Shock_, iLine)
+         File_I(iFile) % Buffer_II(iVarIndex, nDataLine, 1) = real(iShock)
+         ! For XShock_ to ZShock_:
+         iVarPlot = iVarPlot + XShock_ - ShockID_
+         iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
+         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+ZShock_-XShock_, &
+              nDataLine, 1) = MHData_VIB(X_:Z_, iShock, iLine)
+         ! For {R,Lat,Lon}Shock_:
+         call xyz_to_rlonlat(File_I(iFile) % Buffer_II( &
+              iVarIndex:iVarIndex+ZShock_-XShock_, nDataLine, 1), &
+              File_I(iFile) % Buffer_II( &
+              iVarIndex+RShock_-XShock_, nDataLine, 1), &
+              File_I(iFile) % Buffer_II( &
+              iVarIndex+LonShock_-XShock_, nDataLine, 1), &
+              File_I(iFile) % Buffer_II( &
+              iVarIndex+LatShock_-XShock_, nDataLine, 1))
+
+         ! convert angles
+         File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
+              LatShock_-ShockID_+1], nDataLine, 1) = &
+              File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
+              LatShock_-ShockID_+1], nDataLine, 1) * cRadToDeg
+
+         ! start time in seconds from base year
+         Param_I(StartTime_)  = StartTime
+         ! start time in Julian date
+         Param_I(StartJulian_)= StartTimeJulian
+
+         ! reprint data to file
+         call save_plot_file(&
+              NameFile      = NameFile, &
+              StringHeaderIn= StringHeader, &
+              TypeFileIn    = File_I(iFile) % TypeFile, &
+              nDimIn        = 1, &
+              TimeIn        = SPTime, &
+              nStepIn       = iIter, &
+              ParamIn_I     = Param_I, &
+              Coord1In_I    = &
+              File_I(iFile) % Buffer_II(1+nExtraVar, 1:nDataLine, 1), &
+              NameVarIn     = &
+              trim(File_I(iFile) % NameVarPlot) // ' ' // &
+              trim(File_I(iFile) % NameAuxPlot), &
+              VarIn_VI      = &
+              File_I(iFile) % Buffer_II(1:nExtraVar, 1:nDataLine, 1))
+      end do !  iLine
 
     end subroutine write_shock_time
     !==========================================================================
