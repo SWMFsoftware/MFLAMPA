@@ -41,13 +41,13 @@ module SP_ModShock
 
   ! Parameters for the shock coordinates
   integer, public, parameter :: nShockVar = 7, &
-       ShockID_  = 0, & ! Shock index
-       XShock_   = 1, & ! Shock X coordinates
-       YShock_   = 2, & ! Shock Y coordinates
-       ZShock_   = 3, & ! Shock Z coordinates
-       RShock_   = 4, & ! Shock radial distance
-       LonShock_ = 5, & ! Shock longitude
-       LatShock_ = 6    ! Shock latitude
+       ShockID_  = 1, & ! Shock index
+       XShock_   = 2, & ! Shock X coordinates
+       YShock_   = 3, & ! Shock Y coordinates
+       ZShock_   = 4, & ! Shock Z coordinates
+       RShock_   = 5, & ! Shock radial distance
+       LonShock_ = 6, & ! Shock longitude
+       LatShock_ = 7    ! Shock latitude
 
   ! Shock variable names
   character(len=10), public, parameter:: NameVarShock_V(ShockID_:LatShock_) &
@@ -107,7 +107,7 @@ contains
     call check_allocate(iError, 'divU_II')
 
     if(allocated(XyzShockEffUnit_DG)) deallocate(XyzShockEffUnit_DG)
-    allocate(XyzShockEffUnit_DG(RShock_:LatShock_, 1:nLineAll+2))
+    allocate(XyzShockEffUnit_DG(XShock_:LatShock_, 1:nLineAll+2))
     call check_allocate(iError, 'XyzShockEffUnit_DG')
 
   end subroutine init

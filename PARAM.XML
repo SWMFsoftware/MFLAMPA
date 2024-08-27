@@ -931,7 +931,7 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
   <parameter name="nFileOut" type="integer" min="0" default="0" />
     <for name="iPlot" from="1" to="$nFileOut">
       <parameter name="StringPlot" type="strings" case="lower"
-		 min="3" max="20" >
+		 min="2" max="20" >
         <part name="KindData" type="string" input="select">
           <option name="MHD, fluxes 1D" value="mh1d" />
           <option name="MHD, fluxes 2D" value="mh2d" />
@@ -942,6 +942,8 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
           <option name="Distrubution function, along trajectory" value="distrtraj" />
           <option name="Flux 2D"       value="flux2d" />
           <option name="Flux timeline" value="fluxtime" />
+          <option name="Shock 2D"       value="shock2d" />
+          <option name="Shock timeline" value="shocktime" />
         </part>
         <part name="TypeFile" type="string" input="select" required="T">
           <option name="ascii" value="ascii/idl" default="T"/>
@@ -997,7 +999,7 @@ plotting, and NameTrajectoryFile is the path of the trajectory file.
     </for>
 
 #SAVEPLOT
-10				nFileOut
+11				nFileOut
 mh1d flux ascii			StringPlot
 mh2d flux ascii			StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
@@ -1016,6 +1018,7 @@ fluxtime flux ascii		StringPlot
 215.0				Radius [Rs] (read if mh2d/mhtime/distr2d/distrtime/flux2d/fluxtime)
 30.0				Longitude [deg] (read if fluxtime)
 46.0				Latitude [deg] (read if fluxtime)
+shock2d ascii			StringPlot
 
 Sets the number and type of the plotfiles to save. For several types of plot,
 the radius of heliocentric spherical surface on which to plot may be also set.
@@ -1060,6 +1063,12 @@ This is also applicable to the parameters used for "distrtime".
 If using "distraj", one should also specify "#SATELLITE" and reset,
 "#TRIANGULATION" including 'UsePoleTriangulation' (default = F) and
 'UsePlanarTriangles' (default = T) before these lines.
+
+In normal cases, one should have at least 3 parameters for each StringPlot.
+However, if using "shock*", one should just have 2 parameters: save format
+and extension. "Shock2d" is to save outputs for Lon-Lat contour plot at
+each time step, while "ShockTime" is to save outputs along the time axis
+for each field line.
 
 In StringPlot, the first identifier is always a type of plot, the last
 identifier is a type of file, and the string variables in between denote the
