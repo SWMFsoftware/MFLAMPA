@@ -182,8 +182,9 @@ contains
   !============================================================================
   subroutine offset(iLine, iOffset)
 
-    use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_, ShockOld_, &
+    use SP_ModGrid,  ONLY: NoShock_, BOld_, RhoOld_, ShockOld_, &
          iShock_IB, State_VIB, MHData_VIB, X_, Z_, FootPoint_VB
+    use SP_ModShock, ONLY: check_shock_location
     ! shift in the data arrays is required if the grid point(s) is appended
     ! or removed at the foot point of the magnetic field line. SHIFTED ARE:
     ! State_VIB(/RhoOld_,BOld_), Distribution_CB, as well as ShockOld_
@@ -228,10 +229,12 @@ contains
     else
        call CON_stop('No algorithm for iOffset > 1 in '//NameSub)
     end if
+
     ! if trace shock: iShock should fall betweem 1 and nVertex_B(iLine)
     if(iShock_IB(ShockOld_, iLine)/=NoShock_) &
          iShock_IB(ShockOld_, iLine) = min(nVertex_B(iLine), &
          max(iShock_IB(ShockOld_, iLine) + iOffset, 1))
+    call check_shock_location(iLine)
   end subroutine offset
   !============================================================================
   subroutine check_dist_neg(NameSub, lVertex, rVertex, iLine)
