@@ -2618,9 +2618,8 @@ contains
       ! be read and visualized by IDL/TECPLOT; name format is
       ! MH_data_shock_t<ddhhmmss>_n<iIter>.{out/dat}
 
-      use ModCoordTransform, ONLY: xyz_to_rlonlat
-      use SP_ModShock,       ONLY: ShockID_, XShock_, ZShock_, &
-           RShock_, LonShock_, LatShock_
+      use SP_ModShock, ONLY: ShockID_, CoorShock_VIB, &
+           XShock_, LonShock_, LatShock_
 
       ! name of the output file
       character(len=100):: NameFile
@@ -2666,26 +2665,17 @@ contains
          if(.not.Used_B(iLine)) CYCLE
          iLineAll = iLineAll0 + iLine
 
-         ! Assign Shock location
-         ! For ShockID_:
+         ! assign Shock location
+         ! for ShockID_:
          iVarPlot = 1
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
          iShock = iShock_IB(Shock_, iLine)
          File_I(iFile) % Buffer_II(iVarIndex, iLineAll, 1) = real(iShock)
-         ! For XShock_ to ZShock_:
+         ! for {X,Y,Z,R,Lat,Lon}Shock_:
          iVarPlot = iVarPlot + XShock_ - ShockID_
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
-         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+ZShock_-XShock_, &
-              iLineAll, 1) = MHData_VIB(X_:Z_, iShock, iLine)
-         ! For {R,Lat,Lon}Shock_:
-         call xyz_to_rlonlat(File_I(iFile) % Buffer_II( &
-              iVarIndex:iVarIndex+ZShock_-XShock_, iLineAll, 1), &
-              File_I(iFile) % Buffer_II( &
-              iVarIndex+RShock_-XShock_, iLineAll, 1), &
-              File_I(iFile) % Buffer_II( &
-              iVarIndex+LonShock_-XShock_, iLineAll, 1), &
-              File_I(iFile) % Buffer_II( &
-              iVarIndex+LatShock_-XShock_, iLineAll, 1))
+         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+LatShock_-XShock_, &
+              iLineAll, 1) = CoorShock_VIB(XShock_:LatShock_, iLine)
       end do !  iLine
 
       ! gather interpolated data on the source processor
@@ -2701,12 +2691,6 @@ contains
                  0, iComm, iError)
          end if
       end if
-
-      ! convert angles
-      File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
-           LatShock_-ShockID_+1], :, 1) = &
-           File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
-           LatShock_-ShockID_+1], :, 1) * cRadToDeg
 
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
@@ -2738,9 +2722,8 @@ contains
       ! format to be read and visualized by IDL/TECPLOT; name format is
       ! MH_data_shock_<iLon>_<iLat>.{out/dat}
 
-      use ModCoordTransform, ONLY: xyz_to_rlonlat
-      use SP_ModShock,       ONLY: ShockID_, XShock_, ZShock_, &
-           RShock_, LonShock_, LatShock_
+      use SP_ModShock, ONLY: ShockID_, CoorShock_VIB, &
+           XShock_, LonShock_, LatShock_
 
       ! name of the output file
       character(len=100):: NameFile
@@ -2840,31 +2823,16 @@ contains
          ! put time into buffer
          File_I(iFile) % Buffer_II(1+nExtraVar, nDataLine, 1) = SPTime
          ! get shock location
-         ! For ShockID_:
+         ! for ShockID_:
          iVarPlot = 1
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
          iShock = iShock_IB(Shock_, iLine)
          File_I(iFile) % Buffer_II(iVarIndex, nDataLine, 1) = real(iShock)
-         ! For XShock_ to ZShock_:
+         ! for {X,Y,Z,R,Lat,Lon}Shock_:
          iVarPlot = iVarPlot + XShock_ - ShockID_
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
-         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+ZShock_-XShock_, &
-              nDataLine, 1) = MHData_VIB(X_:Z_, iShock, iLine)
-         ! For {R,Lat,Lon}Shock_:
-         call xyz_to_rlonlat(File_I(iFile) % Buffer_II( &
-              iVarIndex:iVarIndex+ZShock_-XShock_, nDataLine, 1), &
-              File_I(iFile) % Buffer_II( &
-              iVarIndex+RShock_-XShock_, nDataLine, 1), &
-              File_I(iFile) % Buffer_II( &
-              iVarIndex+LonShock_-XShock_, nDataLine, 1), &
-              File_I(iFile) % Buffer_II( &
-              iVarIndex+LatShock_-XShock_, nDataLine, 1))
-
-         ! convert angles
-         File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
-              LatShock_-ShockID_+1], nDataLine, 1) = &
-              File_I(iFile) % Buffer_II([LonShock_-ShockID_+1, &
-              LatShock_-ShockID_+1], nDataLine, 1) * cRadToDeg
+         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+LatShock_-XShock_, &
+              nDataLine, 1) = CoorShock_VIB(XShock_:LatShock_, iLine)
 
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime

@@ -228,9 +228,10 @@ contains
     else
        call CON_stop('No algorithm for iOffset > 1 in '//NameSub)
     end if
-    if(iShock_IB(ShockOld_, iLine)/=NoShock_)&
-         iShock_IB(ShockOld_, iLine) = &
-         max(iShock_IB(ShockOld_, iLine) + iOffset, 1)
+    ! if trace shock: iShock should fall betweem 1 and nVertex_B(iLine)
+    if(iShock_IB(ShockOld_, iLine)/=NoShock_) &
+         iShock_IB(ShockOld_, iLine) = min(nVertex_B(iLine), &
+         max(iShock_IB(ShockOld_, iLine) + iOffset, 1))
   end subroutine offset
   !============================================================================
   subroutine check_dist_neg(NameSub, lVertex, rVertex, iLine)

@@ -48,6 +48,7 @@ module SP_ModShock
        RShock_   = 5, & ! Shock radial distance
        LonShock_ = 6, & ! Shock longitude
        LatShock_ = 7    ! Shock latitude
+  real, public, allocatable :: CoorShock_VIB(:,:)
 
   ! Shock variable names
   character(len=10), public, parameter:: NameVarShock_V(ShockID_:LatShock_) &
@@ -70,7 +71,7 @@ module SP_ModShock
        'Deg   ']
 
   ! Shock skeleton for visualization
-  real,    public, allocatable :: XyzShockEffUnit_DG(:, :)
+  real, public, allocatable :: XyzShockEffUnit_DG(:, :)
   ! Arrays to construct a triangular mesh on a sphere
   logical, public :: IsShockTriMade = .false.
   integer, public :: nShockTriMesh, lidShockTri, ridShockTri
@@ -95,7 +96,7 @@ contains
   !============================================================================
   subroutine init
 
-    ! initialize the divU array along s_L axis for all field lines
+    ! initialize arrays related to the shock
 
     use ModUtilities, ONLY: check_allocate
     use SP_ModProc,   ONLY: iError
@@ -105,6 +106,10 @@ contains
     if(allocated(divU_II)) deallocate(divU_II)
     allocate(divU_II(1:nVertexMax, 1:nLine))
     call check_allocate(iError, 'divU_II')
+
+    if(allocated(CoorShock_VIB)) deallocate(CoorShock_VIB)
+    allocate(CoorShock_VIB(XShock_:LatShock_, 1:nLine))
+    call check_allocate(iError, 'CoorShock_VIB')
 
     if(allocated(XyzShockEffUnit_DG)) deallocate(XyzShockEffUnit_DG)
     allocate(XyzShockEffUnit_DG(XShock_:LatShock_, 1:nLineAll+2))
@@ -200,7 +205,9 @@ contains
 
     ! find location of a shock wave on a given line (line)
     ! shock front is assumed to be location of max log(Rho/RhoOld)
-    use SP_ModGrid, ONLY: R_
+    use ModNumConst,       ONLY: cRadToDeg
+    use ModCoordTransform, ONLY: xyz_to_rlonlat
+    use SP_ModGrid,        ONLY: R_, iLineAll0
 
     ! Do not search too close to the Sun
     real, parameter :: RShockMin = 1.20  ! *RSun
@@ -211,6 +218,8 @@ contains
     integer :: iShockCandidate
     ! Loop variables
     integer :: iLine, iEnd
+
+    character(len=*), parameter:: NameSub = 'get_shock_location'
     !--------------------------------------------------------------------------
 
     do iLine = 1, nLine
@@ -234,6 +243,22 @@ contains
             divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
        if(iShockCandidate >= iShockMin) &
             iShock_IB(Shock_, iLine) = iShockCandidate
+
+       ! get the coordinates
+       CoorShock_VIB(XShock_:ZShock_, iLine) = &
+            MHData_VIB(X_:Z_, iShockCandidate, iLine)
+       call xyz_to_rlonlat(CoorShock_VIB(XShock_:ZShock_, iLine), &
+            CoorShock_VIB(RShock_, iLine), &
+            CoorShock_VIB(LonShock_, iLine), &
+            CoorShock_VIB(LatShock_, iLine))
+       if(CoorShock_VIB(RShock_, iLine) == 0.0) then
+          write(*,*) "On the field line, iLineAll=", iLineAll0+iLine
+          call CON_Stop(NameSub//": Error of the shock location (R=0.0).")
+       end if
+
+       ! convert units for angles
+       CoorShock_VIB([LonShock_,LatShock_], iLine) = &
+            CoorShock_VIB([LonShock_,LatShock_], iLine) * cRadToDeg
     end do
 
   end subroutine get_shock_location
@@ -314,9 +339,8 @@ contains
     ! Effective points for the shock surface
     integer :: nShockEff
     integer :: iShockEff_I(1:nLineAll)
-    ! Spatial coordinates of the field lines
+    ! Spatial coordinates of all used field lines
     real, dimension(XShock_:ZShock_, 1:nLineAll) :: XyzShockUnit_DG
-    real, dimension(RShock_:LatShock_, 1:nLineAll) :: rlonlatShock_DG
     ! Loop variables
     integer :: iLine, iLineAll, iShockEff
 
@@ -327,7 +351,7 @@ contains
     if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
     ! Initialization
-    XyzShockUnit_DG = 0.0; rlonlatShock_DG = 0.0
+    XyzShockUnit_DG = 0.0
     XyzShockEffUnit_DG = 0.0; iShockEff_I = 0
     ! Find how many points are effective for the shock front
     nShockEff = count(iShock_IB(Shock_, 1:nLine)>1 .and. Used_B(1:nLine))
@@ -340,18 +364,10 @@ contains
        ! Find how far shock has travelled on this line
        iShockEff_I(iLineAll) = iShock_IB(Shock_, iLine)
        ! Find the location of the shock front on this field line
+       ! and project it to the unit sphere
        XyzShockUnit_DG(XShock_:ZShock_, iLineAll) = &
-            MHData_VIB(X_:Z_, iShockEff_I(iLineAll), iLine)
-       ! Transform to spherical coordinates
-       call xyz_to_rlonlat(XyzShockUnit_DG(XShock_:ZShock_, iLineAll), &
-            rlonlatShock_DG(RShock_,   iLineAll), &
-            rlonlatShock_DG(LonShock_, iLineAll), &
-            rlonlatShock_DG(LatShock_, iLineAll))
-
-       ! Project to unit sphere
-       XyzShockUnit_DG(XShock_:ZShock_, iLineAll) = &
-            XyzShockUnit_DG(XShock_:ZShock_, iLineAll)/ &
-            rlonlatShock_DG(RShock_, iLineAll)
+            CoorShock_VIB(XShock_:ZShock_, iLine)/ &
+            CoorShock_VIB(RShock_, iLine)
     end do LINE
     ! Check correctness
     if(nShockEff /= count(iShockEff_I>1)) call CON_Stop(NameSub// &
