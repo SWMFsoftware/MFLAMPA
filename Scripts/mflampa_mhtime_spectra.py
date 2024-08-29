@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+#  Copyright (C) 2002 Regents of the University of Michigan, 
+#  portions used with permission 
+#  For more information, see http://csem.engin.umich.edu/tools/swmf
 '''
 Provide a plotting example for visualizing the MFLAMPA MHTime
 spectra outputs, compared with the SOHO/ERNE observational data;

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+#  Copyright (C) 2002 Regents of the University of Michigan, 
+#  portions used with permission 
+#  For more information, see http://csem.engin.umich.edu/tools/swmf
 '''
 Provide a plotting example for visualizing the MFLAMPA MH1D outputs
 Firstly written by Dr. Lulu Zhao and later modified by Weihao Liu
