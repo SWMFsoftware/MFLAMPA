@@ -647,7 +647,7 @@ contains
     subroutine process_shock
 
       ! process output parameters for shock skeleton
-      use SP_ModShock, ONLY: ShockID_, LatShock_, &
+      use SP_ModShock, ONLY: ShockID_, CompRatio_, &
            nShockVar, NameVarShock_V, NameVarShockUnit_V
       ! loop variables for variables
       integer :: iVarExtra
@@ -667,8 +667,8 @@ contains
       File_I(iFile) % DoPlotFlux = .false.
       File_I(iFile)%DoPlotSpread = .false.
 
-      ! Save ShockID_, X_:Z_, and RLonLat_ for shock
-      do iVarExtra = ShockID_, LatShock_
+      ! Save ShockID_, X_:Z_, RLonLat_, and CompRatio_ for shock
+      do iVarExtra = ShockID_, CompRatio_
          File_I(iFile)%NameVarPlot = trim(File_I(iFile)%NameVarPlot)//&
               " "//trim(NameVarShock_V(iVarExtra))
          select case(File_I(iFile)%TypeFile)
@@ -2618,8 +2618,7 @@ contains
       ! be read and visualized by IDL/TECPLOT; name format is
       ! MH_data_shock_t<ddhhmmss>_n<iIter>.{out/dat}
 
-      use SP_ModShock, ONLY: ShockID_, CoorShock_VIB, &
-           XShock_, LonShock_, LatShock_
+      use SP_ModShock, ONLY: ShockID_, XShock_, CompRatio_, StateShock_VIB
 
       ! name of the output file
       character(len=100):: NameFile
@@ -2671,11 +2670,11 @@ contains
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
          iShock = iShock_IB(Shock_, iLine)
          File_I(iFile) % Buffer_II(iVarIndex, iLineAll, 1) = real(iShock)
-         ! for {X,Y,Z,R,Lat,Lon}Shock_:
+         ! for {X,Y,Z,R,Lat,Lon}Shock_ and CompRatio_:
          iVarPlot = iVarPlot + XShock_ - ShockID_
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
-         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+LatShock_-XShock_, &
-              iLineAll, 1) = CoorShock_VIB(XShock_:LatShock_, iLine)
+         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+CompRatio_-XShock_, &
+              iLineAll, 1) = StateShock_VIB(XShock_:CompRatio_, iLine)
       end do !  iLine
 
       ! gather interpolated data on the source processor
@@ -2722,8 +2721,7 @@ contains
       ! format to be read and visualized by IDL/TECPLOT; name format is
       ! MH_data_shock_<iLon>_<iLat>.{out/dat}
 
-      use SP_ModShock, ONLY: ShockID_, CoorShock_VIB, &
-           XShock_, LonShock_, LatShock_
+      use SP_ModShock, ONLY: ShockID_, XShock_, CompRatio_, StateShock_VIB
 
       ! name of the output file
       character(len=100):: NameFile
@@ -2828,11 +2826,11 @@ contains
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
          iShock = iShock_IB(Shock_, iLine)
          File_I(iFile) % Buffer_II(iVarIndex, nDataLine, 1) = real(iShock)
-         ! for {X,Y,Z,R,Lat,Lon}Shock_:
+         ! for {X,Y,Z,R,Lat,Lon}Shock_ and CompRatio_:
          iVarPlot = iVarPlot + XShock_ - ShockID_
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
-         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+LatShock_-XShock_, &
-              nDataLine, 1) = CoorShock_VIB(XShock_:LatShock_, iLine)
+         File_I(iFile) % Buffer_II(iVarIndex:iVarIndex+CompRatio_-XShock_, &
+              nDataLine, 1) = StateShock_VIB(XShock_:CompRatio_, iLine)
 
          ! start time in seconds from base year
          Param_I(StartTime_)  = StartTime

@@ -32,44 +32,42 @@ module SP_ModShock
   real, public, allocatable :: divU_II(:,:)
 
   ! Shock algorithm parameters:
-  real,    public, parameter :: dLogRhoThreshold = 0.01
-  integer, public, parameter :: nShockWidth = 50
-
-  ! Information about the shock:
-  ! the Lagrangian Shock ID (0) and 3D (1:3) coordinates, and
-  integer, public, parameter:: & ! init length of segment 1-2:
-       LengthShock_ = 4          ! control appending new particles
+  real,    public :: dLogRhoThreshold = 0.01 ! Empirical value
+  integer, public :: nShockWidth = 10, nShockMargin = 50
 
   ! Parameters for the shock coordinates
-  integer, public, parameter :: nShockVar = 7, &
+  integer, public, parameter :: nShockVar = 8, &
        ShockID_  = 1, & ! Shock index
        XShock_   = 2, & ! Shock X coordinates
        YShock_   = 3, & ! Shock Y coordinates
        ZShock_   = 4, & ! Shock Z coordinates
        RShock_   = 5, & ! Shock radial distance
        LonShock_ = 6, & ! Shock longitude
-       LatShock_ = 7    ! Shock latitude
-  real, public, allocatable :: CoorShock_VIB(:,:)
+       LatShock_ = 7, & ! Shock latitude
+       CompRatio_= 8    ! Compression ratio
+  real, public, allocatable :: StateShock_VIB(:,:)
 
   ! Shock variable names
-  character(len=10), public, parameter:: NameVarShock_V(ShockID_:LatShock_) &
+  character(len=10), public, parameter:: NameVarShock_V(ShockID_:CompRatio_) &
        = ['ShockID   ', &
        'XShock    ', &
        'YShock    ', &
        'ZShock    ', &
        'RShock    ', &
        'LonShock  ', &
-       'LatShock  ']
+       'LatShock  ', &
+       'CompRatio ']
 
   ! Unit for all the shock variables: Length is in the unit of Rsun
-  character(len=6), public :: NameVarShockUnit_V(ShockID_:LatShock_) = [&
+  character(len=6), public :: NameVarShockUnit_V(ShockID_:CompRatio_) = [&
        'none  ', &
        'RSun  ', &
        'RSun  ', &
        'RSun  ', &
        'RSun  ', &
        'Deg   ', &
-       'Deg   ']
+       'Deg   ', &
+       'none  ']
 
   ! Shock skeleton for visualization
   real, public, allocatable :: XyzShockEffUnit_DG(:, :)
@@ -89,6 +87,10 @@ contains
     select case(NameCommand)
     case('#TRACESHOCK')
        call read_var('DoTraceShock', DoTraceShock)
+    case('#IDENTIFYSHOCK')
+       call read_var('nShockWidth', nShockWidth)
+       call read_var('nShockMargin', nShockMargin)
+       call read_var('dLogRhoThreshold', dLogRhoThreshold)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -105,28 +107,35 @@ contains
     !--------------------------------------------------------------------------
 
     if(allocated(divU_II)) deallocate(divU_II)
-    allocate(divU_II(1:nVertexMax, 1:nLine))
+    allocate(divU_II(1:nVertexMax, 1:nLine)) ! divU
     call check_allocate(iError, 'divU_II')
+    divU_II = 1.0
 
-    if(allocated(CoorShock_VIB)) deallocate(CoorShock_VIB)
-    allocate(CoorShock_VIB(XShock_:LatShock_, 1:nLine))
-    call check_allocate(iError, 'CoorShock_VIB')
+    if(allocated(StateShock_VIB)) deallocate(StateShock_VIB)
+    allocate(StateShock_VIB(XShock_:CompRatio_, 1:nLine)) ! States
+    call check_allocate(iError, 'StateShock_VIB')
+    StateShock_VIB = -1.0
 
     if(allocated(XyzShockEffUnit_DG)) deallocate(XyzShockEffUnit_DG)
-    allocate(XyzShockEffUnit_DG(XShock_:LatShock_, 1:nLineAll+2))
+    allocate(XyzShockEffUnit_DG(XShock_:LatShock_, 1:nLineAll+2)) ! Effective
     call check_allocate(iError, 'XyzShockEffUnit_DG')
+    XyzShockEffUnit_DG = -1.0
 
   end subroutine init
   !============================================================================
-  subroutine get_divU
+  subroutine get_divU(TimeLimit)
 
     ! divU = dLogRho_I for time-accurate run
     ! divU = B*d(u/B)/ds in steady-state run
     use SP_ModGrid, ONLY: U_, B_, D_, Rho_, RhoOld_
-    use SP_ModTime, ONLY: IsSteadyState
+    use SP_ModTime, ONLY: IsSteadyState, SPTime
     use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
+    ! Maximum possible time
+    real, intent(in):: TimeLimit
     ! Local VARs
+    ! Inverse of the time step from State_VIB to MHData_VIB
+    real :: InvDtFull
     ! Array of u=\vec{u}*\vec{B}/|B| and u/B at the face center
     real :: uSi_F(nVertexMax), uOverBSi_F(0:nVertexMax)
     ! Array of B and 1/B at the cell- and face-center
@@ -185,6 +194,7 @@ contains
           divU_II(1:iEnd, iLine) = BSi_I(1:iEnd)*DuOverBDsSi_C(1:iEnd)
        end do
     else
+       InvDtFull = 1.0/(TimeLimit - SPTime)
        do iLine = 1, nLine
           ! go line by line and get divU if active
           if(.not.Used_B(iLine)) then
@@ -196,7 +206,7 @@ contains
 
           ! divergence of plasma \vec{u} = -d(ln(rho))/dt at cell center
           divU_II(1:iEnd, iLine) = -log(MhData_VIB(Rho_,1:iEnd,iLine)/ &
-               State_VIB(RhoOld_,1:iEnd,iLine))
+               State_VIB(RhoOld_,1:iEnd,iLine)) * InvDtFull
        end do
     end if
 
@@ -208,7 +218,7 @@ contains
     ! shock front is assumed to be location of max log(Rho/RhoOld)
     use ModNumConst,       ONLY: cRadToDeg
     use ModCoordTransform, ONLY: xyz_to_rlonlat
-    use SP_ModGrid,        ONLY: R_, iLineAll0
+    use SP_ModGrid,        ONLY: R_, Rho_, iLineAll0
 
     ! Do not search too close to the Sun
     real, parameter :: RShockMin = 1.20  ! *RSun
@@ -237,33 +247,45 @@ contains
        ! divergence of plasma velocity (positively) propto dLogRho
        ! note: shock never moves back
        iShockMin = max(iShock_IB(ShockOld_, iLine), nShockWidth+1)
-       iShockMax = iEnd - nShockWidth - 1
+       iShockMax = iEnd - nShockMargin - 1
        iShockCandidate = iShockMin - 1 + minloc( &
             divU_II(iShockMin:iShockMax, iLine), DIM=1, MASK= &
             State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
             divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
        if(iShockCandidate >= iShockMin) &
             iShock_IB(Shock_, iLine) = iShockCandidate
-       
+
        ! check_shock_location: update Used_B(iLine)
        call check_shock_location(iLine)
        if(.not.Used_B(iLine)) CYCLE
 
        ! get the coordinates
-       CoorShock_VIB(XShock_:ZShock_, iLine) = &
+       StateShock_VIB(XShock_:ZShock_, iLine) = &
             MHData_VIB(X_:Z_, iShockCandidate, iLine)
-       call xyz_to_rlonlat(CoorShock_VIB(XShock_:ZShock_, iLine), &
-            CoorShock_VIB(RShock_, iLine), &
-            CoorShock_VIB(LonShock_, iLine), &
-            CoorShock_VIB(LatShock_, iLine))
-       if(CoorShock_VIB(RShock_, iLine) == 0.0) then
+       call xyz_to_rlonlat(StateShock_VIB(XShock_:ZShock_, iLine), &
+            StateShock_VIB(RShock_, iLine), &
+            StateShock_VIB(LonShock_, iLine), &
+            StateShock_VIB(LatShock_, iLine))
+       if(StateShock_VIB(RShock_, iLine) == 0.0) then
           write(*,*) "On the field line, iLineAll=", iLineAll0+iLine
           call CON_Stop(NameSub//": Error of the shock location (R=0.0).")
        end if
 
        ! convert units for angles
-       CoorShock_VIB([LonShock_,LatShock_], iLine) = &
-            CoorShock_VIB([LonShock_,LatShock_], iLine) * cRadToDeg
+       StateShock_VIB([LonShock_,LatShock_], iLine) = &
+            StateShock_VIB([LonShock_,LatShock_], iLine) * cRadToDeg
+       ! also get compression ratio at shock surface
+       StateShock_VIB(CompRatio_, iLine) = &
+            maxval(MHData_VIB(Rho_, &
+            iShockCandidate-nShockWidth+1:iShockCandidate+1, iLine), &
+            MASK=divU_II(iShockCandidate-nShockWidth+1: &
+            iShockCandidate+1, iLine) < -dLogRhoThreshold)/ & ! post shock part
+            minval(MHData_VIB(Rho_, iShockCandidate+1: &
+            iShockCandidate+nShockWidth, iLine), &
+            MASK=divU_II(iShockCandidate+1:iShockCandidate+nShockWidth, &
+            iLine) < -dLogRhoThreshold .and. &
+            MHData_VIB(Rho_, iShockCandidate+1: &
+            iShockCandidate+nShockWidth, iLine) > 0.0)        ! pre shock part
     end do
 
   end subroutine get_shock_location
@@ -371,8 +393,8 @@ contains
        ! Find the location of the shock front on this field line
        ! and project it to the unit sphere
        XyzShockUnit_DG(XShock_:ZShock_, iLineAll) = &
-            CoorShock_VIB(XShock_:ZShock_, iLine)/ &
-            CoorShock_VIB(RShock_, iLine)
+            StateShock_VIB(XShock_:ZShock_, iLine)/ &
+            StateShock_VIB(RShock_, iLine)
     end do LINE
     ! Check correctness
     if(nShockEff /= count(iShockEff_I>1)) call CON_Stop(NameSub// &

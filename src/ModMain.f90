@@ -107,7 +107,7 @@ contains
        case('#SATELLITE', '#TRIANGULATION')
           if(.not.IsFirstSession) CYCLE
           call read_param_satellite(NameCommand)
-       case('#TRACESHOCK')
+       case('#TRACESHOCK', '#IDENTIFYSHOCK')
           call read_param_shock(NameCommand)
        case('#TURBULENTSPECTRUM')
           call read_param_turbulence(NameCommand)
@@ -283,7 +283,7 @@ contains
        if(DataInputTime <= SPTime) RETURN
        ! if tracing shock, get the shock location for each field line
        if(DoTraceShock) then
-          call get_divU
+          call get_divU(min(DataInputTime, TimeLimit))
           call get_shock_location
           call get_shock_skeleton
        end if

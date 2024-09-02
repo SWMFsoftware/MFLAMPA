@@ -759,6 +759,24 @@ profile is not sharpened around it.
 The default value is true.
 </command>
 
+<command name="IDENTIFYSHOCK">
+  <parameter name="nShockWidth" type="integer" min="1" default="10" />
+  <parameter name="nShockMargin" type="integer" min="1" default="50" />
+  <parameter name="dLogRhoThreshold" type="real" min="0.0" default="0.01" />
+
+#IDENTIFYSHOCK
+10			nShockWidth
+50			nShockMargin
+0.01			dLogRhoThreshold
+
+These parameters are used to identify the shock location:
+we use iShock-nShockWidth+1:iShock+nShockWidth to identify the
+minimal divU, which should be smaller than -dLogRhoThreshold.
+In this process, one should notice that the shock should not
+be too close to the end, so there is a number of nShockMargin
+settign for the "margin" distance.
+</command>
+
 <command name="#USEFIXEDMFPUPSTREAM">
   <parameter name="UseFixedMeanFreePathUpstream" type="logical" default="F" />
   <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="0.3" />

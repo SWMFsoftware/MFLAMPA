@@ -70,6 +70,7 @@ contains
     use SP_ModTime,             ONLY: SPTime
     use SP_ModUnit,             ONLY: Io2Si_V, UnitX_
 
+    ! Maximum possible time
     real, intent(in):: TimeLimit
     ! Loop variable
     integer :: iLine
