@@ -647,8 +647,8 @@ contains
     subroutine process_shock
 
       ! process output parameters for shock skeleton
-      use SP_ModShock, ONLY: ShockID_, CompRatio_, &
-           nShockVar, NameVarShock_V, NameVarShockUnit_V
+      use SP_ModShock, ONLY: ShockID_, CompRatio_, nShockVar, &
+           DoSaveStateShock, NameVarShock_V, NameVarShockUnit_V
       ! loop variables for variables
       integer :: iVarExtra
       ! only location and physical variables at the shock surface are printed
@@ -666,6 +666,8 @@ contains
       File_I(iFile) % DoPlot_V   = .false.
       File_I(iFile) % DoPlotFlux = .false.
       File_I(iFile)%DoPlotSpread = .false.
+      ! we do save the states for shock
+      DoSaveStateShock = .true.
 
       ! Save ShockID_, X_:Z_, RLonLat_, and CompRatio_ for shock
       do iVarExtra = ShockID_, CompRatio_

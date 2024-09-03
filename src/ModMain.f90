@@ -239,7 +239,7 @@ contains
     use SP_ModRestart,       ONLY: check_save_restart
     use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
     use SP_ModShock,         ONLY: DoTraceShock, get_divU, &
-         get_shock_location, get_shock_skeleton
+         get_shock_location, get_shock_skeleton, DoSaveStateShock
     use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
     use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
@@ -285,7 +285,7 @@ contains
        if(DoTraceShock) then
           call get_divU(min(DataInputTime, TimeLimit))
           call get_shock_location
-          call get_shock_skeleton
+          if(DoSaveStateShock) call get_shock_skeleton
        end if
        ! run the model
        if(DoRun) call advance(min(DataInputTime, TimeLimit))

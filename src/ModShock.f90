@@ -46,6 +46,7 @@ module SP_ModShock
        LatShock_ = 7, & ! Shock latitude
        CompRatio_= 8    ! Compression ratio
   real, public, allocatable :: StateShock_VIB(:,:)
+  logical, public :: DoSaveStateShock = .false.
 
   ! Shock variable names
   character(len=10), public, parameter:: NameVarShock_V(ShockID_:CompRatio_) &
@@ -111,15 +112,18 @@ contains
     call check_allocate(iError, 'divU_II')
     divU_II = 1.0
 
-    if(allocated(StateShock_VIB)) deallocate(StateShock_VIB)
-    allocate(StateShock_VIB(XShock_:CompRatio_, 1:nLine)) ! States
-    call check_allocate(iError, 'StateShock_VIB')
-    StateShock_VIB = -1.0
+    ! allocate and assign values only when we save states for the shock
+    if(DoSaveStateShock) then
+       if(allocated(StateShock_VIB)) deallocate(StateShock_VIB)
+       allocate(StateShock_VIB(XShock_:CompRatio_, 1:nLine)) ! States
+       call check_allocate(iError, 'StateShock_VIB')
+       StateShock_VIB = -1.0
 
-    if(allocated(XyzShockEffUnit_DG)) deallocate(XyzShockEffUnit_DG)
-    allocate(XyzShockEffUnit_DG(XShock_:LatShock_, 1:nLineAll+2)) ! Effective
-    call check_allocate(iError, 'XyzShockEffUnit_DG')
-    XyzShockEffUnit_DG = -1.0
+       if(allocated(XyzShockEffUnit_DG)) deallocate(XyzShockEffUnit_DG)
+       allocate(XyzShockEffUnit_DG(XShock_:LatShock_, 1:nLineAll+2)) ! Effective
+       call check_allocate(iError, 'XyzShockEffUnit_DG')
+       XyzShockEffUnit_DG = -1.0
+    end if
 
   end subroutine init
   !============================================================================
@@ -206,7 +210,7 @@ contains
 
           ! divergence of plasma \vec{u} = -d(ln(rho))/dt at cell center
           divU_II(1:iEnd, iLine) = -log(MhData_VIB(Rho_,1:iEnd,iLine)/ &
-               State_VIB(RhoOld_,1:iEnd,iLine)) * InvDtFull
+               State_VIB(RhoOld_,1:iEnd,iLine))
        end do
     end if
 
@@ -259,33 +263,36 @@ contains
        call check_shock_location(iLine)
        if(.not.Used_B(iLine)) CYCLE
 
-       ! get the coordinates
-       StateShock_VIB(XShock_:ZShock_, iLine) = &
-            MHData_VIB(X_:Z_, iShockCandidate, iLine)
-       call xyz_to_rlonlat(StateShock_VIB(XShock_:ZShock_, iLine), &
-            StateShock_VIB(RShock_, iLine), &
-            StateShock_VIB(LonShock_, iLine), &
-            StateShock_VIB(LatShock_, iLine))
-       if(StateShock_VIB(RShock_, iLine) == 0.0) then
-          write(*,*) "On the field line, iLineAll=", iLineAll0+iLine
-          call CON_Stop(NameSub//": Error of the shock location (R=0.0).")
-       end if
+       ! calculate values only when we save states for the shock
+       if(DoSaveStateShock) then
+          ! get the coordinates
+          StateShock_VIB(XShock_:ZShock_, iLine) = &
+               MHData_VIB(X_:Z_, iShockCandidate, iLine)
+          call xyz_to_rlonlat(StateShock_VIB(XShock_:ZShock_, iLine), &
+               StateShock_VIB(RShock_, iLine), &
+               StateShock_VIB(LonShock_, iLine), &
+               StateShock_VIB(LatShock_, iLine))
+          if(StateShock_VIB(RShock_, iLine) == 0.0) then
+             write(*,*) "On the field line, iLineAll=", iLineAll0+iLine
+             call CON_Stop(NameSub//": Error of the shock location (R=0.0).")
+          end if
 
-       ! convert units for angles
-       StateShock_VIB([LonShock_,LatShock_], iLine) = &
-            StateShock_VIB([LonShock_,LatShock_], iLine) * cRadToDeg
-       ! also get compression ratio at shock surface
-       StateShock_VIB(CompRatio_, iLine) = &
-            maxval(MHData_VIB(Rho_, &
-            iShockCandidate-nShockWidth+1:iShockCandidate+1, iLine), &
-            MASK=divU_II(iShockCandidate-nShockWidth+1: &
-            iShockCandidate+1, iLine) < -dLogRhoThreshold)/ & ! post shock part
-            minval(MHData_VIB(Rho_, iShockCandidate+1: &
-            iShockCandidate+nShockWidth, iLine), &
-            MASK=divU_II(iShockCandidate+1:iShockCandidate+nShockWidth, &
-            iLine) < -dLogRhoThreshold .and. &
-            MHData_VIB(Rho_, iShockCandidate+1: &
-            iShockCandidate+nShockWidth, iLine) > 0.0)        ! pre shock part
+          ! convert units for angles
+          StateShock_VIB([LonShock_,LatShock_], iLine) = &
+               StateShock_VIB([LonShock_,LatShock_], iLine) * cRadToDeg
+          ! also get compression ratio at shock surface
+          StateShock_VIB(CompRatio_, iLine) = &
+               maxval(MHData_VIB(Rho_, &
+               iShockCandidate-nShockWidth+1:iShockCandidate+1, iLine), &
+               MASK=divU_II(iShockCandidate-nShockWidth+1: &
+               iShockCandidate+1, iLine) < -dLogRhoThreshold)/ & ! post shock
+               minval(MHData_VIB(Rho_, iShockCandidate+1: &
+               iShockCandidate+nShockWidth, iLine), &
+               MASK=divU_II(iShockCandidate+1:iShockCandidate+nShockWidth, &
+               iLine) < -dLogRhoThreshold .and. &
+               MHData_VIB(Rho_, iShockCandidate+1: &
+               iShockCandidate+nShockWidth, iLine) > 0.0)        ! pre shock
+       end if
     end do
 
   end subroutine get_shock_location
