@@ -93,8 +93,8 @@ def get_mhtime_erne(mhchannel_file, mhtime_file):
 
     # To get outputs saved in mhchannel_file and mhtime_file
     dic = {}
-    EChannelLo_I = np.loadtxt(mhchannel_file, unpack=True, skiprows=2, usecols=[2], dtype=float)[1:-1]
-    EChannelHi_I = np.loadtxt(mhchannel_file, unpack=True, skiprows=2, usecols=[3], dtype=float)[1:-1]
+    EChannelLo_I = np.loadtxt(mhchannel_file, unpack=True, skiprows=2, usecols=[2], dtype=float)[1:-7]
+    EChannelHi_I = np.loadtxt(mhchannel_file, unpack=True, skiprows=2, usecols=[3], dtype=float)[1:-7]
     data = np.loadtxt(mhtime_file, unpack=True, skiprows=5, usecols=[i for i in range(25)], dtype=float)
     FluxDiff_II = np.zeros([len(data[0]), len(EChannelLo_I)-1])
     for i in range(len(FluxDiff_II[0])):
@@ -112,7 +112,7 @@ def main_plot_erne(DoSave=False, DoShow=False, figfmt='jpg'):
 
     # Set all directories
     rootdir = find_rootdir()
-    testdir = rootdir + '/run_actual13ERNE'
+    testdir = rootdir + '/run_1304full_01'
     obsdatadir = rootdir + '/data/SOHO_ERNE'
     outsdir = testdir + '/SP/IO2/'
     figsdir = testdir + '/SP/fig/'
@@ -168,4 +168,4 @@ def main_plot_erne(DoSave=False, DoShow=False, figfmt='jpg'):
 #==========================================================================================================
 
 if __name__ == "__main__":
-    main_plot_erne(DoSave=True, DoShow=False, figfmt='pdf')
+    main_plot_erne(DoSave=False, DoShow=True, figfmt='pdf')

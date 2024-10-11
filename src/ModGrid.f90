@@ -38,8 +38,10 @@ module SP_ModGrid
 
   ! Grid info
   ! Angular grid at origin surface
-  integer, public :: nLon = 4
   integer, public :: nLat = 4
+  integer, public :: nLon = 4
+  integer, public :: iLatStart = 1
+  integer, public :: iLonStart = 1
 
   ! Total number of magnetic field lines on all PEs (a product of nLat*nLon)
   integer, public :: nLineAll = 16
@@ -209,6 +211,9 @@ contains
     case('#GRIDNODE')
        call read_var('nLat', nLat)
        call read_var('nLon', nLon)
+    case('#GRIDNODESTART')
+       call read_var('iLatStart', iLatStart)
+       call read_var('iLonStart', iLonStart)
        nLineAll = nLat * nLon
     case('#TESTPOS')
        call read_var('iNodeTest',     iNodeTest)
@@ -310,8 +315,8 @@ contains
     ! Get node number from line number
     !--------------------------------------------------------------------------
     iLineAll = iBlockIn + iLineAll0
-    iLatOut = 1 + (iLineAll - 1)/nLon
-    iLonOut = iLineAll - nLon*(iLatOut - 1)
+    iLatOut = iLatStart + (iLineAll - 1)/nLon
+    iLonOut = iLineAll - nLon*(iLatOut - iLatStart) + (iLonStart - 1)
 
   end subroutine iblock_to_lon_lat
   !============================================================================
@@ -368,11 +373,12 @@ contains
              else
                 write(*,*)'----- Diagnostic Information -----'
                 write(*,*)'iEnd =', iEnd, 'iLine=', iLine
-                write(*,*)'iVertex=', iVertex
+                write(*,*)'iLineAll=', iLineAll0+iLine, 'iVertex=', iVertex
                 write(*,*)'Xyz (iVertex)=', MHData_VIB(X_:Z_,iVertex,iLine)
                 write(*,*)'iVertex+1=',  iVertex+1
                 write(*,*)'Xyz (iVertex+1)=', MHData_VIB(X_:Z_,iVertex+1,iLine)
                 call CON_stop(NameSub//': zero size of mesh')
+                Used_B(iLine) = .false.
              end if
           end if
           ! else

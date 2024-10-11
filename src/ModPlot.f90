@@ -403,7 +403,7 @@ contains
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
           end select
-       end do ! iPlot
+       end do ! iFile
        ! Check consistency: only 1 MH1D file can be requested
        if(count(File_I(1:nFileOut) % iKindData == MH1D_,1) > 1) &
             call CON_stop(NameSub//&
@@ -413,7 +413,7 @@ contains
        if(nOutput < 1)then
           call read_var('DtOutput',DtOutput)
        end if
-    case("#USEDATETIME")
+    case('#USEDATETIME')
        call read_var('UseDateTime',UseDateTime)
     case('#SAVEINITIAL')
        call read_var('DoSaveInitial',DoSaveInitial)

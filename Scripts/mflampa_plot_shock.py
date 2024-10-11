@@ -192,31 +192,32 @@ def plot_shock_surf(CoorXyz_IB, time, values_I, DoSave=False, \
         (vmin, vmax, np.min(values_I), np.max(values_I)))
     norm = Normalize(vmin=vmin, vmax=vmax)
     cmap = cm.rainbow
+    
+    # Plot the points with colors based on their values
+    sc = ax.scatter(points[:, 0], points[:, 1], points[:, 2], \
+        c=values_I, cmap=cmap, norm=norm, marker='o', s=1)  # Reduced size
 
     # Plot the Delaunay tetrahedra
     for tet in tetrahedra:
-        verts = points[tet[:]]
-        poly = Poly3DCollection([verts], alpha=0.95, edgecolor='w', norm=norm, linewidths=0.225)
+        verts = points[tet[1:]]
+        poly = Poly3DCollection([verts], alpha=1.0, edgecolor=cmap(norm(np.mean(values_I[tet[1:]]))), norm=norm, linewidths=0.22)
         # Color the tetrahedra based on some criteria (e.g., centroid value)
-        centroid_value = np.mean(values_I[tet])
+        centroid_value = np.mean(values_I[tet[1:]])
         poly.set_facecolor(cmap(norm(centroid_value)))
         ax.add_collection3d(poly)
         
-        # Plot the edges of the tetrahedron with colors based on the vertex values
-        edges = [
-            [tet[0], tet[1]],
-            [tet[0], tet[2]],
-            [tet[1], tet[2]]
-        ]
-        for edge in edges:
-            edge_color = cmap(norm(np.mean(values_I[edge])))  # Average value of the edge vertices
-            ax.plot([points[edge][0][0], points[edge][1][0]], \
-                    [points[edge][0][1], points[edge][1][1]], \
-                    [points[edge][0][2], points[edge][1][2]], color=edge_color, lw=1.225)
+        # # Plot the edges of the tetrahedron with colors based on the vertex values
+        # edges = [
+        #     [tet[0], tet[1]],
+        #     [tet[0], tet[2]],
+        #     [tet[1], tet[2]]
+        # ]
+        # for edge in edges:
+        #     edge_color = cmap(norm(np.mean(values_I[edge])))  # Average value of the edge vertices
+        #     ax.plot3D([points[edge][0][0], points[edge][1][0]], \
+        #             [points[edge][0][1], points[edge][1][1]], \
+        #             [points[edge][0][2], points[edge][1][2]], color=edge_color, lw=1.225)
 
-    # Plot the points with colors based on their values
-    sc = ax.scatter(points[:, 0], points[:, 1], points[:, 2], \
-        c=values_I, cmap=cmap, norm=norm, marker='o', s=2)  # Reduced size
     # Add colorbar with custom aspect ratio for thinness
     # cax = add_cax(ax=ax, pad=0.03, width=0.02, loc="right")
     cbar = plt.colorbar(sc, ax=ax, fraction=0.02, pad=0.1, aspect=29)  # Adjust colorbar

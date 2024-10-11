@@ -241,9 +241,11 @@ contains
 
     ! check if any of Distribution_CB(:, :, lVertex:rVertex, iLine) < 0.0
     ! if so, IsDistNeg = .true.; otherwise, IsDistNeg = .false. (normal case)
+    use SP_ModGrid, ONLY: iBlock_to_lon_lat
     character(len=*), intent(in):: NameSub  ! String for the module/subroutine
     integer, intent(in) :: lVertex, rVertex ! Start and end indices of iVertex
     integer, intent(in) :: iLine            ! index of line
+    integer :: iLon, iLat
     !--------------------------------------------------------------------------
     if(any(Distribution_CB(:, :, lVertex:rVertex, iLine)<0.0)) then
        write(*,*) NameSub, ': Distribution_CB < 0'
@@ -252,8 +254,11 @@ contains
        IsDistNeg = .true.
        ! With negative values in the Poisson bracket scheme: should stop here
        if( index(NameSub, 'poisson')>0 .or. index(NameSub, 'Poisson')>0 &
-            .or. index(NameSub, 'POISSON')>0 ) &
-            call CON_stop(NameSub//': Distribution_CB < 0')
+            .or. index(NameSub, 'POISSON')>0 ) then
+            call iBlock_to_lon_lat(iLine, iLon, iLat)
+            write(*,*) NameSub//': Distribution_CB < 0 on Line', &
+               iLine, 'with iLon, iLat = ', iLon, iLat
+       end if
     end if
   end subroutine check_dist_neg
   !============================================================================
