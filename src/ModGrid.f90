@@ -211,10 +211,10 @@ contains
     case('#GRIDNODE')
        call read_var('nLat', nLat)
        call read_var('nLon', nLon)
+       nLineAll = nLat * nLon
     case('#GRIDNODESTART')
        call read_var('iLatStart', iLatStart)
        call read_var('iLonStart', iLonStart)
-       nLineAll = nLat * nLon
     case('#TESTPOS')
        call read_var('iNodeTest',     iNodeTest)
        call read_var('iParticleTest', iParticleTest)
