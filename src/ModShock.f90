@@ -232,7 +232,7 @@ contains
     ! Misc
     integer :: iShockCandidate
     ! Loop variables
-    integer :: iLine, iEnd
+    integer :: iLine, iEnd, iShockForward
 
     character(len=*), parameter:: NameSub = 'get_shock_location'
     !--------------------------------------------------------------------------
@@ -252,10 +252,17 @@ contains
        ! note: shock never moves back
        iShockMin = max(iShock_IB(ShockOld_, iLine), nShockWidth+1)
        iShockMax = iEnd - nShockMargin - 1
-       iShockCandidate = iShockMin - 1 + minloc( &
-            divU_II(iShockMin:iShockMax, iLine), DIM=1, MASK= &
-            State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
-            divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
+       ! get the forward grid index for iShockCandidate
+       if (any(State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
+            divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)) then
+          iShockForward = minloc( &
+               divU_II(iShockMin:iShockMax, iLine), DIM=1, MASK= &
+               State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
+               divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
+       else
+          iShockForward = 0
+       end if
+       iShockCandidate = iShockMin - 1 + iShockForward
        if(iShockCandidate >= iShockMin) &
             iShock_IB(Shock_, iLine) = iShockCandidate
 
@@ -301,6 +308,7 @@ contains
 
     ! change the density profile near the shock front
     ! so it becomes steeper for the current line
+    use ModConst,   ONLY: cTiny
     use SP_ModGrid, ONLY: D_
     use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
@@ -319,6 +327,7 @@ contains
     if(present(dLogRhoIn_I)) then
        dLogRho_I = dLogRhoIn_I
     else
+       ! steady state: we do not have dlogrho/dt since dt=0 so we keep divU
        dLogRho_I = -divU_II(1:nX, iLine)
     end if
 
@@ -333,7 +342,7 @@ contains
          DsSi_I(iShock-nShockWidth:iShock+nShockWidth-1))
 
     ! check for zero excess
-    if(dLogRhoExcessSum == 0.0) RETURN
+    if(abs(dLogRhoExcessSum) <= cTiny) RETURN
     ! nullify excess within the smoothed shock
     dLogRho_I(iShock-nShockWidth:iShock+nShockWidth) = min( &
          dLogRhoThreshold, dLogRho_I(iShock-nShockWidth:iShock+nShockWidth))
@@ -354,6 +363,7 @@ contains
        dLogRhoIn_I = dLogRho_I
        divU_II(1:nX, iLine) = -dLogRhoIn_I
     else
+       ! steady state: we do not have dlogrho/dt since dt=0 so we keep dLogRho
        divU_II(1:nX, iLine) = -dLogRho_I
     end if
 
