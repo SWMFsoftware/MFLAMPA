@@ -2961,16 +2961,16 @@ contains
     write(NameOut,'(a)') trim(NamePlotDir)//trim(StringBase)
 
     if(present(Radius)) write(NameOut,'(a,i4.4,f0.2)') &
-         trim(NameOut)//'_R=', int(Radius), Radius - int(Radius)
+         trim(NameOut)//'_R_', int(Radius), Radius - int(Radius)
 
     if(present(Longitude) .and. present(Latitude))then
        ! avoid rounding issue due to conversion from degree to radians and back
        if(abs(nint(Longitude*cRadToDeg)-Longitude*cRadToDeg) < cTolerance)then
           write(NameOut,'(a,i3.3,a)') &
-               trim(NameOut)//'_Lon=', nint(Longitude*cRadToDeg), '.00'
+               trim(NameOut)//'_Lon_', nint(Longitude*cRadToDeg), '.00'
        else
           write(NameOut,'(a,i3.3,f0.2)') &
-               trim(NameOut)//'_Lon=', int(Longitude*cRadToDeg),&
+               trim(NameOut)//'_Lon_', int(Longitude*cRadToDeg),&
                Longitude*cRadToDeg - int(Longitude*cRadToDeg)
        end if
 
@@ -2981,7 +2981,7 @@ contains
              write(StringFmt,'(a)') '(a,i2.2,a)'
           end if
           write(NameOut,StringFmt) &
-               trim(NameOut)//'_Lat=', nint(Latitude*cRadToDeg), '.00'
+               trim(NameOut)//'_Lat_', nint(Latitude*cRadToDeg), '.00'
        else
           if(Latitude < 0.0)then
              write(StringFmt,'(a)') '(a,i3.2,f0.2)'
@@ -2989,7 +2989,7 @@ contains
              write(StringFmt,'(a)') '(a,i2.2,f0.2)'
           end if
           write(NameOut,StringFmt) &
-               trim(NameOut)//'_Lat=', int(Latitude*cRadToDeg),&
+               trim(NameOut)//'_Lat_', int(Latitude*cRadToDeg),&
                abs(Latitude*cRadToDeg - int(Latitude*cRadToDeg))
        end if
     end if
