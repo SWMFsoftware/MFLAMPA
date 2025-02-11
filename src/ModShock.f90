@@ -36,15 +36,25 @@ module SP_ModShock
   integer, public :: nShockWidth = 10, nShockMargin = 50
 
   ! Parameters for the shock coordinates
-  integer, public, parameter :: nShockVar = 8, &
-       ShockID_  = 1, & ! Shock index
-       XShock_   = 2, & ! Shock X coordinates
-       YShock_   = 3, & ! Shock Y coordinates
-       ZShock_   = 4, & ! Shock Z coordinates
-       RShock_   = 5, & ! Shock radial distance
-       LonShock_ = 6, & ! Shock longitude
-       LatShock_ = 7, & ! Shock latitude
-       CompRatio_= 8    ! Compression ratio
+  integer, public, parameter :: nShockVar = 18, &
+       ShockID_    = 1, & ! Shock index
+       XShock_     = 2, & ! Shock X coordinates
+       YShock_     = 3, & ! Shock Y coordinates
+       ZShock_     = 4, & ! Shock Z coordinates
+       RShock_     = 5, & ! Shock radial distance
+       RhoShock_   = 6, & ! Shock number density
+       TShock_     = 7, & ! Shock temperature
+       UxShock_    = 8, & ! Shock Ux
+       UyShock_    = 9, & ! Shock Uy
+       UzShock_    =10, & ! Shock Uz
+       BxShock_    =11, & ! Shock Bx
+       ByShock_    =12, & ! Shock By
+       BzShock_    =13, & ! Shock Bz
+       Wave1Shock_ =14, & ! Shock Wave1
+       Wave2Shock_ =15, & ! Shock Wave2
+       LonShock_   =16, & ! Shock longitude
+       LatShock_   =17, & ! Shock latitude
+       CompRatio_  =18    ! Compression ratio
   real, public, allocatable :: StateShock_VIB(:,:)
   logical, public :: DoSaveStateShock = .false.
 
@@ -55,6 +65,16 @@ module SP_ModShock
        'YShock    ', &
        'ZShock    ', &
        'RShock    ', &
+       'nShock    ', &
+       'TShock    ', &
+       'UxShock   ', &
+       'UyShock   ', &
+       'UzShock   ', &
+       'BxShock   ', &
+       'ByShock   ', &
+       'BzShock   ', &
+       'Wave1Shock', &
+       'Wave2Shock', &
        'LonShock  ', &
        'LatShock  ', &
        'CompRatio ']
@@ -66,6 +86,16 @@ module SP_ModShock
        'RSun  ', &
        'RSun  ', &
        'RSun  ', &
+       'amu/m3', &
+       'kev   ', &
+       'm/s   ', &
+       'm/s   ', &
+       'm/s   ', &
+       'T     ', &
+       'T     ', &
+       'T     ', &
+       'J/m3  ', &
+       'J/m3  ', &
        'Deg   ', &
        'Deg   ', &
        'none  ']
@@ -222,7 +252,7 @@ contains
     ! shock front is assumed to be location of max log(Rho/RhoOld)
     use ModNumConst,       ONLY: cRadToDeg
     use ModCoordTransform, ONLY: xyz_to_rlonlat
-    use SP_ModGrid,        ONLY: R_, Rho_, iLineAll0
+    use SP_ModGrid,        ONLY: R_, Rho_, Wave2_, iLineAll0
 
     ! Do not search too close to the Sun
     real, parameter :: RShockMin = 1.20  ! *RSun
@@ -287,6 +317,9 @@ contains
           ! convert units for angles
           StateShock_VIB([LonShock_,LatShock_], iLine) = &
                StateShock_VIB([LonShock_,LatShock_], iLine) * cRadToDeg
+          ! get MHD VARs
+          StateShock_VIB(RhoShock_:Wave2Shock_, iLine) = &
+               MHData_VIB(Rho_:Wave2_, iShockCandidate, iLine)
           ! also get compression ratio at shock surface
           StateShock_VIB(CompRatio_, iLine) = &
                maxval(MHData_VIB(Rho_, &

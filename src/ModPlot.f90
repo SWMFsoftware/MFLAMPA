@@ -773,11 +773,11 @@ contains
        case(Shock2D_)
           ! extra space reserved for line index
           allocate(File_I(iFile) % Buffer_II( &
-               File_I(iFile)%nExtraVar, 1:nLineAll, 1))
+               File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar, 1:nLineAll, 1))
        case(ShockTime_)
           ! extra space reserved for line index
           allocate(File_I(iFile) % Buffer_II( &
-               1+File_I(iFile)%nExtraVar, 1, 1))
+               1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar, 1, 1))
        end select
     end do
 
@@ -866,7 +866,8 @@ contains
        iKindData = File_I(iFile) % iKindData
 
        ! during initial call only background 1D data is printed
-       if(IsInitialOutput .and. iKindData /= MH1D_) iKindData = -1
+       if(IsInitialOutput .and. &
+          iKindData /= MH1D_ .and. iKindData /= Distr1D_) iKindData = -1
 
        select case(iKindData)
        case(MH1D_)
@@ -2823,10 +2824,10 @@ contains
          ! put time into buffer
          File_I(iFile) % Buffer_II(1+nExtraVar, nDataLine, 1) = SPTime
          ! get shock location
+         iShock = iShock_IB(Shock_, iLine)
          ! for ShockID_:
          iVarPlot = 1
          iVarIndex = File_I(iFile) % iVarExtra_V(iVarPlot)
-         iShock = iShock_IB(Shock_, iLine)
          File_I(iFile) % Buffer_II(iVarIndex, nDataLine, 1) = real(iShock)
          ! for {X,Y,Z,R,Lat,Lon}Shock_ and CompRatio_:
          iVarPlot = iVarPlot + XShock_ - ShockID_
