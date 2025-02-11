@@ -42,7 +42,7 @@ module SP_ModBc
 
   ! Lower end BC, set at the firsr point along the field line
   logical, public   :: UseLowerEndBc = .true.
-  ! Type of lower end BC: float, escape, inject
+  ! Type of lower end BC: float/floating, escape, inject
   character(LEN=6)  :: TypeLowerEndBc = 'inject'
   ! Index of the left lower end BC
   integer, public   :: iStart = 1
@@ -50,9 +50,12 @@ module SP_ModBc
        iStartUseLeft_   = 1, & ! when UseLowerEndBc = .true.
        iStartNoUseLeft_ = 2    ! when UseLowerEndBc = .false.
 
+  ! Momentum BC
+  character(LEN=6)  :: TypeMomemtumInjBc = 'inject'
+  character(LEN=6)  :: TypeMomemtumMaxBc = 'none'
   ! Upper end BC, set at the last point along the field line
   logical, public   :: UseUpperEndBc = .false.
-  ! Type of upper end BC: none, float, escape, lism
+  ! Type of upper end BC: none, float/floating, escape, lism
   character(LEN=6)  :: TypeUpperEndBc = 'none'
   real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(0:nP+1)
 contains
@@ -70,6 +73,9 @@ contains
        call read_var('SpectralIndex',   SpectralIndex)
        call read_var('EfficiencyGlob',  CoefInj)
        call read_var('EfficiencyLowBc', CoefInjLowBc)
+    case('#MOMENTUMBC')
+       call read_var('TypeMomemtumInjBc',  TypeMomemtumInjBc)
+       call read_var('TypeMomemtumMaxBc',  TypeMomemtumMaxBc)
     case('#LOWERENDBC')
        ! Read whether to use LowerLowBc
        call read_var('UseLowerEndBc', UseLowerEndBc)
@@ -93,7 +99,7 @@ contains
           case('none', 'f', 'false')
              ! Reset UseUpperEndBc
              UseUpperEndBc = .false.
-          case('float', 'escape')
+          case('float', 'floating', 'escape')
              ! Do nothing
           case('lism')
              ! We want to read the type of LIS here
@@ -112,57 +118,92 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine set_momentum_bc(iLine, iEnd, nSi_I, iShock)
+  subroutine set_momentum_bc(iLine, nX, nSi_I, iShock)
     ! Set boundary conditions for Distribution_CB on grid point,
     ! on the given field line.
 
-    integer, intent(in) :: iLine, iEnd, iShock
-    real,    intent(in) :: nSi_I(1:iEnd)
+    integer, intent(in) :: iLine, nX, iShock
+    real,    intent(in) :: nSi_I(1:nX)
     ! local variables
     integer :: iVertex     ! loop variable
     real    :: MomentumSi  ! Momentum for the thermal energy k_BTi
     real    :: CoefInjLocal, DistributionBc
+    character(len=*), parameter:: NameSub = 'set_momentum_bc'
 
     !--------------------------------------------------------------------------
-    do iVertex = 1, iEnd
-       ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
-       ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(1/2)/p_inj)^5
-       !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
-       ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
-       CoefInjLocal = CoefInjTiny
-       MomentumSi   = kinetic_energy_to_momentum( &
-            MhData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
+    select case(trim(TypeMomemtumInjBc))
+    case('inject')
+       do iVertex = 1, nX
+          ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
+          ! f = CoefInj/2/pi * N / (2*m*T_p)^(3/2) * ((2*m*T_p)^(1/2)/p_inj)^5
+          !   = CoefInj/2/pi * N / p^3 * (p/p_inj)^5
+          ! where p = sqrt(2*m*T_p) is the momentum of thermal ion
+          CoefInjLocal = CoefInjTiny
+          MomentumSi   = kinetic_energy_to_momentum( &
+               MhData_VIB(T_,iVertex,iLine)*Io2Si_V(UnitEnergy_))
 
-       DistributionBc = (SpectralIndex-3)/(4*cPi)   &
-            * MomentumInjSi**2*Io2Si_V(UnitEnergy_) &
-            * nSi_I(iVertex)/MomentumSi**3          &
-            * (MomentumSi/MomentumInjSi)**SpectralIndex
+          DistributionBc = (SpectralIndex-3)/(4*cPi)   &
+               * MomentumInjSi**2*Io2Si_V(UnitEnergy_) &
+               * nSi_I(iVertex)/MomentumSi**3          &
+               * (MomentumSi/MomentumInjSi)**SpectralIndex
 
-       if(iShock /= NoShock_ .and. iVertex <= iShock + nShockWidth .and.  &
-            iVertex >= iShock - nShockWidth) CoefInjLocal = CoefInj
+          if(iShock /= NoShock_ .and. iVertex <= iShock + nShockWidth .and.  &
+               iVertex >= iShock - nShockWidth) CoefInjLocal = CoefInj
 
-       Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
-    end do
-    ! Modified for lower end boundary
-    Distribution_CB(0, :, 1, iLine) = &
-         Distribution_CB(0, :, 1, iLine)/CoefInj*CoefInjLowBc
+          Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
+       end do
+       ! Modified for lower end boundary
+       Distribution_CB(0, :, 1, iLine) = &
+            Distribution_CB(0, :, 1, iLine)/CoefInj*CoefInjLowBc
+    case('float', 'floating', 'escape')
+       ! Neumann BC: Assume gradient = 0
+       Distribution_CB(0,:,1:nX,iLine) = Distribution_CB(1,:,1:nX,iLine)
+    case('grad')
+       ! Neumann BC: Use the same spectral power P0 <-> P1 <-> P2
+       ! Since P_{iP-1}, P_{iP} and P_{iP+1} is a geometric sequence, it gives
+       ! P_{iP+1} = P_{iP}**2 / P_{iP-1} and f_{iP+1} = f_{iP}**2 / f_{iP-1}.
+       Distribution_CB(0,:,1:nX,iLine) = &
+            Distribution_CB(1,:,1:nX,iLine)**2 &
+            /Distribution_CB(2,:,1:nX,iLine)
+    case default
+       call CON_stop(NameSub// &
+            ': Unknown type of momentum inj BC '//TypeMomemtumInjBc)
+    end select
+
+    select case(trim(TypeMomemtumMaxBc))
+    case('none')
+       ! Do nothing
+    case('float', 'floating', 'escape')
+       ! Neumann BC: Assume gradient = 0
+       Distribution_CB(nP+1,:,1:nX,iLine) = Distribution_CB(nP,:,1:nX,iLine)
+    case('grad')
+       ! Neumann BC: Use the same spectral power nP-1 <-> nP <-> nP+1
+       ! Since P_{iP-1}, P_{iP} and P_{iP+1} is a geometric sequence, it gives
+       ! P_{iP+1} = P_{iP}**2 / P_{iP-1} and f_{iP+1} = f_{iP}**2 / f_{iP-1}.
+       Distribution_CB(nP+1,:,1:nX,iLine) = &
+            Distribution_CB(nP,:,1:nX,iLine)**2 &
+            /Distribution_CB(nP-1,:,1:nX,iLine)
+    case default
+       call CON_stop(NameSub// &
+            ': Unknown type of momentum max BC '//TypeMomemtumMaxBc)
+    end select
 
   end subroutine set_momentum_bc
   !============================================================================
-  subroutine set_upper_end_bc(iLine, iEnd)
+  subroutine set_upper_end_bc(iLine, nX)
     ! Set boundary condition at the last grid point on the given field line.
     ! Assign the calculated BC to UpperEndBc_I.
 
-    integer, intent(in) :: iLine, iEnd
+    integer, intent(in) :: iLine, nX
     real :: XyzSi_D(3)                          ! Where to set BC
     !--------------------------------------------------------------------------
     select case(trim(TypeUpperEndBc))
-    case('float')
-       UpperEndBc_I = Distribution_CB(1:nP,nMu,iEnd,iLine)
+    case('float', 'floating')
+       UpperEndBc_I = Distribution_CB(1:nP, nMu, nX, iLine)
     case('escape')
        UpperEndBc_I = Background_I(1:nP)
     case('lism')
-       XyzSi_D = MhData_VIB(X_:Z_,iEnd,iLine)*Io2Si_V(UnitX_)
+       XyzSi_D = MhData_VIB(X_:Z_, nX, iLine)*Io2Si_V(UnitX_)
        call local_interstellar_spectrum(&
             nP = nP,                         &  ! # of grid points
             MomentumSi_I = Momentum_G(1:nP)* &
@@ -186,13 +227,13 @@ contains
     character(len=*), parameter:: NameSub = 'set_lower_end_bc'
     !--------------------------------------------------------------------------
     select case(trim(TypeLowerEndBc))
-    case('float')
-       LowerEndBc_I = Distribution_CB(0:nP+1, nMu, 1, iLine)
-    case('escape')
-       LowerEndBc_I = Background_I
     case('inject')
        LowerEndBc_I = Distribution_CB(0, 1, 1, iLine) &
             /Momentum_G(0:nP+1)**SpectralIndex
+    case('float', 'floating')
+       LowerEndBc_I = Distribution_CB(0:nP+1, nMu, 1, iLine)
+    case('escape')
+       LowerEndBc_I = Background_I
     case default
        call CON_stop(NameSub//&
             ': Unknown type of lower end BC '//TypeLowerEndBc)

@@ -644,6 +644,29 @@ in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
 
 <commandgroup name="ADVANCE">
 
+<command name="MOMENTUMBC">
+  <parameter name="TypeMomemtumInjBc" type="string" default="inject" />
+  <parameter name="TypeMomemtumMaxBc" type="string" default="none" />
+
+#MOMENTUMBC
+grad			TypeMomemtumInjBc
+grad			TypeMomemtumMaxBc
+
+Set up parameters for the momentum boundary condition, controlling the
+types of BC at injection/minimum and maximum particle energies or its
+equivalent momentum. 
+
+Once can set "inject" as TypeMomemtumInjBc for injecting particles, e.g.,
+for SEP simulations (then, it will use #INJECTION). However, in other cases
+like for background GCRs, there is no need to inject particles. Then, one
+can set "float"/"floating"/"escape" for a floating/escape boundary at
+injection/minimum energy/momentum, meaning to set f(iP=0) = f(iP=1). One
+can also set "grad" to use the same gradient, i.e., grad:f(iP=0) to f(iP=1)
+remains the same as grad:f(iP=1) to f(iP=2) in geometric scale. It is the
+same for the maximum energy/momentum by setting TypeMomemtumMaxBc. Any other
+type is regarded as an unrecognized one at this stage.
+</command>
+
 <command name="INJECTION">
   <parameter name="SpectralIndex" type="real" default="5.0" />
   <parameter name="EfficiencyGlob" type="real" min="0.0" default="1.0" />
@@ -769,7 +792,8 @@ The default value is true.
 T			DoTraceShock
 
 If DoTraceShock is False, the shock wave is not traced and the density
-profile is not sharpened around it.
+profile is not sharpened around it, which means that there is no shock
+accleration process involved.
 
 The default value is true.
 </command>

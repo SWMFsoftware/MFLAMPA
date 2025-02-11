@@ -92,7 +92,7 @@ contains
           call read_param_adv(NameCommand)
        case('#FOCUSEDTRANSPORT')
           call read_param_focused(NameCommand)
-       case('#INJECTION', '#LOWERENDBC', '#UPPERENDBC')
+       case('#INJECTION', '#MOMENTUMBC', '#LOWERENDBC', '#UPPERENDBC')
           call read_param_bc(NameCommand)
        case('#ECHANNEL', '#ECHANNELSAT')
           if(.not.IsFirstSession) CYCLE
