@@ -1990,9 +1990,11 @@ contains
            find_triangle_orig, find_triangle_sph
       use SP_ModSatellite,         ONLY: nSat, NameFileSat_I, &
            NameSat_I, XyzSat_DI, set_satellite_positions,     &
-           DoTrackSatellite_I, UsePoleTri, UsePlanarTri,      &
-           iSouthPoleTri_, iNorthPoleTri_, WeightSat_II,      &
-           IsTriangleFoundSat_I, iStencilOrigSat_II
+           DoTrackSatellite_I, IsTriangleFoundSat_I,          &
+           iStencilOrigSat_II, WeightSat_II
+      use SP_ModTriangulate,       ONLY: UsePoleTri, UsePlanarTri, &
+           iSouthPoleTri_, iNorthPoleTri_, DoTestTri, nLocTestTri, &
+           XyzLocTestTri_II
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -2004,10 +2006,10 @@ contains
 
       ! radial distance, longitude and latitude of satellite
       real    :: rSat, LonSat, LatSat
-      ! interpolation weight (in radial direction)
-      real    :: Weight
       ! index of particle just above the radius
       integer :: iAbove
+      ! interpolation weight (in radial direction)
+      real    :: Weight
       ! skip a field line not reaching radius of output sphere
       logical :: DoReachR_I(nLineAll)
 

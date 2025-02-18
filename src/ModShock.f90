@@ -410,7 +410,7 @@ contains
     use ModTriangulateSpherical, ONLY: trmesh
     use SP_ModGrid,              ONLY: iLineAll0
     use SP_ModProc,              ONLY: iComm, nProc, iProc, iError
-    use SP_ModSatellite,         ONLY: UsePoleTri
+    use SP_ModTriangulate,       ONLY: UsePoleTri
     use SP_ModUnit,              ONLY: Io2Si_V, UnitX_
 
     ! Effective points for the shock surface

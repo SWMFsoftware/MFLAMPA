@@ -49,11 +49,6 @@ module SP_ModSatellite
   ! Unlike ModSatellite in BATSRUS, here the saveplot frequencyis controlled
   ! by #NOUTPUT in SP_ModPlot so we do not read StartTime/EndTime/DtTraj.
 
-  ! If we use poles in triangulation
-  logical, public :: UsePoleTri   = .false.
-  logical, public :: UsePlanarTri = .true.
-  real,    public, parameter :: iSouthPoleTri_ = -1, iNorthPoleTri_ = -2
-
   ! Variables for interpolation in a triangular mesh
   logical, public, allocatable :: IsTriangleFoundSat_I(:) ! if we find tri.
   integer, public, allocatable :: iStencilOrigSat_II(:,:) ! orig. sat stencils
@@ -100,11 +95,6 @@ contains
           if(l2+1 <= 0) l2 = len_trim(NameFileSat_I(iSat))
           NameSat_I(iSat) = NameFileSat_I(iSat)(l1:l2)
        end do
-    case('#TRIANGULATION')
-       ! get pole triangulartion flag
-       call read_var('UsePoleTriangulation', UsePoleTri)
-       ! get the triangulation approach flag
-       call read_var('UsePlanarTriangles', UsePlanarTri)
     case default
        call CON_stop(NameSub//' unknown command='//NameCommand)
     end select

@@ -32,6 +32,7 @@ OBJECTS = \
 	ModTime.o \
 	ModTestFunc.o \
 	SP_ModTiming.o \
+	SP_ModTriangulate.o \
 	ModUnit.o \
 	ModTurbulence.o
 

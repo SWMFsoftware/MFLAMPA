@@ -34,25 +34,26 @@ contains
   !============================================================================
   subroutine read_param
 
-    use SP_ModAdvance,        ONLY: read_param_adv        => read_param
-    use SP_ModAdvancePoisson, ONLY: read_param_focused    => read_param
-    use SP_ModAngularSpread,  ONLY: read_param_spread     => read_param
-    use SP_ModBc,             ONLY: read_param_bc         => read_param
-    use SP_ModChannel,        ONLY: read_param_channel    => read_param
-    use SP_ModDiffusion,      ONLY: read_param_diffuse    => read_param
-    use SP_ModDistribution,   ONLY: read_param_dist       => read_param
-    use SP_ModGrid,           ONLY: read_param_grid       => read_param
-    use SP_ModOriginPoints,   ONLY: read_param_origin     => read_param
-    use SP_ModPlot,           ONLY: read_param_plot       => read_param
-    use SP_ModReadMHData,     ONLY: read_param_mhdata     => read_param
-    use SP_ModRestart,        ONLY: read_param_restart    => read_param
-    use SP_ModSatellite,      ONLY: read_param_satellite  => read_param
-    use SP_ModShock,          ONLY: read_param_shock      => read_param
-    use SP_ModTestFunc,       ONLY: read_param_testfunc   => read_param
-    use SP_ModTime,           ONLY: read_param_time       => read_param
-    use SP_ModTiming,         ONLY: read_param_timing     => read_param
-    use SP_ModTurbulence,     ONLY: read_param_turbulence => read_param
-    use SP_ModUnit,           ONLY: read_param_unit       => read_param
+    use SP_ModAdvance,        ONLY: read_param_adv         => read_param
+    use SP_ModAdvancePoisson, ONLY: read_param_focused     => read_param
+    use SP_ModAngularSpread,  ONLY: read_param_spread      => read_param
+    use SP_ModBc,             ONLY: read_param_bc          => read_param
+    use SP_ModChannel,        ONLY: read_param_channel     => read_param
+    use SP_ModDiffusion,      ONLY: read_param_diffuse     => read_param
+    use SP_ModDistribution,   ONLY: read_param_dist        => read_param
+    use SP_ModGrid,           ONLY: read_param_grid        => read_param
+    use SP_ModOriginPoints,   ONLY: read_param_origin      => read_param
+    use SP_ModPlot,           ONLY: read_param_plot        => read_param
+    use SP_ModReadMHData,     ONLY: read_param_mhdata      => read_param
+    use SP_ModRestart,        ONLY: read_param_restart     => read_param
+    use SP_ModSatellite,      ONLY: read_param_satellite   => read_param
+    use SP_ModShock,          ONLY: read_param_shock       => read_param
+    use SP_ModTestFunc,       ONLY: read_param_testfunc    => read_param
+    use SP_ModTime,           ONLY: read_param_time        => read_param
+    use SP_ModTiming,         ONLY: read_param_timing      => read_param
+    use SP_ModTriangulate,    ONLY: read_param_triangulate => read_param
+    use SP_ModTurbulence,     ONLY: read_param_turbulence  => read_param
+    use SP_ModUnit,           ONLY: read_param_unit        => read_param
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: read_var, read_line, read_command, read_echo_set
@@ -105,9 +106,12 @@ contains
           call read_param_mhdata(NameCommand)
        case('#VERBOSE')
           call read_param_testfunc(NameCommand)
-       case('#SATELLITE', '#TRIANGULATION')
+       case('#SATELLITE')
           if(.not.IsFirstSession) CYCLE
           call read_param_satellite(NameCommand)
+       case('#TESTTRIANGULATE', '#TRIANGULATION')
+          if(.not.IsFirstSession) CYCLE
+          call read_param_triangulate(NameCommand)
        case('#TRACESHOCK', '#IDENTIFYSHOCK')
           call read_param_shock(NameCommand)
        case('#TURBULENTSPECTRUM')
