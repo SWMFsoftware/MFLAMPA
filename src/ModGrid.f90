@@ -29,6 +29,7 @@ module SP_ModGrid
   public:: copy_old_state      ! save old arrays before getting new ones
   public:: get_other_state_var ! Auxiliary components of state vector
   public:: search_line         ! find particle index corresponding to radius
+  public:: check_line_ishock   ! check if iShock exceeds iEnd of the field line
   public:: nP                  ! Total number of points in the momentum grid
   public:: nMu                 ! Number of points in the pitch angle (mu) grid
   public:: IsMuAvg             ! If .true., VDF is omnidirectional
@@ -451,6 +452,16 @@ contains
     end if
 
   end subroutine search_line
+  !============================================================================
+  subroutine check_line_ishock(iLine)
+
+    ! check if the shock front is beyond the last coordinate of this field line
+    ! in case that we accidentally have fewer particles on this field line
+    integer, intent(in) :: iLine            ! index of line
+    !--------------------------------------------------------------------------
+    if(iShock_IB(Shock_, iLine) > nVertex_B(iLine)) Used_B(iLine) = .false.
+
+  end subroutine check_line_ishock
   !============================================================================
 end module SP_ModGrid
 !==============================================================================

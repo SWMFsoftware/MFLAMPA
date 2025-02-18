@@ -867,7 +867,7 @@ contains
 
        ! during initial call only background 1D data is printed
        if(IsInitialOutput .and. &
-          iKindData /= MH1D_ .and. iKindData /= Distr1D_) iKindData = -1
+            iKindData /= MH1D_ .and. iKindData /= Distr1D_) iKindData = -1
 
        select case(iKindData)
        case(MH1D_)
@@ -1993,8 +1993,7 @@ contains
            DoTrackSatellite_I, IsTriangleFoundSat_I,          &
            iStencilOrigSat_II, WeightSat_II
       use SP_ModTriangulate,       ONLY: UsePoleTri, UsePlanarTri, &
-           iSouthPoleTri_, iNorthPoleTri_, DoTestTri, nLocTestTri, &
-           XyzLocTestTri_II
+           iSouthPoleTri_, iNorthPoleTri_, DoTestTri, XyzLocTestTri_I
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -2059,12 +2058,14 @@ contains
       end select
 
       ! Save outputs for each satellite
-      do iSat = 1, nSat
+      TRI_SATELLITE: do iSat = 1, nSat
 
          ! set header
          StringHeader = 'MFLAMPA: Distribution along the trajectory of' &
               //trim(NameFileSat_I(iSat))//', with outputs: '  &
               //trim(File_I(iFile)%StringHeaderAux)
+         if(DoTestTri) StringHeader = &
+              "Test Triangulation in "//trim(StringHeader)
 
          ! set the file name
          call make_file_name( &
@@ -2076,6 +2077,8 @@ contains
 
          ! set and get the satellite location
          call set_satellite_positions(iSat)
+         ! if this is a test for the triangulation: NOT real SatelliteTraj
+         if(DoTestTri) XyzSat_DI(:, iSat) = XyzLocTestTri_I
          call xyz_to_rlonlat(XyzSat_DI(:, iSat), rSat, LonSat, LatSat)
 
          ! We then first have a radial interpolation at rSat
@@ -2087,7 +2090,7 @@ contains
 
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
-         TRI_INTERPOLATE: if(DoTrackSatellite_I(iSat)) then
+         TRI_INTERPOLATE: if(DoTrackSatellite_I(iSat) .or. DoTestTri) then
 
             ! go over all lines on the processor and find the point of
             ! intersection with output sphere if present
@@ -2318,7 +2321,10 @@ contains
                  trim(File_I(iFile) % NameAuxPlot), &
                  VarIn_II       = File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
          end if
-      end do ! iSat
+
+         ! if this is the test for the triangulation, just exit
+         if(DoTestTri) EXIT TRI_SATELLITE
+      end do TRI_SATELLITE ! iSat
 
     end subroutine write_distr_traj
     !==========================================================================

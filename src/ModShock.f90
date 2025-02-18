@@ -7,7 +7,7 @@ module SP_ModShock
   ! and steepening the density and magnetic field strength at shock front.
   use SP_ModGrid,   ONLY: nLine, nLineAll, Used_B, nVertex_B, &
        NameVar_V, LagrID_, X_, Z_, State_VIB, MhData_VIB, &
-       iShock_IB, NoShock_, Shock_, ShockOld_
+       iShock_IB, NoShock_, Shock_, ShockOld_, check_line_ishock
   use SP_ModSize,   ONLY: nVertexMax
   use ModUtilities, ONLY: CON_stop
 
@@ -24,7 +24,6 @@ module SP_ModShock
   public:: get_shock_location   ! finds shock location on all lines
   public:: steepen_shock        ! steepen the density profile at the shock
   public:: get_shock_skeleton   ! shock surface skeleton for visualization
-  public:: check_shock_location ! check the correctness of this field line
 
   ! If the shock wave is traced, the advance algorithms are modified
   logical, public :: DoTraceShock = .true.
@@ -296,8 +295,8 @@ contains
        if(iShockCandidate >= iShockMin) &
             iShock_IB(Shock_, iLine) = iShockCandidate
 
-       ! check_shock_location: update Used_B(iLine)
-       call check_shock_location(iLine)
+       ! check_line_ishock: update Used_B(iLine)
+       call check_line_ishock(iLine)
        if(.not.Used_B(iLine)) CYCLE
 
        ! calculate values only when we save states for the shock
@@ -537,13 +536,4 @@ contains
 
   end subroutine get_shock_skeleton
   !============================================================================
-  subroutine check_shock_location(iLine)
-
-    ! check if the shock front is beyond the last coordinate of this field line
-    ! in case that we accidentally have fewer particles on this field line
-    integer, intent(in) :: iLine            ! index of line
-    !--------------------------------------------------------------------------
-    if(iShock_IB(Shock_, iLine) > nVertex_B(iLine)) Used_B(iLine) = .false.
-
-  end subroutine check_shock_location
 end module SP_ModShock
