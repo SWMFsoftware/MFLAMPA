@@ -368,6 +368,23 @@ This command can only be used in the first session.
 Set the numbers for test node, position, and momentum.
 </command>
 
+<command name="TESTTRIANGULATE" if="$_IsFirstSession">
+  <parameter name="TestTriangulate"  type="logical" default="F" />
+  <parameter name="XLocTestTri"  type="real" default="214.0" />
+  <parameter name="YLocTestTri"  type="real" default="20.0" />
+  <parameter name="ZLocTestTri"  type="real" default="10.0" />
+
+#TESTTRIANGULATE
+T			TestTriangulate
+190.0			XLocTestTri [AU]
+100.0			YLocTestTri [AU]
+5.0			ZLocTestTri [AU]
+
+This command can only be used in the first session.
+
+Set the interpolated location in the unit of [AU] to test triangulation.
+</command>
+
 <command name="TRIANGULATION" if="$_IsFirstSession">
   <parameter name="UsePoleTriangulation"  type="logical" default="F" />
   <parameter name="UsePlanarTriangles"  type="logical" default="T" />

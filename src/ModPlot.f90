@@ -1985,16 +1985,12 @@ contains
       ! separate file is created for each satellite, and the name format is:
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
-      use ModCoordTransform,       ONLY: xyz_to_rlonlat
-      use ModTriangulateSpherical, ONLY: fix_state, &
-           find_triangle_orig, find_triangle_sph
-      use SP_ModSatellite,         ONLY: nSat, NameFileSat_I, &
-           NameSat_I, XyzSat_DI, set_satellite_positions,     &
-           DoTrackSatellite_I, IsTriangleFoundSat_I,          &
-           iStencilOrigSat_II, WeightSat_II
-      use SP_ModTriangulate,       ONLY: UsePoleTri, UsePlanarTri, &
-           iSouthPoleTri_, iNorthPoleTri_, DoTestTri, XyzLocTestTri_I, &
-           intersect_surf, build_trmesh
+      use ModCoordTransform, ONLY: xyz_to_rlonlat
+      use SP_ModSatellite,   ONLY: nSat, NameFileSat_I, NameSat_I, &
+           XyzSat_DI, set_satellite_positions, DoTrackSatellite_I, &
+           IsTriangleFoundSat_I, iStencilOrigSat_II, WeightSat_II
+      use SP_ModTriangulate, ONLY: DoTestTri, XyzLocTestTri_I, &
+           intersect_surf, build_trmesh, interpolate_trmesh
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -2085,7 +2081,7 @@ contains
                  iLineReach_I, Log10DistReachR_IIB, nReachR)
             ! Build the triangulated skeleton with multiple intersection points
             call build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
-                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
+                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, iSat, rSat)
             ! Check the error message from after build_trmesh
             if(iError /= 0) then
                write(*,*) NameSub//': Triangilation failed of ', &
@@ -2093,30 +2089,15 @@ contains
                EXIT TRI_INTERPOLATE
             end if
 
-            ! Find the triangle where the satellite locates
-            if(UsePlanarTri) then
-               call find_triangle_orig(                 &
-                    XyzSat_DI(:, iSat)/rSat, nTriMesh,  &
-                    XyzReachRUnit_DI(:, lidTri:ridTri), &
-                    iList_I, iPointer_I, iEnd_I,        &
-                    Weight_I, IsTriangleFound, iStencil_I)
-            else
-               call find_triangle_sph(                  &
-                    XyzSat_DI(:, iSat)/rSat, nTriMesh,  &
-                    XyzReachRUnit_DI(:, lidTri:ridTri), &
-                    iList_I, iPointer_I, iEnd_I,        &
-                    Weight_I(1), Weight_I(2),           &
-                    Weight_I(3), IsTriangleFound,       &
-                    iStencil_I(1), iStencil_I(2), iStencil_I(3))
-            end if
-            if(.not.IsTriangleFound) then
-               write(*,*) NameSub, ' WARNING: Interpolation fails on the', &
-                    'triangulated sphere, at the location of x,y,z=',      &
-                    XyzSat_DI(:, iSat), ' of ', trim(NameSat_I(iSat))
-               EXIT TRI_INTERPOLATE
-            end if
+            ! Interpolate the values to the specific point(s)
+            call interpolate_trmesh(rSat, XyzSat_DI(:, iSat), &
+                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, &
+                 XyzReachRUnit_DI, Log10DistReachR_IIB, &
+                 File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1), &
+                 IsTriangleFound, iStencil_I, Weight_I)
+            if(.not.IsTriangleFound) EXIT TRI_INTERPOLATE
 
-            ! Save IsTriangleFound, iStencil, and Weights
+            ! Save IsTriangleFound, iStencil and Weights
             IsTriangleFoundSat_I(iSat) = IsTriangleFound
             do i = 1, 3
                ! iStencil_I counts from lidTri
@@ -2125,37 +2106,6 @@ contains
             end do
             WeightSat_II(:, iSat) = Weight_I
 
-            ! Fix states (log10 distribution) at the polar nodes
-            if(UsePoleTri) then
-               do iMu = 1, nMu
-                  ! North:
-                  call fix_state( &
-                       iNodeToFix = ridTri,     &
-                       nNode      = nTriMesh,   &
-                       iList_I    = iList_I,    &
-                       iPointer_I = iPointer_I, &
-                       iEnd_I     = iEnd_I,     &
-                       Xyz_DI     = XyzReachRUnit_DI(:, lidTri:ridTri), &
-                       nVar       = nP+2,       &
-                       State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
-                  ! South:
-                  call fix_state( &
-                       iNodeToFix = lidTri,     &
-                       nNode      = nTriMesh,   &
-                       iList_I    = iList_I,    &
-                       iPointer_I = iPointer_I, &
-                       iEnd_I     = iEnd_I,     &
-                       Xyz_DI     = XyzReachRUnit_DI(:, lidTri:ridTri), &
-                       nVar       = nP+2,       &
-                       State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
-               end do
-            end if
-            ! Interpolate the log10(distribution) at satellite as outputs
-            do i = 1, 3
-               File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) = &
-                    File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) + &
-                    Log10DistReachR_IIB(:, :, iStencil_I(i))*Weight_I(i)
-            end do
             ! Account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
