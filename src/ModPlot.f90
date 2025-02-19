@@ -1986,15 +1986,15 @@ contains
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
       use ModCoordTransform,       ONLY: xyz_to_rlonlat
-      use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
+      use ModTriangulateSpherical, ONLY: fix_state, &
            find_triangle_orig, find_triangle_sph
       use SP_ModSatellite,         ONLY: nSat, NameFileSat_I, &
            NameSat_I, XyzSat_DI, set_satellite_positions,     &
            DoTrackSatellite_I, IsTriangleFoundSat_I,          &
            iStencilOrigSat_II, WeightSat_II
-      use SP_ModTriangulate,       ONLY: UsePoleTri,     &
-           UsePlanarTri, iSouthPoleTri_, iNorthPoleTri_, &
-           DoTestTri, XyzLocTestTri_I, triangulate_surf
+      use SP_ModTriangulate,       ONLY: UsePoleTri, UsePlanarTri, &
+           iSouthPoleTri_, iNorthPoleTri_, DoTestTri, XyzLocTestTri_I, &
+           intersect_surf, build_trmesh
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -2006,26 +2006,14 @@ contains
 
       ! radial distance, longitude and latitude of satellite
       real    :: rSat, LonSat, LatSat
-      ! index of particle just above the radius
-      integer :: iAbove
-      ! interpolation weight (in radial direction)
-      real    :: Weight
-      ! skip a field line not reaching radius of output sphere
-      logical :: DoReachR_I(nLineAll)
-
       ! loop variables
-      integer :: iLine, iSat, iMu, i
-      ! indexes of corresponding node, latitude and longitude
-      integer :: iLineAll
-      ! xyz coordinates of all intersection point or average direction
-      real    :: XyzUnit_DI(X_:Z_, nLineAll)
-      real    :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
+      integer :: iSat, iMu, i
       ! useful intersection points on a unit sphere
       ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
       real    :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
       integer :: iLineReach_I(1:nLineAll+2)
-      integer :: iReachR, nReachR
       real    :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
+      integer :: nReachR
       ! arrays to construct a triangular mesh on a sphere
       integer :: nTriMesh, lidTri, ridTri
       integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
@@ -2085,46 +2073,20 @@ contains
          ! We then first have a radial interpolation at rSat
          ! reset the output buffer, coordinates, flags, and log(Distribution)
          File_I(iFile) % Buffer_II = 0.0
-         XyzUnit_DI = 0.0; Log10DistR_IIB = 0.0
-         DoReachR_I = .false.; iLineReach_I = 0
+         iLineReach_I = 0
          XyzReachRUnit_DI = 0.0; Log10DistReachR_IIB = 0.0
 
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
          TRI_INTERPOLATE: if(DoTrackSatellite_I(iSat) .or. DoTestTri) then
 
-            call triangulate_surf(rSat, XyzReachRUnit_DI, iLineReach_I, &
-                 Log10DistReachR_IIB, DoReachR_I, nReachR)
-
-            ! For poles
-            if(UsePoleTri) then
-               ! Add two grid nodes at the poles:
-               lidTri = 1
-               ridTri = nReachR + 2
-               XyzReachRUnit_DI(:, lidTri) = [0.0, 0.0, -1.0]
-               XyzReachRUnit_DI(:, ridTri) = [0.0, 0.0, +1.0]
-               iLineReach_I(lidTri) = iSouthPoleTri_
-               iLineReach_I(ridTri) = iNorthPoleTri_
-            else
-               lidTri = 2
-               ridTri = nReachR + 1
-            end if
-
-            nTriMesh = ridTri - lidTri + 1
-            ! Allocate and initialize arrays for triangulation and
-            ! interpolation; if allocated, first deallocate them
-            if(allocated(iList_I))    deallocate(iList_I)
-            if(allocated(iPointer_I)) deallocate(iPointer_I)
-            if(allocated(iEnd_I))     deallocate(iEnd_I)
-            allocate(iList_I(6*(nTriMesh-2)), &
-                 iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
-            iList_I = 0; iPointer_I = 0; iEnd_I = 0
-            ! Construct the Triangular mesh used for interpolation
-            call trmesh(nTriMesh,                     &
-                 XyzReachRUnit_DI(X_, lidTri:ridTri), &
-                 XyzReachRUnit_DI(Y_, lidTri:ridTri), &
-                 XyzReachRUnit_DI(Z_, lidTri:ridTri), &
-                 iList_I, iPointer_I, iEnd_I, iError)
+            ! Intersect multiple field lines with the sphere
+            call intersect_surf(rSat, XyzReachRUnit_DI, &
+                 iLineReach_I, Log10DistReachR_IIB, nReachR)
+            ! Build the triangulated skeleton with multiple intersection points
+            call build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
+                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
+            ! Check the error message from after build_trmesh
             if(iError /= 0) then
                write(*,*) NameSub//': Triangilation failed of ', &
                     trim(NameSat_I(iSat)), ' at Iteration=', iIter

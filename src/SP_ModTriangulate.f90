@@ -15,8 +15,9 @@ module SP_ModTriangulate
 
   PRIVATE ! Except
 
-  public:: read_param    ! Read module parameters
-  public:: triangulate_surf ! Triangulate on a sphere with a given radius
+  public:: read_param     ! Read module parameters
+  public:: intersect_surf ! Intersect on a sphere with a given radius
+  public:: build_trmesh   ! Build the triangulated mesh skeleton
 
   ! Test triangulation
   logical, public :: DoTestTri = .false.
@@ -38,6 +39,7 @@ contains
     case("#TESTTRIANGULATE")
        call read_var('TestTriangulate', DoTestTri)
        if(DoTestTri) then
+          if(allocated(XyzLocTestTri_I)) deallocate(XyzLocTestTri_I)
           allocate(XyzLocTestTri_I(nDim))
           call read_var('XLocTestTri', XyzLocTestTri_I(1))
           call read_var('YLocTestTri', XyzLocTestTri_I(2))
@@ -54,8 +56,8 @@ contains
 
   end subroutine read_param
   !============================================================================
-  subroutine triangulate_surf(rSurf, XyzReachRUnit_DI, iLineReach_I, &
-       Log10DistReachR_IIB, DoReachR_I, nReachR)
+  subroutine intersect_surf(rSurf, XyzReachRUnit_DI, &
+       iLineReach_I, Log10DistReachR_IIB, nReachR)
 
     use ModMpi
     use SP_ModDistribution, ONLY: Distribution_CB
@@ -66,11 +68,8 @@ contains
     real,    intent(out) :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
     integer, intent(out) :: iLineReach_I(1:nLineAll+2)
     real,    intent(out) :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
-    ! skip a field line not reaching radius of output sphere
-    logical, intent(out) :: DoReachR_I(nLineAll)
+    ! Count how many field lines reach the sphere at the given r=rSurf
     integer, intent(out) :: nReachR
-    ! real, intent(out) :: XyzUnit_DI(X_:Z_, nLineAll)
-    ! real, intent(out) :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
 
     ! loop variables
     integer :: iLine, iReachR
@@ -80,6 +79,8 @@ contains
     integer :: iAboveR
     ! interpolation weight (in radial direction)
     real    :: WeightR
+    ! skip a field line not reaching radius of output sphere
+    logical :: DoReachR_I(nLineAll)
     ! xyz coordinates of all intersection point or average direction
     real    :: XyzUnit_DI(X_:Z_, nLineAll)
     real    :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
@@ -186,54 +187,54 @@ contains
 
     end subroutine gather_proc
     !==========================================================================
-    subroutine build_trmesh
+  end subroutine intersect_surf
+  !============================================================================
+  subroutine build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
+       nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
 
-      use ModTriangulateSpherical, ONLY: trmesh, fix_state, &
-           find_triangle_orig, find_triangle_sph
+    use ModTriangulateSpherical, ONLY: trmesh
+    ! Input: how many points reach the sphere
+    integer, intent(in)  :: nReachR
+    ! In/Outputs: Can be changed if UsePoleTri
+    real,    intent(inout) :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
+    integer, intent(inout) :: iLineReach_I(1:nLineAll+2)
+    ! Outputs: Count, left and right indices of the triangulated mesh
+    integer, intent(out) :: nTriMesh, lidTri, ridTri
+    ! Outputs: Arrays to construct a triangular mesh on a sphere
+    integer, intent(out), allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
+    !--------------------------------------------------------------------------
 
-      ! arrays to construct a triangular mesh on a sphere
-      integer :: nTriMesh, lidTri, ridTri
-      integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
-      !------------------------------------------------------------------------
+    ! For poles
+    if(UsePoleTri) then
+       ! Add two grid nodes at the poles:
+       lidTri = 1
+       ridTri = nReachR + 2
+       XyzReachRUnit_DI(:, lidTri) = [0.0, 0.0, -1.0]
+       XyzReachRUnit_DI(:, ridTri) = [0.0, 0.0, +1.0]
+       iLineReach_I(lidTri) = iSouthPoleTri_
+       iLineReach_I(ridTri) = iNorthPoleTri_
+    else
+       lidTri = 2
+       ridTri = nReachR + 1
+    end if
 
-      ! For poles
-      if(UsePoleTri) then
-         ! Add two grid nodes at the poles:
-         lidTri = 1
-         ridTri = nReachR + 2
-         XyzReachRUnit_DI(:, lidTri) = [0.0, 0.0, -1.0]
-         XyzReachRUnit_DI(:, ridTri) = [0.0, 0.0, +1.0]
-         iLineReach_I(lidTri) = iSouthPoleTri_
-         iLineReach_I(ridTri) = iNorthPoleTri_
-      else
-         lidTri = 2
-         ridTri = nReachR + 1
-      end if
+    nTriMesh = ridTri - lidTri + 1
+    ! Allocate and initialize arrays for triangulation and
+    ! interpolation; if allocated, first deallocate them
+    if(allocated(iList_I))    deallocate(iList_I)
+    if(allocated(iPointer_I)) deallocate(iPointer_I)
+    if(allocated(iEnd_I))     deallocate(iEnd_I)
+    allocate(iList_I(6*(nTriMesh-2)), &
+         iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
+    iList_I = 0; iPointer_I = 0; iEnd_I = 0
+    ! Construct the Triangular mesh used for interpolation
+    call trmesh(nTriMesh,                     &
+         XyzReachRUnit_DI(X_, lidTri:ridTri), &
+         XyzReachRUnit_DI(Y_, lidTri:ridTri), &
+         XyzReachRUnit_DI(Z_, lidTri:ridTri), &
+         iList_I, iPointer_I, iEnd_I, iError)
 
-      nTriMesh = ridTri - lidTri + 1
-      ! Allocate and initialize arrays for triangulation and
-      ! interpolation; if allocated, first deallocate them
-      if(allocated(iList_I))    deallocate(iList_I)
-      if(allocated(iPointer_I)) deallocate(iPointer_I)
-      if(allocated(iEnd_I))     deallocate(iEnd_I)
-      allocate(iList_I(6*(nTriMesh-2)), &
-           iPointer_I(6*(nTriMesh-2)), iEnd_I(nTriMesh))
-      iList_I = 0; iPointer_I = 0; iEnd_I = 0
-      ! Construct the Triangular mesh used for interpolation
-      call trmesh(nTriMesh,                     &
-           XyzReachRUnit_DI(X_, lidTri:ridTri), &
-           XyzReachRUnit_DI(Y_, lidTri:ridTri), &
-           XyzReachRUnit_DI(Z_, lidTri:ridTri), &
-           iList_I, iPointer_I, iEnd_I, iError)
-      !   if(iError /= 0) then
-      !      write(*,*) NameSub//': Triangilation failed of ', &
-      !           trim(NameSat_I(iSat)), ' at Iteration=', iIter
-      !      EXIT TRI_INTERPOLATE
-      !   end if
-
-    end subroutine build_trmesh
-    !==========================================================================
-  end subroutine triangulate_surf
+  end subroutine build_trmesh
   !============================================================================
 end module SP_ModTriangulate
 !==============================================================================
