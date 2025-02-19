@@ -54,35 +54,42 @@ contains
 
   end subroutine read_param
   !============================================================================
-  subroutine triangulate_surf(rSurf)
+  subroutine triangulate_surf(rSurf, XyzReachRUnit_DI, iLineReach_I, &
+       Log10DistReachR_IIB, DoReachR_I, nReachR)
 
     use ModMpi
     use SP_ModDistribution, ONLY: Distribution_CB
     ! Input: radius of the spherical surface
     real, intent(in) :: rSurf
+    ! Output: useful intersection points on a unit sphere
+    ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
+    real,    intent(out) :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
+    integer, intent(out) :: iLineReach_I(1:nLineAll+2)
+    real,    intent(out) :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
+    ! skip a field line not reaching radius of output sphere
+    logical, intent(out) :: DoReachR_I(nLineAll)
+    integer, intent(out) :: nReachR
+    ! real, intent(out) :: XyzUnit_DI(X_:Z_, nLineAll)
+    ! real, intent(out) :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
+
     ! loop variables
-    integer :: iLine
+    integer :: iLine, iReachR
     ! indexes of corresponding node, latitude and longitude
     integer :: iLineAll
     ! index of particle just above the radius
     integer :: iAboveR
     ! interpolation weight (in radial direction)
     real    :: WeightR
-    ! skip a field line not reaching radius of output sphere
-    logical :: DoReachR_I(nLineAll)
-
     ! xyz coordinates of all intersection point or average direction
     real    :: XyzUnit_DI(X_:Z_, nLineAll)
     real    :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
-    ! useful intersection points on a unit sphere
-    ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
-    real    :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
-    integer :: iReachR, nReachR
-    integer :: iLineReach_I(1:nLineAll+2)
-    real    :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
 
     character(len=*), parameter:: NameSub = 'triangulate_surf'
     !------------------------------------------------------------------------
+
+    XyzUnit_DI = 0.0; Log10DistR_IIB = 0.0
+    DoReachR_I = .false.; iLineReach_I = 0
+    XyzReachRUnit_DI = 0.0; Log10DistReachR_IIB = 0.0
 
     ! go over all lines on the processor and find the point of
     ! intersection with output sphere if present

@@ -1992,8 +1992,9 @@ contains
            NameSat_I, XyzSat_DI, set_satellite_positions,     &
            DoTrackSatellite_I, IsTriangleFoundSat_I,          &
            iStencilOrigSat_II, WeightSat_II
-      use SP_ModTriangulate,       ONLY: UsePoleTri, UsePlanarTri, &
-           iSouthPoleTri_, iNorthPoleTri_, DoTestTri, XyzLocTestTri_I
+      use SP_ModTriangulate,       ONLY: UsePoleTri,     &
+           UsePlanarTri, iSouthPoleTri_, iNorthPoleTri_, &
+           DoTestTri, XyzLocTestTri_I, triangulate_surf
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -2092,89 +2093,8 @@ contains
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
          TRI_INTERPOLATE: if(DoTrackSatellite_I(iSat) .or. DoTestTri) then
 
-            ! go over all lines on the processor and find the point of
-            ! intersection with output sphere if present
-            LINE:do iLine = 1, nLine
-               if(.not.Used_B(iLine)) CYCLE LINE
-               iLineAll = iLineAll0 + iLine
-
-               ! Find the particle just above the given radius
-               call search_line(iLine, rSat, &
-                    iAbove, DoReachR_I(iLineAll), Weight)
-               DoReachR_I(iLineAll) = DoReachR_I(iLineAll) .and. iAbove /= 1
-               ! if no intersection found -> proceed to the next line
-               if(.not.DoReachR_I(iLineAll)) CYCLE LINE
-
-               ! Found intersection => get POS & log10(f[Io]) at that location
-               ! Find coordinates and log(Distribution) at intersection
-               XyzUnit_DI(:, iLineAll) = ( &
-                    MHData_VIB(X_:Z_, iAbove-1, iLine)*(1-Weight) +  &
-                    MHData_VIB(X_:Z_, iAbove,   iLine)*   Weight )/rSat
-               Log10DistR_IIB(:, :, iLineAll) = ( &
-                    log10(Distribution_CB(:, :, iAbove,   iLine))* Weight + &
-                    log10(Distribution_CB(:, :, iAbove-1, iLine))*(1-Weight))
-            end do LINE !  iLine
-
-            ! Gather interpolated coordinates on the source processor
-            if(nProc > 1) then
-               if(iProc == 0) then
-                  call MPI_REDUCE(MPI_IN_PLACE, XyzUnit_DI, &
-                       3*nLineAll, MPI_REAL, MPI_SUM,       &
-                       0, iComm, iError)
-                  call MPI_REDUCE(MPI_IN_PLACE,             &
-                       Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
-                       MPI_REAL, MPI_SUM, 0, iComm, iError)
-                  call MPI_REDUCE(MPI_IN_PLACE, DoReachR_I, &
-                       nLineAll, MPI_LOGICAL, MPI_LOR,      &
-                       0, iComm, iError)
-               else
-                  call MPI_REDUCE(XyzUnit_DI, XyzUnit_DI,   &
-                       3*nLineAll, MPI_REAL, MPI_SUM,       &
-                       0, iComm, iError)
-                  call MPI_REDUCE(Log10DistR_IIB,           &
-                       Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
-                       MPI_REAL, MPI_SUM, 0, iComm, iError)
-                  call MPI_REDUCE(DoReachR_I, DoReachR_I,   &
-                       nLineAll, MPI_LOGICAL, MPI_LOR,      &
-                       0, iComm, iError)
-               end if
-            end if
-
-            ! Send useful interpolated coordinates to the source processor
-            if(iProc == 0) then
-               ! Calculate the useful points on the sphere
-               nReachR = count(DoReachR_I)
-               if(nReachR == nLineAll) then
-                  ! For most cases, the satellite used falls in 1.1-240 AU
-                  XyzReachRUnit_DI(:, 2:nLineAll+1) = XyzUnit_DI
-                  do iLineAll = 1, nLineAll
-                     iLineReach_I(iLineAll+1) = iLineAll
-                  end do
-                  Log10DistReachR_IIB(:, :, 2:nLineAll+1) = Log10DistR_IIB
-               else
-                  ! Otherwise, we will spend some time reorganizing the points
-                  iReachR = 1
-                  do iLineAll = 1, nLineAll
-                     if(DoReachR_I(iLineAll)) then
-                        iReachR = iReachR + 1
-                        XyzReachRUnit_DI(:, iReachR) = XyzUnit_DI(:, iLineAll)
-                        iLineReach_I(iReachR) = iLineAll
-                        Log10DistReachR_IIB(:, :, iReachR) = &
-                             Log10DistR_IIB(:, :, iLineAll)
-                     end if
-                  end do
-               end if
-            end if
-
-            ! Broadcast the coordinates and flags to all processors
-            call MPI_BCAST(XyzReachRUnit_DI, 3*(nLineAll+2), &
-                 MPI_REAL, 0, iComm, iError)
-            call MPI_BCAST(iLineReach_I, nLineAll+2, &
-                 MPI_INTEGER, 0, iComm, iError)
-            call MPI_BCAST(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
-                 MPI_REAL, 0, iComm, iError)
-            call MPI_BCAST(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
-            call MPI_BCAST(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
+            call triangulate_surf(rSat, XyzReachRUnit_DI, iLineReach_I, &
+                 Log10DistReachR_IIB, DoReachR_I, nReachR)
 
             ! For poles
             if(UsePoleTri) then

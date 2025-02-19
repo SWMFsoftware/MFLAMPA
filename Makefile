@@ -265,10 +265,10 @@ test_spectra:
 	${MAKE} test_spectra_rundir
 	@echo "test_spectra_run..." >> test_spectra.diff
 	${MAKE} test_spectra_run
-	@echo "test_spectra_check..." >> test_spectra.diff
-	${MAKE} test_spectra_check
 	@echo "test_spectra_trj_check..." >> test_spectra.diff
 	${MAKE} test_spectra_trj_check
+	@echo "test_spectra_check..." >> test_spectra.diff
+	${MAKE} test_spectra_check
 
 test_spectra_compile: test_compile
 
@@ -280,6 +280,15 @@ test_spectra_rundir:
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
 test_spectra_run: test_run
+
+test_spectra_trj_check:
+	cat ${TESTDIR}/SP/IO2/Distr*_def_*.out \
+		> ${TESTDIR}/SP/IO2/Distraj_data.outs
+	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
+		${TESTDIR}/SP/IO2/Distraj_data.outs \
+		data/output/test_mflampa/Distraj_poisson_data.ref.gz \
+		> test_spectra.diff
+	ls -l test_spectra.diff
 
 test_spectra_check:
 	cat ${TESTDIR}/SP/IO2/MH_data_{*???_???,*n000006}.out \
@@ -294,15 +303,6 @@ test_spectra_check:
 	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
 		${TESTDIR}/SP/IO2/Distr_data.outs \
 		data/output/test_mflampa/Distr_poisson_data.ref.gz \
-		> test_spectra.diff
-	ls -l test_spectra.diff
-
-test_spectra_trj_check:
-	cat ${TESTDIR}/SP/IO2/*_def_*.out \
-		> ${TESTDIR}/SP/IO2/Distraj_data.outs
-	${SCRIPTDIR}/DiffNum.pl -BLESS=${BLESS} -t -r=1e-6 -a=1e-6 \
-		${TESTDIR}/SP/IO2/Distraj_data.outs \
-		data/output/test_mflampa/Distraj_poisson_data.ref.gz \
 		> test_spectra.diff
 	ls -l test_spectra.diff
 
