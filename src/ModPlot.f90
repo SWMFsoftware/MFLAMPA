@@ -2081,7 +2081,7 @@ contains
                  iLineReach_I, Log10DistReachR_IIB, nReachR)
             ! Build the triangulated skeleton with multiple intersection points
             call build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
-                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, iSat, rSat)
+                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
             ! Check the error message from after build_trmesh
             if(iError /= 0) then
                write(*,*) NameSub//': Triangilation failed of ', &

@@ -128,7 +128,7 @@ contains
     MomentumInjSi= kinetic_energy_to_momentum(EnergyInjIo*Io2Si_V(UnitEnergy_))
     MomentumMaxSi= kinetic_energy_to_momentum(EnergyMaxIo*Io2Si_V(UnitEnergy_))
     ! grid size in the log momentum space
-    dLogP = log(MomentumMaxSi/MomentumInjSi)/nP
+    dLogP = log(MomentumMaxSi/MomentumInjSi)/real(nP)
 
     ! Functions to convert the grid index to momentum and energy
     Momentum3_F(-1) = exp(-3*(0.5*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj

@@ -189,13 +189,11 @@ contains
   end subroutine intersect_surf
   !============================================================================
   subroutine build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
-       nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, iSat, rSat)
+       nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
 
     use ModTriangulateSpherical, ONLY: trmesh
-    use SP_ModSatellite, ONLY: XyzSat_DI
     ! Input: how many points reach the sphere
-    integer, intent(in)  :: nReachR, iSat
-    real,    intent(in)  :: rSat
+    integer, intent(in)  :: nReachR
     ! In/Outputs: Can be changed if UsePoleTri
     real,    intent(inout):: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
     integer, intent(inout):: iLineReach_I(1:nLineAll+2)
@@ -203,7 +201,6 @@ contains
     integer, intent(out)  :: nTriMesh, lidTri, ridTri
     ! Outputs: Arrays to construct a triangular mesh on a sphere
     integer, intent(out), allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
-    integer :: iReachR
     !--------------------------------------------------------------------------
 
     ! For poles
@@ -219,20 +216,6 @@ contains
        lidTri = 2
        ridTri = nReachR + 1
     end if
-
-    do iReachR = lidTri, ridTri
-        write(*,*) "iSat=", iSat, rSat, iReachR, XyzReachRUnit_DI(:, iReachR)
-    end do
-    select case(iSat)
-    case(1) ! Earth
-        XyzSat_DI(:, iSat) = [-0.28, 0.82, sqrt(1-0.82*0.82-0.28*0.28)]*rSat
-    case(2) ! STA
-        XyzSat_DI(:, iSat) = [-0.3, 0.82, sqrt(1-0.82*0.82-0.3*0.3)]*rSat
-    case(3) ! PSP
-        XyzSat_DI(:, iSat) = [-0.59, 0.66, sqrt(1-0.66*0.66-0.59*0.59)]*rSat
-    case(4) ! SolO
-        XyzSat_DI(:, iSat) = [-0.36, 0.79, sqrt(1-0.79*0.79-0.36*0.36)]*rSat
-    end select
 
     nTriMesh = ridTri - lidTri + 1
     ! Allocate and initialize arrays for triangulation and

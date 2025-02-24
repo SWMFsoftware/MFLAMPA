@@ -112,10 +112,13 @@ contains
 
     if(allocated(IsTriangleFoundSat_I)) deallocate(IsTriangleFoundSat_I)
     allocate(IsTriangleFoundSat_I(nSat))
+    IsTriangleFoundSat_I = .false.
     if(allocated(iStencilOrigSat_II)) deallocate(iStencilOrigSat_II)
     allocate(iStencilOrigSat_II(nDim, nSat))
+    iStencilOrigSat_II = 0
     if(allocated(WeightSat_II)) deallocate(WeightSat_II)
     allocate(WeightSat_II(nDim, nSat))
+    WeightSat_II = 0.0
 
   end subroutine init
   !============================================================================

@@ -43,9 +43,22 @@ module SP_ModDiffusion
 
   ! Whether to include diffusion term
   logical, public :: UseDiffusion = .true.
+  logical, public :: UseDiffusionPerp = .false. ! Perpendicular Diffusion
   ! Set diffusion or scatter coefficients
   real, public, dimension(nVertexMax) :: DOuterSi_I, &
-       CoefLambdaxx_I, CoefLambdaMuMu_I        ! For Lambda_xx and Lambda_mumu
+       CoefLambdaxx_I, CoefLambdaMuMu_I         ! For lambda_xx and lambda_mumu
+  ! Perpendicular diffusion
+  real,    public :: DPerpRatio = 0.065         ! Simple ratio of Dperp/Dpara
+  ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
+  integer         :: nRPerp, nThetaPerp, nPhiPerp
+  real            :: dThetaPerp, dPhiPerp       ! dTheta and dPhi
+  real, allocatable:: dRPerpMesh_I(:), dRPerpFace_I(:) ! dR of cell center+face
+  real            :: RMinPerp = 1.2, RMaxPerp = 240.0  ! RMin and RMax of Grid
+  real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
+  character(len=6):: ScaleRPerp                 ! Scale (Linear/Log) along R_
+  real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
+       RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:)
+
   ! Local parameters!
   ! Diffusion as in Li et al. 2003, doi:10.1029/2002JA009666
   logical, public :: UseFixedMeanFreePathUpstream = .false.
@@ -59,6 +72,7 @@ contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
+    integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
     character(len=*), intent(in) :: NameCommand ! From PARAM.in
     character(len=8) :: StringScaleTurbulenceType
     character(len=*), parameter:: NameSub = 'read_param'
@@ -86,6 +100,70 @@ contains
        ScaleTurbulenceSi = ScaleTurbulenceSi * cAu
     case('#DIFFUSION')
        call read_var('UseDiffusion', UseDiffusion)
+    case('#DPERP')
+       call read_var('UseDiffusionPerp', UseDiffusionPerp)
+       if(UseDiffusionPerp) then
+          ! Simply assume DPerp/DPara = DPerpRatio
+          call read_var('DPerpRatio', DPerpRatio)
+
+          ! Handle triangulated mesh in radial direction
+          call read_var('nRPerp', nRPerp)
+          call read_var('RMinPerp', RMinPerp)
+          call read_var('RMaxPerp', RMaxPerp)
+          if(nRPerp<=1 .or. RMinPerp<=0.0 .or. RMaxPerp<RMinPerp) RETURN
+          if(allocated(RPerp_C)) deallocate(RPerp_C)
+          allocate(RPerp_C(nRPerp))
+          if(allocated(RPerp_F)) deallocate(RPerp_F)
+          allocate(RPerp_F(nRPerp+1))
+          if(allocated(dRPerpMesh_I)) deallocate(dRPerpMesh_I)
+          allocate(dRPerpMesh_I(nRPerp-1))
+          if(allocated(dRPerpFace_I)) deallocate(dRPerpFace_I)
+          allocate(dRPerpFace_I(nRPerp))
+          ! From RMinPerp to RMaxPerp: Distribution of multiple spheres
+          call read_var('ScaleRPerp', ScaleRPerp)
+          select case(trim(ScaleRPerp))
+          case("Linear", "linear")
+             dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
+             dRPerpFace_I = dRPerpMesh_I(1) ! Same=Const.
+             do iRPerp = 1, nRPerp
+                RPerp_F(iRPerp) = RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1)
+             end do
+             RPerp_F(nRPerp+1) = RMaxPerp
+             RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+          case("Exp", "exp", "Exponential", "exponential")
+             dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
+             do iRPerp = 1, nRPerp+1
+               RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
+             end do
+             RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+             dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
+             dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
+          end select
+
+          ! Handle lon-lat grid in the triangulated mesh
+          call read_var('nThetaPerp', nThetaPerp)
+          call read_var('nPhiPerp', nPhiPerp)
+          if(nThetaPerp<=0 .or. nPhiPerp<=0) RETURN
+          ! Theta: nThetaPerp, dThetaPerp and ThetaPerp_C
+          if(mod(nThetaPerp, 2) > 0) then
+             write(*,*) "nThetaPerp reads", nThetaPerp, "and becomes", &
+                  nThetaPerp+1, "to avoid singularity when theta=0"
+             nThetaPerp = nThetaPerp + 1
+          end if
+          dThetaPerp = cPi/real(nThetaPerp)
+          if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C)
+          allocate(ThetaPerp_C(nThetaPerp))
+          do iThetaPerp = 1, nThetaPerp
+             ThetaPerp_C(iThetaPerp) = (real(iThetaPerp)-0.5)*dThetaPerp
+          end do
+          ! Phi: nPhiPerp, dPhiPerp and PhiPerp_C
+          dPhiPerp = cTwoPi/real(nPhiPerp)
+          if(allocated(PhiPerp_C)) deallocate(PhiPerp_C)
+          allocate(PhiPerp_C(nPhiPerp))
+          do iPhiPerp = 1, nPhiPerp
+             PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
+          end do
+       end if
     end select
   end subroutine read_param
   !============================================================================
@@ -347,6 +425,18 @@ contains
     end do MU
 
   end subroutine diffuse_distribution_c
+  !============================================================================
+  subroutine diffuseperp_distribution()
+
+    !--------------------------------------------------------------------------
+    ! cross-field (perpendicular) diffusion
+  contains
+    !==========================================================================
+    subroutine get_multi_uniform_spheres
+
+    end subroutine get_multi_uniform_spheres
+    !==========================================================================
+  end subroutine diffuseperp_distribution
   !============================================================================
   subroutine scatter_distribution_s(iLine, nX, nSi_I, BSi_I, Dt)
     ! Calculate scattering: \deltaf/\deltat = (Dmumu*f_mu)_mu with global Dt
