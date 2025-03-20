@@ -75,7 +75,8 @@ rundir:
 	mkdir -p ${RUNDIR}/SP
 	cd ${RUNDIR}/SP; \
 		mkdir restartIN restartOUT IO2; \
-		ln -s ${SPDIR}/Param .
+		ln -s ${SPDIR}/Param .; \
+		ln -s ${DIR}/GM/BATSRUS/data/TRAJECTORY .
 	@(if [ "$(STANDALONE)" != "NO" ]; then \
 		touch ${DIR}/share/JobScripts/job._TMP_${MACHINE}; \
 		touch ${DIR}/share/JobScripts/_TMP_.${MACHINE}.pl; \
