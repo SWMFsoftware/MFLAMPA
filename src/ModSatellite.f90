@@ -221,7 +221,7 @@ contains
              ! Temporary: new nPoint
              i = nPoint - iOffset + 1
              Xyz_DI(:, 1:i) = Xyz_DI(:, iOffset:nPoint)
-             Timme_I(1:i) = Time_I(iOffset:nPoint)
+             Time_I(1:i) = Time_I(iOffset:nPoint)
              nPoint = i
           end if
           ! Convert the coordinates if necessary (Out /= In)
