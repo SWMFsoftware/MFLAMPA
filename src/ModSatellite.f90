@@ -7,6 +7,7 @@ module SP_ModSatellite
   use SP_ModProc,     ONLY: iProc, iComm, iError
   use SP_ModSize,     ONLY: nDim
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
+  use SP_ModGrid,     ONLY: TypeCoordSystem
 
   implicit none
 
@@ -27,11 +28,6 @@ module SP_ModSatellite
   character(len=50), public:: NameFileSat_I(MaxSat)
   ! Names of the satellite
   character(len=50), public:: NameSat_I(MaxSat)
-
-  ! Coordinate system
-  character(len=3), public :: TypeCoordOut  ! Coord of outputs (default: HGR)
-  character(len=3), public :: TypeCoordSat_I(MaxSat)  ! Coord in TRAJECTORY
-  character(len=3), public :: TypeCoordPlot_I(MaxSat) ! Coord for plotting
 
   ! Current positions
   real, public:: XyzSat_DI(nDim, MaxSat)
@@ -64,7 +60,6 @@ contains
     integer :: iSat                         ! loop variable for satellites
     ! VARs for SATELLITE, specified to save the VDF along trajectories
     integer :: l1, l2                       ! indices to get satellite name
-    character(len=3) :: TypeCoordSC = "HGR" ! as usually used in SC
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     call test_start(NameSub, DoTest)
@@ -77,14 +72,6 @@ contains
        UseSatellite = .true.
        if(nSat > MaxSat) call CON_stop(NameSub // ': Number of ' // &
             'output files is too large in #SATELLITE: nSat > MaxSat')
-
-       ! Recognize the coordinate system which the satellite trajetory is
-       ! converted to, which can be GEO, GSE, GSM, MAG, SMG, HGR, HGI, HGC
-       call read_var('TypeCoordSystem', TypeCoordOut)
-       TypeCoordPlot_I(1:nSat) = TypeCoordOut
-       if(TypeCoordOut /= TypeCoordSC) &
-            write(*,*) NameSub // " WARNING: MhData in SC/IH are in" &
-            // TypeCoordSC // "as default, but now in "// TypeCoordOut
 
        ! Read satellite input file name and set the satellite name
        do iSat = 1, nSat
@@ -138,12 +125,13 @@ contains
     integer            :: nPoint                ! count of location points
     integer            :: MaxPoint              ! maximum location points
     integer            :: i, iSat               ! loop variables
+    integer            :: iOffset               ! last point in which time<0
     integer            :: iTime_I(7)            ! time: YYYY/MM/DD-hh:mm:ss:ms
     real               :: Xyz_D(nDim)           ! location coordinates
     real(Real8_)       :: DateTime              ! date and time
     real, allocatable  :: Time_I(:), Xyz_DI(:,:)! time and location arrays
     character(len=100) :: NameFile              ! readin filenames
-    character(len=3)   :: TypeCoordIn = 'HGI'   ! 'HGI' in TRAJECTORY files
+    character(len=3)   :: TypeCoordSat = 'HGI'  ! 'HGI' in TRAJECTORY files
 
     logical:: DoTest
     character(len=*), parameter:: NameSub = 'read_satellite_input_files'
@@ -199,17 +187,15 @@ contains
                write(STDOUT_, *) NameSub, " reading: ", trim(NameFile)
 
           call open_file(file=NameFile, status="old")
-          nPoint = 0
-
+          nPoint  = 0
+          iOffset = 0
           ! Read the file: read #COOR TypeCoord, #START and points
-          ! Default coordinate system is the one used by BATSRUS (HGR/GSM?)
-          TypeCoordSat_I(iSat) = TypeCoordIn
           READFILE: do
              read(UnitTmp_,'(a)', iostat=iError) StringLine
              if(iError /= 0) EXIT READFILE
 
              if(index(StringLine, '#COOR')>0) &
-                  read(UnitTmp_,'(a)') TypeCoordSat_I(iSat)
+                  read(UnitTmp_,'(a)') TypeCoordSat
 
              if(index(StringLine, '#START')>0) then
                 READPOINTS: do
@@ -222,18 +208,27 @@ contains
                    ! Convert integer date/time to simulation time
                    call time_int_to_real(iTime_I, DateTime)
                    Time_I(nPoint) = DateTime - StartTime
+                   if(Time_I(nPoint) < 0.0) iOffset = nPoint
                 enddo READPOINTS
              end if
           end do READFILE
 
           call close_file
-          if(DoTest) write(*,*) NameSub, ': nPoint=', nPoint
-
+          if(DoTest) write(*,*) NameSub//': nPoint=', nPoint, &
+               ' iOffset=', iOffset
+          ! Meaningfull part of trajectory ranges from iOffset to nPoint:
+          if( iOffset > 1 ) then
+             ! Temporary: new nPoint
+             i = nPoint - iOffset + 1
+             Xyz_DI(:, 1:i) = Xyz_DI(:, iOffset:nPoint)
+             Timme_I(1:i) = Time_I(iOffset:nPoint)
+             nPoint = i
+          end if
           ! Convert the coordinates if necessary (Out /= In)
-          if(TypeCoordPlot_I(iSat) /= TypeCoordSat_I(iSat)) then
+          if(TypeCoordSystem /= TypeCoordSat) then
              do i = 1, nPoint
                 Xyz_DI(:, i) = matmul(transform_matrix(Time_I(i), &
-                     TypeCoordSat_I(iSat), TypeCoordPlot_I(iSat)), Xyz_DI(:,i))
+                     TypeCoordSat, TypeCoordSystem), Xyz_DI(:,i))
              end do
           end if
 
@@ -252,6 +247,7 @@ contains
        ! Store time and positions for satellite iSat on all PE-s
        TimeSat_II(1:nPoint, iSat) = Time_I(1:nPoint)
        XyzSat_DII(:, 1:nPoint, iSat) = Xyz_DI(:, 1:nPoint)
+       iPointCurrentSat_I(1:nSat) = 1
 
        if(DoTest) then
           nPoint = min(10, nPoint)
