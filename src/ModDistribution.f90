@@ -44,7 +44,8 @@ module SP_ModDistribution
   ! P**3/3 and total energy in the IO unit, at face center
   real, public, dimension(-1:nP+1) :: Momentum3_F, EnergyIo_F, GammaLorentz_F
   ! Speed, momentum, kinetic energy at the momentum grid points
-  real, public, dimension( 0:nP+1) :: SpeedSi_G, Momentum_G, KinEnergyIo_G
+  real, public, dimension( 0:nP+1) :: SpeedSi_G, Momentum_G, &
+          KinEnergyIo_G, GammaLorentz_G
   ! Volumes of each cell along the momentum axis
   real, public, dimension( 0:nP+1) :: VolumeP_I, VolumeE_I, VolumeE3_I
   real, public, dimension( 0:nP+1) :: Background_I
@@ -132,7 +133,7 @@ contains
 
     ! Functions to convert the grid index to momentum and energy
     Momentum3_F(-1) = exp(-3*(0.5*dLogP))/3.0 ! P^3/3 at -0.5*dLogP from PInj
-    EnergyIo_F(-1) = momentum_to_energy(MomentumInjSi*exp(-0.5*dLogP))
+    EnergyIo_F(-1) = momentum_to_energy(MomentumInjSi*exp(-0.5*dLogP)) ! SI now
     do iP = 0, nP+1
        Momentum_G(iP)    = MomentumInjSi*exp(iP*dLogP)
        ! For velocity = p*c**2/sqrt(p**2+(m*c**2)**2), at cell center
@@ -152,8 +153,9 @@ contains
             (EnergyMaxIo-EnergyInjIo) &  ! Energy range
             /Momentum_G(iP)**2           ! Convert from diff flux to VDF
     end do
+    GammaLorentz_G = KinEnergyIo_G*Io2Si_V(UnitEnergy_)/cRmeProton + 1.0
     GammaLorentz_F = EnergyIo_F/cRmeProton
-    EnergyIo_F = EnergyIo_F*Si2Io_V(UnitEnergy_)
+    EnergyIo_F = EnergyIo_F*Si2Io_V(UnitEnergy_) ! SI to IO
     VolumeE_I  = EnergyIo_F(0:nP+1)    - EnergyIo_F(-1:nP)
     VolumeE3_I = EnergyIo_F(0:nP+1)**3 - EnergyIo_F(-1:nP)**3
 

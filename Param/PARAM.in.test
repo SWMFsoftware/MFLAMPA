@@ -22,8 +22,15 @@ T			DoRun
 #TRACESHOCK
 F			DoTraceShock
 
-#DIFFUSION
+#SCALETURBULENCE
+constant		ScaleTurbulenceType
+0.2402397832		ScaleTurbulence1AU [AU]
+
+#DIFFUSIONPARA
 T			UseDiffusion
+F			UseBtotal
+sokolov2004			TypeMhdDiffusion
+F			UseFixedUps
 
 #INCLUDE
 MH_data_e20120123/MH_data.H
@@ -40,10 +47,6 @@ mh2d flux ascii		StringPlot
 mhtime flux ascii		StringPlot
 215.0			Radius
 
-#SCALETURBULENCE
-constant		ScaleTurbulenceType
-0.2402397832		ScaleTurbulence1AU [AU]
-
 #STOP
 -1			nIterMax
 300			TimeMax
@@ -52,9 +55,12 @@ constant		ScaleTurbulenceType
 
 ==============================================================================
 
-#USEFIXEDMFPUPSTREAM
-T			UseFixedMeanFreePathUpstream
-0.3			MeanFreePath0InAu [AU]
+#DIFFUSIONPARA
+T			UseDiffusion
+F			UseBtotal
+sokolov2004			TypeMhdDiffusion
+T			UseFixedUps
+0.3			MeanFreePath0InAu
 
 #STOP
 -1			nIterMax

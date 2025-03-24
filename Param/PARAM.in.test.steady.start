@@ -33,6 +33,10 @@ F			DoTraceShock
 #ADVECTION
 T			UsePoissonBracket
 
+#SCALETURBULENCE
+constant		ScaleTurbulenceType
+0.2402397832		ScaleTurbulence1AU [AU]
+
 #INCLUDE
 MH_data_e20120123/MH_data.H
 
@@ -60,10 +64,6 @@ mh2d flux ascii		StringPlot
 #NOUTPUT
 10			nOutput
 -1.0			DtOutput
-
-#SCALETURBULENCE
-constant		ScaleTurbulenceType
-0.2402397832		ScaleTurbulence1AU [AU]
 
 #STOP
 10			nIterMax

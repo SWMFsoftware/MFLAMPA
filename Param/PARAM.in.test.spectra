@@ -22,11 +22,18 @@ T			DoRun
 #TRACESHOCK
 F			DoTraceShock
 
-#DIFFUSION
-T			UseDiffusion
-
 #ADVECTION
 T			UsePoissonBracket
+
+#SCALETURBULENCE
+constant		ScaleTurbulenceType
+0.2402397832		ScaleTurbulence1AU [AU]
+
+#DIFFUSIONPARA
+T			UseDiffusion
+F			UseBtotal
+sokolov2004			TypeMhdDiffusion
+F			UseFixedUps
 
 #PARTICLEENERGYUNIT
 keV			ParticleEnergyUnit
@@ -107,10 +114,6 @@ distrtime energy def ascii		StringPlot
 215.0			Radius
 distrtraj energy def ascii		StringPlot
 
-#SCALETURBULENCE
-constant		ScaleTurbulenceType
-0.2402397832		ScaleTurbulence1AU [AU]
-
 #NOUTPUT
 -1			nOutput
 100			DtOutput
@@ -123,9 +126,12 @@ constant		ScaleTurbulenceType
 
 ==============================================================================
 
-#USEFIXEDMFPUPSTREAM
-T			UseFixedMeanFreePathUpstream
-0.3			MeanFreePath0InAu [AU]
+#DIFFUSIONPARA
+T			UseDiffusion
+F			UseBtotal
+sokolov2004			TypeMhdDiffusion
+T			UseFixedUps
+0.3			MeanFreePath0InAu
 
 #STOP
 -1			nIterMax

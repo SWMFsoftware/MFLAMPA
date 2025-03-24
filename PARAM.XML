@@ -833,30 +833,37 @@ be too close to the end, so there is a number of nShockMargin
 settign for the "margin" distance.
 </command>
 
-<command name="#USEFIXEDMFPUPSTREAM">
-  <parameter name="UseFixedMeanFreePathUpstream" type="logical" default="F" />
-  <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="0.3" />
-
-#USEFIXEDMFPUPSTREAM
-F			UseFixedMeanFreePathUpstream
-0.3			MeanFreePath0InAu [AU]
-
-Determine whether we set the mean free path, see
-Li et al. (2003), doi: 10.1029/2002JA009666.
-The default value for UseFixedMeanFreePathUpstream is set as
-as false, and that for MeanFreePath0InAu is 0.3 [AU], one can
-also see Chen et al. (2024), doi: 10.3847/1538-4357/ad33c3.
-</command>
-
-
 <command name="DIFFUSION">
   <parameter name="UseDiffusion" type="logical" default="T" />
+  <parameter name="UseBtotal" type="logical" default="F" />
+  <parameter name="TypeMhdDiffusion" type="string" default="sokolov2004" />
+  <parameter name="UseFixedUps" type="logical" default="F" />
+  <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="0.3" />
 
-#DIFFUSION
+#DIFFUSIONPARA
 T			UseDiffusion
+F			UseBtotal
+sokolov2004			TypeMhdDiffusion
+T			UseFixedUps
+0.3			MeanFreePath0InAu
 
 Used for testing, to disable diffusion, if UseDiffusion is false.
 The default value is true.
+
+UseBtotal is for the turbulence calculation: when calculating (B/dB)**2,
+if UseBtotal=.true., B is given as sqrt(B**2+dB**2). The default value
+is false, and one can turn this on. 
+TypeMhdDiffusion is to determine how the turbulence (dB) is calculated
+from the MHD parameters. "giacalone1999" assumes a (dB)**2/(1+(k*lc)**(5/3))
+law for the power spectral density in the turbulence spectrum. "sokolov2004"
+is what we use from the Sokolov et al 2004 paper, assuming Ic*k**(-5/3) law
+with a correlation length setup in "ScaleTurbulence1AU".
+
+UseFixedUps is to determine whether we set the mean free path in upstream,
+with formulas described Li et al. (2003), doi: 10.1029/2002JA009666.
+The default value for UseFixedMeanFreePathUpstream is set as
+as false, and that for MeanFreePath0InAu is 0.3 [AU], one can
+also see Chen et al. (2024), doi: 10.3847/1538-4357/ad33c3.
 </command>
 
 </commandgroup>

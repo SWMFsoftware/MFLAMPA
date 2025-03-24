@@ -11,9 +11,9 @@ module SP_ModDiffusion
   ! Updated (identation, comments): I.Sokolov, Dec.17, 2017
 
   use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
-  use ModConst,     ONLY: cAu, cLightSpeed, cGeV, cMu, Rsun, cGyroRadius
+  use ModConst,     ONLY: cAu, cLightSpeed, ckeV, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, &
+  use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, GammaLorentz_G, &
        MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
   use SP_ModGrid,   ONLY: nP, nMu, State_VIB, &
        MHData_VIB, D_, R_, Wave1_, Wave2_
@@ -41,12 +41,20 @@ module SP_ModDiffusion
      module procedure scatter_distribution_c   ! DtLocal for (nP, nMu, nX)
   end interface scatter_distribution
 
-  ! Whether to include diffusion term
+  ! Whether to include diffusion term (parallel comes first)
   logical, public :: UseDiffusion = .true.
   logical, public :: UseDiffusionPerp = .false. ! Perpendicular Diffusion
+  ! Determine which type of the diffusion in upstream and from mhd turbulence
+  character(len=15) :: TypeMhdDiffusion = 'sokolov2004'
   ! Set diffusion or scatter coefficients
-  real, public, dimension(nVertexMax) :: DOuterSi_I, &
-       CoefLambdaxx_I, CoefLambdaMuMu_I         ! For lambda_xx and lambda_mumu
+  ! Coefficients in the diffusion operator
+  ! df/dt = DOuter * d(DInner * df/dx)/dx
+  ! DOuter = BSi in the cell center
+  ! DInner = Diffusion Coefficient/BSi at the face
+  real, public, dimension(nVertexMax, nP) :: DInnerSi_II, & ! Dinner/BSi
+       CoefLambdaMuMu_II ! mfp, mu>1
+  real, public, dimension(nVertexMax) :: DOuterSi_I, CoefLambdaxx_I !mfp, mu=1
+
   ! Perpendicular diffusion
   real,    public :: DPerpRatio = 0.065         ! Simple ratio of Dperp/Dpara
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
@@ -61,7 +69,7 @@ module SP_ModDiffusion
 
   ! Local parameters!
   ! Diffusion as in Li et al. 2003, doi:10.1029/2002JA009666
-  logical, public :: UseFixedMeanFreePathUpstream = .false.
+  logical         :: UseBtotal = .false., UseFixedUps = .false.
   real            :: MeanFreePath0InAu = 1.0
   ! Parameter characterizing cut-off wavenumber of turbulent spectrum:
   ! value of scale turbulence at 1 AU for any type (const or linear)
@@ -72,35 +80,49 @@ contains
   !============================================================================
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
+    use ModUtilities, ONLY: lower_case
     integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
     character(len=*), intent(in) :: NameCommand ! From PARAM.in
-    character(len=8) :: StringScaleTurbulenceType
+    character(len=8) :: TypeScaleTurbulence
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-    case('#USEFIXEDMFPUPSTREAM')
-       call read_var('UseFixedMeanFreePathUpstream',&
-            UseFixedMeanFreePathUpstream)
-       if(UseFixedMeanFreePathUpstream)then
-          ! see Li et al. (2003), doi:10.1029/2002JA009666
-          call read_var('MeanFreePath0InAu', MeanFreePath0InAu)
-       end if
     case('#SCALETURBULENCE')
        ! cut-off wavenumber of turbulence spectrum: k0 = 2 cPi / Scale
-       call read_var('ScaleTurbulenceType', StringScaleTurbulenceType)
-       select case(StringScaleTurbulenceType)
+       call read_var('ScaleTurbulenceType', TypeScaleTurbulence)
+       call lower_case(TypeScaleTurbulence)
+       ! determine the turbulence scale wrt distance in space
+       select case(trim(TypeScaleTurbulence))
        case('const', 'constant')
           iScaleTurbulenceType = Const_
        case('linear')
           iScaleTurbulenceType = Linear_
        case default
-          call CON_stop(NameSub//": unknown scale turbulence type")
+          call CON_stop(NameSub//": Unknown scale turbulence type")
        end select
+       ! specify the turbulence scale at 1 au
        call read_var('ScaleTurbulence1AU', ScaleTurbulenceSi)
        ScaleTurbulenceSi = ScaleTurbulenceSi * cAu
-    case('#DIFFUSION')
+    case('#DIFFUSIONPARA')
        call read_var('UseDiffusion', UseDiffusion)
-    case('#DPERP')
+       ! set up diffusion parameters only when UseDiffusion
+       if(UseDiffusion) then
+          ! Use calculated from the mhd turbulence for downstream; if not using
+          ! the fixed upstream diffusion coefficient, also use the mhd turbulence
+          ! Determine whether or not to use Btotal=sqrt(B**2+dB**2) as B
+          call read_var('UseBtotal', UseBtotal)
+          call read_var("TypeMhdDiffusion", TypeMhdDiffusion)
+          call lower_case(TypeMhdDiffusion)
+
+          ! Determine whether or not to fix upstream diffusion coefficient
+          call read_var('UseFixedUps', UseFixedUps)
+          if(UseFixedUps) then
+             ! Specify upstream diffusion coefficient
+             ! see Li et al. 2003, doi:10.1029/2002JA009666
+             call read_var('MeanFreePath0InAu', MeanFreePath0InAu)
+          end if
+       end if
+    case('#DIFFUSIONPERP')
        call read_var('UseDiffusionPerp', UseDiffusionPerp)
        if(UseDiffusionPerp) then
           ! Simply assume DPerp/DPara = DPerpRatio
@@ -133,11 +155,13 @@ contains
           case("Exp", "exp", "Exponential", "exponential")
              dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
              do iRPerp = 1, nRPerp+1
-               RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
+                RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
              end do
              RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
              dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
              dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
+          case default
+             call CON_stop('Error in ScaleRPerp for Perpendicular Diffusion.')
           end select
 
           ! Handle lon-lat grid in the triangulated mesh
@@ -259,22 +283,6 @@ contains
     real, dimension(nP, nMu) :: LowerEndSpectrum_II, UpperEndSpectrum_II
     ! Logical variable for whether or not to use given lower and upper spectra
     logical :: UseLowerSpectrum = .false., UseUpperSpectrum = .false.
-    ! Coefficients in the diffusion operator
-    ! df/dt = DOuter * d(DInner * df/dx)/dx
-    ! DOuter = BSi in the cell center
-    ! DInner = DiffusionCoefficient/BSi at the face
-    real :: DInnerSi_II(nX, nP)                       ! Calculate only once
-    ! Lower limit to floor the spatial diffusion coefficient For a
-    ! given spatial and temporal resolution, the value of the
-    ! diffusion coefficient should be artificially increased to get
-    ! the diffusion length to be larger than the shock front width,
-    ! which even for the steepened shock is as wide as a mesh size
-    ! of the Largangian grid, State_VIB(D_,:,:)*RSun. In this way,
-    ! the Lagrangian grid resolution is sufficient to resolve a
-    ! precursor in the upstream distribution of DiffCoeffMin=0
-    ! (default value), we do NOT enhance the diffusion coefficient!
-    ! Physically, DiffCoeffMin should be given by the product of
-    ! shock wave speed and local grid spacing.
     real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
     real :: DsMeshSi_I(1:nX-1), DsFaceSi_I(2:nX-1)
@@ -341,15 +349,22 @@ contains
     ! For each momentum, the dependence of the diffusion coefficient
     ! on momentum is D \propto r_L*v \propto Momentum**2/TotalEnergy
     if(UseTurbulentSpectrum) then
-       DInnerSi_II = Dxx(nX, BSi_I(1:nX))/ &
+       DInnerSi_II(1:nX, 1:nP) = Dxx(nX, BSi_I(1:nX))/ &
             spread(BSi_I(1:nX), DIM=2, NCOPIES=nP)
     else
-       ! Add v (= p*c**2 / E_total in the relativistic case) and p**(1/3)
-       DInnerSi_II = spread(CoefLambdaxx_I(1:nX), DIM=2, NCOPIES=nP)* &
-            spread(Momentum_G(1:nP)**(1.0/3)* &
-            SpeedSi_G(1:nP), DIM=1, NCOPIES=nX)
-       DInnerSi_II = max(DInnerSi_II, DiffCoeffMinSi/ &
-            spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP))
+       ! Lower limit to floor the spatial diffusion coefficient For a
+       ! given spatial and temporal resolution, the value of the
+       ! diffusion coefficient should be artificially increased to get
+       ! the diffusion length to be larger than the shock front width,
+       ! which even for the steepened shock is as wide as a mesh size
+       ! of the Largangian grid, State_VIB(D_,:,:)*RSun. In this way,
+       ! the Lagrangian grid resolution is sufficient to resolve a
+       ! precursor in the upstream distribution of DiffCoeffMin=0
+       ! (default value), we do NOT enhance the diffusion coefficient!
+       ! Physically, DiffCoeffMin should be given by the product of
+       ! shock wave speed and local grid spacing.
+       DInnerSi_II(1:nX, 1:nP) = max(DInnerSi_II(1:nX, 1:nP), &
+            DiffCoeffMinSi/spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP))
     end if
 
     MU:do iMu = 1, nMu
@@ -507,13 +522,13 @@ contains
 
           where(SpeedSi_G(iP)*abs(Mu_F) >= 10.0*AlfvenSpeed_I(iX))
              ! Set Dmumu where mu is large enough
-             DMuMu_I = SpeedSi_G(iP)/(CoefLambdaMuMu_I(iX)* &
+             DMuMu_I = SpeedSi_G(iP)/(CoefLambdaMuMu_II(iX, iP)* &
                   Momentum_G(iP))*FactorMu_F*DtOverDMu2_C(iP, :, iX)
           elsewhere
              ! Set the lower limit of D_mumu when |mu| is close to zero
-             DMuMu_I = SpeedSi_G(iP)/CoefLambdaMuMu_I(iX)* &
-                  max(FactorMu_F(iMuSwitch), LowerLimMu)* &
-                  DtOverDMu2_C(iP, :, iX)
+             DMuMu_I = SpeedSi_G(iP)/(CoefLambdaMuMu_II(iX, iP)* &
+                  Momentum_G(iP))*max(FactorMu_F(iMuSwitch), LowerLimMu)* &
+                  DtOverDMu2_C(iP,:,iX)
           end where
 
           ! Set up coefficients for solving the linear equation set
@@ -533,11 +548,15 @@ contains
   subroutine set_diffusion_coef(iLine, nX, iShock, BSi_I)
     ! Set spatial diffusion and mu scattering coefficients for given field line
 
-    integer, intent(in) :: iLine, nX, iShock
-    real, intent(in)    :: BSi_I(1:nX)
-    real                :: ScaleSi_I(1:nX), RadiusSi_I(1:nX)
-    real, parameter     :: cCoef = 81.0/(7.0*cPi*cTwoPi**(2.0/3))
-    real, parameter     :: cCoefxx_to_mumu = 14.0/27.0
+    use ModConst, ONLY: cElectronCharge, cProtonMass
+    integer, intent(in):: iLine, nX, iShock
+    integer            :: iP
+    real, intent(in)   :: BSi_I(1:nX)
+    real               :: ScaleSi_I(1:nX), RadiusSi_I(1:nX), OmegaCyclo_I(1:nX)
+    real               :: dBSi_I(1:nX), BtotalSi_I(1:nX)
+    real, parameter    :: cCoef = 81.0/(7.0*cPi*cTwoPi**(2.0/3))
+    real, parameter    :: cCoefxx_to_mumu = 14.0/27.0
+    character(len=*), parameter:: NameSub = 'set_diffusion_coef'
     !--------------------------------------------------------------------------
     DOuterSi_I(1:nX) = BSi_I(1:nX)
     RadiusSi_I(1:nX) = State_VIB(R_,1:nX,iLine)*Io2Si_V(UnitX_)
@@ -550,28 +569,30 @@ contains
     case(Linear_)
        ScaleSi_I(1:nX) = ScaleTurbulenceSi*RadiusSi_I(1:nX)/cAu
     end select
-    ! Compute diffusion coefficient without the contribution of v (velocity)
-    ! and p (momentum), as v and p are different for different iP
-    if(UseFixedMeanFreePathUpstream) then
-       ! diffusion is different up- and down-stream
-       ! Sokolov et al. 2004, paragraphs before and after eq (4)
-       where(RadiusSi_I(1:nX) > 0.9*RadiusSi_I(iShock))
-          ! upstream: reset the diffusion coefficient to
-          ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)**(1/3)
-          ! see Li et al. (2003), doi:10.1029/2002JA009666
-          ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-          ! 1/AU cancels with unit of Lambda0, no special attention needed;
-          ! v (velocity) and (p)**(1/3) are calculated in momentum do loop
-          CoefLambdaxx_I(1:nX) = (1.0/3.0)*MeanFreePath0InAu *    &
-               RadiusSi_I(1:nX)*(cLightSpeed*MomentumInjSi/cGeV)**(1.0/3)
-       elsewhere
-          CoefLambdaxx_I(1:nX) = (cCoef/3.0)*BSi_I(1:nX)**2 /     &
-               (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))* &
-               (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
-               **(1.0/3)
-       end where
+
+    ! Handle MHD turbulence => Parallel diffusion coefficient of particles
+    dBSi_I(1:nX) = sqrt(cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))
+    if(UseBtotal) then
+       BtotalSi_I(1:nX) = sqrt(BSi_I(1:nX)**2 + dBSi_I(1:nX)**2)
     else
-       ! Sokolov et al., 2004: eq (4),
+       BtotalSi_I(1:nX) = BSi_I(1:nX)
+    end if
+    ! Determine what eqn. is used for calculation
+    select case(trim(TypeMhdDiffusion))
+    case('giacalone1999')
+       ! see Giacalone & Jokipii 1999, doi:10.1086/307452
+       OmegaCyclo_I(1:nX) = cElectronCharge*BtotalSi_I(1:nX)/cProtonMass
+       do iP = 1, nP
+          DInnerSi_II(1:nX, iP) = (3.0*SpeedSi_G(iP)**3)/ &
+               (40.0*(OmegaCyclo_I(1:nX)/GammaLorentz_G(iP))**2* &
+               ScaleSi_I(1:nX)*sin(3.0*cPi/5.0))* (BtotalSi_I/dBSi_I)**2* &
+               (1.0 + 72.0/7.0*((OmegaCyclo_I(1:nX)*ScaleSi_I(1:nX))/ &
+               (GammaLorentz_G(iP)*SpeedSi_G(iP)))**(5.0/3))/BSi_I(1:nX)
+          ! End: Add 1/B as the actual diffusion is D/B
+       end do
+    case('sokolov2004')
+       ! see Sokolov et al., 2004: eq (4),
+       ! also see Borovikov 2019, doi:10.48550/arXiv.1911.10165
        ! Gyroradius = cGyroRadius * momentum / |B|
        ! DInner \propto (B/\delta B)**2*Gyroradius*Vel/|B|
        ! ------------------------------------------------------
@@ -581,13 +602,43 @@ contains
             (cMu*sum(MHData_VIB(Wave1_:Wave2_,1:nX,iLine),1))*    &
             (ScaleSi_I(1:nX)**2*cGyroRadius*MomentumInjSi/BSi_I(1:nX))&
             **(1.0/3)
+       do iP = 1, nP
+          DInnerSi_II(1:nX, iP) = CoefLambdaxx_I(1:nX)* &
+               Momentum_G(iP)**(1.0/3)*SpeedSi_G(iP)/BSi_I(1:nX)
+       end do
+    case default
+       call CON_Stop(NameSub//": Unknown TypeMhdDiffusion"//TypeMhdDiffusion)
+    end select
+
+    ! diffusion is different up- and down-stream
+    ! Sokolov et al. 2004, paragraphs before and after eq (4)
+    if(UseFixedUps) then
+       ! Compute diffusion coefficient without the contribution of v (velocity)
+       ! and p (momentum), as v and p are different for different iP
+       where(RadiusSi_I(1:nX) > 0.9*RadiusSi_I(iShock))
+          ! upstream: reset the diffusion coefficient to
+          ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)**(1/3)
+          ! see Li et al. (2003), doi:10.1029/2002JA009666
+          ! ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
+          ! 1/AU cancels with unit of Lambda0, no special attention needed;
+          ! v (velocity) and (p)**(1/3) are calculated in momentum do loop
+          CoefLambdaxx_I(1:nX) = (1.0/3.0)*MeanFreePath0InAu* &
+               RadiusSi_I(1:nX)*(cLightSpeed*MomentumInjSi/cGeV)**(1.0/3)
+       endwhere
+       ! update the DInner diffusion coefficient
+       do iP = 1, nP
+          DInnerSi_II(1:nX, iP) = CoefLambdaxx_I(1:nX)* &
+               Momentum_G(iP)**(1.0/3)*SpeedSi_G(iP)/BSi_I(1:nX)
+       end do
     end if
 
-    ! Add 1/B as the actual diffusion is D/B
-    CoefLambdaxx_I(1:nX) = CoefLambdaxx_I(1:nX)/BSi_I(1:nX)
-
-    ! CoefLambda_xx => CoefLambda_mumu
-    CoefLambdaMuMu_I(1:nX) = cCoefxx_to_mumu * CoefLambdaxx_I(1:nX)
+    if(nMu > 1) then
+       ! for focused transport eq.: CoefLambda_xx => CoefLambda_mumu
+       do iP = 1, nP
+          CoefLambdaMuMu_II(1:nX, iP) = cCoefxx_to_mumu * &
+               DInnerSi_II(1:nX, iP)*BSi_I(1:nX)*3.0/SpeedSi_G(iP)
+       end do
+    end if
 
   end subroutine set_diffusion_coef
   !============================================================================
