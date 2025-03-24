@@ -81,7 +81,6 @@ contains
   subroutine read_param(NameCommand)
     use ModReadParam, ONLY: read_var
     use ModUtilities, ONLY: lower_case
-    integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
     character(len=*), intent(in) :: NameCommand ! From PARAM.in
     character(len=8) :: TypeScaleTurbulence
     character(len=*), parameter:: NameSub = 'read_param'
@@ -124,6 +123,7 @@ contains
        end if
     case('#DIFFUSIONPERP')
        call read_var('UseDiffusionPerp', UseDiffusionPerp)
+       ! Setup perpendicular diffusion coefficients only when using it
        if(UseDiffusionPerp) then
           ! Simply assume DPerp/DPara = DPerpRatio
           call read_var('DPerpRatio', DPerpRatio)
@@ -133,36 +133,9 @@ contains
           call read_var('RMinPerp', RMinPerp)
           call read_var('RMaxPerp', RMaxPerp)
           if(nRPerp<=1 .or. RMinPerp<=0.0 .or. RMaxPerp<RMinPerp) RETURN
-          if(allocated(RPerp_C)) deallocate(RPerp_C)
-          allocate(RPerp_C(nRPerp))
-          if(allocated(RPerp_F)) deallocate(RPerp_F)
-          allocate(RPerp_F(nRPerp+1))
-          if(allocated(dRPerpMesh_I)) deallocate(dRPerpMesh_I)
-          allocate(dRPerpMesh_I(nRPerp-1))
-          if(allocated(dRPerpFace_I)) deallocate(dRPerpFace_I)
-          allocate(dRPerpFace_I(nRPerp))
+
           ! From RMinPerp to RMaxPerp: Distribution of multiple spheres
           call read_var('ScaleRPerp', ScaleRPerp)
-          select case(trim(ScaleRPerp))
-          case("Linear", "linear")
-             dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
-             dRPerpFace_I = dRPerpMesh_I(1) ! Same=Const.
-             do iRPerp = 1, nRPerp
-                RPerp_F(iRPerp) = RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1)
-             end do
-             RPerp_F(nRPerp+1) = RMaxPerp
-             RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
-          case("Exp", "exp", "Exponential", "exponential")
-             dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
-             do iRPerp = 1, nRPerp+1
-                RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
-             end do
-             RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
-             dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
-             dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
-          case default
-             call CON_stop('Error in ScaleRPerp for Perpendicular Diffusion.')
-          end select
 
           ! Handle lon-lat grid in the triangulated mesh
           call read_var('nThetaPerp', nThetaPerp)
@@ -174,19 +147,9 @@ contains
                   nThetaPerp+1, "to avoid singularity when theta=0"
              nThetaPerp = nThetaPerp + 1
           end if
-          dThetaPerp = cPi/real(nThetaPerp)
-          if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C)
-          allocate(ThetaPerp_C(nThetaPerp))
-          do iThetaPerp = 1, nThetaPerp
-             ThetaPerp_C(iThetaPerp) = (real(iThetaPerp)-0.5)*dThetaPerp
-          end do
-          ! Phi: nPhiPerp, dPhiPerp and PhiPerp_C
-          dPhiPerp = cTwoPi/real(nPhiPerp)
-          if(allocated(PhiPerp_C)) deallocate(PhiPerp_C)
-          allocate(PhiPerp_C(nPhiPerp))
-          do iPhiPerp = 1, nPhiPerp
-             PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
-          end do
+
+          ! Setup the mesh used for triangulation in perpendicular diffusion
+          call setup_multi_uniform_spheres
        end if
     end select
   end subroutine read_param
@@ -441,16 +404,68 @@ contains
 
   end subroutine diffuse_distribution_c
   !============================================================================
+  subroutine setup_multi_uniform_spheres
+
+    integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
+    character(len=*), parameter:: NameSub = 'setup_multi_uniform_spheres'
+    !--------------------------------------------------------------------------
+    ! setup the mesh arrays for triangulation used in perpendicular diffusion
+    if(allocated(RPerp_C)) deallocate(RPerp_C)
+    allocate(RPerp_C(nRPerp))
+    if(allocated(RPerp_F)) deallocate(RPerp_F)
+    allocate(RPerp_F(nRPerp+1))
+    if(allocated(dRPerpMesh_I)) deallocate(dRPerpMesh_I)
+    allocate(dRPerpMesh_I(nRPerp-1))
+    if(allocated(dRPerpFace_I)) deallocate(dRPerpFace_I)
+    allocate(dRPerpFace_I(nRPerp))
+
+    ! R: radial direction
+    select case(trim(ScaleRPerp))
+    case("Linear", "linear")
+       dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
+       dRPerpFace_I = dRPerpMesh_I(1) ! Same=Const.
+       do iRPerp = 1, nRPerp
+          RPerp_F(iRPerp) = RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1)
+       end do
+       RPerp_F(nRPerp+1) = RMaxPerp
+       RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+    case("Exp", "exp", "Exponential", "exponential")
+       dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
+       do iRPerp = 1, nRPerp+1
+          RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
+       end do
+       RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+       dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
+       dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
+    case default
+       call CON_stop(NameSub// &
+            'Error in ScaleRPerp for Perpendicular Diffusion.')
+    end select
+
+    ! Theta: zenith/latitudinal direction
+    dThetaPerp = cPi/real(nThetaPerp)
+    if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C)
+    allocate(ThetaPerp_C(nThetaPerp))
+    do iThetaPerp = 1, nThetaPerp
+       ThetaPerp_C(iThetaPerp) = (real(iThetaPerp)-0.5)*dThetaPerp
+    end do
+
+    ! Phi: azimuthal/longitudinal direction
+    dPhiPerp = cTwoPi/real(nPhiPerp)
+    if(allocated(PhiPerp_C)) deallocate(PhiPerp_C)
+    allocate(PhiPerp_C(nPhiPerp))
+    do iPhiPerp = 1, nPhiPerp
+       PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
+    end do
+
+  end subroutine setup_multi_uniform_spheres
+  !============================================================================
   subroutine diffuseperp_distribution()
 
     !--------------------------------------------------------------------------
-    ! cross-field (perpendicular) diffusion
-  contains
-    !==========================================================================
-    subroutine get_multi_uniform_spheres
 
-    end subroutine get_multi_uniform_spheres
-    !==========================================================================
+  ! cross-field (perpendicular) diffusion
+  !============================================================================
   end subroutine diffuseperp_distribution
   !============================================================================
   subroutine scatter_distribution_s(iLine, nX, nSi_I, BSi_I, Dt)

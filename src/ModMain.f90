@@ -98,7 +98,8 @@ contains
        case('#ECHANNEL', '#ECHANNELSAT')
           if(.not.IsFirstSession) CYCLE
           call read_param_channel(NameCommand)
-       case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', '#DIFFUSIONPARA')
+       case('#USEFIXEDMFPUPSTREAM', '#SCALETURBULENCE', &
+            '#DIFFUSIONPARA', '#DIFFUSIONPERP')
           call read_param_diffuse(NameCommand)
        case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG', '#NOUTPUT')
           call read_param_plot(NameCommand)
