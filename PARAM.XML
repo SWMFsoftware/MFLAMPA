@@ -987,14 +987,12 @@ The number of different time-line tags of the MH_data files.
 
 <command name="SATELLITE" if="$_IsFirstSession">
   <parameter name="nSatellite" type="integer" min="0" default="0" />
-  <parameter name="TypeCoordSystem" type="string" default="HGR" />
   <for name="iSatellite" from="1" to="$nSatellite">
     <parameter name="NameTrajectoryFile" type="string" />
   </for>
 
 #SATELLITE
 4				nSatellite
-HGR			TypeCoordSystem
 ../TRAJECTORY/earth.dat		NameTrajectoryFile
 ../TRAJECTORY/sta.dat		NameTrajectoryFile
 ../TRAJECTORY/psp.dat		NameTrajectoryFile
@@ -1005,7 +1003,8 @@ This command can only be used in the first session.
 Set the satellites included for spectra outputs along the trajectory.
 nSatellite is the number of the satellite trajectory, TypeCoordSystem
 is the type of the coordinate system specified for the outputs and
-plotting, and NameTrajectoryFile is the path of the trajectory file.
+plotting same as in SP, and NameTrajectoryFile is the path of the
+trajectory file.
 </command>
 
 <command name="SAVEPLOT">

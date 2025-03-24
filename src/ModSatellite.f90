@@ -87,7 +87,6 @@ contains
     end select
 
     call test_stop(NameSub, DoTest)
-
   end subroutine read_param
   !============================================================================
   subroutine init
@@ -178,7 +177,6 @@ contains
 
     ! Read the trajectories
     SATELLITES: do iSat = 1, nSat
-
        ! Read file on the root processor
        if(iProc == 0) then
 
@@ -217,7 +215,7 @@ contains
           if(DoTest) write(*,*) NameSub//': nPoint=', nPoint, &
                ' iOffset=', iOffset
           ! Meaningfull part of trajectory ranges from iOffset to nPoint:
-          if( iOffset > 1 ) then
+          if(iOffset > 1) then
              ! Temporary: new nPoint
              i = nPoint - iOffset + 1
              Xyz_DI(:, 1:i) = Xyz_DI(:, iOffset:nPoint)
@@ -256,12 +254,10 @@ contains
           write(*,*) NameSub,': ySat=', XyzSat_DII(2, 1:nPoint, iSat)
           write(*,*) NameSub,': zSat=', XyzSat_DII(3, 1:nPoint, iSat)
        end if
-
     end do SATELLITES
 
     deallocate(Time_I, Xyz_DI)
     call test_stop(NameSub, DoTest)
-
   end subroutine read_satellite_input_files
   !============================================================================
   subroutine set_satellite_positions(iSat)
@@ -280,7 +276,7 @@ contains
 
     nPoint = nPointTraj_I(iSat)
     if(nPoint > 0) then
-
+       ! Get the index for current time and satellite
        i = iPointCurrentSat_I(iSat)
        if(DoTest) write(*,*) NameSub, ' nPoint, iPoint, TimeSim, TimeSat=', &
             nPoint, i, tSimulation, TimeSat_II(i, iSat)
@@ -291,6 +287,8 @@ contains
        iPointCurrentSat_I(iSat) = i
        if(DoTest) write(*,*) NameSub, ' final iPoint=', i
 
+       ! if the index is out of range: do not track this satellite;
+       ! otherwise, make a linear interpolation in time for the location
        if( (i == nPoint .and. tSimulation > TimeSat_II(i, iSat))  &
             .or. i == 1 ) then
           DoTrackSatellite_I(iSat) = .false.
@@ -307,11 +305,9 @@ contains
           write(*,*) NameSub, ' DoTrackSat =', DoTrackSatellite_I(iSat)
           write(*,*) NameSub, ' XyzSat     =', XyzSat_DI(:, iSat)
        end if
-
     end if
 
     call test_stop(NameSub, DoTest)
-
   end subroutine set_satellite_positions
   !============================================================================
 end module SP_ModSatellite

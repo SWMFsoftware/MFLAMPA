@@ -93,7 +93,6 @@ T				UsePlanarTriangles
 
 #SATELLITE
 4			nSatellite
-HGR			TypeCoordSystem
 ../TRAJECTORY/earth.dat		NameTrajectoryFile
 ../TRAJECTORY/sta.dat		NameTrajectoryFile
 ../TRAJECTORY/psp.dat		NameTrajectoryFile
