@@ -10,13 +10,15 @@ module SP_ModDiffusion
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
   ! Updated (identation, comments): I.Sokolov, Dec.17, 2017
 
+  use ModMpi
   use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
   use ModConst,     ONLY: cAu, cLightSpeed, ckeV, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize,   ONLY: nVertexMax
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, GammaLorentz_G, &
        MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
-  use SP_ModGrid,   ONLY: nP, nMu, State_VIB, &
-       MHData_VIB, D_, R_, Wave1_, Wave2_
+  use SP_ModGrid,   ONLY: nP, nMu, State_VIB, MHData_VIB, &
+       D_, R_, X_, Z_, Wave1_, Wave2_
+  use SP_ModProc,   ONLY: nProc, iProc, iComm, iError
   use SP_ModUnit,   ONLY: Io2Si_V, UnitX_
   use ModUtilities, ONLY: CON_stop
 
@@ -27,8 +29,8 @@ module SP_ModDiffusion
   SAVE
 
   ! Public members:
-  public :: read_param, diffuse_distribution, &
-       scatter_distribution, set_diffusion_coef
+  public :: read_param, diffuse_distribution, scatter_distribution, &
+       diffuseperp_distribution, set_diffusion_coef
   ! Diffusion in space
   interface diffuse_distribution
      module procedure diffuse_distribution_s   ! Global time step Dt
@@ -46,8 +48,7 @@ module SP_ModDiffusion
   logical, public :: UseDiffusionPerp = .false. ! Perpendicular Diffusion
   ! Determine which type of the diffusion in upstream and from mhd turbulence
   character(len=15) :: TypeMhdDiffusion = 'sokolov2004'
-  ! Set diffusion or scatter coefficients
-  ! Coefficients in the diffusion operator
+  ! Set diffusion or scatter coefficients in the diffusion operator
   ! df/dt = DOuter * d(DInner * df/dx)/dx
   ! DOuter = BSi in the cell center
   ! DInner = Diffusion Coefficient/BSi at the face
@@ -64,8 +65,9 @@ module SP_ModDiffusion
   real            :: RMinPerp = 1.2, RMaxPerp = 240.0  ! RMin and RMax of Grid
   real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
   character(len=6):: ScaleRPerp                 ! Scale (Linear/Log) along R_
+  integer         :: iRPerpStart, iRPerpEnd
   real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
-       RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:)
+       RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:)
 
   ! Local parameters!
   ! Diffusion as in Li et al. 2003, doi:10.1029/2002JA009666
@@ -133,6 +135,10 @@ contains
           call read_var('RMinPerp', RMinPerp)
           call read_var('RMaxPerp', RMaxPerp)
           if(nRPerp<=1 .or. RMinPerp<=0.0 .or. RMaxPerp<RMinPerp) RETURN
+          if(nRPerp<nProc) then
+             write(*,*) "nRPerp = ", nRPerp, "< nProc = ", nProc, &
+                  "now set nRPerp = nProc = ", nProc
+          end if
 
           ! From RMinPerp to RMaxPerp: Distribution of multiple spheres
           call read_var('ScaleRPerp', ScaleRPerp)
@@ -406,7 +412,9 @@ contains
   !============================================================================
   subroutine setup_multi_uniform_spheres
 
+    use ModCoordTransform, ONLY: sph_to_xyz
     integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
+    integer :: iProcChunk, iRPerpRemainder
     character(len=*), parameter:: NameSub = 'setup_multi_uniform_spheres'
     !--------------------------------------------------------------------------
     ! setup the mesh arrays for triangulation used in perpendicular diffusion
@@ -418,6 +426,20 @@ contains
     allocate(dRPerpMesh_I(nRPerp-1))
     if(allocated(dRPerpFace_I)) deallocate(dRPerpFace_I)
     allocate(dRPerpFace_I(nRPerp))
+    if(allocated(XyzPerp_CB)) deallocate(XyzPerp_CB)
+    allocate(XyzPerp_CB(X_:Z_, nPhiPerp, nThetaPerp, nRPerp))
+    XyzPerp_CB = 0.0
+
+    ! Determine chunk size, start and end indices for each processor
+    iProcChunk = nRPerp/nProc      ! Base chunk size
+    iRPerpRemainder = mod(nRPerp, nProc)  ! Leftover elements
+    if(iProc < iRPerpRemainder) then
+       iRPerpStart = iProc*(iProcChunk+1) + 1
+       iRPerpEnd   = iRPerpStart + iProcChunk
+    else
+       iRPerpStart = iProc*iProcChunk + iRPerpRemainder+1
+       iRPerpEnd   = iRPerpStart + iProcChunk-1
+    endif
 
     ! R: radial direction
     select case(trim(ScaleRPerp))
@@ -458,14 +480,110 @@ contains
        PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
     end do
 
+    ! (R, Theta, Phi) => (X, Y, Z) + parallelization
+    do iRPerp = iRPerpStart, iRPerpEnd
+       do iThetaPerp = 1, nThetaPerp
+          do iPhiPerp = 1, nPhiPerp
+             call sph_to_xyz(RPerp_C(iRPerp), &
+                  ThetaPerp_C(iThetaPerp), PhiPerp_C(iPhiPerp), &
+                  XyzPerp_CB(:, iPhiPerp, iThetaPerp, iRPerp))
+          end do
+       end do
+    end do
+    if(nProc > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, XyzPerp_CB, &
+         3*nPhiPerp*nThetaPerp*nRPerp, MPI_REAL, MPI_SUM, iComm, iError)
+
   end subroutine setup_multi_uniform_spheres
   !============================================================================
   subroutine diffuseperp_distribution()
 
-    !--------------------------------------------------------------------------
+    use SP_ModGrid,        ONLY: nLineAll
+    use SP_ModTriangulate, ONLY: intersect_surf, build_trmesh, &
+         interpolate_trmesh
 
-  ! cross-field (perpendicular) diffusion
-  !============================================================================
+    integer :: iRPerp, iThetaPerp, iPhiPerp, iMu ! loop variables
+    real    :: XyzReachRPerp_III(X_:Z_, 1:nLineAll+2, nRPerp)
+    integer :: iLineReachRPerp_II(1:nLineAll+2, nRPerp)
+    real    :: DistrReachR_CB(0:nP+1, 1:nMu, 1:nLineAll+2, nRPerp)
+    real    :: DistrRPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    integer :: nReachRPerp_I(nRPerp)
+    logical :: IsTriangleFound_III(nPhiPerp, nThetaPerp, nRPerp)
+    integer :: iStencil_IV(3, nPhiPerp, nThetaPerp, nRPerp)
+    real    :: Weight_IV(3, nPhiPerp, nThetaPerp, nRPerp)
+
+    ! Very local VARs, only used in each spherical layer for triangulation
+    ! Count, left and right indices of the triangulated mesh
+    integer :: nTriMesh, lidTri, ridTri
+    ! Arrays to construct a triangular mesh on a sphere
+    integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
+
+    character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
+    !--------------------------------------------------------------------------
+    ! cross-field (perpendicular) diffusion
+    DistrRPerp_5D = 0.0; IsTriangleFound_III = .false.
+    iStencil_IV = -1; Weight_IV = 0.0
+
+    ! step 1: field lines => intersection points on multiple uniform layers
+    ! here, iProc is for field lines, not for sub-slices/layers
+    do iRPerp = 1, nRPerp
+       call intersect_surf(RPerp_C(iRPerp), XyzReachRPerp_III(:,:,iRPerp), &
+            iLineReachRPerp_II(:,iRPerp), DistrReachR_CB(:,:,:,iRPerp), &
+            nReachRPerp_I(iRPerp))
+       ! DistrReachR_CB (and DistrRPerp_5D is (are) in log10 indeed
+    end do
+
+    ! then, iProc is for sub-slices/layers now
+    RSPHERE: do iRPerp = iRPerpStart, iRPerpEnd
+       ! step 2: intersection points => construct the triangulation skeleton 
+       call build_trmesh(nReachRPerp_I(iRPerp), &
+            XyzReachRPerp_III(:,:,iRPerp), iLineReachRPerp_II(:,iRPerp), &
+            nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
+       ! Check the error message from after build_trmesh
+       if(iError /= 0) then
+          write(*,*) 'iProc = ', iProc, &
+               NameSub//': build_trmesh failed at RPerp=', &
+               RPerp_C(iRPerp), '[Rsun], Dperp stopped'
+          RETURN
+       end if
+
+       ! step 3: skeleton => interpolate the values to multiple uniform layers
+       do iThetaPerp = 1, nThetaPerp
+          do iPhiPerp = 1, nPhiPerp
+             call interpolate_trmesh(RPerp_C(iRPerp),                     &
+                  XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),               &
+                  nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I,  &
+                  XyzReachRPerp_III(:,:,iRPerp),                          &
+                  DistrReachR_CB(:,:,:,iRPerp),                           &
+                  DistrRPerp_5D(0:nP+1,1:nMu,iPhiPerp,iThetaPerp,iRPerp), &
+                  IsTriangleFound_III(iPhiPerp,iThetaPerp,iRPerp),        &
+                  iStencil_IV(:,iPhiPerp,iThetaPerp,iRPerp),              &
+                  Weight_IV(:,iPhiPerp,iThetaPerp,iRPerp))
+          end do
+       end do
+       ! there is non-interpolated values on the slice
+       if(.not. any(IsTriangleFound_III)) CYCLE
+    end do RSPHERE
+
+    ! Gather results to all processes
+    if(nProc > 1) then
+       do iRPerp = iRPerpStart, iRPerpEnd
+          call MPI_BCAST(DistrRPerp_5D(:,:,:,:,iRPerp), &
+               (nP+2)*nMu*nPhiPerp*nThetaPerp, &
+               MPI_REAL, 0, iComm, iError)
+       end do
+    end if
+    DistrRPerp_5D = exp(DistrRPerp_5D*log(10.0)) ! log10(VDF) => VDF
+    ! Check the error message from after interpolate_trmesh
+    if(iError /= 0) then
+       write(*,*) 'iProc = ', iProc, &
+            NameSub//': interpolate_trmesh failed, Dperp stopped'
+       RETURN
+    end if
+
+    ! step 4: solve the Dperp distribution Eq in multiple uniform layers
+
+    ! step 5: interpolate back to the intersection points along field lines
+
   end subroutine diffuseperp_distribution
   !============================================================================
   subroutine scatter_distribution_s(iLine, nX, nSi_I, BSi_I, Dt)
@@ -645,6 +763,11 @@ contains
           DInnerSi_II(1:nX, iP) = CoefLambdaxx_I(1:nX)* &
                Momentum_G(iP)**(1.0/3)*SpeedSi_G(iP)/BSi_I(1:nX)
        end do
+    end if
+
+    ! for perpendicular diffusion: it becomes "Dpara - Dperp" here
+    if(UseDiffusionPerp) then
+       DInnerSi_II = DInnerSi_II * (1.0-DPerpRatio)
     end if
 
     if(nMu > 1) then

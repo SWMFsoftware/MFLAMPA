@@ -56,7 +56,7 @@ contains
   end subroutine read_param
   !============================================================================
   subroutine intersect_surf(rSurf, XyzReachRUnit_DI, &
-       iLineReach_I, Log10DistReachR_IIB, nReachR)
+       iLineReach_I, Log10DistrReachR_IIB, nReachR)
 
     use ModMpi
     use SP_ModDistribution, ONLY: Distribution_CB
@@ -66,7 +66,7 @@ contains
     ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
     real,    intent(out):: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
     integer, intent(out):: iLineReach_I(1:nLineAll+2)
-    real,    intent(out):: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
+    real,    intent(out):: Log10DistrReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
     ! Count how many field lines reach the sphere at the given r=rSurf
     integer, intent(out):: nReachR
 
@@ -82,14 +82,14 @@ contains
     logical :: DoReachR_I(nLineAll)
     ! xyz coordinates of all intersection point or average direction
     real    :: XyzUnit_DI(X_:Z_, nLineAll)
-    real    :: Log10DistR_IIB(0:nP+1, 1:nMu, nLineAll)
+    real    :: Log10DistrR_IIB(0:nP+1, 1:nMu, nLineAll)
 
     character(len=*), parameter:: NameSub = 'triangulate_surf'
     !------------------------------------------------------------------------
 
-    XyzUnit_DI = 0.0; Log10DistR_IIB = 0.0
+    XyzUnit_DI = 0.0; Log10DistrR_IIB = 0.0
     DoReachR_I = .false.; iLineReach_I = 0
-    XyzReachRUnit_DI = 0.0; Log10DistReachR_IIB = 0.0
+    XyzReachRUnit_DI = 0.0; Log10DistrReachR_IIB = 0.0
 
     ! go over all lines on the processor and find the point of
     ! intersection with output sphere if present
@@ -104,12 +104,12 @@ contains
        ! if no intersection found -> proceed to the next line
        if(.not.DoReachR_I(iLineAll)) CYCLE LINE
 
-       ! Found intersection => get POS & log10(f[Io]) at that location
+       ! Found intersection => get POS & log10(f[IO_Unit]) at that location
        ! Find coordinates and log(Distribution) at intersection
        XyzUnit_DI(:, iLineAll) = ( &
             MHData_VIB(X_:Z_, iAboveR-1, iLine)*(1-WeightR) +  &
             MHData_VIB(X_:Z_, iAboveR,   iLine)*   WeightR )/rSurf
-       Log10DistR_IIB(:, :, iLineAll) = ( &
+       Log10DistrR_IIB(:, :, iLineAll) = ( &
             log10(Distribution_CB(:, :, iAboveR,   iLine))* WeightR + &
             log10(Distribution_CB(:, :, iAboveR-1, iLine))*(1-WeightR))
     end do LINE !  iLine
@@ -130,7 +130,7 @@ contains
                  3*nLineAll, MPI_REAL, MPI_SUM,       &
                  0, iComm, iError)
             call MPI_REDUCE(MPI_IN_PLACE,             &
-                 Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
+                 Log10DistrR_IIB, (nP+2)*nMu*nLineAll,&
                  MPI_REAL, MPI_SUM, 0, iComm, iError)
             call MPI_REDUCE(MPI_IN_PLACE, DoReachR_I, &
                  nLineAll, MPI_LOGICAL, MPI_LOR,      &
@@ -139,8 +139,8 @@ contains
             call MPI_REDUCE(XyzUnit_DI, XyzUnit_DI,   &
                  3*nLineAll, MPI_REAL, MPI_SUM,       &
                  0, iComm, iError)
-            call MPI_REDUCE(Log10DistR_IIB,           &
-                 Log10DistR_IIB, (nP+2)*nMu*nLineAll, &
+            call MPI_REDUCE(Log10DistrR_IIB,          &
+                 Log10DistrR_IIB, (nP+2)*nMu*nLineAll,&
                  MPI_REAL, MPI_SUM, 0, iComm, iError)
             call MPI_REDUCE(DoReachR_I, DoReachR_I,   &
                  nLineAll, MPI_LOGICAL, MPI_LOR,      &
@@ -158,7 +158,7 @@ contains
             do iLineAll = 1, nLineAll
                iLineReach_I(iLineAll+1) = iLineAll
             end do
-            Log10DistReachR_IIB(:, :, 2:nLineAll+1) = Log10DistR_IIB
+            Log10DistrReachR_IIB(:, :, 2:nLineAll+1) = Log10DistrR_IIB
          else
             ! Otherwise, we will spend some time reorganizing the points
             iReachR = 1
@@ -167,8 +167,8 @@ contains
                   iReachR = iReachR + 1
                   XyzReachRUnit_DI(:, iReachR) = XyzUnit_DI(:, iLineAll)
                   iLineReach_I(iReachR) = iLineAll
-                  Log10DistReachR_IIB(:, :, iReachR) = &
-                       Log10DistR_IIB(:, :, iLineAll)
+                  Log10DistrReachR_IIB(:, :, iReachR) = &
+                       Log10DistrR_IIB(:, :, iLineAll)
                end if
             end do
          end if
@@ -179,7 +179,7 @@ contains
            MPI_REAL, 0, iComm, iError)
       call MPI_BCAST(iLineReach_I, nLineAll+2, &
            MPI_INTEGER, 0, iComm, iError)
-      call MPI_BCAST(Log10DistReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
+      call MPI_BCAST(Log10DistrReachR_IIB, (nP+2)*nMu*(nLineAll+2), &
            MPI_REAL, 0, iComm, iError)
       call MPI_BCAST(DoReachR_I, nLineAll, MPI_LOGICAL, 0, iComm, iError)
       call MPI_BCAST(nReachR, 1, MPI_INTEGER, 0, iComm, iError)
@@ -237,7 +237,7 @@ contains
   !============================================================================
   subroutine interpolate_trmesh(rSurf, XyzInterp_I, nTriMesh, &
        lidTri, ridTri, iList_I, iPointer_I, iEnd_I, &
-       XyzReachRUnit_DI, Log10DistReachR_IIB, Log10DistInterp_II, &
+       XyzReachRUnit_DI, Log10DistrReachR_IIB, Log10DistrInterp_II, &
        IsTriangleFound, iStencil_I, Weight_I)
 
     use ModTriangulateSpherical, ONLY: fix_state, &
@@ -254,9 +254,9 @@ contains
     ! Input: Xyz coordinates of the intersection points on the sphere
     real,    intent(in)   :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
     ! Input: Values at the intersection points on the sphere
-    real,    intent(inout):: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
+    real,    intent(inout):: Log10DistrReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
     ! Output: Interpolated values at XyzInterp_I
-    real,    intent(inout):: Log10DistInterp_II(0:nP+1, 1:nMu)
+    real,    intent(inout):: Log10DistrInterp_II(0:nP+1, 1:nMu)
     ! variables for interpolation in a triangular mesh
     logical, intent(out) :: IsTriangleFound
     integer, intent(out) :: iStencil_I(3)
@@ -266,6 +266,9 @@ contains
     integer :: iSat, iMu, i
     character(len=*), parameter:: NameSub = 'interpolate_trmesh'
     !--------------------------------------------------------------------------
+    IsTriangleFound = .false.
+    iStencil_I = -1
+    Weight_I = 0.0
 
     ! Find the triangle where the satellite locates
     if(UsePlanarTri) then
@@ -302,7 +305,7 @@ contains
                iEnd_I     = iEnd_I,     &
                Xyz_DI     = XyzReachRUnit_DI(:, lidTri:ridTri), &
                nVar       = nP+2,       &
-               State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
+               State_VI   = Log10DistrReachR_IIB(:, iMu, lidTri:ridTri))
           ! South:
           call fix_state( &
                iNodeToFix = lidTri,     &
@@ -312,13 +315,13 @@ contains
                iEnd_I     = iEnd_I,     &
                Xyz_DI     = XyzReachRUnit_DI(:, lidTri:ridTri), &
                nVar       = nP+2,       &
-               State_VI   = Log10DistReachR_IIB(:, iMu, lidTri:ridTri))
+               State_VI   = Log10DistrReachR_IIB(:, iMu, lidTri:ridTri))
        end do
     end if
     ! Interpolate the log10(distribution) at satellite as outputs
     do i = 1, 3
-       Log10DistInterp_II = Log10DistInterp_II + &
-            Log10DistReachR_IIB(:, :, iStencil_I(i))*Weight_I(i)
+       Log10DistrInterp_II = Log10DistrInterp_II + &
+            Log10DistrReachR_IIB(:, :, iStencil_I(i))*Weight_I(i)
     end do
 
   end subroutine interpolate_trmesh

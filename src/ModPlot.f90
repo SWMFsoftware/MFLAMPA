@@ -2008,7 +2008,7 @@ contains
       ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
       real    :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
       integer :: iLineReach_I(1:nLineAll+2)
-      real    :: Log10DistReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
+      real    :: Log10DistrReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
       integer :: nReachR
       ! arrays to construct a triangular mesh on a sphere
       integer :: nTriMesh, lidTri, ridTri
@@ -2070,7 +2070,7 @@ contains
          ! reset the output buffer, coordinates, flags, and log(Distribution)
          File_I(iFile) % Buffer_II = 0.0
          iLineReach_I = 0
-         XyzReachRUnit_DI = 0.0; Log10DistReachR_IIB = 0.0
+         XyzReachRUnit_DI = 0.0; Log10DistrReachR_IIB = 0.0
 
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
@@ -2078,7 +2078,7 @@ contains
 
             ! Intersect multiple field lines with the sphere
             call intersect_surf(rSat, XyzReachRUnit_DI, &
-                 iLineReach_I, Log10DistReachR_IIB, nReachR)
+                 iLineReach_I, Log10DistrReachR_IIB, nReachR)
             ! Build the triangulated skeleton with multiple intersection points
             call build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
                  nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
@@ -2092,7 +2092,7 @@ contains
             ! Interpolate the values to the specific point(s)
             call interpolate_trmesh(rSat, XyzSat_DI(:, iSat), &
                  nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, &
-                 XyzReachRUnit_DI, Log10DistReachR_IIB, &
+                 XyzReachRUnit_DI, Log10DistrReachR_IIB, &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1), &
                  IsTriangleFound, iStencil_I, Weight_I)
             if(.not.IsTriangleFound) EXIT TRI_INTERPOLATE
