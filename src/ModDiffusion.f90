@@ -65,7 +65,7 @@ module SP_ModDiffusion
   real            :: RMinPerp = 1.2, RMaxPerp = 240.0  ! RMin and RMax of Grid
   real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
   character(len=6):: ScaleRPerp                 ! Scale (Linear/Log) along R_
-  integer         :: iRPerpStart, iRPerpEnd
+  integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
   real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
        RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:)
 
@@ -431,15 +431,21 @@ contains
     XyzPerp_CB = 0.0
 
     ! Determine chunk size, start and end indices for each processor
-    iProcChunk = nRPerp/nProc      ! Base chunk size
+    if(allocated(iRPerpStart_I)) deallocate(iRPerpStart_I)
+    if(allocated(iRPerpEnd_I)) deallocate(iRPerpEnd_I)
+    allocate(iRPerpStart_I(0:nProc-1), iRPerpEnd_I(0:nProc-1))
+    iProcChunk = nRPerp/nProc             ! Base chunk size
     iRPerpRemainder = mod(nRPerp, nProc)  ! Leftover elements
-    if(iProc < iRPerpRemainder) then
-       iRPerpStart = iProc*(iProcChunk+1) + 1
-       iRPerpEnd   = iRPerpStart + iProcChunk
-    else
-       iRPerpStart = iProc*iProcChunk + iRPerpRemainder+1
-       iRPerpEnd   = iRPerpStart + iProcChunk-1
-    endif
+    ! Loop over processors to compute start and end indices
+    do iProc = 0, nProc-1
+       if(iProc < iRPerpRemainder) then
+          iRPerpStart_I(iProc) = iProc*(iProcChunk+1) + 1
+          iRPerpEnd_I(iProc)   = iRPerpStart_I(iProc) + iProcChunk
+       else
+          iRPerpStart_I(iProc) = iProc*iProcChunk + iRPerpRemainder+1
+          iRPerpEnd_I(iProc)   = iRPerpStart_I(iProc) + iProcChunk-1
+       endif
+    end do
 
     ! R: radial direction
     select case(trim(ScaleRPerp))
@@ -481,7 +487,7 @@ contains
     end do
 
     ! (R, Theta, Phi) => (X, Y, Z) + parallelization
-    do iRPerp = iRPerpStart, iRPerpEnd
+    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
              call sph_to_xyz(RPerp_C(iRPerp), &
@@ -501,7 +507,7 @@ contains
     use SP_ModTriangulate, ONLY: intersect_surf, build_trmesh, &
          interpolate_trmesh
 
-    integer :: iRPerp, iThetaPerp, iPhiPerp, iMu ! loop variables
+    integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real    :: XyzReachRPerp_III(X_:Z_, 1:nLineAll+2, nRPerp)
     integer :: iLineReachRPerp_II(1:nLineAll+2, nRPerp)
     real    :: DistrReachR_CB(0:nP+1, 1:nMu, 1:nLineAll+2, nRPerp)
@@ -533,7 +539,7 @@ contains
     end do
 
     ! then, iProc is for sub-slices/layers now
-    RSPHERE: do iRPerp = iRPerpStart, iRPerpEnd
+    RSPHERE: do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
        ! step 2: intersection points => construct the triangulation skeleton 
        call build_trmesh(nReachRPerp_I(iRPerp), &
             XyzReachRPerp_III(:,:,iRPerp), iLineReachRPerp_II(:,iRPerp), &
@@ -549,14 +555,14 @@ contains
        ! step 3: skeleton => interpolate the values to multiple uniform layers
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
-             call interpolate_trmesh(RPerp_C(iRPerp),                     &
-                  XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),               &
-                  nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I,  &
-                  XyzReachRPerp_III(:,:,iRPerp),                          &
-                  DistrReachR_CB(:,:,:,iRPerp),                           &
-                  DistrRPerp_5D(0:nP+1,1:nMu,iPhiPerp,iThetaPerp,iRPerp), &
-                  IsTriangleFound_III(iPhiPerp,iThetaPerp,iRPerp),        &
-                  iStencil_IV(:,iPhiPerp,iThetaPerp,iRPerp),              &
+             call interpolate_trmesh(RPerp_C(iRPerp),                    &
+                  XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),              &
+                  nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, &
+                  XyzReachRPerp_III(:,:,iRPerp),                         &
+                  DistrReachR_CB(:,:,:,iRPerp),                          &
+                  DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp),         &
+                  IsTriangleFound_III(iPhiPerp,iThetaPerp,iRPerp),       &
+                  iStencil_IV(:,iPhiPerp,iThetaPerp,iRPerp),             &
                   Weight_IV(:,iPhiPerp,iThetaPerp,iRPerp))
           end do
        end do
@@ -564,13 +570,14 @@ contains
        if(.not. any(IsTriangleFound_III)) CYCLE
     end do RSPHERE
 
-    ! Gather results to all processes
+    ! Broadcast results to all processes
     if(nProc > 1) then
-       do iRPerp = iRPerpStart, iRPerpEnd
-          call MPI_BCAST(DistrRPerp_5D(:,:,:,:,iRPerp), &
-               (nP+2)*nMu*nPhiPerp*nThetaPerp, &
-               MPI_REAL, 0, iComm, iError)
-       end do
+      do iPE = 0, nProc-1
+       call MPI_BCAST(DistrRPerp_5D(:,:,:,:,             &
+            iRPerpStart_I(iProc):iRPerpEnd_I(iProc)),    &
+            (iRPerpEnd_I(iProc)-iRPerpStart_I(iProc)+1)* &
+            (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, 0, iComm, iError)
+      end do
     end if
     DistrRPerp_5D = exp(DistrRPerp_5D*log(10.0)) ! log10(VDF) => VDF
     ! Check the error message from after interpolate_trmesh
