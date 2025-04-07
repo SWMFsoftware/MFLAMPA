@@ -1,9 +1,6 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Apr  2 14:35:52 2025
-
-@author: nikolett
+@author: nikolett@umich.edu
 """
 
 import math
