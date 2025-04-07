@@ -50,6 +50,9 @@ class Triangle:
         radius_sq = (center.x - ax)**2 + (center.y - ay)**2
         return center, radius_sq
 
+    # the correct method would be determinant calculation,
+    # but this is computationally heavy and slows the process
+    """
     def contains_point_in_circumcircle(self, p):
         a, b, c = self.points
         ax, ay = a.x - p.x, a.y - p.y
@@ -60,13 +63,18 @@ class Triangle:
             - (bx * bx + by * by) * (ax * cy - cx * ay) \
             + (cx * cx + cy * cy) * (ax * by - bx * ay)
         return det > 0
-
+    """
+    def contains_point_in_circumcircle(self, p):
+        dx = self._circumcenter.x - p.x
+        dy = self._circumcenter.y - p.y
+        dist_sq = dx * dx + dy * dy
+        return dist_sq < self._radius_sq
+    
     def edges(self):
         return [(self.points[i], self.points[(i+1)%3]) for i in range(3)]
 
     def __repr__(self):
         return f"Triangle({self.points[0]}, {self.points[1]}, {self.points[2]})"
-
 
 def bowyer_watson(points):
     # Step 1: Super-triangle that encompasses all
@@ -263,9 +271,7 @@ if __name__ == "__main__":
     
     # TRIANGULATION SANITY CHECK 4
     # CHECK RUNTIME FOR FUNCTION AND CLASS - ROUGHLY THE SAME
-    # FOR SMALLER NUMBER OF POINTS, THE CLASS RUNS FASTER
-    # FOR A LARGER NUMBER OF POINTS, THE FUNCTION RUNS FASTER
-    # SCALES WITH
+    # THE CLASS RUNS FASTER, RECOMMEND USING THAT
     """
     import time 
     coords = [[random.uniform(0, 100), random.uniform(0, 100)] for _ in range(10000)]
