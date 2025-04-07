@@ -11,6 +11,9 @@ import numpy as np
 import datetime as dt
 import matplotlib.tri as tri
 from scipy.ndimage import gaussian_filter
+from scipy.spatial import Delaunay
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 # Read data from some lines in files
 def read_line(filename, linenum):
@@ -32,9 +35,9 @@ def read_args():
     parser = argparse.ArgumentParser( \
         description="Read information for mflampa_tri2dflux")
     parser.add_argument('--dirMH2D', type=str, default='./SP/IO2/', \
-        help='Path to M-FLAMPA mh2d output (default: ./SP/IO2/)')
+        help='Directory of the M-FLAMPA mh2d output (default: ./SP/IO2/)')
     parser.add_argument('--pathEChannel', type=str, default='./SP/IO2/', \
-        help='Path to MH_data_EChannel.H file (default: ./SP/IO2/)')
+        help='Path to the MH_data_EChannel.H file (default: ./SP/IO2/)')
     parser.add_argument('--nLon', type=int, default=360, \
         help='nLon in the interpolated LonLat map (default: 360)')
     parser.add_argument('--nLat', type=int, default=180, \
@@ -45,6 +48,14 @@ def read_args():
         help='Value scale to use (default: log)')
     parser.add_argument('--SmoothSigma', type=float, default=1.0, \
         help='Smoothing sigma (default: 1.0)')
+    parser.add_argument('--dicFig', type=str, default='./SP/Fig/', \
+        help='Directory to saved figures (default: ./SP/Fig/)')
+    parser.add_argument('--doAllInterp', type=bool, default=False, \
+        help='Whether to all interpolation from iIter=0 (default: False)')
+    parser.add_argument('--vmin', type=float, default=1.0E-2, \
+        help='Min of the color bar in 2D map (default: 1.0E-2)')
+    parser.add_argument('--vmax', type=float, default=1.0E+2, \
+        help='Max of the color bar in 2D map (default: 1.0E+2)')
     
     # return as args
     args = parser.parse_args()
@@ -74,6 +85,29 @@ def read_mh_echannel(pathEChannel="./SP/IO2/MH_data_EChannel.H"):
     table_io = StringIO(table_text)
     # Read the table with whitespace separator
     df = pd.read_csv(table_io, sep=r'\s+', engine='python')
+
+    # Change the Energy and Units, if needed (=> MeV)
+    UnitEChannel = df['EnergyUnit'][0].lower()
+    match UnitEChannel:
+        case 'ev':
+            factor = 1.0E-6
+        case 'kev':
+            factor = 1.0E-3
+        case 'mev':
+            factor = 1.0
+        case 'gev':
+            factor = 1.0E+3
+        case 'tev':
+            factor = 1.0E+6
+        case _:
+            raise ValueError(f"Unknown energy unit: {UnitEChannel}")
+    for iEChannel in range(len(df['FluxChannel'])):
+        if 'flux_Channel' in df.loc[iEChannel, 'FluxChannel']:
+            df.loc[iEChannel, 'EnergyLow'] = \
+                float(df['EnergyLow'][iEChannel]*factor)
+            df.loc[iEChannel, 'EnergyHigh'] = \
+                float(df['EnergyHigh'][iEChannel]*factor)
+            df.loc[iEChannel, 'EnergyUnit'] = 'MeV'
 
     return df
 
@@ -201,6 +235,50 @@ def tri_interp_value(tri_skeleton, dataz_I, dataxinterp, \
     datazinterp = gaussian_filter(datazinterp, sigma=SmoothSigma)
     return datazinterp
 
+# Plot the triangulation 2d map
+def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
+    IChannelLow, UnitChannelLow, UnitFlux, \
+    time, dirFig, vmin=1.0E-2, vmax=1.0E+2):
+    ### Parameters:
+    ### LON_II, LAT_II, IFLUX_II: 2D matrices of the contour map
+    ### IChannelLow (integer), UnitChannelLow (string): Used to
+    ###         have ">? [Unit]" Energy Channel (e.g., >10 MeV)
+    ### UnitFlux (string): Used to have the flux, e.g., [pfu]
+    ### time (string): specify the time
+    ### dirFig (string): specify the directory of plots saved
+    ### ############
+    ### Returns: 
+    ### Figures saved, no actual returns from the function
+    ############################################################
+    
+    # Declare the canvas, font and color bar
+    fig = plt.figure(figsize=(9, 5))
+    fig.subplots_adjust(left=0.07, right=1.04, top=0.93, bottom=0.1)
+    hfont = {'fontname': 'Helvetica'}
+    log10vmin = int(np.log10(vmin)); log10vmax = int(np.log10(vmax))
+    normCont = LogNorm(vmin=vmin, vmax=vmax)
+    
+    # Plot in the panel
+    plt.title("Integral Flux of $>$%d %s at %s"%( \
+        IChannelLow, UnitChannelLow, time), fontsize=16, **hfont)
+    im = plt.pcolormesh(LON_II, LAT_II, IFLUX_II, \
+        norm=normCont, cmap='RdYlBu_r', rasterized=True)
+    plt.xticks(fontsize=12.5, **hfont)
+    plt.yticks(range(-90, 100, 30), fontsize=12.5, **hfont); plt.ylim(-90, 90)
+    plt.xlabel("Longitude [Degree]", fontsize=14, labelpad=2, **hfont)
+    plt.ylabel("Latitude [Degree]", fontsize=14, labelpad=2, **hfont)
+    
+    # Add color bar
+    cbar = plt.colorbar(im, pad=0.02)
+    cbar.set_label("Energetic Protons Flux [%s]"%(UnitFlux), fontsize=14, **hfont)
+    cbar.ax.set_yticks(10.0**np.arange(log10vmin, log10vmax+1.0, 1.0))
+    cbar.ax.set_yticklabels([r"$\mathdefault{10^{%d}}$"%(i) \
+        for i in range(log10vmin, log10vmax+1, 1)], fontsize=12, **hfont)
+
+    # Save the plot
+    plt.savefig(dirFig+'mflampa_tri2dflux_%s_GT_%d%s.pdf'%( \
+        time, IChannelLow, UnitChannelLow), transparent=True)
+    plt.close()
 
 # To run the script
 if __name__ == "__main__":
@@ -233,15 +311,27 @@ if __name__ == "__main__":
 
     # 4.3: Preparations before entering the loop for iterations
     LonInterp_I = np.linspace(0.0, 360.0, args.nLon+1)
-    LatInterp_I = np.linspace(0.0, 360.0, args.nLat+1)
+    LatInterp_I = np.linspace(-90.0, 90.0, args.nLat+1)
     LATInterp_II, LONInterp_II = np.meshgrid(LatInterp_I, LonInterp_I)
     IFluxInterp_IV = np.zeros([IFluxAug_III.shape[0], IFluxAug_III.shape[-1], \
         args.nLon+1, args.nLat+1]) # nIter, nEChannel, nLon (remapped), nLat (remapped)
-    print(IFluxInterp_IV.shape)
-    # In each step, we:
+    if not os.path.exists(args.dicFig):
+        os.makedirs(args.dicFig)
+
+    # In each iteration, we:
     for iIter in range(len(dic_mh2d['Time'])):
+        # 4.4: Decide whether or not we run this iteration
+        # If the directory has been created, then we run this iteration and
+        # saved the figures; otherwise, we will check the flag of interpolation
+        # from args and decide whether we skip looping the existing iteration
+        dirIterFig = os.path.join(args.dicFig, \
+            dic_mh2d['Time'][iIter].strftime('%Y%m%d_%H%M%S'))+"/"
+        if not os.path.exists(dirIterFig):
+            os.makedirs(dirIterFig)
+        else:
+            if not args.doAllInterp: continue
         
-        # 4.4: Get the effective and augmented data
+        # 4.5: Get the effective and augmented data
         LonEff_I = LonAug_II[iIter][MskIFluxAug_II[iIter]] # deg
         LatEff_I = LatAug_II[iIter][MskIFluxAug_II[iIter]] # deg
         IFluxEff_II = IFluxAug_III[iIter][MskIFluxAug_II[iIter]] # Flux
@@ -258,4 +348,14 @@ if __name__ == "__main__":
         print("iIter = %d"%(iIter), "Time =", dic_mh2d['Time'][iIter], \
             "with Orig LonLat Size =", LonEff_I.shape, LatEff_I.shape, \
             "to the Remapped LonLat Size =", LONInterp_II.shape, LATInterp_II.shape)
+    
+        # Step 7: Visualization: Save the plots
+        for jChannel in range(IFluxInterp_IV.shape[1]):
+            plot_tri_2dflux(LON_II=LONInterp_II, LAT_II=LATInterp_II, \
+                IFLUX_II=IFluxInterp_IV[iIter, jChannel], \
+                IChannelLow=df_mh_echannel['EnergyLow'][jChannel+1], \
+                UnitChannelLow=df_mh_echannel['EnergyUnit'][jChannel+1], \
+                UnitFlux=df_mh_echannel['FluxChannelUnit'][jChannel+1], \
+                time=dic_mh2d['Time'][iIter].strftime('%Y%m%d_%H%M%S'), \
+                dirFig=dirIterFig, vmin=args.vmin, vmax=args.vmax)
     
