@@ -121,7 +121,70 @@ def bowyer_watson(points):
 
     return final_tris
 
-def plot_triangulation(points, triangles, show_point_labels=False):
+class DelaunayTriangulator:
+    def __init__(self, points):
+        self.points = points
+        self.triangles = []
+        self._super_triangle = None
+        self._build()
+
+    def _build(self):
+        # Step 1: Create super triangle
+        min_x = min(p.x for p in self.points)
+        max_x = max(p.x for p in self.points)
+        min_y = min(p.y for p in self.points)
+        max_y = max(p.y for p in self.points)
+
+        dx = max_x - min_x
+        dy = max_y - min_y
+        delta_max = max(dx, dy)
+        mid_x = (min_x + max_x) / 2
+        mid_y = (min_y + max_y) / 2
+
+        p1 = Point(mid_x - 20 * delta_max, mid_y - delta_max)
+        p2 = Point(mid_x, mid_y + 20 * delta_max)
+        p3 = Point(mid_x + 20 * delta_max, mid_y - delta_max)
+        self._super_triangle = (p1, p2, p3)
+
+        self.triangles = [Triangle(p1, p2, p3)]
+
+        # Step 2: Insert each point into the triangulation
+        for point in self.points:
+            self._add_point(point)
+
+        # Step 3: Remove triangles connected to super triangle vertices
+        self.triangles = [
+            t for t in self.triangles
+            if all(v not in self._super_triangle for v in t.points)
+        ]
+
+    def _add_point(self, point):
+        bad_triangles = [
+            t for t in self.triangles if t.contains_point_in_circumcircle(point)
+        ]
+
+        # Step 1: Find boundary edges (edges not shared by two triangles)
+        edge_count = {}
+        for tri in bad_triangles:
+            for edge in tri.edges():
+                e = tuple(sorted(edge, key=lambda p: (p.x, p.y)))
+                edge_count[e] = edge_count.get(e, 0) + 1
+
+        boundary = [e for e, count in edge_count.items() if count == 1]
+
+        # Step 2: Remove bad triangles
+        for tri in bad_triangles:
+            self.triangles.remove(tri)
+
+        # Step 3: Retriangulate the hole
+        for edge in boundary:
+            new_tri = Triangle(edge[0], edge[1], point)
+            self.triangles.append(new_tri)
+
+    def get_triangles(self):
+        return self.triangles
+
+def plot_triangulation(points, triangles, show_point_labels=False, title ="Delaunay Triangulation"):
     fig, ax = plt.subplots()
 
     xs = [p.x for p in points]
@@ -139,7 +202,7 @@ def plot_triangulation(points, triangles, show_point_labels=False):
         ax.plot(x_coords, y_coords, color='red', linewidth=1)
 
     ax.set_aspect('equal')
-    plt.title("Delaunay Triangulation")
+    plt.title(title)
     plt.grid(True)
     plt.show()
 
@@ -166,18 +229,23 @@ def read_custom_csv(filename, skiprows=16, cols = cols):
 
 if __name__ == "__main__":
     
-    # TRIANGULATION SANITY CHECK
+    # TRIANGULATION SANITY CHECK 1
     # CREATING RANDOM COORDINATES TO CALCULATE TRIANGULATION ON
+    
     import random    
     coords = [[random.uniform(0, 1), random.uniform(0, 1)] for _ in range(15)]
     input_points = [Point(x, y) for x, y in coords]
     tris = bowyer_watson(input_points)
+    triangulator = DelaunayTriangulator(input_points)
+    triangles = triangulator.get_triangles()
+
     
     # TRIANGULATION SANITY CHECK 2
     # PLOT THE TRIANGULATION
     
     import matplotlib.pyplot as plt
-    plot_triangulation(input_points, tris, show_point_labels=True)
+    plot_triangulation(input_points, tris, show_point_labels=True, title="Function Definition")
+    plot_triangulation(input_points, triangles, show_point_labels=True, title="Class Definition")
     
         
     # TRIANGULATION SANITY CHECK 3
@@ -194,6 +262,28 @@ if __name__ == "__main__":
     ax.plot(coords[:,0], coords[:,1], 'o')
     ax.set_aspect('equal')
     plt.show()
+    """
+    
+    # TRIANGULATION SANITY CHECK 4
+    # CHECK RUNTIME FOR FUNCTION AND CLASS - ROUGHLY THE SAME
+    # FOR SMALLER NUMBER OF POINTS, THE CLASS RUNS FASTER
+    # FOR A LARGER NUMBER OF POINTS, THE FUNCTION RUNS FASTER
+    # SCALES WITH
+    """
+    import time 
+    coords = [[random.uniform(0, 100), random.uniform(0, 100)] for _ in range(10000)]
+    input_points = [Point(x, y) for x, y in coords]
+    start_time = time.perf_counter()
+    tris = bowyer_watson(input_points)
+    end_time = time.perf_counter()
+    execution_time = end_time - start_time
+    print(f"The function took {execution_time} seconds to run.")
+    start_time = time.perf_counter()
+    triangulator = DelaunayTriangulator(input_points)
+    triangles = triangulator.get_triangles()
+    end_time = time.perf_counter()
+    execution_time = end_time - start_time
+    print(f"The class took {execution_time} seconds to run.")
     """
     
     # FIELD LINE READ-IN SANITY CHECK
