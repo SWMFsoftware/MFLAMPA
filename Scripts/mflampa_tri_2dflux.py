@@ -31,7 +31,7 @@ def read_line(filename, linenum):
 
 # Read the command line
 def read_args():
-    # argparse
+    # argparse and help information
     parser = argparse.ArgumentParser( \
         description="Read information for mflampa_tri2dflux")
     parser.add_argument('--dirMH2D', type=str, default='./SP/IO2/', \
@@ -50,12 +50,24 @@ def read_args():
         help='Smoothing sigma (default: 1.0)')
     parser.add_argument('--dicFig', type=str, default='./SP/Fig/', \
         help='Directory to saved figures (default: ./SP/Fig/)')
+    parser.add_argument('--formatFig', type=str, default='pdf', \
+        help='format of the figure (default: pdf)')
+    parser.add_argument('--IsTranFig', type=bool, default=True, \
+        help='whether to set transparent background in plots (default: True)')
     parser.add_argument('--doAllInterp', type=bool, default=False, \
         help='Whether to all interpolation from iIter=0 (default: False)')
     parser.add_argument('--vmin', type=float, default=1.0E-2, \
         help='Min of the color bar in 2D map (default: 1.0E-2)')
     parser.add_argument('--vmax', type=float, default=1.0E+2, \
         help='Max of the color bar in 2D map (default: 1.0E+2)')
+    parser.add_argument('--starttime', type=dt.datetime, \
+        default=dt.datetime(1900, 1, 1), help='start time of the ' + \
+        'event simulation (default: 2 min prior to the first file)')
+    parser.add_argument('--startEChannel', type=int, default=1, \
+        help='start of the energy channel in saved plots (default: 1)')
+    parser.add_argument('--endEChannel', type=int, default=99, \
+        help='end of the energy channel in saved plots' + \
+            '(default: the last energy channel in the EChannel.H file)')
     
     # return as args
     args = parser.parse_args()
@@ -170,6 +182,7 @@ def read_simu_mh2d(dirMH2D="./SP/"):
     
     return dic
 
+# Augment LonLat points
 def aug_lonlatII(LonOrig_II, LatOrig_II, IFluxOrig_III, sepLon):
     ### Parameters:
     ### LonOrig_II, LatOrig_II: Original LonLat points on field lines
@@ -237,15 +250,21 @@ def tri_interp_value(tri_skeleton, dataz_I, dataxinterp, \
 
 # Plot the triangulation 2d map
 def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
-    IChannelLow, UnitChannelLow, UnitFlux, \
-    time, dirFig, vmin=1.0E-2, vmax=1.0E+2):
+    IChannelLow, IChannelHigh, UnitChannelLow, UnitFlux, \
+    time, starttime, dirFig, formatFig, IsTranFig, \
+    vmin=1.0E-2, vmax=1.0E+2):
     ### Parameters:
     ### LON_II, LAT_II, IFLUX_II: 2D matrices of the contour map
-    ### IChannelLow (integer), UnitChannelLow (string): Used to
+    ### IChannelLow (integer), IChannelHigh (integer), 
+    ###         and UnitChannelLow (string): Used to
     ###         have ">? [Unit]" Energy Channel (e.g., >10 MeV)
     ### UnitFlux (string): Used to have the flux, e.g., [pfu]
-    ### time (string): specify the time
+    ### time (dt.datetime): specify the time
+    ### starttime (dt.datetime): specify the start time
     ### dirFig (string): specify the directory of plots saved
+    ### formatFig (string): format of the saved figure(s)
+    ### IsTranFig (bool): whether to set transparent background in plots
+    ### vmin and vmax: color bar range
     ### ############
     ### Returns: 
     ### Figures saved, no actual returns from the function
@@ -257,10 +276,26 @@ def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
     hfont = {'fontname': 'Helvetica'}
     log10vmin = int(np.log10(vmin)); log10vmax = int(np.log10(vmax))
     normCont = LogNorm(vmin=vmin, vmax=vmax)
+    # Prepare for the time
+    timestr = time.strftime('%Y%m%d_%H%M%S')
+    dtime = time-starttime
+    dtimetotalMin = dtime.total_seconds()/60.0
+    dtimeHr = int(dtimetotalMin/60)
+    dtimeMin = dtimetotalMin - dtimeHr*60
     
     # Plot in the panel
-    plt.title("Integral Flux of $>$%d %s at %s"%( \
-        IChannelLow, UnitChannelLow, time), fontsize=16, **hfont)
+    if '/' in UnitFlux:
+        # Differential flux
+        plt.title("Differential Flux of %.2f–%.2f %s at %s "%( \
+            IChannelLow, IChannelHigh, UnitChannelLow, timestr) + \
+            r"($t=$%d$\,$hr$\;$%d$\,$min)"% (
+            dtimeHr, dtimeMin), fontsize=16, **hfont)
+    else:
+        # Integral flux
+        plt.title("Integral Flux of $>$%d %s at %s "%( \
+            IChannelLow, UnitChannelLow, timestr) + \
+            r"($t=$%d$\,$hr$\;$%d$\,$min)"% (
+            dtimeHr, dtimeMin), fontsize=16, **hfont)
     im = plt.pcolormesh(LON_II, LAT_II, IFLUX_II, \
         norm=normCont, cmap='RdYlBu_r', rasterized=True)
     plt.xticks(fontsize=12.5, **hfont)
@@ -276,8 +311,16 @@ def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
         for i in range(log10vmin, log10vmax+1, 1)], fontsize=12, **hfont)
 
     # Save the plot
-    plt.savefig(dirFig+'mflampa_tri2dflux_%s_GT_%d%s.pdf'%( \
-        time, IChannelLow, UnitChannelLow), transparent=True)
+    if '/' in UnitFlux:
+        # Differential flux
+        plt.savefig(dirFig+'mflampa_tri2dflux_%s_%.2f_to_%.2f%s.%s'%( \
+            timestr, IChannelLow, IChannelHigh, UnitChannelLow, \
+            formatFig), dpi=256, transparent=IsTranFig)
+    else:
+        # Integral flux
+        plt.savefig(dirFig+'mflampa_tri2dflux_%s_GT_%d%s.%s'%( \
+            timestr, IChannelLow, UnitChannelLow, formatFig), \
+            dpi=256, transparent=IsTranFig)
     plt.close()
 
 # To run the script
@@ -308,8 +351,14 @@ if __name__ == "__main__":
     LonAug_II, LatAug_II, IFluxAug_III = aug_lonlatII( \
         LonOrig_II, LatOrig_II, IFluxOp_III, args.sepLon)
     MskIFluxAug_II = np.all(IFluxAug_III>0.0, axis=2) # nIter, nLine*2
+    # 4.3: Adjust the args.starttime and EChannel for saved plots
+    if (args.starttime.year==1900) and (args.starttime.month==1) \
+        and (args.starttime.day==1):
+            args.starttime=dic_mh2d['Time'][0] - dt.timedelta(minutes=2.0)
+    ChannelStart = int(max(1, args.startEChannel) - 1)
+    ChannelEnd = int(min(IFluxAug_III.shape[-1], args.endEChannel) - 1)
 
-    # 4.3: Preparations before entering the loop for iterations
+    # 4.4: Preparations before entering the loop for iterations
     LonInterp_I = np.linspace(0.0, 360.0, args.nLon+1)
     LatInterp_I = np.linspace(-90.0, 90.0, args.nLat+1)
     LATInterp_II, LONInterp_II = np.meshgrid(LatInterp_I, LonInterp_I)
@@ -320,7 +369,7 @@ if __name__ == "__main__":
 
     # In each iteration, we:
     for iIter in range(len(dic_mh2d['Time'])):
-        # 4.4: Decide whether or not we run this iteration
+        # 4.5: Decide whether or not we run this iteration
         # If the directory has been created, then we run this iteration and
         # saved the figures; otherwise, we will check the flag of interpolation
         # from args and decide whether we skip looping the existing iteration
@@ -331,7 +380,7 @@ if __name__ == "__main__":
         else:
             if not args.doAllInterp: continue
         
-        # 4.5: Get the effective and augmented data
+        # 4.6: Get the effective and augmented data
         LonEff_I = LonAug_II[iIter][MskIFluxAug_II[iIter]] # deg
         LatEff_I = LatAug_II[iIter][MskIFluxAug_II[iIter]] # deg
         IFluxEff_II = IFluxAug_III[iIter][MskIFluxAug_II[iIter]] # Flux
@@ -340,7 +389,7 @@ if __name__ == "__main__":
         tri_mh2d_skeleton = get_tri_skeleton(datax_I=LonEff_I, datay_I=LatEff_I)
         
         # Step 6: Interpolate based on the mh2d triangulation skeleton
-        for jChannel in range(IFluxInterp_IV.shape[1]):
+        for jChannel in range(ChannelStart, ChannelEnd+1):
             IFluxInterp_IV[iIter, jChannel] = tri_interp_value( \
                 tri_skeleton=tri_mh2d_skeleton, dataz_I=IFluxEff_II[:, jChannel], \
                 dataxinterp=LONInterp_II, datayinterp=LATInterp_II, \
@@ -350,12 +399,14 @@ if __name__ == "__main__":
             "to the Remapped LonLat Size =", LONInterp_II.shape, LATInterp_II.shape)
     
         # Step 7: Visualization: Save the plots
-        for jChannel in range(IFluxInterp_IV.shape[1]):
+        for jChannel in range(ChannelStart, ChannelEnd+1):
             plot_tri_2dflux(LON_II=LONInterp_II, LAT_II=LATInterp_II, \
                 IFLUX_II=IFluxInterp_IV[iIter, jChannel], \
                 IChannelLow=df_mh_echannel['EnergyLow'][jChannel+1], \
+                IChannelHigh=df_mh_echannel['EnergyHigh'][jChannel+1], \
                 UnitChannelLow=df_mh_echannel['EnergyUnit'][jChannel+1], \
                 UnitFlux=df_mh_echannel['FluxChannelUnit'][jChannel+1], \
-                time=dic_mh2d['Time'][iIter].strftime('%Y%m%d_%H%M%S'), \
-                dirFig=dirIterFig, vmin=args.vmin, vmax=args.vmax)
+                time=dic_mh2d['Time'][iIter], starttime=args.starttime, \
+                dirFig=dirIterFig, formatFig=args.formatFig, \
+                IsTranFig=args.IsTranFig, vmin=args.vmin, vmax=args.vmax)
     
