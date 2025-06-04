@@ -38,10 +38,14 @@ def read_args():
         help='Directory of the M-FLAMPA mh2d output (default: ./SP/IO2/)')
     parser.add_argument('--pathEChannel', type=str, default='./SP/IO2/', \
         help='Path to the MH_data_EChannel.H file (default: ./SP/IO2/)')
-    parser.add_argument('--nLon', type=int, default=360, \
-        help='nLon in the interpolated LonLat map (default: 360)')
-    parser.add_argument('--nLat', type=int, default=180, \
-        help='nLat in the interpolated LonLat map (default: 180)')
+    parser.add_argument('--dLon', type=float, default=0.0, \
+        help='Rotation angle of the coordinate system (default: 0.0)')
+    parser.add_argument('--nLon', type=int, default=120, \
+        help='nLon in the interpolated LonLat map (default: 120, i.e., dLon = 3 deg)')
+    parser.add_argument('--nLat', type=int, default=60, \
+        help='nLat in the interpolated LonLat map (default: 60, i.e., dLat = 3 deg)')
+    parser.add_argument('--IsAddBC', type=bool, default=True, \
+        help='Add BC at latitude = plus/minus 90 deg (default: True)')
     parser.add_argument('--sepLon', type=float, default=180.0, \
         help='sepLon in the interpolated LonLat map (default: 180.0)')
     parser.add_argument('--ValueScale', type=str, default='log', \
@@ -124,14 +128,14 @@ def read_mh_echannel(pathEChannel="./SP/IO2/MH_data_EChannel.H"):
     return df
 
 # Read the MH2D files in the given path
-def read_simu_mh2d(dirMH2D="./SP/"):
+def read_simu_mh2d(dirMH2D="./SP/", dLon=0.0, IsAddBC=True):
     # Given dirMH2D, read all the mh2d files created by M-FLAMPA
         
     # mh2d files: first 5 lines are meta data saved as a header
     nLineHeader = 5
     
     # Get all files aligned with the specific mh2d filename format in the given path
-    fmt_mh2dfile = re.compile(r"^MH_data_R=\d{4}.\d{2}_e\d{8}_\d{6}_n\d{6}\.out$")
+    fmt_mh2dfile = re.compile(r"^MH_data_R_\d{4}.\d{2}_e\d{8}_\d{6}_n\d{6}\.out$")
     files_mh2dfile = [ ]
     files = sorted(os.listdir(dirMH2D))
     for j in range(len(files)):
@@ -164,16 +168,42 @@ def read_simu_mh2d(dirMH2D="./SP/"):
         iLon = header_mh2d_I.index("Longitude") # Index of "Longtude"
         iLat = header_mh2d_I.index("Latitude") # Index of "Latitude"
         
-        LonLat_III = np.zeros([nIter_MH2D, nLine, 2])
-        IFluxOp_III = np.zeros([nIter_MH2D, nLine, nEnergymh2d])
-        for iIter in range(nIter_MH2D):
-            iLine_I = np.loadtxt(files_mh2dfile[iIter], skiprows=nLineHeader, \
-                unpack=True, usecols=[0], dtype=float).astype(np.int64)
-            LonLat_II = np.loadtxt(files_mh2dfile[iIter], skiprows=nLineHeader, \
-                unpack=True, usecols=[iLon, iLat]+[iLat+1+i for i in range(nEnergymh2d)], dtype=float)
-            LonLat_III[iIter, iLine_I-1, 0] = LonLat_II[0]
-            LonLat_III[iIter, iLine_I-1, 1] = LonLat_II[1]
-            IFluxOp_III[iIter, iLine_I-1, :] = LonLat_II[2:].T # NaN and negative values are included
+        if IsAddBC:
+            # Add BC point (every 10 deg) for visualization
+            argsLon_I = np.linspace(-180.0, 360.0, 29)
+            argsLatN_I = np.ones_like(argsLon_I)*100.0
+            argsLatS_I = -np.ones_like(argsLon_I)*100.0
+            LonLat_III = np.zeros([nIter_MH2D, nLine+2*len(argsLon_I), 2])
+            IFluxOp_III = np.zeros([nIter_MH2D, nLine+2*len(argsLon_I), nEnergymh2d])
+            for iIter in range(nIter_MH2D):
+                iLine_I = np.loadtxt(files_mh2dfile[iIter], skiprows=nLineHeader, \
+                    unpack=True, usecols=[0], dtype=float).astype(np.int64)
+                LonLat_II = np.loadtxt(files_mh2dfile[iIter], skiprows=nLineHeader, \
+                    unpack=True, usecols=[iLon, iLat]+[iLat+1+i for i in range(nEnergymh2d)], dtype=float)
+                LonLat_III[iIter, iLine_I-1, 0] = LonLat_II[0]+dLon # Lon + dLon (Coord)
+                LonLat_III[iIter, iLine_I-1, 1] = LonLat_II[1] # Lat
+                IFluxOp_III[iIter, iLine_I-1, :] = LonLat_II[2:].T # NaN and negative values are included
+                
+                # BC points added to the end
+                argsFlux_II = np.ones([2*len(argsLon_I), len(LonLat_II)-2])*1.0E-7
+                LonLat_III[iIter, nLine:nLine+len(argsLon_I), 0] = argsLon_I # Lon + dLon (Coord)
+                LonLat_III[iIter, nLine:nLine+len(argsLon_I), 1] = argsLatN_I # Lat
+                LonLat_III[iIter, nLine+len(argsLon_I):, 0] = argsLon_I # Lon + dLon (Coord)
+                LonLat_III[iIter, nLine+len(argsLon_I):, 1] = argsLatS_I # Lat
+                IFluxOp_III[iIter, nLine:, :] = argsFlux_II # NaN and negative values are included
+        else:
+            # Otherwise just make a copy from saved files
+            LonLat_III = np.zeros([nIter_MH2D, nLine, 2])
+            IFluxOp_III = np.zeros([nIter_MH2D, nLine, nEnergymh2d])
+            for iIter in range(nIter_MH2D):
+                iLine_I = np.loadtxt(files_mh2dfile[iIter], skiprows=nLineHeader, \
+                    unpack=True, usecols=[0], dtype=float).astype(np.int64)
+                LonLat_II = np.loadtxt(files_mh2dfile[iIter], skiprows=nLineHeader, \
+                    unpack=True, usecols=[iLon, iLat]+[iLat+1+i for i in range(nEnergymh2d)], dtype=float)
+                LonLat_III[iIter, iLine_I-1, 0] = LonLat_II[0]+dLon # Lon + dLon (Coord)
+                LonLat_III[iIter, iLine_I-1, 1] = LonLat_II[1] # Lat
+                IFluxOp_III[iIter, iLine_I-1, :] = LonLat_II[2:].T # NaN and negative values are included
+        
         dic['Position'] = LonLat_III # deg
         dic['IFluxOp'] = IFluxOp_III # consistent with information in MH_data_EChannel.H
     else:
@@ -252,7 +282,7 @@ def tri_interp_value(tri_skeleton, dataz_I, dataxinterp, \
 def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
     IChannelLow, IChannelHigh, UnitChannelLow, UnitFlux, \
     time, starttime, dirFig, formatFig, IsTranFig, \
-    vmin=1.0E-2, vmax=1.0E+2):
+    triDe=None, vmin=1.0E-2, vmax=1.0E+2):
     ### Parameters:
     ### LON_II, LAT_II, IFLUX_II: 2D matrices of the contour map
     ### IChannelLow (integer), IChannelHigh (integer), 
@@ -264,6 +294,7 @@ def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
     ### dirFig (string): specify the directory of plots saved
     ### formatFig (string): format of the saved figure(s)
     ### IsTranFig (bool): whether to set transparent background in plots
+    ### triDe (Delaunay return): triangulation skeleton
     ### vmin and vmax: color bar range
     ### ############
     ### Returns: 
@@ -298,6 +329,8 @@ def plot_tri_2dflux(LON_II, LAT_II, IFLUX_II, \
             dtimeHr, dtimeMin), fontsize=16, **hfont)
     im = plt.pcolormesh(LON_II, LAT_II, IFLUX_II, \
         norm=normCont, cmap='RdYlBu_r', rasterized=True)
+    trimesh = plt.triplot(LON_II, LAT_II, triDe.simplices, \
+        ls='-', color='gray', linewidth=0.15, alpha=0.85)
     plt.xticks(fontsize=12.5, **hfont)
     plt.yticks(range(-90, 100, 30), fontsize=12.5, **hfont); plt.ylim(-90, 90)
     plt.xlabel("Longitude [Degree]", fontsize=14, labelpad=2, **hfont)
@@ -335,7 +368,7 @@ if __name__ == "__main__":
     print("df_mh_echannel:", df_mh_echannel)
     
     # Step 3: Read the mh2d files
-    dic_mh2d = read_simu_mh2d(dirMH2D=args.dirMH2D)
+    dic_mh2d = read_simu_mh2d(dirMH2D=args.dirMH2D, dLon=args.dLon, IsAddBC=args.IsAddBC)
     print("dic_mh2d keywords", dic_mh2d.keys())
     
     # Step 4: Check and Prepare the data for triangulation
@@ -386,6 +419,7 @@ if __name__ == "__main__":
         IFluxEff_II = IFluxAug_III[iIter][MskIFluxAug_II[iIter]] # Flux
     
         # Step 5: Get the triangulation skeleton
+        triDe = Delaunay(np.c_[LonEff_I, LatEff_I])
         tri_mh2d_skeleton = get_tri_skeleton(datax_I=LonEff_I, datay_I=LatEff_I)
         
         # Step 6: Interpolate based on the mh2d triangulation skeleton
@@ -408,5 +442,5 @@ if __name__ == "__main__":
                 UnitFlux=df_mh_echannel['FluxChannelUnit'][jChannel+1], \
                 time=dic_mh2d['Time'][iIter], starttime=args.starttime, \
                 dirFig=dirIterFig, formatFig=args.formatFig, \
-                IsTranFig=args.IsTranFig, vmin=args.vmin, vmax=args.vmax)
+                IsTranFig=args.IsTranFig, triDe=triDe, vmin=args.vmin, vmax=args.vmax)
     
