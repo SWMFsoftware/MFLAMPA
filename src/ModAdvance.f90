@@ -40,6 +40,11 @@ contains
        call read_var('Cfl', Cfl)
     case('#ADVECTION')
        call read_var('UsePoissonBracket', UsePoissonBracket)
+       ! When nMu is not 1, we will solve the focused transport equation,
+       ! including the extra pitch-angle adiabatic focusing effect. If one
+       ! wants to account for this term, UseMuFocusing should be set to true,
+       ! namely using triple/3 Poisson brackets. Otherwise, one will neglect
+       ! this term and use double/2 Poisson brackets. 
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
