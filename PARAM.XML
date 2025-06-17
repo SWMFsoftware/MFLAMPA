@@ -338,19 +338,19 @@ and nLon will be placed uniformly on the solar surface, for the
 field line footpoints.
 </command>
 
-<command name="GRIDNODESTART" if="$_IsFirstSession">
-  <parameter name="iLatStart"  type="integer" min="1" default="1" />
-  <parameter name="iLonStart"  type="integer" min="1" default="1" />
+<command name="GRIDNODEOFFSET" if="$_IsFirstSession and $_IsFirstSession">
+  <parameter name="iLatOffset"  type="integer" min="0" default="0" />
+  <parameter name="iLonOffset"  type="integer" min="0" default="0" />
 
 #GRIDNODESTART
-1			iLatStart
-1			iLonStart
+0			iLatOffset
+0			iLonOffset
 
 This command can only be used in the first session.
 
 Set the configured parameters of the Lagrangian grid, where
-iLatStart and iLonStart denote the starting index for fieldlines
-along latitudes and longitude, respectively.
+iLatOffset and iLonOffset denote the offset index for fieldlines
+along latitudes and longitude, respectively. Default values are 0.
 </command>
 
 <command name="TESTPOS" if="$_IsFirstSession">

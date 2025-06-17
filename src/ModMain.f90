@@ -81,10 +81,13 @@ contains
           if(IsStandAlone) CYCLE
           call read_param_origin
        case('#MOMENTUMGRID', '#PITCHANGLEGRID', '#CHECKGRIDSIZE', &
-            '#COORDSYSTEM', '#COORDINATESYSTEM', &
-            '#GRIDNODE', '#GRIDNODESTART', '#TESTPOS')
+            '#COORDSYSTEM', '#COORDINATESYSTEM', '#GRIDNODE', '#TESTPOS')
           ! Currently we do not need '#DOSMOOTH'
           if(.not.IsFirstSession) CYCLE
+          call read_param_grid(NameCommand)
+       case('#GRIDNODEOFFSET')
+          if(.not.IsFirstSession) CYCLE
+          call check_stand_alone
           call read_param_grid(NameCommand)
        case('#ENERGYRANGE', '#FLUXINITIAL')
           if(.not.IsFirstSession) CYCLE

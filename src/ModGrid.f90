@@ -39,10 +39,10 @@ module SP_ModGrid
 
   ! Grid info
   ! Angular grid at origin surface
-  integer, public :: nLat = 4
-  integer, public :: nLon = 4
-  integer, public :: iLatStart = 1
-  integer, public :: iLonStart = 1
+  integer, public :: nLat = 4  ! Number of lines along Lat grid
+  integer, public :: nLon = 4  ! Number of lines along Lon grid
+  integer:: iLatOffset = 0     ! Offset of line index along Lat grid
+  integer:: iLonOffset = 0     ! Offset of line index along Lon grid
 
   ! Total number of magnetic field lines on all PEs (a product of nLat*nLon)
   integer, public :: nLineAll = 16
@@ -213,9 +213,9 @@ contains
        call read_var('nLat', nLat)
        call read_var('nLon', nLon)
        nLineAll = nLat * nLon
-    case('#GRIDNODESTART')
-       call read_var('iLatStart', iLatStart)
-       call read_var('iLonStart', iLonStart)
+    case('#GRIDNODEOFFSET')
+       call read_var('iLatOffset', iLatOffset)
+       call read_var('iLonOffset', iLonOffset)
     case('#TESTPOS')
        call read_var('iNodeTest',     iNodeTest)
        call read_var('iParticleTest', iParticleTest)
@@ -316,8 +316,8 @@ contains
     ! Get node number from line number
     !--------------------------------------------------------------------------
     iLineAll = iBlockIn + iLineAll0
-    iLatOut = iLatStart + (iLineAll - 1)/nLon
-    iLonOut = iLineAll - nLon*(iLatOut - iLatStart) + (iLonStart - 1)
+    iLatOut = 1+iLatOffset + (iLineAll - 1)/nLon
+    iLonOut = iLineAll - nLon*(iLatOut - 1-iLatOffset) + iLonOffset
 
   end subroutine iblock_to_lon_lat
   !============================================================================
