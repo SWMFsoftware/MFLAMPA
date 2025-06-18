@@ -38,7 +38,7 @@ module SP_ModBc
   real, public      :: CoefInj = 0.25, SpectralIndex = 5.0
   real, parameter   :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
   ! Injection coefficient at lower end boundary, should set 0.0 for GCRs
-  real, public      :: CoefInjLowBc = 0.25
+  ! real, public      :: CoefInjLowBc = 0.25
 
   ! Lower end BC, set at the firsr point along the field line
   logical, public   :: UseLowerEndBc = .true.
@@ -51,8 +51,8 @@ module SP_ModBc
        iStartNoUseLeft_ = 2    ! when UseLowerEndBc = .false.
 
   ! Momentum BC
-  character(LEN=6)  :: TypeMomemtumInjBc = 'inject'
-  character(LEN=6)  :: TypeMomemtumMaxBc = 'none'
+  character(LEN=6)  :: TypeMomentumMinBc = 'inject'
+  character(LEN=6)  :: TypeMomentumMaxBc = 'none'
   ! Upper end BC, set at the last point along the field line
   logical, public   :: UseUpperEndBc = .false.
   ! Type of upper end BC: none, float/floating, escape, lism
@@ -69,13 +69,17 @@ contains
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-    case('#INJECTION')
-       call read_var('SpectralIndex',   SpectralIndex)
-       call read_var('EfficiencyGlob',  CoefInj)
-       call read_var('EfficiencyLowBc', CoefInjLowBc)
+    ! case('#INJECTION')
+    !   call read_var('SpectralIndex',   SpectralIndex)
+    !   call read_var('EfficiencyGlob',  CoefInj)
+    !   call read_var('EfficiencyLowBc', CoefInjLowBc)
     case('#MOMENTUMBC')
-       call read_var('TypeMomemtumInjBc',  TypeMomemtumInjBc)
-       call read_var('TypeMomemtumMaxBc',  TypeMomemtumMaxBc)
+       call read_var('TypeMomentumMinBc',  TypeMomentumMinBc)
+       if(TypeMomentumMinBc=='inject')then
+          call read_var('SpectralIndex',   SpectralIndex)
+          call read_var('EfficiencyInj',  CoefInj)
+       end if
+       call read_var('TypeMomentumMaxBc',  TypeMomentumMaxBc)
     case('#LOWERENDBC')
        ! Read whether to use LowerLowBc
        call read_var('UseLowerEndBc', UseLowerEndBc)
@@ -131,7 +135,7 @@ contains
     character(len=*), parameter:: NameSub = 'set_momentum_bc'
 
     !--------------------------------------------------------------------------
-    select case(trim(TypeMomemtumInjBc))
+    select case(trim(TypeMomentumMinBc))
     case('inject')
        do iVertex = 1, nX
           ! injection(Ti, Rho), see Sokolov et al., 2004, eq (3)
@@ -153,8 +157,8 @@ contains
           Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
        end do
        ! Modified for lower end boundary
-       Distribution_CB(0, :, 1, iLine) = &
-            Distribution_CB(0, :, 1, iLine)/CoefInj*CoefInjLowBc
+       ! Distribution_CB(0, :, 1, iLine) = &
+       !     Distribution_CB(0, :, 1, iLine)/CoefInj*CoefInjLowBc
     case('float', 'floating', 'escape')
        ! Neumann BC: Assume gradient = 0
        Distribution_CB(0,:,1:nX,iLine) = Distribution_CB(1,:,1:nX,iLine)
@@ -167,10 +171,10 @@ contains
             /Distribution_CB(2,:,1:nX,iLine)
     case default
        call CON_stop(NameSub// &
-            ': Unknown type of momentum inj BC '//TypeMomemtumInjBc)
+            ': Unknown type of BC at minimal momentum '//TypeMomentumMinBc)
     end select
 
-    select case(trim(TypeMomemtumMaxBc))
+    select case(trim(TypeMomentumMaxBc))
     case('none')
        ! Do nothing
     case('float', 'floating', 'escape')
@@ -185,7 +189,7 @@ contains
             /Distribution_CB(nP-1,:,1:nX,iLine)
     case default
        call CON_stop(NameSub// &
-            ': Unknown type of momentum max BC '//TypeMomemtumMaxBc)
+            ': Unknown type of momentum max BC '//TypeMomentumMaxBc)
     end select
 
   end subroutine set_momentum_bc
