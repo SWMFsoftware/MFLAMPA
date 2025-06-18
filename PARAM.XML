@@ -471,16 +471,16 @@ Read the number of energy bins, usually from the restart.H file.
 </command>
 
 <command name="ENERGYRANGE" if="$_IsFirstSession">
-  <parameter name="EnergyMin" type="real" min="0.0" default="1.0" />
-  <parameter name="EnergyMax" type="real" min="0.0" default="1000.0" />
+  <parameter name="EnergyMin" type="real" min="0.0" default="1.0E+1" />
+  <parameter name="EnergyMax" type="real" min="0.0" default="1.0E+7" />
 
-#MOMENTUMGRID
-1.0			EnergyMin
-1000.0			EnergyMax
+#ENERGYRANGE
+1.0E+1			EnergyMin
+1.0E+7			EnergyMax
 
 This command can only be used in the first session.
 
-Read energy range, usually from the restart.H file.
+Read energy range with the unit of keV as default, usually from the restart.H file.
 </command>
 
 <command name="PITCHANGLEGRID" if="$_IsFirstSession">
