@@ -591,11 +591,18 @@ maximum number of energy channels is 99.
 <commandgroup name="ENDBC">
 
 <command name="LOWERENDBC">
-  <parameter name="UseLowerEndBc" type="logical" default="F"/>
-  <parameter name="TypeLowerEndBc" type="string" default="inject"/>
+  <parameter name="UseLowerEndBc" type="logical" default="T"/>
+  <if expr="$UseLowerEndBc">
+    <parameter name="TypeLowerEndBc" type="string" case="lower" input="select"
+	       required="T">
+      <option name="injection"   value="inject" default="T" />
+      <option name="floating bc" value="float"             />
+      <option name="free escape" value="escape"	          />
+    </parameter>
+  </if>
 
 #LOWERENDBC
-F			UseLowerEndBc
+T			UseLowerEndBc
 inject			TypeLowerEndBc
 
 To determine whether or which type we set the lower boundary conditions.
@@ -617,19 +624,25 @@ and exclude the LowerEndSpectrum_I when solving the diffusion term.
 
 <command name="UPPERENDBC">
   <parameter name="UseUpperEndBc" type="logical" default="F"/>
-  <parameter name="TypeUpperEndBc" type="string" input="select">
-    <option name="lism" default="T"/>
-    <option name="none"/>
-    <option name="float"/>
-    <option name="escape"/>
-  </parameter>
-  <parameter name="TypeLisBc" type="string" input="select">
-    <option name="default" default="T"/>
-    <option name="usoskin2005"/>
-    <option name="corti2019"/>
-  </parameter>
-  <parameter name="UseModulationPot" type="logical" default="F"/>
-  <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
+  <if expr="$UseUpperEndBc">
+    <parameter name="TypeUpperEndBc" type="string" input="select">
+      <option name="none" default="T"/>
+      <option name="lism"/>
+      <option name="float"/>
+      <option name="escape"/>
+    </parameter>
+    <if expr="$TypeUpperEndBc eq 'lism'">
+      <parameter name="TypeLisBc" type="string" input="select">
+	<option name="default" default="T"/>
+	<option name="usoskin2005"/>
+	<option name="corti2019"/>
+      </parameter>
+      <parameter name="UseModulationPot" type="logical" default="F"/>
+      <if expr="$UseModulationPot">
+	<parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
+      </if>
+    </if>
+  </if>
 
 #UPPERENDBC
 T			UseUpperEndBc
