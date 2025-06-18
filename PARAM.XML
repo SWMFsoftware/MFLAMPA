@@ -675,40 +675,31 @@ in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
 <commandgroup name="ADVANCE">
 
 <command name="MOMENTUMBC">
-  <parameter name="TypeMomemtumInjBc" type="string" default="inject" />
+  <parameter name="TypeMomemtumMinBc" type="string" input="select">
+    <option name="inject" default="T"/>
+    <option name="none"/>
+    <option name="float"/>
+    <option name="escape"/>
+  </parameter>
+  <if expr="$TypeMomentumMinBc eq 'inject'">
+    <parameter name="SpectralIndex" type="real" default="5.0" />
+    <parameter name="EfficiencyInj" type="real" min="0.0" default="1.0" />
+  </if>
   <parameter name="TypeMomemtumMaxBc" type="string" default="none" />
 
 #MOMENTUMBC
-grad			TypeMomemtumInjBc
-grad			TypeMomemtumMaxBc
+inject			TypeMomemtumMinBc
+5.0			SpectralIndex
+1.0			EfficiencyInj
+none			TypeMomemtumMaxBc
 
 Set up parameters for the momentum boundary condition, controlling the
 types of BC at injection/minimum and maximum particle energies or its
 equivalent momentum. 
 
 Once can set "inject" as TypeMomemtumInjBc for injecting particles, e.g.,
-for SEP simulations (then, it will use #INJECTION). However, in other cases
-like for background GCRs, there is no need to inject particles. Then, one
-can set "float"/"floating"/"escape" for a floating/escape boundary at
-injection/minimum energy/momentum, meaning to set f(iP=0) = f(iP=1). One
-can also set "grad" to use the same gradient, i.e., grad:f(iP=0) to f(iP=1)
-remains the same as grad:f(iP=1) to f(iP=2) in geometric scale. It is the
-same for the maximum energy/momentum by setting TypeMomemtumMaxBc. Any other
-type is regarded as an unrecognized one at this stage.
-</command>
-
-<command name="INJECTION">
-  <parameter name="SpectralIndex" type="real" default="5.0" />
-  <parameter name="EfficiencyGlob" type="real" min="0.0" default="1.0" />
-  <parameter name="EfficiencyLowBc" type="real" min="0.0" default="1.0" />
-
-#INJECTION
-5.0			SpectralIndex
-1.0			EfficiencyGlob
-1.0			EfficiencyLowBc
-
-Set up parameters of the power-law spectrum of suprathermal
-particles at sqrt(2*mp*Ti) lt p lt Pinj:
+for SEP simulations and read parameters of the power-law spectrum of
+suprathermal particles at sqrt(2*mp*Ti) lt p lt Pinj:
 
 f(p) propto [Efficiency * (Spectral index - 3) / p**SpectralIndex]
 
@@ -717,15 +708,17 @@ density to the total proton density. Should not exceed one,
 however, somewhat higher than one values may be of use.
 Default distribution is f(p) propto [1.0 * 2 / p**5].
 
-Here, "EfficiencyGlob" is the injection efficiency for all particles
-at all coordinates, and "EfficiencyLowBc" is the one at the first point,
-namely the footpoint of multiple field lines at the solar surface. For
-solar energetic particle simulations, the injection particles are usually
-set to be ~10 keV, with the same "EfficiencyGlob" and "EfficiencyLowBc".
-However, for galactic cosmic rays simulations, "EfficiencyLowBc" should
-be set as 0 since no particles should be injected from the solar surface,
-since these cosmic ray particles are coming from outside the solar system.
+However, in other cases like for background GCRs, there is no need to
+inject particles. Then, one can set "float"/"floating"/"escape" for a
+floating/escape boundary at injection/minimum energy/momentum, meaning
+to set f(iP=0) = f(iP=1). One can also set "grad" to use the same gradient,
+i.e., grad:f(iP=0) to f(iP=1) remains the same as grad:f(iP=1) to f(iP=2)
+in geometric scale.
+
+It is the same for the maximum energy/momentum by setting TypeMomemtumMaxBc.
+Any other type is regarded as an unrecognized one at this stage.
 </command>
+
 
 <command name="CFL">
   <parameter name="Cfl" type="real" min="0.0" max="1.0" default="0.9" />
@@ -733,7 +726,8 @@ since these cosmic ray particles are coming from outside the solar system.
 #CFL
 0.9			Cfl
 
-Please send an email to Igor Sokolov for more information.
+The CFL number for explicit scheme solving, for example, advection along
+energy axis in the phase space.
 </command>
 
 <command name="ADVECTION">

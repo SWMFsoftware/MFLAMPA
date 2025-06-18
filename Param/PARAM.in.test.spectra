@@ -67,10 +67,11 @@ GOES			NameSatellite
 #INCLUDE
 MH_data_e20120123/MH_data.H
 
-#INJECTION
+#MOMENTUMBC
+inject			TypeMomemtumMinBc
 5.0			SpectralIndex
-0.25			EfficiencyGlob
-0.25			EfficiencyLowBc
+0.25			EfficiencyInj
+none			TypeMomemtumMaxBc
 
 #READMHDATA
 T			DoReadMhData
