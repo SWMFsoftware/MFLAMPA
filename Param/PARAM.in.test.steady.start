@@ -51,7 +51,7 @@ inject			TypeLowerEndBc
 #UPPERENDBC
 T			UseUpperEndBc
 lism			TypeUpperEndBc
-default			TypeLisBc
+usoskin			TypeLisBc
 T			UseModulationPot
 534.7			ModulationPot
 
