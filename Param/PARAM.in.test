@@ -26,12 +26,6 @@ F			DoTraceShock
 constant		ScaleTurbulenceType
 0.2402397832		ScaleTurbulence1AU [AU]
 
-#DIFFUSIONPARA
-T			UseDiffusion
-F			UseBtotal
-sokolov2004			TypeMhdDiffusion
-F			UseFixedUps
-
 #INCLUDE
 MH_data_e20120123/MH_data.H
 
@@ -55,10 +49,7 @@ mhtime flux ascii		StringPlot
 
 ==============================================================================
 
-#DIFFUSIONPARA
-T			UseDiffusion
-F			UseBtotal
-sokolov2004			TypeMhdDiffusion
+#USEFIXEDMFPUPSTREAM
 T			UseFixedUps
 0.3			MeanFreePath0InAu
 

@@ -105,24 +105,12 @@ contains
        call read_var('ScaleTurbulence1AU', ScaleTurbulenceSi)
        ScaleTurbulenceSi = ScaleTurbulenceSi * cAu
     case('#DIFFUSIONPARA')
-       call read_var('UseDiffusion', UseDiffusion)
-       ! set up diffusion parameters only when UseDiffusion
-       if(UseDiffusion) then
-          ! Use calculated from the mhd turbulence for downstream; if not using
-          ! the fixed upstream diffusion coefficient, also use the mhd turbulence
-          ! Determine whether or not to use Btotal=sqrt(B**2+dB**2) as B
-          call read_var('UseBtotal', UseBtotal)
-          call read_var("TypeMhdDiffusion", TypeMhdDiffusion)
-          call lower_case(TypeMhdDiffusion)
-
-          ! Determine whether or not to fix upstream diffusion coefficient
-          call read_var('UseFixedUps', UseFixedUps)
-          if(UseFixedUps) then
-             ! Specify upstream diffusion coefficient
-             ! see Li et al. 2003, doi:10.1029/2002JA009666
-             call read_var('MeanFreePath0InAu', MeanFreePath0InAu)
-          end if
-       end if
+       ! Use calculated from the mhd turbulence for downstream; if not using
+       ! the fixed upstream diffusion coefficient, also use the mhd turbulence
+       ! Determine whether or not to use Btotal=sqrt(B**2+dB**2) as B
+       call read_var('UseBtotal', UseBtotal)
+       call read_var("TypeMhdDiffusion", TypeMhdDiffusion)
+       call lower_case(TypeMhdDiffusion)
     case('#DIFFUSIONPERP')
        call read_var('UseDiffusionPerp', UseDiffusionPerp)
        ! Setup perpendicular diffusion coefficients only when using it
@@ -157,6 +145,19 @@ contains
           ! Setup the mesh used for triangulation in perpendicular diffusion
           call setup_multi_uniform_spheres
        end if
+    case('#USEFIXEDMFPUPSTREAM')
+       ! Determine whether or not to fix upstream diffusion coefficient
+       call read_var('UseFixedMeanFreePathUpstream',&
+            UseFixedUps)
+       if(UseFixedUps)then
+          ! see Li et al. (2003), doi:10.1029/2002JA009666
+          call read_var('MeanFreePath0InAu', MeanFreePath0InAu)
+       end if
+    case('#DIFFUSION')
+       ! To be used only for testing/developing, to switch off diffusion
+       call read_var('UseDiffusion', UseDiffusion)
+    case default
+       call CON_stop('SP:'//NameSub//': unknown command '//NameCommand)
     end select
   end subroutine read_param
   !============================================================================
