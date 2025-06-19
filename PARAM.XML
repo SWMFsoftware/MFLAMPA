@@ -595,9 +595,9 @@ maximum number of energy channels is 99.
   <if expr="$UseLowerEndBc">
     <parameter name="TypeLowerEndBc" type="string" case="lower" input="select"
 	       required="T">
-      <option name="injection"   value="inject" default="T" />
-      <option name="floating bc" value="float"             />
-      <option name="free escape" value="escape"	          />
+      <option name="inject" default="T" />
+      <option name="float"             />
+      <option name="escape"	          />
     </parameter>
   </if>
 
@@ -633,9 +633,8 @@ and exclude the LowerEndSpectrum_I when solving the diffusion term.
     </parameter>
     <if expr="$TypeUpperEndBc eq 'lism'">
       <parameter name="TypeLisBc" type="string" input="select">
-	<option name="default" default="T"/>
-	<option name="usoskin2005"/>
-	<option name="corti2019"/>
+	<option name="usoskin" default="T"/>
+	<option name="corti"/>
       </parameter>
       <parameter name="UseModulationPot" type="logical" default="F"/>
       <if expr="$UseModulationPot">

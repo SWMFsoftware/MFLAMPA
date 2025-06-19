@@ -177,6 +177,9 @@ contains
     select case(trim(TypeMomentumMaxBc))
     case('none')
        ! Do nothing
+       ! Igor: Do nothing means "maintain the initial value of the VDF"
+       ! Distribution_CB(nP+1,:,1:nX,iLine) = Background_I(nP+1)
+       ! "escape" should be also in this case, rather than in "float"
     case('float', 'floating', 'escape')
        ! Neumann BC: Assume gradient = 0
        Distribution_CB(nP+1,:,1:nX,iLine) = Distribution_CB(nP,:,1:nX,iLine)
