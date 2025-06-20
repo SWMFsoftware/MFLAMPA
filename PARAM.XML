@@ -855,7 +855,9 @@ with a correlation length setup in "ScaleTurbulence1AU".
 
 <command name="USEFIXEDMFPUPSTREAM">
   <parameter name="UseFixedUps" type="logical" default="F" />
-  <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="0.3" />
+  <if expr="$UseFixedUps">
+    <parameter name="MeanFreePath0InAu" type="real" min="0.0" default="0.3" />
+  </if>
   
 #USEFIXEDMFPUPSTREAM
 T			UseFixedUps
