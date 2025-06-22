@@ -276,7 +276,6 @@ test_spectra_compile: test_compile
 test_spectra_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cp -rf ${DIR}/GM/BATSRUS/data/TRAJECTORY ./
 	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test.spectra PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 
@@ -342,7 +341,6 @@ test_mpi_reference:
 test_mpi_rundir:
 	rm -rf ${TESTDIR}
 	${MAKE} rundir RUNDIR=${TESTDIR} STANDALONE=YES SPDIR=`pwd`
-	cp -rf ${DIR}/GM/BATSRUS/data/TRAJECTORY ./
 	cd ${TESTDIR}; cp -f SP/Param/PARAM.in.test.mpi PARAM.in
 	cd ${TESTDIR}; tar xzf ../data/input/test_mflampa/MH_data_e20120123.tgz
 

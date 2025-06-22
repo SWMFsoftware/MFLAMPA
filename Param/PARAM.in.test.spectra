@@ -88,10 +88,10 @@ T				UsePlanarTriangles
 
 #SATELLITE
 4			nSatellite
-../TRAJECTORY/earth.dat		NameTrajectoryFile
-../TRAJECTORY/sta.dat		NameTrajectoryFile
-../TRAJECTORY/psp.dat		NameTrajectoryFile
-../TRAJECTORY/solo.dat		NameTrajectoryFile
+SP/TRAJECTORY/earth.dat		NameTrajectoryFile
+SP/TRAJECTORY/sta.dat		NameTrajectoryFile
+SP/TRAJECTORY/psp.dat		NameTrajectoryFile
+SP/TRAJECTORY/solo.dat		NameTrajectoryFile
 
 #SAVEPLOT
 8			nFileOut
