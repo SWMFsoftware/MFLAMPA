@@ -106,11 +106,11 @@ allclean:
 
 # Moved here from share/Library as it does not belong there
 # optimization fails with gcc12 + nagfor
-test_poisson_bracket.o: test_poisson_bracket.f90
-	${COMPILE.f90} ${Cflag0} test_poisson_bracket.f90
+test_poisson_bracket.o: ./src/test_poisson_bracket.f90
+	${COMPILE.f90} ${Cflag0} ./src/test_poisson_bracket.f90
 
 test_poisson_bracket_exe:
-	@(cd ../src; make LIB)
+	@(cd ${SHAREDIR}; make LIB)
 	@make test_poisson_bracket.o
 	${LINK.f90} -o test_poisson.exe test_poisson_bracket.o \
 		-L${LIBDIR} -lSHARE ${Lflag}
