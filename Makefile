@@ -124,13 +124,13 @@ test_poisson_bracket:
 	@make test_poisson_bracket_check
 
 test_poisson_bracket_check:
-	-@(${DIFFNUM} -b -r=1e-6 -a=1e-7 \
-		test_poisson.out test_poisson.ref.out.gz > test_poisson.diff)
-	-@(${DIFFNUM} -b -r=1e-6 -a=1e-7 \
-		test_poisson2d.out test_poisson2d.ref.out.gz \
+	-@(${SCRIPTDIR}/DiffNum.pl -b -r=1e-6 -a=1e-7 \
+		test_poisson.out ./output/test_poisson.ref.out.gz > test_poisson.diff)
+	-@(${SCRIPTDIR}/DiffNum.pl -b -r=1e-6 -a=1e-7 \
+		test_poisson2d.out ./output/test_poisson2d.ref.out.gz \
 		>> test_poisson.diff)
-	-@(${DIFFNUM} -b -a=1e-7 \
-		test_dsa_sa_mhd.out test_dsa_poisson.ref \
+	-@(${SCRIPTDIR}/DiffNum.pl -b -a=1e-7 \
+		test_dsa_sa_mhd.out ./output/test_dsa_poisson.ref \
 		>> test_poisson.diff)
 	@ls -l test_poisson.diff
 
