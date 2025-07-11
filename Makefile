@@ -110,7 +110,9 @@ test_poisson_bracket.o: ./src/test_poisson_bracket.f90
 	${COMPILE.f90} ${Cflag0} ./src/test_poisson_bracket.f90
 
 test_poisson_bracket_exe:
-	@(cd ${SHAREDIR}; make LIB)
+	@(cd ${SHAREDIR}; ${MAKE} LIB)
+	@(cd ${EMPIRICALCRDIR}; ${MAKE} LIB)
+	@(cd src; ${MAKE} LIB)
 	@make test_poisson_bracket.o
 	${LINK.f90} -o test_poisson.exe test_poisson_bracket.o \
 		-L${LIBDIR} -lSHARE ${Lflag}
