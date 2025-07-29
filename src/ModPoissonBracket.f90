@@ -256,7 +256,7 @@ contains
     integer, intent(in) :: nJ     !# of cells along coordinate 2
     integer, intent(in) :: nK     !# of cells along coordinate 3
     integer, intent(in) :: nP     !# of cells along coordinate 4
-    integer :: iKStart , iKLast, iPStart, iPLast
+    integer :: kStart , kLast, iPStart, iPLast, jStart, jLast
 
     ! Distribution function with gc. Two layers of face ghostcels
     ! and one level of corner ghost cells are used
@@ -348,12 +348,14 @@ contains
     ! Loop variables:
     integer :: i, j, k, iP, iDim, nDim
     ! Variations of VDF (one layer of ghost cell values):
-    real,dimension(0:nI+1, 0:nJ+1, 1/nK:nK+1-1/nK, 1/nP:nP+1-1/nP) :: &
-         DeltaMinusF_G, DeltaMinusH_G, SumDeltaHPlus_G, SumDeltaHMinus_G
-    ! Face-centered vriations of Hamiltonian functions, with
+    real,dimension(0:nI+1, 0:nJ+1, 1/nK:nK+1-1/nK,1/nP:nP+1-1/nP) :: &
+         DeltaMinusF_G, SumDeltaHPlus_G, SumDeltaHMinus_G
+    !
+    ! Face-centered vriations of Hamiltonian functions.
     ! one layer of ghost faces
     real :: DeltaH_DG(4,-1:nI+1,-1:nJ+1,-1+2*(1/nK):nK+1-1/nK,&
          -1+2*(1/nP):nP+1-1/nP)
+    real :: DeltaMinusH
     ! Fluxes:
     ! Sum of \delta^+H fluxes, to be limited
     real :: SumFluxPlus
@@ -404,7 +406,18 @@ contains
     IsPeriodic_D = .false.
     if(present(IsPeriodicIn_D))&
          IsPeriodic_D = IsPeriodicIn_D(1:4-1/nK-1/nP)
-    iKStart  = 1/nK ;  iKLast  = nK + 1 - 1/nK; nDim = 4 - 1/nK - 1/nP
+    kStart  = 1/nK ;  kLast  = nK + 1 - 1/nK; nDim = 4 - 1/nK - 1/nP
+    if(nDim==2.and.&
+         (.not.present(dHamiltonian02_FY)).and.&
+         (.not.present(Hamiltonian12_N)))then
+       ! The problem is in fact 1-D
+       nDim   = 1
+       jStart = 1
+       jLast  = nJ
+    else
+       jStart = 0
+       jLast = nJ+1
+    end if
     iPStart  = 1/nP ;  iPLast  = nP + 1 - 1/nP
     vInv_G = 1.0/Volume_G
 
@@ -421,14 +434,14 @@ contains
     ! |                  |    |                   |    |                   |
     ! 0--------->--------1x   0---------->--------1x   0---------->--------1y
     if (present(Hamiltonian12_N)) then
-       DeltaH_DG(1,-1:nI+1, 0:nJ+1,iKStart:iKLast,iPStart:iPLast)          = &
-            DeltaH_DG(1,-1:nI+1, 0:nJ+1,iKStart:iKLast,iPStart:iPLast)     + &
-            Hamiltonian12_N(-1:nI+1, 0:nJ+1,iKStart:iKLast,iPStart:iPLast) - &
-            Hamiltonian12_N(-1:nI+1,-1:nJ  ,iKStart:iKLast,iPStart:iPLast)
-       DeltaH_DG(2, 0:nI+1,-1:nJ+1,iKStart:iKLast,iPStart:iPLast)          = &
-            DeltaH_DG(2, 0:nI+1,-1:nJ+1,iKStart:iKLast,iPStart:iPLast)     + &
-            Hamiltonian12_N(-1:nI  ,-1:nJ+1,iKStart:iKLast,iPStart:iPLast) - &
-            Hamiltonian12_N(0:nI+1 ,-1:nJ+1,iKStart:iKLast,iPStart:iPLast)
+       DeltaH_DG(1,-1:nI+1, 0:nJ+1,kStart:kLast,iPStart:iPLast)          = &
+            DeltaH_DG(1,-1:nI+1, 0:nJ+1,kStart:kLast,iPStart:iPLast)     + &
+            Hamiltonian12_N(-1:nI+1, 0:nJ+1,kStart:kLast,iPStart:iPLast) - &
+            Hamiltonian12_N(-1:nI+1,-1:nJ  ,kStart:kLast,iPStart:iPLast)
+       DeltaH_DG(2, 0:nI+1,-1:nJ+1,kStart:kLast,iPStart:iPLast)          = &
+            DeltaH_DG(2, 0:nI+1,-1:nJ+1,kStart:kLast,iPStart:iPLast)     + &
+            Hamiltonian12_N(-1:nI  ,-1:nJ+1,kStart:kLast,iPStart:iPLast) - &
+            Hamiltonian12_N(0:nI+1 ,-1:nJ+1,kStart:kLast,iPStart:iPLast)
     end if
     if (present(Hamiltonian13_N)) then
        DeltaH_DG(1,-1:nI+1, 0:nJ+1, 0:nK+1,iPStart:iPLast)                 = &
@@ -490,12 +503,12 @@ contains
     !
     ! ---------->--------t   ---------->---------t    ----------->-------t
     if (present(dHamiltonian01_FX))&
-         DeltaH_DG(1,-1:nI+1, 0:nJ+1,iKStart:iKLast,iPStart:iPLast)     = &
-         DeltaH_DG(1,-1:nI+1, 0:nJ+1,iKStart:iKLast,iPStart:iPLast)     + &
-         dHamiltonian01_FX
+         DeltaH_DG(1,-1:nI+1, jStart:jLast,kStart:kLast,iPStart:iPLast)   = &
+         DeltaH_DG(1,-1:nI+1, jStart:jLast,kStart:kLast,iPStart:iPLast)   + &
+         dHamiltonian01_FX(-1:nI+1, jStart:jLast,kStart:kLast,iPStart:iPLast)
     if (present(dHamiltonian02_FY))&
-         DeltaH_DG(2, 0:nI+1,-1:nJ+1,iKStart:iKLast,iPStart:iPLast)     = &
-         DeltaH_DG(2, 0:nI+1,-1:nJ+1,iKStart:iKLast,iPStart:iPLast)     + &
+         DeltaH_DG(2, 0:nI+1,-1:nJ+1,kStart:kLast,iPStart:iPLast)     = &
+         DeltaH_DG(2, 0:nI+1,-1:nJ+1,kStart:kLast,iPStart:iPLast)     + &
          dHamiltonian02_FY
     if (present(dHamiltonian03_FZ))&
          DeltaH_DG(3, 0:nI+1, 0:nJ+1,-1:nK+1,iPStart:iPLast)            = &
@@ -513,42 +526,41 @@ contains
     ! negative directions the should be taken with opposite sign
     ! Nullify arrays:
     DeltaMinusF_G = 0.0
-    DeltaMinusH_G = 0.0
     SumDeltaHPlus_G = 0.0
     SumDeltaHMinus_G = 0.0
-    ! Calculate DeltaMinusF_G and SumDeltaHPlus_G
-    do iDim = 1, nDim
-       ! Calculate contributions from up faces to
-       ! SumDeltaHPlus_G and DeltaMinusF_G
-       ! Upper & lower bounds for +1 (may be with diffent meanings elsewhere)
-       iU_D = [nI+1,nJ+1,iKLast,iPLast]; iU_D(iDim) = iU_D(iDim)+1
-       iD_D = [0,0,iKStart,iPStart]; iD_D(iDim) = iD_D(iDim)+1
-       DeltaMinusH_G = min(0.0, DeltaH_DG(iDim, &
-            0:nI+1, 0:nJ+1, iKStart:iKLast, iPStart:iPLast))
-       SumDeltaHMinus_G = SumDeltaHMinus_G + DeltaMinusH_G
-       DeltaMinusF_G = DeltaMinusF_G + DeltaMinusH_G* &
-            (VDF_G(iD_D(1):iU_D(1), iD_D(2):iU_D(2), &
-            iD_D(3):iU_D(3), iD_D(4):iU_D(4)) - &
-            VDF_G(0:nI+1, 0:nJ+1, iKStart:iKLast, iPStart:iPLast))
-       SumDeltaHPlus_G = SumDeltaHPlus_G + max(0.0, DeltaH_DG(iDim, &
-            0:nI+1, 0:nJ+1, iKStart:iKLast, iPStart:iPLast))
-
-       ! Calculate contributions from down faces to
-       ! SumDeltaHPlus and DeltaMinusF_G
-       ! Upper & lower bounds for -1 (may be with diffent meanings elsewhere)
-       iU_D = [nI+1,nJ+1,iKLast,iPLast]; iU_D(iDim) = iU_D(iDim)-1
-       iD_D = [0,0,iKStart,iPStart]; iD_D(iDim) = iD_D(iDim)-1
-       DeltaMinusH_G = min(0.0, -DeltaH_DG(iDim, &
-            iD_D(1):iU_D(1), iD_D(2):iU_D(2), &
-            iD_D(3):iU_D(3), iD_D(4):iU_D(4)))
-       SumDeltaHMinus_G = SumDeltaHMinus_G + DeltaMinusH_G
-       DeltaMinusF_G = DeltaMinusF_G + DeltaMinusH_G* &
-            (VDF_G(iD_D(1):iU_D(1), iD_D(2):iU_D(2), &
-            iD_D(3):iU_D(3), iD_D(4):iU_D(4)) - &
-            VDF_G(0:nI+1, 0:nJ+1, iKStart:iKLast, iPStart:iPLast))
-       SumDeltaHPlus_G = SumDeltaHPlus_G + max(0.0, &
-            -DeltaH_DG(iDim, iD_D(1):iU_D(1), iD_D(2):iU_D(2), &
-            iD_D(3):iU_D(3), iD_D(4):iU_D(4)))
+    ! Calculate DeltaMinusF and SumDeltaHPlus_G
+    do iP=iPStart,iPLast
+       do k=kStart,kLast
+          do j=jStart,jLast
+             do i=0,nI+1
+                VDF = VDF_G(i,j,k,iP)
+                do iDim = 1, nDim
+                   ! Caalculate contributions from up faces to
+                   ! SumDeltaHPlus and DeltaMinusF
+                   iU_D = [i,j,k,iP]; iU_D(iDim) = iU_D(iDim) + 1
+                   DeltaMinusH = min(0.0, DeltaH_DG(iDim,i,j,k,iP))
+                   SumDeltaHMinus_G(i,j,k,iP) = &
+                        SumDeltaHMinus_G(i,j,k,iP) + DeltaMinusH
+                   DeltaMinusF_G(i,j,k,iP) = DeltaMinusF_G(i,j,k,iP) + &
+                        DeltaMinusH*&
+                        (VDF_G(iU_D(1),iU_D(2),iU_D(3),iU_D(4)) - VDF)
+                   SumDeltaHPlus_G(i,j,k,iP) = SumDeltaHPlus_G(i,j,k,iP) + &
+                        max(0.0, DeltaH_DG(iDim,i,j,k,iP))
+                   iD_D = [i,j,k,iP]; iD_D(iDim) = iD_D(iDim) - 1
+                   DeltaMinusH = min(0.0,-DeltaH_DG(iDim,&
+                        iD_D(1),iD_D(2),iD_D(3),iD_D(4)))
+                   SumDeltaHMinus_G(i,j,k,iP) = &
+                        SumDeltaHMinus_G(i,j,k,iP) + DeltaMinusH
+                   DeltaMinusF_G(i,j,k,iP) = DeltaMinusF_G(i,j,k,iP) + &
+                        DeltaMinusH*&
+                        (VDF_G(iD_D(1),iD_D(2),iD_D(3),iD_D(4)) - VDF)
+                   SumDeltaHPlus_G(i,j,k,iP) = SumDeltaHPlus_G(i,j,k,iP) + &
+                        max(0.0,&
+                        -DeltaH_DG(iDim,iD_D(1),iD_D(2),iD_D(3),ID_D(4)))
+                end do
+             end do
+          end do
+       end do
     end do
 
     ! Get local CFLs
@@ -562,7 +574,6 @@ contains
     end where
     ! Not UseTimeDependentVolume: Local CFLs are expressed via *vInv_G
     if(.not.UseTimeDependentVolume) CFLCoef_G = CFLCoef_G*vInv_G
-
     ! Set CFL and time step
     if(UseTimeDependentVolume)then
        if(present(DtIn))then
@@ -594,7 +605,7 @@ contains
           ! Time accurate mode, equal time step everywhere
           TimeStep_G = Dt
        else
-          ! Solve minimal time step from equation
+          ! Solve the maximum allowed time step from equation
           ! CFLIn = \Delta t*(-\sum\delta^-H)/(\Delta t*dV/dt + V)
 
           Dt = CFLIn*minval(  Volume_G(1:nI,1:nJ,1:nK,1:nP)/&
@@ -712,7 +723,7 @@ contains
             SumFlux2_G(1:nI,1,1:nK,1:nP) + SumFlux2_G(1:nI,nJ+1,1:nK,1:nP)
        SumFlux2_G(1:nI,nJ,1:nK,1:nP) = &
             SumFlux2_G(1:nI,nJ,1:nK,1:nP) + SumFlux2_G(1:nI,0,1:nK,1:nP)
-    else
+    elseif(nDim > 1)then
        do iP=1,nP; do k=1,nK; do i=1,nI
           if(DeltaH_DG(2,i,0,k,iP) > 0.0)then
              SumFlux2_G(i,1,k,iP) = SumFlux2_G(i,1,k,iP) + &
