@@ -93,6 +93,8 @@ contains
     real :: Dt
     ! Prediction for the next time step:
     real :: DtNext
+    ! Loop variable
+    integer :: iX
 
     ! Now, time-accurate Poisson bracket advection scheme for Parker Eqn.
     character(len=*), parameter:: NameSub = 'advect_via_poisson_parker'
@@ -112,14 +114,13 @@ contains
     ! Time derivative
     dVolumeXDt_I         = (VolumeXEnd_I - VolumeXStart_I)/tFinal
     ! Total control volume: initial and time derivative
-    Volume_G(0:nP+1, 0:nX+1)    = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
-         spread(VolumeXStart_I, DIM=1, NCOPIES=nP+2)
-    dVolumeDt_G(0:nP+1, 0:nX+1) = spread(VolumeP_I, DIM=2, NCOPIES=nX+2)* &
-         spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+2)
-    ! Calculate 1st Hamiltonian function used in the time-dependent
-    ! poisson bracket: {f_jk; p**3/3 * DeltaS/B}_{tau, p**3/3}
-    dHamiltonian01_FX(-1:nP+1, 0:nX+1) = -spread(Momentum3_F, DIM=2, &
-         NCOPIES=nX+2)* spread(dVolumeXDt_I, DIM=1, NCOPIES=nP+3)
+    do iX = 0, nX+1
+       Volume_G(:,iX)    = VolumeP_I*VolumeXStart_I(iX)
+       dVolumeDt_G(:,iX) = VolumeP_I*dVolumeXDt_I(iX)
+       ! Calculate 1st Hamiltonian function used in the time-dependent
+       ! poisson bracket: {f_jk; p**3/3 * DeltaS/B}_{tau, p**3/3}
+       dHamiltonian01_FX(:,iX) = -Momentum3_F*dVolumeXDt_I(iX)
+    end do
     ! Time initialization
     Time = 0.0
 
