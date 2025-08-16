@@ -129,7 +129,7 @@ contains
        iShockOld = iShock_IB(ShockOld_, iLine)
        if(DoTraceShock) then
           ! This is how many steps should be done to allow the shock to
-          ! the move not more than one mesh size
+          ! move not more than through one mesh size per step
           nProgress = max(1, iShock-iShockOld)
           iShockOld = min(iShockOld, iShock-1)
        else
