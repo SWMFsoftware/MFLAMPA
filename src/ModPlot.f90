@@ -1142,24 +1142,8 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)then
-         if(iProc==0)then
-            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_SUM, &
-                 0, iComm, iError)
-            call MPI_REDUCE(MPI_IN_PLACE, DoPrint_I, &
-                 nLineAll, MPI_LOGICAL, MPI_LAND, &
-                 0, iComm, iError)
-         else
-            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
-                 File_I(iFile) % Buffer_II, &
-                 nLineAll * (iVarLat + nFluxVar), MPI_REAL, MPI_SUM, &
-                 0, iComm, iError)
-            call MPI_REDUCE(DoPrint_I, DoPrint_I, &
-                 nLineAll, MPI_LOGICAL, MPI_LAND, &
-                 0, iComm, iError)
-         end if
-      end if
+      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+                 nLineAll*(iVarLat + nFluxVar),  MPI_SUM, 0, iComm, iError)
 
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
@@ -1694,25 +1678,8 @@ contains
       end if
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)then
-         if(iProc==0)then
-            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 (nP+2)*nMu*nLineAll, MPI_REAL, MPI_SUM, &
-                 0, iComm, iError)
-            call MPI_REDUCE(MPI_IN_PLACE, DoPrint_I, &
-                 nLineAll, MPI_LOGICAL, MPI_LAND, &
-                 0, iComm, iError)
-         else
-            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
-                 File_I(iFile) % Buffer_II, &
-                 (nP+2)*nMu*nLineAll, MPI_REAL, MPI_SUM, &
-                 0, iComm, iError)
-            call MPI_REDUCE(DoPrint_I, DoPrint_I, &
-                 nLineAll, MPI_LOGICAL, MPI_LAND, &
-                 0, iComm, iError)
-         end if
-      end if
-
+      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II,&
+                 (nP+2)*nMu*nLineAll, MPI_SUM, 0, iComm, iError)
       ! print data to file
       if(iProc==0) then
          ! Note: here, by including nDimIn, all the Coord{1, 2(, 3)}In_I
@@ -2237,19 +2204,8 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)then
-         if(iProc==0)then
-            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 nFlux * nSpreadLon * nSpreadLat, &
-                 MPI_REAL, MPI_SUM, 0, iComm, iError)
-         else
-            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
-                 File_I(iFile) % Buffer_II, &
-                 nFlux * nSpreadLon * nSpreadLat, &
-                 MPI_REAL, MPI_SUM, 0, iComm, iError)
-         end if
-      end if
-
+      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+                 nFlux * nSpreadLon * nSpreadLat, MPI_SUM, 0, iComm, iError)
       ! add background/initial flux back
       do iFlux = 1, nFlux
          File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :, 1) = &
@@ -2409,18 +2365,8 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)then
-         if(iProc==0)then
-            call MPI_REDUCE(MPI_IN_PLACE, &
-                 File_I(iFile) % Buffer_II(1, nDataLine, 1), &
-                 nFluxVar, MPI_REAL, MPI_SUM, 0, iComm, iError)
-         else
-            call MPI_REDUCE(File_I(iFile) % Buffer_II(1, nDataLine, 1), &
-                 File_I(iFile) % Buffer_II(1, nDataLine, 1), &
-                 nFluxVar, MPI_REAL, MPI_SUM, 0, iComm, iError)
-         end if
-      end if
-
+      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II(&
+           1:nFluxVar, nDataLine, 1), nFluxVar, MPI_SUM, 0, iComm, iError)
       if(iProc==0)then
          ! add background/initial flux back
          File_I(iFile) % Buffer_II(1:nFluxVar, nDataLine, 1) = &
@@ -2521,18 +2467,8 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)then
-         if(iProc==0)then
-            call MPI_REDUCE(MPI_IN_PLACE, File_I(iFile) % Buffer_II, &
-                 nLineAll * nExtraVar, MPI_REAL, MPI_SUM, &
-                 0, iComm, iError)
-         else
-            call MPI_REDUCE(File_I(iFile) % Buffer_II, &
-                 File_I(iFile) % Buffer_II, &
-                 nLineAll * nExtraVar, MPI_REAL, MPI_SUM, &
-                 0, iComm, iError)
-         end if
-      end if
+      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+                 nLineAll * nExtraVar, MPI_SUM, 0, iComm, iError)
 
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
