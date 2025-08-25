@@ -38,8 +38,10 @@ T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
 #SAVEPLOT
-2			nFileOut
+3			nFileOut
 mh1d flux ascii		StringPlot
+mh2d flux ascii		StringPlot
+215.0			Radius
 mhtime flux ascii		StringPlot
 215.0			Radius
 
