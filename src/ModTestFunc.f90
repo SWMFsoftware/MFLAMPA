@@ -51,6 +51,12 @@ contains
   subroutine test_start(NameSub, DoTest, iBlock, i, j, k, DoTestAll)
     !$acc routine seq
 
+#ifdef _OPENACC
+#ifndef NOACCMODULE
+    use openacc
+#endif
+#endif
+
     character(len=*),  intent(in) :: NameSub   ! method to be tested
     logical,           intent(out):: DoTest    ! return true if testing is on
 
@@ -60,11 +66,15 @@ contains
     !--------------------------------------------------------------------------
     DoTest = .false.
 #ifdef _OPENACC
+#ifndef NOACCMODULE
     if (acc_on_device(acc_device_host)) then
+#endif
 #endif
        call test_start_cpu(NameSub, DoTest, iBlock, i, j, k, DoTestAll)
 #ifdef _OPENACC
+#ifndef NOACCMODULE
     end if
+#endif
 #endif
   end subroutine test_start
   !============================================================================
