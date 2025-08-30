@@ -161,9 +161,9 @@ contains
     ! Herewith CFL = A*Delta t/Delta(ln p):
     ! f^(n+1)_i-CFL*(f^n_(i-1/2)-f^n_(i+1/2)=f^n_i, where
     ! For CFL>0:
-    ! f^n_(i-1/2)=f^n_(i-1)+cHalf*(cOne-CFL)*df_lim^n_(i-1)
+    ! f^n_(i-1/2)=f^n_(i-1)+0.5*(1-CFL)*df_lim^n_(i-1)
     ! For CFL<0:
-    ! f^n_(i-1/2)=f^n_(i  )-cHalf*(cOne+CFL)*df_lim^n_(i  )
+    ! f^n_(i-1/2)=f^n_(i  )-0.5*(1+CFL)*df_lim^n_(i  )
 
     !--------------------------------------------------------------------------
     nStep = 1 + int(abs(CflIn)); Cfl = CflIn/real(nStep)
