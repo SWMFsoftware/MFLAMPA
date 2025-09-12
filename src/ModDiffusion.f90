@@ -788,7 +788,7 @@ contains
 
   end subroutine set_diffusion_coef
   !============================================================================
-  subroutine tridiag(n, Lower_I, Mean_I, Upper_I, Res_I, W_I)
+  subroutine tridiag(n, Lower_I, Main_I, Upper_I, Res_I, W_I)
     ! Solve tri-diagonal system of equations:
     !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
     !  ||l_2 m_2 u_2...        || ||w_2|| ||r_2||
@@ -799,22 +799,22 @@ contains
 
     ! Input parameters
     integer, intent(in) :: n
-    real,    intent(in) :: Lower_I(n), Mean_I(n), Upper_I(n), Res_I(n)
+    real,    intent(in) :: Lower_I(n), Main_I(n), Upper_I(n), Res_I(n)
     ! Output parameters
     real,    intent(out):: W_I(n)
     ! Misc
     integer:: j
     real:: Aux,Aux_I(2:n)
     !--------------------------------------------------------------------------
-    if(Mean_I(1) == 0.0) call CON_stop('Error in tridiag: Mean_I(1)=0')
-    Aux = Mean_I(1)
+    if(Main_I(1) == 0.0) call CON_stop('Error in tridiag: Main_I(1)=0')
+    Aux = Main_I(1)
     W_I(1) = Res_I(1)/Aux
     do j = 2, n
        Aux_I(j) = Upper_I(j-1)/Aux
-       Aux = Mean_I(j) - Lower_I(j)*Aux_I(j)
+       Aux = Main_I(j) - Lower_I(j)*Aux_I(j)
        if(Aux == 0.0) then
-          write(*,*) 'M_I(j), L_I(j), Aux_I(j) = ',&
-               Mean_I(j),Lower_I(j),Aux_I(j)
+          write(*,*) 'Main_I(j), Lower_I(j), Aux_I(j) = ',&
+               Main_I(j),Lower_I(j),Aux_I(j)
           write(*,*) ' For j=',j
           call CON_stop('Tridiag failed')
        end if
