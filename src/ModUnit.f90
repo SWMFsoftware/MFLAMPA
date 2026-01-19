@@ -8,7 +8,7 @@ module SP_ModUnit
   ! Dec.24 2017 Sokolov & Borovikov.
 
   use SP_ModGrid, ONLY: nVar, LagrID_
-  use ModConst,   ONLY: Rsun, energy_in,                        &
+  use ModConst, ONLY: Rsun, energy_in,                        &
        gen_kin_energy_to_momentum => kinetic_energy_to_momentum,&
        gen_momentum_to_kin_energy => momentum_to_kinetic_energy,&
        gen_momentum_to_energy     => momentum_to_energy
