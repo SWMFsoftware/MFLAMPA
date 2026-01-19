@@ -3,10 +3,10 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModMain
 
-  use ModUtilities,     ONLY: CON_stop
-  use SP_ModProc,       ONLY: iProc
+  use ModUtilities, ONLY: CON_stop
+  use SP_ModProc, ONLY: iProc
   use SP_ModReadMhData, ONLY: DoReadMhData
-  use SP_ModTime,       ONLY: IsStandAlone
+  use SP_ModTime, ONLY: IsStandAlone
 
   implicit none
   SAVE
@@ -34,26 +34,26 @@ contains
   !============================================================================
   subroutine read_param
 
-    use SP_ModAdvance,        ONLY: read_param_adv         => read_param
+    use SP_ModAdvance, ONLY: read_param_adv         => read_param
     use SP_ModAdvancePoisson, ONLY: read_param_focused     => read_param
-    use SP_ModAngularSpread,  ONLY: read_param_spread      => read_param
-    use SP_ModBc,             ONLY: read_param_bc          => read_param
-    use SP_ModChannel,        ONLY: read_param_channel     => read_param
-    use SP_ModDiffusion,      ONLY: read_param_diffuse     => read_param
-    use SP_ModDistribution,   ONLY: read_param_dist        => read_param
-    use SP_ModGrid,           ONLY: read_param_grid        => read_param
-    use SP_ModOriginPoints,   ONLY: read_param_origin      => read_param
-    use SP_ModPlot,           ONLY: read_param_plot        => read_param
-    use SP_ModReadMHData,     ONLY: read_param_mhdata      => read_param
-    use SP_ModRestart,        ONLY: read_param_restart     => read_param
-    use SP_ModSatellite,      ONLY: read_param_satellite   => read_param
-    use SP_ModShock,          ONLY: read_param_shock       => read_param
-    use SP_ModTestFunc,       ONLY: read_param_testfunc    => read_param
-    use SP_ModTime,           ONLY: read_param_time        => read_param
-    use SP_ModTiming,         ONLY: read_param_timing      => read_param
-    use SP_ModTriangulate,    ONLY: read_param_triangulate => read_param
-    use SP_ModTurbulence,     ONLY: read_param_turbulence  => read_param
-    use SP_ModUnit,           ONLY: read_param_unit        => read_param
+    use SP_ModAngularSpread, ONLY: read_param_spread      => read_param
+    use SP_ModBc, ONLY: read_param_bc          => read_param
+    use SP_ModChannel, ONLY: read_param_channel     => read_param
+    use SP_ModDiffusion, ONLY: read_param_diffuse     => read_param
+    use SP_ModDistribution, ONLY: read_param_dist        => read_param
+    use SP_ModGrid, ONLY: read_param_grid        => read_param
+    use SP_ModOriginPoints, ONLY: read_param_origin      => read_param
+    use SP_ModPlot, ONLY: read_param_plot        => read_param
+    use SP_ModReadMHData, ONLY: read_param_mhdata      => read_param
+    use SP_ModRestart, ONLY: read_param_restart     => read_param
+    use SP_ModSatellite, ONLY: read_param_satellite   => read_param
+    use SP_ModShock, ONLY: read_param_shock       => read_param
+    use SP_ModTestFunc, ONLY: read_param_testfunc    => read_param
+    use SP_ModTime, ONLY: read_param_time        => read_param
+    use SP_ModTiming, ONLY: read_param_timing      => read_param
+    use SP_ModTriangulate, ONLY: read_param_triangulate => read_param
+    use SP_ModTurbulence, ONLY: read_param_turbulence  => read_param
+    use SP_ModUnit, ONLY: read_param_unit        => read_param
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: read_var, read_line, read_command, read_echo_set
@@ -184,16 +184,16 @@ contains
   subroutine initialize
 
     use SP_ModAngularSpread, ONLY: init_spread     => init
-    use SP_ModChannel,       ONLY: init_channel    => init
-    use SP_ModDistribution,  ONLY: init_dist       => init
-    use SP_ModPlot,          ONLY: init_plot       => init
-    use SP_ModReadMhData,    ONLY: init_mhdata     => init
-    use SP_ModRestart,       ONLY: read_restart
-    use SP_ModSatellite,     ONLY: init_sat        => init
-    use SP_ModShock,         ONLY: init_shock      => init
-    use SP_ModTurbulence,    ONLY: init_turbulence => init, &
+    use SP_ModChannel, ONLY: init_channel    => init
+    use SP_ModDistribution, ONLY: init_dist       => init
+    use SP_ModPlot, ONLY: init_plot       => init
+    use SP_ModReadMhData, ONLY: init_mhdata     => init
+    use SP_ModRestart, ONLY: read_restart
+    use SP_ModSatellite, ONLY: init_sat        => init
+    use SP_ModShock, ONLY: init_shock      => init
+    use SP_ModTurbulence, ONLY: init_turbulence => init, &
          UseTurbulentSpectrum
-    use SP_ModUnit,          ONLY: init_unit       => init
+    use SP_ModUnit, ONLY: init_unit       => init
 
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
@@ -224,8 +224,8 @@ contains
   !============================================================================
   subroutine finalize
 
-    use SP_ModRestart,    ONLY: stand_alone_final_restart
-    use SP_ModPlot,       ONLY: finalize_plot      => finalize
+    use SP_ModRestart, ONLY: stand_alone_final_restart
+    use SP_ModPlot, ONLY: finalize_plot      => finalize
     use SP_ModReadMhData, ONLY: finalize_mhdata    => finalize
     ! use SP_ModTurbulence, ONLY: finalize_turbulence => finalize
 
@@ -241,16 +241,16 @@ contains
   !============================================================================
   subroutine run(TimeLimit)
 
-    use SP_ModAdvance,       ONLY: advance, iterate_steady_state
+    use SP_ModAdvance, ONLY: advance, iterate_steady_state
     use SP_ModAngularSpread, ONLY: get_magnetic_flux, IsReadySpreadPoint
-    use SP_ModGrid,          ONLY: get_other_state_var, copy_old_state
-    use SP_ModReadMhData,    ONLY: read_mh_data
-    use SP_ModRestart,       ONLY: check_save_restart
-    use SP_ModSatellite,     ONLY: UseSatellite, read_satellite_input_files
-    use SP_ModShock,         ONLY: DoTraceShock, get_divU, &
+    use SP_ModGrid, ONLY: get_other_state_var, copy_old_state
+    use SP_ModReadMhData, ONLY: read_mh_data
+    use SP_ModRestart, ONLY: check_save_restart
+    use SP_ModSatellite, ONLY: UseSatellite, read_satellite_input_files
+    use SP_ModShock, ONLY: DoTraceShock, get_divU, &
          get_shock_location, get_shock_skeleton, DoSaveStateShock
-    use SP_ModPlot,          ONLY: save_plot_all, iTimeOutput, DtOutput
-    use SP_ModTime,          ONLY: SPTime, DataInputTime, iIter, IsSteadyState
+    use SP_ModPlot, ONLY: save_plot_all, iTimeOutput, DtOutput
+    use SP_ModTime, ONLY: SPTime, DataInputTime, iIter, IsSteadyState
 
     ! advance the solution in time
     real, intent(in) :: TimeLimit
@@ -314,7 +314,7 @@ contains
   subroutine check
 
     use ModUtilities, ONLY: make_dir
-    use SP_ModPlot,   ONLY: NamePlotDir
+    use SP_ModPlot, ONLY: NamePlotDir
     use SP_ModTiming, ONLY: check_timing => check
     ! Make output directory
     character(len=*), parameter:: NameSub = 'check'
