@@ -665,7 +665,7 @@ contains
     do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE
        do iVertex = 1, nVertex_B(iLine)
-          call distr_to_flux(Distribution_CB(:,:,iVertex,iLine),&
+          call distr_to_flux(Distribution_CB(1:nP,1:nMu,iVertex,iLine),&
                Flux_VIB(:,iVertex,iLine))
        end do
     end do
