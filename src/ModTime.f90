@@ -4,8 +4,8 @@
 module SP_ModTime
 
   use ModTimeConvert, ONLY: time_int_to_julian, time_real_to_julian
-  use ModKind,        ONLY: Real8_
-  use ModUtilities,   ONLY: CON_stop
+  use ModKind, ONLY: Real8_
+  use ModUtilities, ONLY: CON_stop
 
   implicit none
 
