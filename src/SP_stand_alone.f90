@@ -3,22 +3,22 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 program MFLAMPA
 
-  use ModKind,      ONLY: Real8_
-  use SP_ModProc,   ONLY: iComm, nProc, iProc, iError
+  use ModKind, ONLY: Real8_
+  use SP_ModProc, ONLY: iComm, nProc, iProc, iError
   use ModUtilities, ONLY: remove_file, touch_file
-  use SP_ModTime,   ONLY: iIter, init_time  => init
-  use SP_ModPlot,   ONLY:        init_plot  => init
+  use SP_ModTime, ONLY: iIter, init_time  => init
+  use SP_ModPlot, ONLY:        init_plot  => init
   use SP_ModTiming, ONLY: nTiming
-  use SP_ModMain,   ONLY: IsLastRead,     &
+  use SP_ModMain, ONLY: IsLastRead,     &
        IsStandAlone, TimeMax, nIterMax,   &
        SP_read_param => read_param,       &
        SP_check      => check,            &
        SP_initialize => initialize,       &
        SP_run        => run,              &
        SP_finalize   => finalize
-  use SP_ModGrid,   ONLY: init_stand_alone, init_grid => init
+  use SP_ModGrid, ONLY: init_stand_alone, init_grid => init
   use ModReadParam, ONLY: read_file, read_init
-  use CON_planet,   ONLY: init_planet_const, set_planet_defaults
+  use CON_planet, ONLY: init_planet_const, set_planet_defaults
   use ModMpi
 
   implicit none
