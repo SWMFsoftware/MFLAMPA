@@ -4,14 +4,14 @@
 module SP_ModBc
 
   ! The module sets up boundary conditions
-  use ModNumConst,  ONLY: cPi
+  use ModNumConst, ONLY: cPi
   use ModCosmicRay, ONLY: local_interstellar_spectrum, &
        TypeLisBc, UseModulationPot, ModulationPot
   use SP_ModDistribution, ONLY: Distribution_CB, Momentum_G, &
        MomentumInjSi, Background_I
-  use SP_ModGrid,   ONLY: nP, nMu, MhData_VIB, NoShock_, T_, X_, Z_
-  use SP_ModShock,  ONLY: nShockWidth
-  use SP_ModUnit,   ONLY: kinetic_energy_to_momentum,  &
+  use SP_ModGrid, ONLY: nP, nMu, MhData_VIB, NoShock_, T_, X_, Z_
+  use SP_ModShock, ONLY: nShockWidth
+  use SP_ModUnit, ONLY: kinetic_energy_to_momentum,  &
        UnitEnergy_, UnitX_, Io2Si_V
   use ModUtilities, ONLY: CON_stop
   implicit none
@@ -132,8 +132,8 @@ contains
     integer :: iVertex     ! loop variable
     real    :: MomentumSi  ! Momentum for the thermal energy k_BTi
     real    :: CoefInjLocal, DistributionBc
-    character(len=*), parameter:: NameSub = 'set_momentum_bc'
 
+    character(len=*), parameter:: NameSub = 'set_momentum_bc'
     !--------------------------------------------------------------------------
     select case(trim(TypeMomentumMinBc))
     case('inject')
