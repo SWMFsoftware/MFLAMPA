@@ -6,8 +6,8 @@ module SP_ModChannel
   ! Setting energy channels and get the integral/differential intensity
 
   use ModUtilities, ONLY: CON_stop
-  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B, nP, nMu
-  use SP_ModUnit,   ONLY: Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_, &
+  use SP_ModGrid, ONLY: nLine, nVertex_B, Used_B, nP, nMu
+  use SP_ModUnit, ONLY: Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_, &
        NameFluxUnit, NameDiffFluxUnit, NameEnergyFluxUnit
 
   implicit none
@@ -18,6 +18,7 @@ module SP_ModChannel
 
   public:: init               ! initialize the flux channels
   public:: read_param         ! read satellite-related parameters
+  public:: distr_to_flux      ! convert distribution function to fluxes
   public:: get_integral_flux  ! calculate Flux_VIB
 
   ! ------------ For saving the intensity in energy channels ------------
@@ -297,12 +298,12 @@ contains
   subroutine init
     ! To initialize the energy channels of the satellite(s)
 
-    use ModConst,           ONLY: cMeV
-    use ModUtilities,       ONLY: check_allocate
+    use ModConst, ONLY: cMeV
+    use ModUtilities, ONLY: check_allocate
     use SP_ModDistribution, ONLY: KinEnergyIo_G, &
          EnergyInjIo, EnergyMaxIo, FluxInitIo
-    use SP_ModProc,         ONLY: iError
-    use SP_ModSize,         ONLY: nVertexMax
+    use SP_ModProc, ONLY: iError
+    use SP_ModSize, ONLY: nVertexMax
     ! loop variables
     integer :: iSat, iFlux
     ! index VAR for convenience
@@ -656,14 +657,32 @@ contains
   end subroutine init
   !============================================================================
   subroutine get_integral_flux
+
+    use SP_ModDistribution, ONLY: Distribution_CB
+    ! loop variables
+    integer:: iLine, iVertex
+    !--------------------------------------------------------------------------
+    do iLine = 1, nLine
+       if(.not.Used_B(iLine)) CYCLE
+       do iVertex = 1, nVertex_B(iLine)
+          call distr_to_flux(Distribution_CB(:,:,iVertex,iLine),&
+               Flux_VIB(:,iVertex,iLine))
+       end do
+    end do
+  end subroutine get_integral_flux
+  !============================================================================
+  subroutine distr_to_flux(Distribution_II, Flux_V)
     ! compute the total (simulated) integral flux of particles and particle
     ! fluxes in specified energy channels; also compute total energy flux
 
-    use ModNumConst,        ONLY: cTiny
+    use ModNumConst, ONLY: cTiny
     use SP_ModDistribution, ONLY: DeltaMu, Momentum_G, &
-         KinEnergyIo_G, Distribution_CB, search_kinetic_energy
+         KinEnergyIo_G, search_kinetic_energy
+
+    real, intent(in) :: Distribution_II(1:nP, 1:nMu)
+    real, intent(out):: Flux_V(Flux0_:FluxMax_)
     ! loop variables
-    integer:: iLine, iVertex, iP, iFlux, iPLo, iPHi
+    integer:: iP, iFlux, iPLo, iPHi
     ! VDF*Momentum_G**2, VDF*Momentum_G**2*KinEnergy
     real   :: DistTimesP2_I(1:nP), DistTimesP2E_I(1:nP)
     ! increments of each bin for particle and energy fluxes
@@ -676,73 +695,67 @@ contains
     real   :: FluxLo_I(FluxFirst_:FluxLast_), FluxHi_I(FluxFirst_:FluxLast_)
 
     !--------------------------------------------------------------------------
-    do iLine = 1, nLine
-       if(.not.Used_B(iLine)) CYCLE
-       do iVertex = 1, nVertex_B(iLine)
-          ! Calculate intermediate variables
-          DistTimesP2_I = sum(Distribution_CB(1:nP, 1:nMu, iVertex, iLine), &
-               DIM=2)*DeltaMu*0.5 * Momentum_G(1:nP)**2
-          DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_G(1:nP)
-          ! Increment of particle and energy fluxes
-          ! Integration loop with midpoint rule
-          dFlux_I  = 0.5*(KinEnergyIo_G(2:nP) - KinEnergyIo_G(1:nP-1))* &
-               (DistTimesP2_I(1:nP-1) + DistTimesP2_I(2:nP))
-          dEFlux_I = 0.5*(KinEnergyIo_G(2:nP) - KinEnergyIo_G(1:nP-1))* &
-               (DistTimesP2E_I(1:nP-1) + DistTimesP2E_I(2:nP))
+    ! Calculate intermediate variables
+    DistTimesP2_I = sum(Distribution_II(1:nP, 1:nMu), &
+         DIM=2)*DeltaMu*0.5 * Momentum_G(1:nP)**2
+    DistTimesP2E_I = DistTimesP2_I*KinEnergyIo_G(1:nP)
+    ! Increment of particle and energy fluxes
+    ! Integration loop with midpoint rule
+    dFlux_I  = 0.5*(KinEnergyIo_G(2:nP) - KinEnergyIo_G(1:nP-1))* &
+         (DistTimesP2_I(1:nP-1) + DistTimesP2_I(2:nP))
+    dEFlux_I = 0.5*(KinEnergyIo_G(2:nP) - KinEnergyIo_G(1:nP-1))* &
+         (DistTimesP2E_I(1:nP-1) + DistTimesP2E_I(2:nP))
 
-          ! Calculate and store the total particle and energy fluxes
-          Flux_VIB(Flux0_, iVertex, iLine) = sum(dFlux_I )*Si2Io_V(UnitFlux_)
-          Flux_VIB(EFlux_, iVertex, iLine) = sum(dEFlux_I)*Si2Io_V(UnitFlux_)
+    ! Calculate and store the total particle and energy fluxes
+    Flux_V(Flux0_) = sum(dFlux_I )*Si2Io_V(UnitFlux_)
+    Flux_V(EFlux_) = sum(dEFlux_I)*Si2Io_V(UnitFlux_)
 
-          ! Reset values
-          FluxLo_I = 0.0; FluxHi_I = 0.0
-          ! Calculate the particle fluxes for all energy channels
-          do iFlux = FluxFirst_, FluxLast_
-             ! 1) For the flux from EnergyLo to EnergyMax
-             ! Get the partial flux increments
-             call search_kinetic_energy(EChannelLoIo_I(iFlux), iPLo, &
-                  IsFoundChannelIo, DistTimesP2_I, dFluxChannelLo)
-             ! iPLo: from 1 to nP-1, due to the range of EChannelLoIo_I
-             if(iPLo == nP-1) then
-                ! Only contributed from nP-1 to nP, when iPLo == nP-1
-                FluxLo_I(iFlux) = dFluxChannelLo
-             else
-                ! For the rest bins: make a summation, when iPLo < nP-1
-                FluxLo_I(iFlux) = dFluxChannelLo + sum(dFlux_I(iPLo+1:nP-1))
-             end if
+    ! Reset values
+    FluxLo_I = 0.0; FluxHi_I = 0.0
+    ! Calculate the particle fluxes for all energy channels
+    do iFlux = FluxFirst_, FluxLast_
+       ! 1) For the flux from EnergyLo to EnergyMax
+       ! Get the partial flux increments
+       call search_kinetic_energy(EChannelLoIo_I(iFlux), iPLo, &
+            IsFoundChannelIo, DistTimesP2_I, dFluxChannelLo)
+       ! iPLo: from 1 to nP-1, due to the range of EChannelLoIo_I
+       if(iPLo == nP-1) then
+          ! Only contributed from nP-1 to nP, when iPLo == nP-1
+          FluxLo_I(iFlux) = dFluxChannelLo
+       else
+          ! For the rest bins: make a summation, when iPLo < nP-1
+          FluxLo_I(iFlux) = dFluxChannelLo + sum(dFlux_I(iPLo+1:nP-1))
+       end if
 
-             ! 2) For the flux from EnergyHi to EnergyMax
-             if(abs(EChannelHiIo_I(iFlux)-KinEnergyIo_G(nP)) < cTiny) then
-                FluxHi_I(iFlux) = 0.0
-             else
-                ! Get the partial flux increments
-                call search_kinetic_energy(EChannelHiIo_I(iFlux), iPHi, &
-                     IsFoundChannelHi, DistTimesP2_I, dFluxChannelHi)
-                ! iPHi: from 1 to nP-1, due to the range of EChannelHiIo_I
-                if(iPHi == nP-1) then
-                   ! Only contributed from nP-1 to nP, when iPHi == nP-1
-                   FluxHi_I(iFlux) = dFluxChannelHi
-                else
-                   ! For the rest bins: make a summation, when iPHi < nP-1
-                   FluxHi_I(iFlux) = dFluxChannelHi + sum(dFlux_I(iPHi+1:nP-1))
-                end if
-             end if
-          end do
-
-          ! Store the results for specified energy channels
-          Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
-               (FluxLo_I - FluxHi_I)*Si2Io_V(UnitFlux_)
-          ! In case that nFluxChannel == 0
-          if(allocated(EChannelType_I)) then
-             where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDiff_)
-                Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) = &
-                     Flux_VIB(FluxFirst_:FluxLast_, iVertex, iLine) &
-                     *InvEChannelBinIo_I
-             end where
+       ! 2) For the flux from EnergyHi to EnergyMax
+       if(abs(EChannelHiIo_I(iFlux)-KinEnergyIo_G(nP)) < cTiny) then
+          FluxHi_I(iFlux) = 0.0
+       else
+          ! Get the partial flux increments
+          call search_kinetic_energy(EChannelHiIo_I(iFlux), iPHi, &
+               IsFoundChannelHi, DistTimesP2_I, dFluxChannelHi)
+          ! iPHi: from 1 to nP-1, due to the range of EChannelHiIo_I
+          if(iPHi == nP-1) then
+             ! Only contributed from nP-1 to nP, when iPHi == nP-1
+             FluxHi_I(iFlux) = dFluxChannelHi
+          else
+             ! For the rest bins: make a summation, when iPHi < nP-1
+             FluxHi_I(iFlux) = dFluxChannelHi + sum(dFlux_I(iPHi+1:nP-1))
           end if
-       end do
+       end if
     end do
-  end subroutine get_integral_flux
+
+    ! Store the results for specified energy channels
+    Flux_V(FluxFirst_:FluxLast_) = &
+         (FluxLo_I - FluxHi_I)*Si2Io_V(UnitFlux_)
+    ! In case that nFluxChannel == 0
+    if(allocated(EChannelType_I)) then
+       where(EChannelType_I(FluxFirst_:FluxLast_) == FluxDiff_)
+          Flux_V(FluxFirst_:FluxLast_) = Flux_V(FluxFirst_:FluxLast_) &
+               *InvEChannelBinIo_I
+       end where
+    end if
+  end subroutine distr_to_flux
   !============================================================================
 end module SP_ModChannel
 !==============================================================================
