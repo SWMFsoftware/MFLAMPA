@@ -3,11 +3,11 @@
 !  For more information, see http://csem.engin.umich.edu/tools/swmf
 module SP_ModSatellite
 
-  use ModUtilities,   ONLY: open_file, close_file, CON_stop
-  use SP_ModProc,     ONLY: iProc, iComm, iError
-  use SP_ModSize,     ONLY: nDim
+  use ModUtilities, ONLY: open_file, close_file, CON_stop
+  use SP_ModProc, ONLY: iProc, iComm, iError
+  use SP_ModSize, ONLY: nDim
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
-  use SP_ModGrid,     ONLY: TypeCoordSystem
+  use SP_ModGrid, ONLY: TypeCoordSystem
 
   implicit none
 
@@ -110,12 +110,12 @@ contains
   !============================================================================
   subroutine read_satellite_input_files
 
-    use CON_axes,       ONLY: transform_matrix
+    use CON_axes, ONLY: transform_matrix
     use ModTimeConvert, ONLY: time_int_to_real
-    use ModIoUnit,      ONLY: UnitTmp_, STDOUT_
-    use ModKind,        ONLY: Real8_
+    use ModIoUnit, ONLY: UnitTmp_, STDOUT_
+    use ModKind, ONLY: Real8_
     use ModMpi
-    use SP_ModTime,     ONLY: StartTime
+    use SP_ModTime, ONLY: StartTime
 
     ! One line of input
     character(len=100) :: StringLine
@@ -263,7 +263,7 @@ contains
   subroutine set_satellite_positions(iSat)
 
     use ModNumConst, ONLY: cTiny
-    use SP_ModTime,  ONLY: tSimulation => SPTime
+    use SP_ModTime, ONLY: tSimulation => SPTime
 
     integer, intent(in) :: iSat
     integer :: i, nPoint
