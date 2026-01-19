@@ -16,7 +16,7 @@
 module ModPoissonBracket
 
   use ModMpi
-  use ModUtilities,    ONLY: CON_stop
+  use ModUtilities, ONLY: CON_stop
   implicit none
   SAVE
   private ! except
