@@ -10,7 +10,7 @@ module ModDiffusion
   ! Adapted for the use in MFLAMPA (Dist_I is an input paramater,
   ! fixed contributions to M_I in the end points)-D.Borovikov, 2017
   ! Updated (identation, comments):  I.Sokolov, Dec.17, 2017
-  use ModUtilities,      ONLY: CON_stop
+  use ModUtilities, ONLY: CON_stop
   implicit none
 
   PRIVATE
@@ -201,9 +201,9 @@ end module ModDiffusion
 !==============================================================================
 module ModTestPoissonBracket
   use ModPoissonBracket, ONLY: explicit
-  use ModUtilities,      ONLY: CON_stop
-  use ModNumConst,       ONLY: cTwoPi
-  use ModPlotFile,       ONLY: save_plot_file
+  use ModUtilities, ONLY: CON_stop
+  use ModNumConst, ONLY: cTwoPi
+  use ModPlotFile, ONLY: save_plot_file
   use ModConst
   implicit none
   ! Pass the VDF from test_dsa_poisson to restart test_dsa_sa_mhd
@@ -935,10 +935,10 @@ module ModTestMultiPoisson
   ! In the code, label Q: s_L  P: \mu  R: ln(P^3/3)  NLoop: t
   ! this code consider only the most simple equation
   use ModPoissonBracket, ONLY: explicit
-  use ModUtilities,      ONLY: CON_stop
-  use ModNumConst,       ONLY: cTwoPi, cPi
-  use ModPlotFile,       ONLY: save_plot_file
-  use ModConst,          ONLY: cRmeProton, cGeV, &
+  use ModUtilities, ONLY: CON_stop
+  use ModNumConst, ONLY: cTwoPi, cPi
+  use ModPlotFile, ONLY: save_plot_file
+  use ModConst, ONLY: cRmeProton, cGeV, &
        cMu, cAtomicMass, rSun, cLightSpeed
   implicit none
   ! Grid setups
@@ -1719,8 +1719,8 @@ end module ModTestMultiPoisson
 module ModHillVortex
 
   use ModPoissonBracket, ONLY: explicit
-  use ModUtilities,      ONLY: CON_stop
-  use ModPlotFile,       ONLY: save_plot_file
+  use ModUtilities, ONLY: CON_stop
+  use ModPlotFile, ONLY: save_plot_file
   use ModConst
 
   implicit none
@@ -1978,8 +1978,8 @@ end module ModHillVortex
 !==============================================================================
 module ModStochastic
   use ModPoissonBracket, ONLY: explicit
-  use ModUtilities,      ONLY: CON_stop
-  use ModPlotFile,       ONLY: save_plot_file
+  use ModUtilities, ONLY: CON_stop
+  use ModPlotFile, ONLY: save_plot_file
   use ModConst
   implicit none
   PRIVATE ! Except
@@ -2120,10 +2120,10 @@ program test_program
   use ModTestPoissonBracket, ONLY: test_poisson_bracket, test_dsa_sa_mhd, &
        test_dsa_poisson, test_energy_conservation, test_in_action_angle,  &
        test_poisson_2d, test_poisson_2d_smooth
-  use ModNumConst,           ONLY: cTwoPi
-  use ModHillVortex,         ONLY: test_hill_vortex
-  use ModStochastic,         ONLY: test_stochastic
-  use ModTestMultiPoisson,   ONLY: test_multi_poisson
+  use ModNumConst, ONLY: cTwoPi
+  use ModHillVortex, ONLY: test_hill_vortex
+  use ModStochastic, ONLY: test_stochastic
+  use ModTestMultiPoisson, ONLY: test_multi_poisson
 
   implicit none
   !----------------------------------------------------------------------------
