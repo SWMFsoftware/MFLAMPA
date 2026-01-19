@@ -7,15 +7,15 @@ module SP_ModAdvancePoisson
   ! with Poisson brackets (Sokolov et al., 2023)
   ! See https://doi.org/10.1016/j.jcp.2023.111923
 
-  use SP_ModSize,         ONLY: nVertexMax
-  use SP_ModGrid,         ONLY: nP, nMu, State_VIB
-  use SP_ModBc,           ONLY: set_momentum_bc, set_VDF, &
+  use SP_ModSize, ONLY: nVertexMax
+  use SP_ModGrid, ONLY: nP, nMu, State_VIB
+  use SP_ModBc, ONLY: set_momentum_bc, set_VDF, &
        UseUpperEndBc, UseLowerEndBc, iStart
   use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_F, &
        Distribution_CB, IsDistNeg, check_dist_neg, dLogP
-  use SP_ModDiffusion,    ONLY: UseDiffusion, diffuse_distribution
-  use ModUtilities,       ONLY: CON_stop
-  use ModPoissonBracket,  ONLY: explicit
+  use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+  use ModUtilities, ONLY: CON_stop
+  use ModPoissonBracket, ONLY: explicit
 
   implicit none
 
@@ -354,11 +354,11 @@ contains
     ! pitch-angle scattering terms, with (p**3/3, mu, s_L).
     ! Here, we diffuse the distribution function at each time step.
 
-    use ModConst,           ONLY: cProtonMass, cRmeProton, cLightSpeed
-    use SP_ModDiffusion,    ONLY: scatter_distribution
+    use ModConst, ONLY: cProtonMass, cRmeProton, cLightSpeed
+    use SP_ModDiffusion, ONLY: scatter_distribution
     use SP_ModDistribution, ONLY: DeltaMu, Mu_F, DeltaMu3_I, &
          GammaLorentz_F, VolumeE_I, VolumeE3_I
-    use SP_ModUnit,         ONLY: Si2Io_V, UnitEnergy_
+    use SP_ModUnit, ONLY: Si2Io_V, UnitEnergy_
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock front
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -494,8 +494,8 @@ contains
       real, dimension(0:nX+1) :: VolumeXEnd_I
       ! Inverse of B when the subroutine starts and ends
       real, dimension(1:nX  ) :: InvBOldSi_I, InvBSi_I
-      !------------------------------------------------------------------------
 
+      !------------------------------------------------------------------------
       ! Geometric volume: for DeltaS/B, with 1 ghost point at the boundary
       ! Start volume: 1/n at Time = 0.0
       VolumeXStart_I(1:nX) = Mass_C/nOldSi_I
@@ -673,12 +673,12 @@ contains
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, mu, s_L)
     ! First advect and then diffuse the VDF by splitting method
 
-    use ModConst,           ONLY: cProtonMass, cRmeProton, cLightSpeed
-    use SP_ModDiffusion,    ONLY: scatter_distribution
+    use ModConst, ONLY: cProtonMass, cRmeProton, cLightSpeed
+    use SP_ModDiffusion, ONLY: scatter_distribution
     use SP_ModDistribution, ONLY: DeltaMu, Mu_F, &
          GammaLorentz_F, VolumeE_I, VolumeE3_I
-    use SP_ModGrid,         ONLY: D_, U_
-    use SP_ModUnit,         ONLY: Io2Si_V, Si2Io_V, UnitX_, UnitEnergy_
+    use SP_ModGrid, ONLY: D_, U_
+    use SP_ModUnit, ONLY: Io2Si_V, Si2Io_V, UnitX_, UnitEnergy_
     ! INPUTS:
     integer, intent(in) :: iLine, iShock ! Indices of line and shock front
     integer, intent(in) :: nX            ! Number of meshes along s_L axis
@@ -716,9 +716,9 @@ contains
     real    :: Dt_C(nP, nMu, nX)
 
     ! Now, steady-state Poisson bracket advection scheme for focused Eqn.
+
     character(len=*), parameter:: NameSub = 'iterate_poisson_focused'
     !--------------------------------------------------------------------------
-
     ! Initialize arrays
     call init_states_focused
     ! Calculate Hamiltonian functions
