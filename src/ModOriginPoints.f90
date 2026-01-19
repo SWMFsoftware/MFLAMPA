@@ -21,7 +21,7 @@ contains
 
     ! Read input parameters for SP component
     use ModReadParam, ONLY: read_var
-    use CON_axes,     ONLY: dLongitudeHgrDeg
+    use CON_axes, ONLY: dLongitudeHgrDeg
 
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
