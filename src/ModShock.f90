@@ -5,10 +5,10 @@ module SP_ModShock
 
   ! This module contains subroutines for determining the shock location,
   ! and steepening the density and magnetic field strength at shock front.
-  use SP_ModGrid,   ONLY: nLine, nLineAll, Used_B, nVertex_B, &
+  use SP_ModGrid, ONLY: nLine, nLineAll, Used_B, nVertex_B, &
        NameVar_V, LagrID_, X_, Z_, State_VIB, MhData_VIB, &
        iShock_IB, NoShock_, Shock_, ShockOld_, check_line_ishock
-  use SP_ModSize,   ONLY: nVertexMax
+  use SP_ModSize, ONLY: nVertexMax
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -132,7 +132,7 @@ contains
     ! initialize arrays related to the shock
 
     use ModUtilities, ONLY: check_allocate
-    use SP_ModProc,   ONLY: iError
+    use SP_ModProc, ONLY: iError
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
 
@@ -249,9 +249,9 @@ contains
 
     ! find location of a shock wave on a given line (line)
     ! shock front is assumed to be location of max log(Rho/RhoOld)
-    use ModNumConst,       ONLY: cRadToDeg
+    use ModNumConst, ONLY: cRadToDeg
     use ModCoordTransform, ONLY: xyz_to_rlonlat
-    use SP_ModGrid,        ONLY: R_, Rho_, Wave2_, iLineAll0
+    use SP_ModGrid, ONLY: R_, Rho_, Wave2_, iLineAll0
 
     ! Do not search too close to the Sun
     real, parameter :: RShockMin = 1.20  ! *RSun
@@ -340,7 +340,7 @@ contains
 
     ! change the density profile near the shock front
     ! so it becomes steeper for the current line
-    use ModConst,   ONLY: cTiny
+    use ModConst, ONLY: cTiny
     use SP_ModGrid, ONLY: D_
     use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
@@ -404,13 +404,13 @@ contains
   subroutine get_shock_skeleton
 
     ! get the shock wave front surface skeleton for visualization
-    use ModCoordTransform,       ONLY: xyz_to_rlonlat
+    use ModCoordTransform, ONLY: xyz_to_rlonlat
     use ModMpi
     use ModTriangulateSpherical, ONLY: trmesh
-    use SP_ModGrid,              ONLY: iLineAll0
-    use SP_ModProc,              ONLY: iComm, nProc, iProc, iError
-    use SP_ModTriangulate,       ONLY: UsePoleTri
-    use SP_ModUnit,              ONLY: Io2Si_V, UnitX_
+    use SP_ModGrid, ONLY: iLineAll0
+    use SP_ModProc, ONLY: iComm, nProc, iProc, iError
+    use SP_ModTriangulate, ONLY: UsePoleTri
+    use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
     ! Effective points for the shock surface
     integer :: nShockEff
@@ -537,3 +537,4 @@ contains
   end subroutine get_shock_skeleton
   !============================================================================
 end module SP_ModShock
+!==============================================================================
