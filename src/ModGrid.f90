@@ -12,9 +12,9 @@ module SP_ModGrid
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use SP_ModSize,   ONLY: nVertexMax, nP => nMomentum, &
+  use SP_ModSize, ONLY: nVertexMax, nP => nMomentum, &
        nMu => nPitchAngle, IsMuAvg => IsPitchAngleAverage
-  use SP_ModProc,   ONLY: nProc, iProc, iError
+  use SP_ModProc, ONLY: nProc, iProc, iError
 
   implicit none
 
@@ -64,7 +64,7 @@ module SP_ModGrid
   integer, public, pointer :: nVertex_B(:)
 
   ! Function converting line number to lon-lat location of the line
-  public :: iBlock_to_lon_lat
+  public :: iblock_to_lon_lat
 
   ! Array for current and present location of shock wave
   integer, public, parameter:: nShockParam = 2,  &
@@ -230,7 +230,7 @@ contains
 
     ! allocate the grid used in this model
     use ModUtilities, ONLY: check_allocate
-    use SP_ModProc,   ONLY: warn_more_proc
+    use SP_ModProc, ONLY: warn_more_proc
     integer :: iNodeLast                 ! last line on this node
 
     character(len=*), parameter:: NameSub = 'init'
@@ -424,8 +424,8 @@ contains
     integer,      intent(out):: iXout   ! result: index just above Radius
     logical,      intent(out):: IsFound ! result: whether search succeeds
     real,optional,intent(out):: Weight  ! interpolation weight at output index
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     ! check whether line reaches the given radial distance
     if(State_VIB(R_, nVertex_B(iLine), iLine) < Radius) then
        ! mark failure to find location
