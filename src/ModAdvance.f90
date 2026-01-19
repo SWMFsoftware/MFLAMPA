@@ -4,13 +4,13 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-  use SP_ModDiffusion,    ONLY: UseDiffusion, set_diffusion_coef
+  use SP_ModDiffusion, ONLY: UseDiffusion, set_diffusion_coef
   use SP_ModDistribution, ONLY: IsDistNeg
-  use SP_ModGrid,         ONLY: nLine, Used_B, nVertex_B, &
+  use SP_ModGrid, ONLY: nLine, Used_B, nVertex_B, &
        State_VIB, MHData_VIB, Rho_, B_, iShock_IB, Shock_, IsMuAvg
-  use SP_ModShock,        ONLY: DoTraceShock, nShockWidth, steepen_shock
-  use SP_ModSize,         ONLY: nVertexMax
-  use ModUtilities,       ONLY: CON_stop
+  use SP_ModShock, ONLY: DoTraceShock, nShockWidth, steepen_shock
+  use SP_ModSize, ONLY: nVertexMax
+  use ModUtilities, ONLY: CON_stop
 
   implicit none
 
@@ -44,7 +44,7 @@ contains
        ! including the extra pitch-angle adiabatic focusing effect. If one
        ! wants to account for this term, UseMuFocusing should be set to true,
        ! namely using triple/3 Poisson brackets. Otherwise, one will neglect
-       ! this term and use double/2 Poisson brackets. 
+       ! this term and use double/2 Poisson brackets.
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -69,11 +69,11 @@ contains
     ! and (3) new steepen_shock
 
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
-    use SP_ModAdvancePoisson,   ONLY: advect_via_poisson_parker, &
+    use SP_ModAdvancePoisson, ONLY: advect_via_poisson_parker, &
          calc_states_poisson_focused, advect_via_poisson_focused
-    use SP_ModGrid,             ONLY: D_, RhoOld_, BOld_, ShockOld_
-    use SP_ModTime,             ONLY: SPTime
-    use SP_ModUnit,             ONLY: Io2Si_V, UnitX_
+    use SP_ModGrid, ONLY: D_, RhoOld_, BOld_, ShockOld_
+    use SP_ModTime, ONLY: SPTime
+    use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
     ! Maximum possible time
     real, intent(in):: TimeLimit
@@ -213,8 +213,8 @@ contains
     integer :: iEnd, iShock
     ! Local arrays to store the state vectors in SI units
     real, dimension(1:nVertexMax):: nSi_I, BSi_I
-    !--------------------------------------------------------------------------
 
+    !--------------------------------------------------------------------------
     LINE:do iLine = 1, nLine
        ! go line by line and iterate the solution
        if(.not.Used_B(iLine)) CYCLE LINE
