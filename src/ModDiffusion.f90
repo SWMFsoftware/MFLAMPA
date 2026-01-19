@@ -11,15 +11,15 @@ module SP_ModDiffusion
   ! Updated (identation, comments): I.Sokolov, Dec.17, 2017
 
   use ModMpi
-  use ModNumConst,  ONLY: cPi, cTwoPi, cTiny
-  use ModConst,     ONLY: cAu, cLightSpeed, ckeV, cGeV, cMu, Rsun, cGyroRadius
-  use SP_ModSize,   ONLY: nVertexMax
+  use ModNumConst, ONLY: cPi, cTwoPi, cTiny
+  use ModConst, ONLY: cAu, cLightSpeed, ckeV, cGeV, cMu, Rsun, cGyroRadius
+  use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, GammaLorentz_G, &
        MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
-  use SP_ModGrid,   ONLY: nP, nMu, State_VIB, MHData_VIB, &
+  use SP_ModGrid, ONLY: nP, nMu, State_VIB, MHData_VIB, &
        D_, R_, X_, Z_, Wave1_, Wave2_
-  use SP_ModProc,   ONLY: nProc, iProc, iComm, iError
-  use SP_ModUnit,   ONLY: Io2Si_V, UnitX_
+  use SP_ModProc, ONLY: nProc, iProc, iComm, iError
+  use SP_ModUnit, ONLY: Io2Si_V, UnitX_
   use ModUtilities, ONLY: CON_stop
 
   implicit none
@@ -54,7 +54,7 @@ module SP_ModDiffusion
   ! DInner = Diffusion Coefficient/BSi at the face
   real, public, dimension(nVertexMax, nP) :: DInnerSi_II, & ! Dinner/BSi
        CoefLambdaMuMu_II ! mfp, mu>1
-  real, public, dimension(nVertexMax) :: DOuterSi_I, CoefLambdaxx_I !mfp, mu=1
+  real, public, dimension(nVertexMax) :: DOuterSi_I, CoefLambdaxx_I ! mfp, mu=1
 
   ! Perpendicular diffusion
   real,    public :: DPerpRatio = 0.065         ! Simple ratio of Dperp/Dpara
@@ -504,80 +504,45 @@ contains
   !============================================================================
   subroutine diffuseperp_distribution()
 
-    use SP_ModGrid,        ONLY: nLineAll
+    use SP_ModGrid, ONLY: nLineAll
     use SP_ModTriangulate, ONLY: intersect_surf, build_trmesh, &
          interpolate_trmesh
 
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
-    real    :: XyzReachRPerp_III(X_:Z_, 1:nLineAll+2, nRPerp)
-    integer :: iLineReachRPerp_II(1:nLineAll+2, nRPerp)
-    real    :: DistrReachR_CB(0:nP+1, 1:nMu, 1:nLineAll+2, nRPerp)
     real    :: DistrRPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
-    integer :: nReachRPerp_I(nRPerp)
-    logical :: IsTriangleFound_III(nPhiPerp, nThetaPerp, nRPerp)
-    integer :: iStencil_IV(3, nPhiPerp, nThetaPerp, nRPerp)
-    real    :: Weight_IV(3, nPhiPerp, nThetaPerp, nRPerp)
-
-    ! Very local VARs, only used in each spherical layer for triangulation
-    ! Count, left and right indices of the triangulated mesh
-    integer :: nTriMesh, lidTri, ridTri
-    ! Arrays to construct a triangular mesh on a sphere
-    integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
-
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
     ! cross-field (perpendicular) diffusion
-    DistrRPerp_5D = 0.0; IsTriangleFound_III = .false.
-    iStencil_IV = -1; Weight_IV = 0.0
+    DistrRPerp_5D = 0.0
 
     ! step 1: field lines => intersection points on multiple uniform layers
     ! here, iProc is for field lines, not for sub-slices/layers
-    do iRPerp = 1, nRPerp
-       call intersect_surf(RPerp_C(iRPerp), XyzReachRPerp_III(:,:,iRPerp), &
-            iLineReachRPerp_II(:,iRPerp), DistrReachR_CB(:,:,:,iRPerp), &
-            nReachRPerp_I(iRPerp))
-       ! DistrReachR_CB (and DistrRPerp_5D is (are) in log10 indeed
+    do iPE = 0, nProc-1
+       do iRPerp = iRPerpStart_I(iPE), iRPerpEnd_I(iPE)
+          call intersect_surf(RPerp_C(iRPerp), iPE, iRperp)
+       end do
     end do
 
     ! then, iProc is for sub-slices/layers now
-    RSPHERE: do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-       ! step 2: intersection points => construct the triangulation skeleton 
-       call build_trmesh(nReachRPerp_I(iRPerp), &
-            XyzReachRPerp_III(:,:,iRPerp), iLineReachRPerp_II(:,iRPerp), &
-            nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
-       ! Check the error message from after build_trmesh
-       if(iError /= 0) then
-          write(*,*) 'iProc = ', iProc, &
-               NameSub//': build_trmesh failed at RPerp=', &
-               RPerp_C(iRPerp), '[Rsun], Dperp stopped'
-          RETURN
-       end if
-
-       ! step 3: skeleton => interpolate the values to multiple uniform layers
+    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
+       ! step 2: intersection points => construct the triangulation skeleton
+       call build_trmesh(iRPerp)
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
-             call interpolate_trmesh(RPerp_C(iRPerp),                    &
-                  XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),              &
-                  nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, &
-                  XyzReachRPerp_III(:,:,iRPerp),                         &
-                  DistrReachR_CB(:,:,:,iRPerp),                          &
-                  DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp),         &
-                  IsTriangleFound_III(iPhiPerp,iThetaPerp,iRPerp),       &
-                  iStencil_IV(:,iPhiPerp,iThetaPerp,iRPerp),             &
-                  Weight_IV(:,iPhiPerp,iThetaPerp,iRPerp))
+             call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
+                  iRIn = iRPerp, Log10DistrInterp_II=                         &
+                  DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
           end do
        end do
-       ! there is non-interpolated values on the slice
-       if(.not. any(IsTriangleFound_III)) CYCLE
-    end do RSPHERE
+    end do
 
     ! Broadcast results to all processes
     if(nProc > 1) then
       do iPE = 0, nProc-1
        call MPI_BCAST(DistrRPerp_5D(:,:,:,:,             &
-            iRPerpStart_I(iProc):iRPerpEnd_I(iProc)),    &
-            (iRPerpEnd_I(iProc)-iRPerpStart_I(iProc)+1)* &
-            (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, 0, iComm, iError)
+            iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+            (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+            (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
       end do
     end if
     DistrRPerp_5D = exp(DistrRPerp_5D*log(10.0)) ! log10(VDF) => VDF
@@ -617,7 +582,7 @@ contains
     ! Calculate scattering: \deltaf/\deltat = (Dmumu*f_mu)_mu with local Dt
 
     use ModMpi
-    use ModConst,   ONLY: cAtomicMass
+    use ModConst, ONLY: cAtomicMass
 
     ! Variables as inputs
     ! input Line and End index (for how many particles)

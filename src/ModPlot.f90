@@ -5,24 +5,27 @@ module SP_ModPlot
 
   ! Methods for saving plots
 
-  use ModIoUnit,           ONLY: UnitTmp_
-  use ModNumConst,         ONLY: cDegToRad, cRadToDeg, cTolerance
-  use ModPlotFile,         ONLY: save_plot_file, read_plot_file
-  use ModUtilities,        ONLY: open_file, close_file, remove_file, CON_stop
+  use ModIoUnit, ONLY: UnitTmp_
+  use ModNumConst, ONLY: cDegToRad, cRadToDeg, cTolerance
+  use ModPlotFile, ONLY: save_plot_file, read_plot_file
+  use ModUtilities, ONLY: open_file, close_file, remove_file, CON_stop
+#ifdef _OPENACC
+  use ModUtilities, ONLY: norm2
+#endif
   use SP_ModAngularSpread, ONLY: get_normalized_spread,  &
        nSpreadLon, nSpreadLat, SpreadLon_I, SpreadLat_I, &
        IsReadySpreadPoint, IsReadySpreadGrid
-  use SP_ModChannel,       ONLY: FluxChannelInit_V, Flux_VIB,    &
+  use SP_ModChannel, ONLY: FluxChannelInit_V, Flux_VIB,    &
        Flux0_, FluxMax_, NameFluxChannel_I, NameFluxUnit_I
-  use SP_ModDistribution,  ONLY: KinEnergyIo_G, Momentum_G, Distribution_CB
-  use SP_ModGrid,          ONLY: nVar, nMHData, nLine, nLineAll, &
+  use SP_ModDistribution, ONLY: KinEnergyIo_G, Momentum_G, Distribution_CB
+  use SP_ModGrid, ONLY: nVar, nMHData, nLine, nLineAll, &
        iLineAll0, search_line, MHData_VIB, State_VIB, iShock_IB, &
        nVertex_B, NameVar_V, Shock_, LagrID_, X_, Y_, Z_, R_,    &
        TypeCoordSystem, nP, nMu, IsMuAvg
-  use SP_ModProc,          ONLY: iProc
-  use SP_ModSize,          ONLY: nVertexMax, nDim
-  use SP_ModTime,          ONLY: SPTime, iIter, StartTime, StartTimeJulian
-  use SP_ModUnit,          ONLY: NameFluxUnit, NameDiffFluxUnit, &
+  use SP_ModProc, ONLY: iProc
+  use SP_ModSize, ONLY: nVertexMax, nDim
+  use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
+  use SP_ModUnit, ONLY: NameFluxUnit, NameDiffFluxUnit, &
        NameEnergyUnit, NameVarUnit_V, Si2Io_V, UnitFlux_
 
   implicit none
@@ -173,7 +176,7 @@ contains
 
     use ModUtilities, ONLY: split_string, lower_case
     use ModReadParam, ONLY: read_var
-    use SP_ModTime,   ONLY: IsSteadyState
+    use SP_ModTime, ONLY: IsSteadyState
     character(len=*), intent(in):: NameCommand
     ! set parameters of output files: file format, kind of output etc.
     character(len=300):: StringPlot
@@ -517,8 +520,8 @@ contains
       character(len=20):: NameScale, NameDistance, NameVar
 
       ! only 1 variable (at most) is printed
-      !------------------------------------------------------------------------
 
+      !------------------------------------------------------------------------
       File_I(iFile) % nMhdVar = 0
       if(IsMuAvg) then
          ! Do not save Mu
@@ -817,11 +820,11 @@ contains
     ! write the output data
 
     use ModMpi
-    use SP_ModChannel,      ONLY: get_integral_flux
+    use SP_ModChannel, ONLY: get_integral_flux
     use SP_ModDistribution, ONLY: Mu_C
-    use SP_ModGrid,         ONLY: Used_B
-    use SP_ModProc,         ONLY: iComm, nProc, iError
-    use SP_ModTime,         ONLY: IsSteadyState
+    use SP_ModGrid, ONLY: Used_B
+    use SP_ModProc, ONLY: iComm, nProc, iError
+    use SP_ModTime, ONLY: IsSteadyState
 
     logical, intent(in), optional:: IsInitialOutputIn
 
@@ -1065,7 +1068,6 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_mh_2d'
       !------------------------------------------------------------------------
-
       nExtraVar = File_I(iFile)%nExtraVar
       nMhdVar   = File_I(iFile)%nMhdVar
       nFluxVar  = File_I(iFile)%nFluxVar
@@ -1370,11 +1372,11 @@ contains
       ! a file is output once with the name being NameEChannelFile, i.e.,
       ! MH_data_EChannel.H, only created in the first initial call
 
-      use SP_ModChannel,      ONLY: nFluxChannel, nFluxChannelSat, &
+      use SP_ModChannel, ONLY: nFluxChannel, nFluxChannelSat, &
            FluxFirst_, FluxLast_, EFlux_, NameChannelSource_I,     &
            EChannelLoIo_I, EChannelHiIo_I, EChannelMidIo_I
       use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
-      use SP_ModUnit,         ONLY: NameEnergyFluxUnit
+      use SP_ModUnit, ONLY: NameEnergyFluxUnit
 
       ! header for the file
       character(len=200) :: StringHeader, StringColumn
@@ -1952,8 +1954,7 @@ contains
       ! separate file is created for each satellite, and the name format is:
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
-      use ModCoordTransform, ONLY: xyz_to_rlonlat
-      use SP_ModSatellite,   ONLY: nSat, NameFileSat_I, NameSat_I, &
+      use SP_ModSatellite, ONLY: nSat, NameFileSat_I, NameSat_I, &
            XyzSat_DI, set_satellite_positions, DoTrackSatellite_I, &
            IsTriangleFoundSat_I, iStencilOrigSat_II, WeightSat_II
       use SP_ModTriangulate, ONLY: DoTestTri, XyzLocTestTri_I, &
@@ -1967,24 +1968,8 @@ contains
       ! scale and conversion factor
       real    :: Scale_G(0:nP+1)
 
-      ! radial distance, longitude and latitude of satellite
-      real    :: rSat, LonSat, LatSat
       ! loop variables
       integer :: iSat, iMu, i
-      ! useful intersection points on a unit sphere
-      ! Here the last index is 2:nLineAll+1 for normal nLineAll lines
-      real    :: XyzReachRUnit_DI(X_:Z_, 1:nLineAll+2)
-      integer :: iLineReach_I(1:nLineAll+2)
-      real    :: Log10DistrReachR_IIB(0:nP+1, 1:nMu, 1:nLineAll+2)
-      integer :: nReachR
-      ! arrays to construct a triangular mesh on a sphere
-      integer :: nTriMesh, lidTri, ridTri
-      integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
-      ! variables for interpolation in a triangular mesh
-      logical :: IsTriangleFound
-      integer :: iStencil_I(3)
-      real    :: Weight_I(3)
-
       character(len=*), parameter:: NameSub = 'write_distr_traj'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
@@ -2002,77 +1987,59 @@ contains
       ! set the file name: saved cdf/def/DEF (f or f*p**2, in which unit)
       select case(File_I(iFile) % iTypeDistr)
       case(CDF_)
-         TypeDistr = '_cdf'
+         TypeDistr = 'cdf_'
       case(DEFIo_)
-         TypeDistr = '_def'
+         TypeDistr = 'def_'
       case(DEFSi_)
-         TypeDistr = '_DEF'
+         TypeDistr = 'DEF_'
       end select
-
       ! Save outputs for each satellite
       TRI_SATELLITE: do iSat = 1, nSat
 
          ! set header
-         StringHeader = 'MFLAMPA: Distribution along the trajectory of' &
-              //trim(NameFileSat_I(iSat))//', with outputs: '  &
+         StringHeader = 'MFLAMPA: Distribution along the trajectory of ' &
+              //trim(NameSat_I(iSat))//', with outputs: '  &
               //trim(File_I(iFile)%StringHeaderAux)
          if(DoTestTri) StringHeader = &
               "Test Triangulation in "//trim(StringHeader)
 
          ! set the file name
-         call make_file_name( &
-              StringBase    = NameDistrData //                 &
-              trim(NameSat_I(iSat)) // TypeDistr,              &
-              iIter         = iIter,                           &
-              NameExtension = File_I(iFile)%NameFileExtension, &
-              NameOut       = NameFile)
 
          ! set and get the satellite location
          call set_satellite_positions(iSat)
          ! if this is a test for the triangulation: NOT real SatelliteTraj
          if(DoTestTri) XyzSat_DI(:, iSat) = XyzLocTestTri_I
-         call xyz_to_rlonlat(XyzSat_DI(:, iSat), rSat, LonSat, LatSat)
-
-         ! We then first have a radial interpolation at rSat
-         ! reset the output buffer, coordinates, flags, and log(Distribution)
-         File_I(iFile) % Buffer_II = 0.0
-         iLineReach_I = 0
-         XyzReachRUnit_DI = 0.0; Log10DistrReachR_IIB = 0.0
 
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
-         TRI_INTERPOLATE: if(DoTrackSatellite_I(iSat) .or. DoTestTri) then
+         if(.not.(DoTrackSatellite_I(iSat) .or. DoTestTri))CYCLE TRI_SATELLITE
 
-            ! Intersect multiple field lines with the sphere
-            call intersect_surf(rSat, XyzReachRUnit_DI, &
-                 iLineReach_I, Log10DistrReachR_IIB, nReachR)
-            ! Build the triangulated skeleton with multiple intersection points
-            call build_trmesh(nReachR, XyzReachRUnit_DI, iLineReach_I, &
-                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I)
-            ! Check the error message from after build_trmesh
-            if(iError /= 0) then
-               write(*,*) NameSub//': Triangilation failed of ', &
-                    trim(NameSat_I(iSat)), ' at Iteration=', iIter
-               EXIT TRI_INTERPOLATE
-            end if
-
+         ! Intersect multiple field lines with the sphere
+         call intersect_surf(norm2(XyzSat_DI(:, iSat)))
+         if(iProc==0)then
+            call build_trmesh()
             ! Interpolate the values to the specific point(s)
-            call interpolate_trmesh(rSat, XyzSat_DI(:, iSat), &
-                 nTriMesh, lidTri, ridTri, iList_I, iPointer_I, iEnd_I, &
-                 XyzReachRUnit_DI, Log10DistrReachR_IIB, &
+            call interpolate_trmesh(XyzSat_DI(:, iSat),       &
+                 Log10DistrInterp_II = &
                  File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1), &
-                 IsTriangleFound, iStencil_I, Weight_I)
-            if(.not.IsTriangleFound) EXIT TRI_INTERPOLATE
-
-            ! Save IsTriangleFound, iStencil and Weights
-            IsTriangleFoundSat_I(iSat) = IsTriangleFound
-            do i = 1, 3
-               ! iStencil_I counts from lidTri
-               iStencilOrigSat_II(i, iSat) = &
-                    iLineReach_I(lidTri-1+iStencil_I(i))
-            end do
-            WeightSat_II(:, iSat) = Weight_I
-
+                 iStencilOut_I=iStencilOrigSat_II(:, iSat),   &
+                 WeightOut_I=WeightSat_II(:, iSat))
+         end if
+         ! Save IsTriangleFound, iStencil and Weights
+         call MPI_BCAST(iStencilOrigSat_II(:, iSat),          &
+              3, MPI_INTEGER, 0, iComm, iError)
+         ! If triangulation fails, iStencil is not assigned
+         if(all(iStencilOrigSat_II(:, iSat)==-1))then
+            if(DoTestTri) EXIT TRI_SATELLITE
+            CYCLE TRI_SATELLITE
+         end if
+         IsTriangleFoundSat_I(iSat) = .true.
+         call MPI_BCAST(WeightSat_II(:, iSat), 3, MPI_REAL, 0, iComm, iError)
+         if(iProc==0) then
+            call make_file_name( &
+                 StringBase    = TypeDistr // trim(NameSat_I(iSat)), &
+                 NameExtension = File_I(iFile)%NameFileExtension,    &
+                 NameOut       = NameFile)
             ! Account for the requested output
             select case(File_I(iFile) % iTypeDistr)
             case(CDF_)
@@ -2087,40 +2054,38 @@ contains
                     2.0*spread(Log10Momentum_G, DIM=2, NCOPIES=nMu)
             end select
 
-         end if TRI_INTERPOLATE
-
-         ! print data to file
-         if(IsMuAvg) then
-            ! not necessary to save Mu
-            call save_plot_file( &
-                 NameFile       = NameFile, &
-                 StringHeaderIn = StringHeader, &
-                 TypeFileIn     = File_I(iFile) % TypeFile, &
-                 nDimIn         = 1, &
-                 TimeIn         = SPTime, &
-                 nStepIn        = iIter, &
-                 Coord1In_I     = Scale_G, &
-                 NameVarIn      = &
-                 trim(File_I(iFile) % NameVarPlot) // ' ' // &
-                 trim(File_I(iFile) % NameAuxPlot), &
-                 VarIn_I        = File_I(iFile) % Buffer_II(0:nP+1, nMu, 1))
-         else
-            ! pitch-angle dependent, necessary to save
-            call save_plot_file( &
-                 NameFile       = NameFile, &
-                 StringHeaderIn = StringHeader, &
-                 TypeFileIn     = File_I(iFile) % TypeFile, &
-                 nDimIn         = 2, &
-                 TimeIn         = SPTime, &
-                 nStepIn        = iIter, &
-                 Coord1In_I     = Scale_G, &
-                 Coord2In_I     = Mu_C, &
-                 NameVarIn      = &
-                 trim(File_I(iFile) % NameVarPlot) // ' ' // &
-                 trim(File_I(iFile) % NameAuxPlot), &
-                 VarIn_II       = File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
+            ! print data to file
+            if(IsMuAvg) then
+               ! not necessary to save Mu
+               call save_plot_file( &
+                    NameFile       = NameFile, &
+                    StringHeaderIn = StringHeader, &
+                    TypeFileIn     = File_I(iFile) % TypeFile, &
+                    nDimIn         = 1, &
+                    TimeIn         = SPTime, &
+                    nStepIn        = iIter, &
+                    Coord1In_I     = Scale_G, &
+                    NameVarIn      = &
+                    trim(File_I(iFile) % NameVarPlot) // ' ' // &
+                    trim(File_I(iFile) % NameAuxPlot), &
+                    VarIn_I        = File_I(iFile) % Buffer_II(0:nP+1,nMu,1))
+            else
+               ! pitch-angle dependent, necessary to save
+               call save_plot_file( &
+                    NameFile       = NameFile, &
+                    StringHeaderIn = StringHeader, &
+                    TypeFileIn     = File_I(iFile) % TypeFile, &
+                    nDimIn         = 2, &
+                    TimeIn         = SPTime, &
+                    nStepIn        = iIter, &
+                    Coord1In_I     = Scale_G, &
+                    Coord2In_I     = Mu_C, &
+                    NameVarIn      = &
+                    trim(File_I(iFile) % NameVarPlot) // ' ' // &
+                    trim(File_I(iFile) % NameAuxPlot), &
+                    VarIn_II       = File_I(iFile) % Buffer_II(0:nP+1,1:nMu,1))
+            end if
          end if
-
          ! if this is the test for the triangulation, just exit
          if(DoTestTri) EXIT TRI_SATELLITE
       end do TRI_SATELLITE ! iSat
@@ -2641,7 +2606,7 @@ contains
   subroutine finalize
 
     use ModUtilities, ONLY: cTab
-    use SP_ModGrid,   ONLY: nLat, nLon
+    use SP_ModGrid, ONLY: nLat, nLon
 
     ! write the header file that contains necessary information
     ! for reading input files in a separate run
