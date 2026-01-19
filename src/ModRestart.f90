@@ -5,14 +5,14 @@ module SP_ModRestart
 
   ! This module contains methods for writing output files
 
-  use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModGrid,   ONLY: iblock_to_lon_lat, nLine, &
+  use SP_ModSize, ONLY: nVertexMax
+  use SP_ModGrid, ONLY: iblock_to_lon_lat, nLine, &
        MhData_VIB, iShock_IB, Used_B, FootPoint_VB, &
        nVertex_B, nShockParam, nLon, nLat
   use SP_ModDistribution, ONLY: Distribution_CB
-  use SP_ModTime,   ONLY: SPTime, iIter, iStartTime_I
+  use SP_ModTime, ONLY: SPTime, iIter, iStartTime_I
   use ModUtilities, ONLY: open_file, close_file, CON_stop
-  use ModIoUnit,    ONLY: UnitTmp_
+  use ModIoUnit, ONLY: UnitTmp_
 
   implicit none
 
@@ -165,10 +165,10 @@ contains
   !============================================================================
   subroutine write_restart_header
 
-    use ModUtilities,       ONLY: cTab
-    use SP_ModGrid,         ONLY: nP, nMu
-    use SP_ModPlot,         ONLY: nTag
-    use SP_ModProc,         ONLY: iProc
+    use ModUtilities, ONLY: cTab
+    use SP_ModGrid, ONLY: nP, nMu
+    use SP_ModPlot, ONLY: nTag
+    use SP_ModProc, ONLY: iProc
     use SP_ModDistribution, ONLY: EnergyInjIo, EnergyMaxIo
     ! full name of the header file
     character(len=100):: NameFile
