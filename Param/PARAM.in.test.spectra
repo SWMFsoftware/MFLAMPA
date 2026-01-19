@@ -86,6 +86,12 @@ T			UseModulationPot
 F				UsePoleTriangulation
 T				UsePlanarTriangles
 
+#TESTTRIANGULATE
+T
+-5.56E+01
+1.81E+02
+1.0E+02
+
 #SATELLITE
 4			nSatellite
 SP/TRAJECTORY/earth.dat		NameTrajectoryFile
