@@ -5,13 +5,13 @@ module SP_ModReadMhData
 
   ! This module contains methods for reading input MH data
 
-  use SP_ModGrid,   ONLY: iblock_to_lon_lat, get_other_state_var, nMhData, &
+  use SP_ModGrid, ONLY: iblock_to_lon_lat, get_other_state_var, nMhData, &
        nLine, Z_, Used_B, FootPoint_VB, nVertex_B, MhData_VIB, LagrID_, T_
-  use SP_ModTime,   ONLY: SPTime, DataInputTime
+  use SP_ModTime, ONLY: SPTime, DataInputTime
   use SP_ModDistribution, ONLY: offset
-  use ModPlotFile,  ONLY: read_plot_file
+  use ModPlotFile, ONLY: read_plot_file
   use ModUtilities, ONLY: fix_dir_name, open_file, close_file, CON_stop
-  use ModIoUnit,    ONLY: io_unit_new
+  use ModIoUnit, ONLY: io_unit_new
 
   implicit none
 
@@ -116,7 +116,7 @@ contains
   !============================================================================
   subroutine read_mh_data(DoOffsetIn)
 
-    use ModConst,   ONLY: cKeV
+    use ModConst, ONLY: cKeV
     use SP_ModPlot, ONLY: NameMHData
     use SP_ModUnit, ONLY: Si2Io_V, UnitEnergy_
 
