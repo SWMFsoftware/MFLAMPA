@@ -10,8 +10,8 @@ module SP_ModDistribution
   use ModUtilities, ONLY: norm2
 #endif
   use ModUtilities, ONLY: CON_stop
-  use SP_ModSize,   ONLY: nVertexMax
-  use SP_ModGrid,   ONLY: nLine, nVertex_B, Used_B, nP, nMu, IsMuAvg
+  use SP_ModSize, ONLY: nVertexMax
+  use SP_ModGrid, ONLY: nLine, nVertex_B, Used_B, nP, nMu, IsMuAvg
 
   implicit none
 
@@ -107,10 +107,10 @@ contains
   !============================================================================
   subroutine init
 
-    use ModConst,     ONLY: cLightSpeed, cRmeProton
+    use ModConst, ONLY: cLightSpeed, cRmeProton
     use ModUtilities, ONLY: check_allocate
-    use SP_ModProc,   ONLY: iError
-    use SP_ModUnit,   ONLY: kinetic_energy_to_momentum, momentum_to_energy, &
+    use SP_ModProc, ONLY: iError
+    use SP_ModUnit, ONLY: kinetic_energy_to_momentum, momentum_to_energy, &
          momentum_to_kinetic_energy, Io2Si_V, Si2Io_V, UnitEnergy_, UnitFlux_
     ! loop variables
     integer :: iLine, iVertex, iP, iMu
