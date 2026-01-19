@@ -7,8 +7,8 @@ module SP_ModAdvanceAdvection
   ! Prototype: Sokolov & Roussev, FLAMPA code, 2004
   ! Version: Sokolov & Roussev, Jan, 2008, SP/FLAMPA/src/ModLogAdvection.f90
 
-  use ModUtilities,       ONLY: CON_stop
-  use SP_ModGrid,         ONLY: nP
+  use ModUtilities, ONLY: CON_stop
+  use SP_ModGrid, ONLY: nP
   use SP_ModDistribution, ONLY: Distribution_CB, &
        dLogP, Background_I, IsDistNeg, check_dist_neg
   implicit none
@@ -28,7 +28,7 @@ contains
 
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution, &
          UseDiffusionPerp, diffuseperp_distribution
-    use SP_ModBc,        ONLY: set_momentum_bc, iStart, set_lower_end_vdf, &
+    use SP_ModBc, ONLY: set_momentum_bc, iStart, set_lower_end_vdf, &
          UseLowerEndBc, set_lower_end_bc, LowerEndBc_I, &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
     ! INPUTS:
