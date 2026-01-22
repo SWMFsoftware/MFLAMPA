@@ -101,16 +101,36 @@ SP/TRAJECTORY/solo.dat		NameTrajectoryFile
 
 #SAVEPLOT
 8			nFileOut
-mh1d flux ascii		StringPlot
+mh1d range flux ascii		StringPlot
+2
+2
+2
+2
 mh2d flux ascii		StringPlot
 215.0			Radius
-mhtime flux ascii		StringPlot
+mhtime range flux ascii		StringPlot
+2
+2
+2
+2
 215.0			Radius
-distr1d energy distance def ascii		StringPlot
-distr1d momentum length cdf ascii		StringPlot
+distr1d range energy distance def ascii		StringPlot
+2
+2
+2
+2
+distr1d range momentum length cdf ascii		StringPlot
+2
+2
+2
+2
 distr2d energy def ascii		StringPlot
 215.0			Radius
-distrtime energy def ascii		StringPlot
+distrtime range energy def ascii		StringPlot
+2
+2
+2
+2
 215.0			Radius
 distrtraj energy def ascii		StringPlot
 
