@@ -137,8 +137,10 @@ module SP_ModPlot
      real:: Lon, Lat
      ! spread of flux of an individual line over grid
      real, pointer:: Spread_II(:,:)
+     integer :: iRange_I(4)
   end type TypePlotFile
-
+  ! Indexes in iRange_I
+  integer, parameter :: iLonMin_ = 1, iLonMax_ = 2, iLatMin_ = 3, iLatMax_ = 4
   ! All plot files
   type(TypePlotFile), allocatable :: File_I(:)
 
@@ -207,7 +209,9 @@ contains
             call CON_stop(NameSub//'Only a single #SAVEPLOT is allowed')
        ! allocate the storage for file info
        allocate(File_I(nFileOut))
-
+       do iFile = 1, nFileOut
+          File_I(iFile)%iRange_I = 0
+       end do
        ! read info about each file
        do iFile = 1, nFileOut
           ! reset and read the file info
@@ -229,18 +233,62 @@ contains
           select case(KindData)
           case('mh1d')
              File_I(iFile) % iKindData = MH1D_
+             ! Check range
+             if(trim(StringPlot_I(2))=='range') then
+                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
+                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
+                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
+                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
+                ! Remove 'range' from StringPlot
+                StringPlot_I(1:nStringPlot-1) = &
+                     StringPlot_I(2:nStringPlot)
+                nStringPlot = nStringPlot
+             end if
           case('mh2d')
              File_I(iFile) % iKindData = MH2D_
           case('mhtime')
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = MHTime_
+             ! Check range
+             if(trim(StringPlot_I(2))=='range') then
+                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
+                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
+                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
+                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
+                ! Remove 'range' from StringPlot
+                StringPlot_I(1:nStringPlot-1) = &
+                     StringPlot_I(2:nStringPlot)
+                nStringPlot = nStringPlot
+             end if
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
+                         ! Check range
+             if(trim(StringPlot_I(2))=='range') then
+                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
+                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
+                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
+                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
+                ! Remove 'range' from StringPlot
+                StringPlot_I(1:nStringPlot-1) = &
+                     StringPlot_I(2:nStringPlot)
+                nStringPlot = nStringPlot
+             end if
           case('distr2d')
              File_I(iFile) % iKindData = Distr2D_
           case('distrtime')
              File_I(iFile) % iKindData = DistrTime_
+             ! Check range
+             if(trim(StringPlot_I(2))=='range') then
+                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
+                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
+                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
+                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
+                ! Remove 'range' from StringPlot
+                StringPlot_I(1:nStringPlot-1) = &
+                     StringPlot_I(2:nStringPlot)
+                nStringPlot = nStringPlot
+             end if
           case('distrtraj')
              File_I(iFile) % iKindData = DistrTraj_
           case('flux2d')
@@ -695,6 +743,7 @@ contains
   !============================================================================
   subroutine init
 
+    use SP_ModGrid, ONLY : nLon, nLat
     ! initialize the file matrix
     ! storage for existing tags (possible during restart
     character(len=50),allocatable:: StringTag_I(:)
@@ -741,6 +790,8 @@ contains
           allocate(File_I(iFile) % Buffer_II( &
                File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
                File_I(iFile)%nFluxVar, 1:nVertexMax, 1))
+          if(all(File_I(iFile)%iRange_I==0))&
+               File_I(iFile)%iRange_I = [1, nLon, 1, nLat]
        case(MH2D_)
           ! extra space is reserved for longitude and latitude
           allocate(File_I(iFile) % Buffer_II( &
@@ -753,6 +804,8 @@ contains
                File_I(iFile)%nFluxVar, 1, 1))
        case(Distr1D_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nVertexMax))
+          if(all(File_I(iFile)%iRange_I==0))&
+               File_I(iFile)%iRange_I = [1, nLon, 1, nLat]
        case(Distr2D_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nLineAll))
        case(DistrTime_)
@@ -970,6 +1023,7 @@ contains
 
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
+         if(do_skip(iLine, File_I(iFile)%iRange_I))CYCLE
          call make_file_name( &
               StringBase    = NameMHData,                      &
               iLine         = iLine,                           &
@@ -1269,6 +1323,7 @@ contains
       ! with output sphere if present
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
+         if(do_skip(iLine, File_I(iFile)%iRange_I))CYCLE
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
 
@@ -1507,7 +1562,7 @@ contains
 
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
-
+         if(do_skip(iLine, File_I(iFile)%iRange_I))CYCLE
          ! set the file name
          call make_file_name( &
               StringBase    = NameDistrData//TypeDistr//TypeDist, &
@@ -1814,6 +1869,7 @@ contains
       ! with output sphere if present
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
+         if(do_skip(iLine, File_I(iFile)%iRange_I))CYCLE
          ! reset, the field line is printed unless fail to reach output sphere
          DoPrint = .true.
 
@@ -2038,6 +2094,7 @@ contains
          if(iProc==0) then
             call make_file_name( &
                  StringBase    = TypeDistr // trim(NameSat_I(iSat)), &
+                 Time = SPTime,                                      &
                  NameExtension = File_I(iFile)%NameFileExtension,    &
                  NameOut       = NameFile)
             ! Account for the requested output
@@ -2601,6 +2658,17 @@ contains
 
     end subroutine write_shock_time
     !==========================================================================
+    logical function do_skip(iLine, iRange_I)
+
+      use SP_ModGrid, ONLY : iblock_to_lon_lat
+      integer, intent(in) :: iLine, iRange_I(iLonMin_:iLatMax_)
+      integer :: iLon, iLat
+      !------------------------------------------------------------------------
+      call iblock_to_lon_lat(iLine, iLon, iLat)
+      do_skip = any([iLon,iLat] < iRange_I(iLonMin_:iLatMin_:2)).or.&
+           any([iLon,iLat] > iRange_I(iLonMax_:iLatMax_:2))
+    end function do_skip
+    !==========================================================================
   end subroutine save_plot_all
   !============================================================================
   subroutine finalize
@@ -2676,7 +2744,7 @@ contains
   end subroutine get_date_time_string
   !============================================================================
   subroutine make_file_name(StringBase, Radius, Longitude, Latitude,&
-       iLine, iIter, NameExtension, NameOut)
+       iLine, iIter, Time, NameExtension, NameOut)
 
     ! creates a string with file name and stores in NameOut;
     ! result is as follows:
@@ -2689,6 +2757,7 @@ contains
     real,    optional,  intent(in) :: Latitude
     integer, optional,  intent(in) :: iLine
     integer, optional,  intent(in) :: iIter
+    real,    optional,  intent(in) :: Time
     character(len=*),   intent(in) :: NameExtension
     character(len=100), intent(out):: NameOut
 
@@ -2697,9 +2766,9 @@ contains
     ! write format
     character(len=100) :: StringFmt
     ! lon, lat indexes corresponding to iLineAll
-    integer:: iLon, iLat
-
+    integer:: iLon, iLat 
     !--------------------------------------------------------------------------
+
     write(NameOut,'(a)') trim(NamePlotDir)//trim(StringBase)
 
     if(present(Radius)) write(NameOut,'(a,i4.4,f0.2)') &
@@ -2751,8 +2820,17 @@ contains
           write(NameOut,'(a,i6.6)') &
                trim(NameOut)//'_t'//StringTime(1:8)//'_n', iIter
        end if
+    elseif(present(Time))then
+       if(UseDateTime)then
+          call get_date_time_string(Time, StringTime)
+          write(NameOut,'(a,i6.6)') &
+               trim(NameOut)//'_e'//StringTime
+       else
+          call get_time_string(Time, StringTime(1:8))
+          write(NameOut,'(a,i6.6)') &
+               trim(NameOut)//'_t'//StringTime(1:8)
+       end if
     end if
-
     write(NameOut,'(a)') trim(NameOut)//trim(NameExtension)
 
   end subroutine make_file_name
