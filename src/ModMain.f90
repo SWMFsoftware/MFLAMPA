@@ -110,10 +110,10 @@ contains
           call read_param_mhdata(NameCommand)
        case('#VERBOSE')
           call read_param_testfunc(NameCommand)
-       case('#SATELLITE')
+       case('#SATELLITE','#TESTTRIANGULATE')
           if(.not.IsFirstSession) CYCLE
           call read_param_satellite(NameCommand)
-       case('#TESTTRIANGULATE', '#TRIANGULATION')
+       case('#TRIANGULATION')
           if(.not.IsFirstSession) CYCLE
           call read_param_triangulate(NameCommand)
        case('#TRACESHOCK', '#IDENTIFYSHOCK')

@@ -24,10 +24,6 @@ module SP_ModTriangulate
   public:: interpolate_trmesh ! Interpolate at the specified location
 
   ! In all names below "Tri" means "Triangulation"
-  ! Test triangulation
-  logical, public :: DoTestTri = .false.
-  real,    public :: XyzLocTestTri_I(nDim)
-
   ! If we use poles in triangulation
   logical, public :: UsePoleTri   = .false.
   logical, public :: UsePlanarTri = .true.
@@ -60,13 +56,6 @@ contains
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-    case("#TESTTRIANGULATE")
-       call read_var('TestTriangulate', DoTestTri)
-       if(DoTestTri) then
-          call read_var('XLocTestTri', XyzLocTestTri_I(1))
-          call read_var('YLocTestTri', XyzLocTestTri_I(2))
-          call read_var('ZLocTestTri', XyzLocTestTri_I(3))
-       end if
     case('#TRIANGULATION')
        ! get pole triangulartion flag
        call read_var('UsePoleTriangulation', UsePoleTri)

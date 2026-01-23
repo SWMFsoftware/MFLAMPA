@@ -49,6 +49,9 @@ module SP_ModSatellite
   logical, public, allocatable :: IsTriangleFoundSat_I(:) ! if we find tri.
   integer, public, allocatable :: iStencilOrigSat_II(:,:) ! orig. sat stencils
   real,    public, allocatable :: WeightSat_II(:,:) ! weights for interpolation
+  ! Test triangulation
+  logical, public :: DoTestTri = .false.
+  real,    public :: XyzLocTestTri_I(nDim)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -65,6 +68,14 @@ contains
     call test_start(NameSub, DoTest)
 
     select case(NameCommand)
+    case("#TESTTRIANGULATE")
+       call read_var('TestTriangulate', DoTestTri)
+       if(DoTestTri) then
+          call read_var('XLocTestTri', XyzLocTestTri_I(1))
+          call read_var('YLocTestTri', XyzLocTestTri_I(2))
+          call read_var('ZLocTestTri', XyzLocTestTri_I(3))
+       end if
+
     case("#SATELLITE")
        ! Read the number of satellites, for saving the spectrum by DistrTraj_
        call read_var('nSatellite', nSat)
