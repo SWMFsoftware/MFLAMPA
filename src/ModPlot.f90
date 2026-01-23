@@ -263,7 +263,7 @@ contains
              end if
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
-                         ! Check range
+             ! Check range
              if(trim(StringPlot_I(2))=='range') then
                 call read_var('iLonMin',File_I(iFile)%iRange_I(1))
                 call read_var('iLonMax',File_I(iFile)%iRange_I(2))
@@ -802,6 +802,8 @@ contains
           allocate(File_I(iFile) % Buffer_II( &
                1 + File_I(iFile)%nMhdVar + File_I(iFile)%nExtraVar + &
                File_I(iFile)%nFluxVar, 1, 1))
+          if(all(File_I(iFile)%iRange_I==0))&
+               File_I(iFile)%iRange_I = [1, nLon, 1, nLat]
        case(Distr1D_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nVertexMax))
           if(all(File_I(iFile)%iRange_I==0))&
@@ -810,6 +812,8 @@ contains
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1:nLineAll))
        case(DistrTime_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
+          if(all(File_I(iFile)%iRange_I==0))&
+               File_I(iFile)%iRange_I = [1, nLon, 1, nLat]
        case(DistrTraj_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
        case(Flux2D_)
