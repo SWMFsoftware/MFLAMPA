@@ -233,62 +233,23 @@ contains
           select case(KindData)
           case('mh1d')
              File_I(iFile) % iKindData = MH1D_
-             ! Check range
-             if(trim(StringPlot_I(2))=='range') then
-                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
-                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
-                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
-                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
-                ! Remove 'range' from StringPlot
-                StringPlot_I(1:nStringPlot-1) = &
-                     StringPlot_I(2:nStringPlot)
-                nStringPlot = nStringPlot
-             end if
+             call check_range(iFile)
           case('mh2d')
              File_I(iFile) % iKindData = MH2D_
           case('mhtime')
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = MHTime_
-             ! Check range
-             if(trim(StringPlot_I(2))=='range') then
-                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
-                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
-                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
-                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
-                ! Remove 'range' from StringPlot
-                StringPlot_I(1:nStringPlot-1) = &
-                     StringPlot_I(2:nStringPlot)
-                nStringPlot = nStringPlot
-             end if
+             call check_range(iFile)
           case('distr1d')
              File_I(iFile) % iKindData = Distr1D_
              ! Check range
-             if(trim(StringPlot_I(2))=='range') then
-                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
-                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
-                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
-                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
-                ! Remove 'range' from StringPlot
-                StringPlot_I(1:nStringPlot-1) = &
-                     StringPlot_I(2:nStringPlot)
-                nStringPlot = nStringPlot
-             end if
+             call check_range(iFile)
           case('distr2d')
              File_I(iFile) % iKindData = Distr2D_
           case('distrtime')
              File_I(iFile) % iKindData = DistrTime_
-             ! Check range
-             if(trim(StringPlot_I(2))=='range') then
-                call read_var('iLonMin',File_I(iFile)%iRange_I(1))
-                call read_var('iLonMax',File_I(iFile)%iRange_I(2))
-                call read_var('iLatMin',File_I(iFile)%iRange_I(3))
-                call read_var('iLatMax',File_I(iFile)%iRange_I(4))
-                ! Remove 'range' from StringPlot
-                StringPlot_I(1:nStringPlot-1) = &
-                     StringPlot_I(2:nStringPlot)
-                nStringPlot = nStringPlot
-             end if
+             call check_range(iFile)
           case('distrtraj')
              File_I(iFile) % iKindData = DistrTraj_
           case('flux2d')
@@ -475,6 +436,27 @@ contains
     end select
 
   contains
+    !==========================================================================
+    subroutine check_range(iFile)
+      integer, intent(in) :: iFile
+      !------------------------------------------------------------------------
+      if(trim(StringPlot_I(2))=='range') then
+         call read_var('iLonMin',File_I(iFile)%iRange_I(1))
+         call read_var('iLonMax',File_I(iFile)%iRange_I(2))
+         call read_var('iLatMin',File_I(iFile)%iRange_I(3))
+         call read_var('iLatMax',File_I(iFile)%iRange_I(4))
+      elseif(trim(StringPlot_I(2))=='single') then
+         call read_var('iLon',File_I(iFile)%iRange_I(1))
+         call read_var('iLat',File_I(iFile)%iRange_I(3))
+         File_I(iFile)%iRange_I(2:4:2) = File_I(iFile)%iRange_I(1:3:2)
+      else
+         RETURN
+      end if
+      ! Remove 'range' or 'single' from StringPlot
+      StringPlot_I(1:nStringPlot-1) = &
+           StringPlot_I(2:nStringPlot)
+      nStringPlot = nStringPlot
+    end subroutine check_range
     !==========================================================================
     subroutine process_mh
 
