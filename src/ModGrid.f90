@@ -65,6 +65,7 @@ module SP_ModGrid
 
   ! Function converting line number to lon-lat location of the line
   public :: iblock_to_lon_lat
+  public :: ilineall_to_lon_lat
 
   ! Array for current and present location of shock wave
   integer, public, parameter:: nShockParam = 2,  &
@@ -308,6 +309,7 @@ contains
   subroutine iblock_to_lon_lat(iBlockIn, iLonOut, iLatOut)
 
     ! return angular grid's indexes corresponding to this line
+    ! local: input is the local number of line (block)
     integer, intent(in) :: iBlockIn
     integer, intent(out):: iLonOut
     integer, intent(out):: iLatOut
@@ -315,11 +317,23 @@ contains
     integer :: iLineAll
     ! Get node number from line number
     !--------------------------------------------------------------------------
-    iLineAll = iBlockIn + iLineAll0
-    iLatOut = 1+iLatOffset + (iLineAll - 1)/nLon
-    iLonOut = iLineAll - nLon*(iLatOut - 1-iLatOffset) + iLonOffset
-
+    call ilineall_to_lon_lat(&
+         iLineAll = iBlockIn + iLineAll0, &
+         iLonOut = iLonOut, iLatOut = iLatOut)
   end subroutine iblock_to_lon_lat
+  !============================================================================
+  subroutine ilineall_to_lon_lat(iLineAll, iLonOut, iLatOut)
+
+    ! return angular grid's indexes corresponding to this line
+    ! global: input is the global number of line
+    integer, intent(in) :: iLineAll
+    integer, intent(out):: iLonOut
+    integer, intent(out):: iLatOut
+    !--------------------------------------------------------------------------
+    iLatOut = 1 + iLatOffset + (iLineAll - 1)/nLon
+    iLonOut = iLineAll - nLon*(iLatOut - 1 - iLatOffset) + iLonOffset
+
+  end subroutine ilineall_to_lon_lat
   !============================================================================
   subroutine copy_old_state
 
