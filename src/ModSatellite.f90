@@ -9,6 +9,7 @@ module SP_ModSatellite
   use SP_ModSize, ONLY: nDim
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
   use SP_ModGrid, ONLY: TypeCoordSystem
+  use SP_ModTime, ONLY: SPTime, StartTime
 
   implicit none
 
@@ -30,6 +31,8 @@ module SP_ModSatellite
   character(len=50), public:: NameFileSat_I(MaxSat)
   ! Names of the satellite
   character(len=50), public:: NameSat_I(MaxSat)
+  ! the output directory
+  character(len=*), public, parameter :: NamePlotDir = "SP/IO2/"
 
   ! Current positions
   real, public:: XyzSat_DI(nDim, MaxSat)
@@ -329,9 +332,13 @@ contains
 
     use SP_ModTriangulate, ONLY:  &
          intersect_surf, build_trmesh, interpolate_trmesh
+    use ModIoUnit, ONLY: UnitTmp_
 
     logical, intent(in) :: IsFirstCall
 
+    ! name of the output file
+    character(len=100) :: NameFile
+    character(len=400) :: String
     ! loop variables
     integer :: iSat
 
@@ -339,6 +346,19 @@ contains
     !--------------------------------------------------------------------------
     if(IsFirstCall)then
        ! write headers to satellite files
+       if(iProc/=0)RETURN
+       do iSat = 1, nSat
+          call set_satellite_positions(iSat)
+          if(.not.(DoTrackSatellite_I(iSat)))CYCLE
+          NameFile = trim(NamePlotDir)//trim(NameSat_I(iSat))//'_sat.out'
+          write(*,*)'NameFile='//NameFile
+          call open_file(file=NameFile, status='replace', NameCaller=NameSub)
+          String = 'Data along the '//trim(NameSat_I(iSat))//' trajectory'
+          write(UnitTmp_,'(a)')trim(String)
+          String = 'yyyy mm dd HH MM ss ms'
+          write(UnitTmp_,'(a)')trim(String)
+          call close_file
+       end do
        RETURN
     end if
     ! Save outputs for each satellite
@@ -375,6 +395,31 @@ contains
        ! if this is the test for the triangulation, just exit
        if(DoTestTri) EXIT TRI_SATELLITE
     end do TRI_SATELLITE ! iSat
+  contains
+    !==========================================================================
+    subroutine get_date_time_string(Time, StringTime)
+
+      use ModTimeConvert, ONLY: time_real_to_int
+      ! the subroutine converts real variable Time into a string,
+      ! the structure of the string is 'ddhhmmss',
+      ! i.e shows number of days, hours, minutes and seconds
+      ! after the beginning of the simulation
+      real,              intent(in) :: Time
+      character(len=23), intent(out):: StringTime
+      integer :: iTime_I(7)
+      !------------------------------------------------------------------------
+      call time_real_to_int(StartTime+Time, iTime_I)
+      write(StringTime,'(i4.4,a,i2.2,a,i2.2,a,i2.2,a,i2.2,a,i2.2,a,i3.3)')&
+           iTime_I(1),' ',& ! Year
+           iTime_I(2),' ',& ! Month
+           iTime_I(3),' ',& ! Day
+           iTime_I(4),' ',& ! Hour
+           iTime_I(5),' ',& ! Minute
+           iTime_I(6),' ',& ! Second
+           iTime_I(7)       ! Millisecond
+
+    end subroutine get_date_time_string
+    !==========================================================================
   end subroutine write_satellite_file
   !============================================================================
 end module SP_ModSatellite
