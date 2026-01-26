@@ -25,7 +25,7 @@ module SP_ModSatellite
 
   ! ----- For saving the distribution function along SATELLITES -----
   integer, public    :: nSat   = 0    ! number of satellites for DistrTraj_
-  integer, parameter :: MaxSat = 300  ! Max number of satellites
+  integer, parameter :: MaxSat = 10   ! Max number of satellites
 
   ! Names and unit numbers for satellite files
   character(len=50), public:: NameFileSat_I(MaxSat)
@@ -351,11 +351,11 @@ contains
           call set_satellite_positions(iSat)
           if(.not.(DoTrackSatellite_I(iSat)))CYCLE
           NameFile = trim(NamePlotDir)//trim(NameSat_I(iSat))//'_sat.out'
-          write(*,*)'NameFile='//NameFile
           call open_file(file=NameFile, status='replace', NameCaller=NameSub)
-          String = 'Data along the '//trim(NameSat_I(iSat))//' trajectory'
+          String = 'Data along the '//trim(NameSat_I(iSat))//' trajectory:'//&
+               '[# # # # # s ms # # deg deg]'
           write(UnitTmp_,'(a)')trim(String)
-          String = 'yyyy mm dd HH MM ss ms'
+          String = 'yyyy mm dd HH MM ss ms lon lat'
           write(UnitTmp_,'(a)')trim(String)
           call close_file
        end do
@@ -392,7 +392,16 @@ contains
        end if
        IsTriangleFoundSat_I(iSat) = .true.
        call MPI_BCAST(WeightSat_II(:, iSat), 3, MPI_REAL, 0, iComm, iError)
-       ! if this is the test for the triangulation, just exit
+       if(iProc==0)then
+          NameFile = trim(NamePlotDir)//trim(NameSat_I(iSat))//'_sat.out'
+          call open_file(file=NameFile, position='append', status='unknown', &
+               NameCaller=NameSub)
+          String=''
+          call get_date_time_string(SPTime, String)
+          call get_lon_lat(iSat, String(len_trim(String)+1:))
+          write(UnitTmp_,'(a)') trim(String)
+          call close_file
+       end if
        if(DoTestTri) EXIT TRI_SATELLITE
     end do TRI_SATELLITE ! iSat
   contains
@@ -405,20 +414,35 @@ contains
       ! i.e shows number of days, hours, minutes and seconds
       ! after the beginning of the simulation
       real,              intent(in) :: Time
-      character(len=23), intent(out):: StringTime
+      character(len=24), intent(out):: StringTime
       integer :: iTime_I(7)
       !------------------------------------------------------------------------
       call time_real_to_int(StartTime+Time, iTime_I)
-      write(StringTime,'(i4.4,a,i2.2,a,i2.2,a,i2.2,a,i2.2,a,i2.2,a,i3.3)')&
+      write(StringTime,'(i4.4,a,i2.2,a,i2.2,a,i2.2,a,i2.2,a,i2.2,a,i3.3,a)')&
            iTime_I(1),' ',& ! Year
            iTime_I(2),' ',& ! Month
            iTime_I(3),' ',& ! Day
            iTime_I(4),' ',& ! Hour
            iTime_I(5),' ',& ! Minute
            iTime_I(6),' ',& ! Second
-           iTime_I(7)       ! Millisecond
+           iTime_I(7),' '   ! Millisecond
 
     end subroutine get_date_time_string
+    !==========================================================================
+    subroutine get_lon_lat(iSat, StringLonLat)
+
+      use SP_ModGrid, ONLY: ilineall_to_lon_lat
+      integer, intent(in) :: iSat
+      character(len=9), intent(out):: StringLonLat
+
+      integer :: iLon, iLat, iLineAll, iLoc
+      !------------------------------------------------------------------------
+
+      iLoc = maxloc(WeightSat_II(:, iSat), DIM=1)
+      iLineAll = iStencilSat_II(iLoc, iSat)
+      call ilineall_to_lon_lat(iLineAll, iLon, iLat)
+      write(StringLonLat,'(a,i3.3,a,i3.3,a)')' ', iLon, ' ', iLat, ' '
+    end subroutine get_lon_lat
     !==========================================================================
   end subroutine write_satellite_file
   !============================================================================
