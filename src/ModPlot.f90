@@ -725,7 +725,7 @@ contains
   !============================================================================
   subroutine init
 
-    use SP_ModGrid, ONLY : nLon, nLat
+    use SP_ModGrid, ONLY: nLon, nLat
     ! initialize the file matrix
     ! storage for existing tags (possible during restart
     character(len=50),allocatable:: StringTag_I(:)
@@ -861,6 +861,7 @@ contains
     use ModMpi
     use SP_ModChannel, ONLY: get_integral_flux
     use SP_ModDistribution, ONLY: Mu_C
+    use SP_ModSatellite, ONLY: nSat, write_satellite_file
     use SP_ModGrid, ONLY: Used_B
     use SP_ModProc, ONLY: iComm, nProc, iError
     use SP_ModTime, ONLY: IsSteadyState
@@ -883,6 +884,7 @@ contains
     if(nFileOut == 0)RETURN
     ! check whether this is a call for initial output
     if(IsInitialOutput)then
+       if(nSat > 0) call write_satellite_file(.true.)
        if(.not.DoSaveInitial)RETURN
     else
        call get_integral_flux
@@ -902,7 +904,7 @@ contains
           RETURN
        end if
     end if
-
+    if(nSat > 0) call write_satellite_file(.false.)
     ! Save outputs into each file (according to StringPlot)
     do iFile = 1, nFileOut
        iKindData = File_I(iFile) % iKindData
@@ -1996,12 +1998,8 @@ contains
       ! separate file is created for each satellite, and the name format is:
       ! Distribution_<Satellite>_<cdf/def/DEF>_e<ddhhmmss>_n<iIter>.{out/dat}
 
-      use SP_ModSatellite, ONLY: nSat, NameFileSat_I, NameSat_I, &
-           XyzSat_DI, set_satellite_positions, DoTrackSatellite_I, &
-           IsTriangleFoundSat_I, iStencilOrigSat_II, WeightSat_II, &
-           DoTestTri, XyzLocTestTri_I
-      use SP_ModTriangulate, ONLY:  &
-           intersect_surf, build_trmesh, interpolate_trmesh
+      use SP_ModSatellite, ONLY: nSat, NameSat_I, Distribution_III, &
+           DoTrackSatellite_I, DoTestTri
 
       ! name of the output file
       character(len=100) :: NameFile
@@ -2046,39 +2044,13 @@ contains
          if(DoTestTri) StringHeader = &
               "Test Triangulation in "//trim(StringHeader)
 
-         ! set the file name
-
-         ! set and get the satellite location
-         call set_satellite_positions(iSat)
-         ! if this is a test for the triangulation: NOT real SatelliteTraj
-         if(DoTestTri) XyzSat_DI(:, iSat) = XyzLocTestTri_I
-
          ! If we can track the satellite: we do triangulation and interpolation
          ! Otherwise the outputs will be 0.0 but the simulations will not stop
          if(.not.(DoTrackSatellite_I(iSat) .or. DoTestTri))CYCLE TRI_SATELLITE
 
-         ! Intersect multiple field lines with the sphere
-         call intersect_surf(norm2(XyzSat_DI(:, iSat)))
          if(iProc==0)then
-            call build_trmesh()
-            ! Interpolate the values to the specific point(s)
-            call interpolate_trmesh(XyzSat_DI(:, iSat),       &
-                 Log10DistrInterp_II = &
-                 File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1), &
-                 iStencilOut_I=iStencilOrigSat_II(:, iSat),   &
-                 WeightOut_I=WeightSat_II(:, iSat))
-         end if
-         ! Save IsTriangleFound, iStencil and Weights
-         call MPI_BCAST(iStencilOrigSat_II(:, iSat),          &
-              3, MPI_INTEGER, 0, iComm, iError)
-         ! If triangulation fails, iStencil is not assigned
-         if(all(iStencilOrigSat_II(:, iSat)==-1))then
-            if(DoTestTri) EXIT TRI_SATELLITE
-            CYCLE TRI_SATELLITE
-         end if
-         IsTriangleFoundSat_I(iSat) = .true.
-         call MPI_BCAST(WeightSat_II(:, iSat), 3, MPI_REAL, 0, iComm, iError)
-         if(iProc==0) then
+            File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) = &
+                 Distribution_III(:, :, iSat)
             call make_file_name( &
                  StringBase    = TypeDistr // trim(NameSat_I(iSat)), &
                  Time = SPTime,                                      &
@@ -2647,7 +2619,7 @@ contains
     !==========================================================================
     logical function do_skip(iLine, iRange_I)
 
-      use SP_ModGrid, ONLY : iblock_to_lon_lat
+      use SP_ModGrid, ONLY: iblock_to_lon_lat
       integer, intent(in) :: iLine, iRange_I(iLonMin_:iLatMax_)
       integer :: iLon, iLat
       !------------------------------------------------------------------------
@@ -2753,9 +2725,9 @@ contains
     ! write format
     character(len=100) :: StringFmt
     ! lon, lat indexes corresponding to iLineAll
-    integer:: iLon, iLat 
-    !--------------------------------------------------------------------------
+    integer:: iLon, iLat
 
+    !--------------------------------------------------------------------------
     write(NameOut,'(a)') trim(NamePlotDir)//trim(StringBase)
 
     if(present(Radius)) write(NameOut,'(a,i4.4,f0.2)') &

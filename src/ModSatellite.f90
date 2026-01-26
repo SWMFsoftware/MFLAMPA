@@ -5,6 +5,7 @@ module SP_ModSatellite
 
   use ModUtilities, ONLY: open_file, close_file, CON_stop
   use SP_ModProc, ONLY: iProc, iComm, iError
+  use ModMpi
   use SP_ModSize, ONLY: nDim
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
   use SP_ModGrid, ONLY: TypeCoordSystem
@@ -19,6 +20,7 @@ module SP_ModSatellite
   public:: init                       ! Initialize for satellite triangulation
   public:: read_satellite_input_files ! read satellite trajectories
   public:: set_satellite_positions    ! set satellite positions
+  public:: write_satellite_file
 
   ! ----- For saving the distribution function along SATELLITES -----
   integer, public    :: nSat   = 0    ! number of satellites for DistrTraj_
@@ -47,8 +49,9 @@ module SP_ModSatellite
 
   ! Variables for interpolation in a triangular mesh
   logical, public, allocatable :: IsTriangleFoundSat_I(:) ! if we find tri.
-  integer, public, allocatable :: iStencilOrigSat_II(:,:) ! orig. sat stencils
+  integer, public, allocatable :: iStencilSat_II(:,:) ! orig. sat stencils
   real,    public, allocatable :: WeightSat_II(:,:) ! weights for interpolation
+  real,    public, allocatable :: Distribution_III(:,:,:)
   ! Test triangulation
   logical, public :: DoTestTri = .false.
   real,    public :: XyzLocTestTri_I(nDim)
@@ -104,19 +107,21 @@ contains
     ! Initialize arrays for satellite triangulation
 
     use SP_ModSize, ONLY: nDim
+    use SP_ModGrid, ONLY: nP, nMu
     !--------------------------------------------------------------------------
     if(.not.UseSatellite) RETURN
 
     if(allocated(IsTriangleFoundSat_I)) deallocate(IsTriangleFoundSat_I)
     allocate(IsTriangleFoundSat_I(nSat))
     IsTriangleFoundSat_I = .false.
-    if(allocated(iStencilOrigSat_II)) deallocate(iStencilOrigSat_II)
-    allocate(iStencilOrigSat_II(nDim, nSat))
-    iStencilOrigSat_II = 0
+    if(allocated(iStencilSat_II)) deallocate(iStencilSat_II)
+    allocate(iStencilSat_II(nDim, nSat))
+    iStencilSat_II = 0
     if(allocated(WeightSat_II)) deallocate(WeightSat_II)
     allocate(WeightSat_II(nDim, nSat))
     WeightSat_II = 0.0
-
+    if(allocated(Distribution_III))deallocate(Distribution_III)
+    allocate(Distribution_III(0:nP+1,nMu,nSat))
   end subroutine init
   !============================================================================
   subroutine read_satellite_input_files
@@ -125,7 +130,6 @@ contains
     use ModTimeConvert, ONLY: time_int_to_real
     use ModIoUnit, ONLY: UnitTmp_, STDOUT_
     use ModKind, ONLY: Real8_
-    use ModMpi
     use SP_ModTime, ONLY: StartTime
 
     ! One line of input
@@ -320,6 +324,58 @@ contains
 
     call test_stop(NameSub, DoTest)
   end subroutine set_satellite_positions
+  !============================================================================
+  subroutine write_satellite_file(IsFirstCall)
+
+    use SP_ModTriangulate, ONLY:  &
+         intersect_surf, build_trmesh, interpolate_trmesh
+
+    logical, intent(in) :: IsFirstCall
+
+    ! loop variables
+    integer :: iSat
+
+    character(len=*), parameter:: NameSub = 'write_satellite_file'
+    !--------------------------------------------------------------------------
+    if(IsFirstCall)then
+       ! write headers to satellite files
+       RETURN
+    end if
+    ! Save outputs for each satellite
+    TRI_SATELLITE: do iSat = 1, nSat
+       ! set and get the satellite location
+       call set_satellite_positions(iSat)
+       ! if this is a test for the triangulation: NOT real SatelliteTraj
+       if(DoTestTri) XyzSat_DI(:, iSat) = XyzLocTestTri_I
+
+       ! If we can track the satellite: we do triangulation and interpolation
+       ! Otherwise the outputs will be 0.0 but the simulations will not stop
+       if(.not.(DoTrackSatellite_I(iSat) .or. DoTestTri))CYCLE TRI_SATELLITE
+
+       ! Intersect multiple field lines with the sphere
+       call intersect_surf(norm2(XyzSat_DI(:, iSat)))
+       if(iProc==0)then
+          call build_trmesh()
+          ! Interpolate the values to the specific point(s)
+          call interpolate_trmesh(XyzSat_DI(:, iSat),       &
+               Log10DistrInterp_II = Distribution_III(:,:,iSat),&
+               iStencilOut_I=iStencilSat_II(:, iSat),   &
+               WeightOut_I=WeightSat_II(:, iSat))
+       end if
+       ! Save IsTriangleFound, iStencil and Weights
+       call MPI_BCAST(iStencilSat_II(:, iSat),          &
+            3, MPI_INTEGER, 0, iComm, iError)
+       ! If triangulation fails, iStencil is not assigned
+       if(all(iStencilSat_II(:, iSat)==-1))then
+          if(DoTestTri) EXIT TRI_SATELLITE
+          CYCLE TRI_SATELLITE
+       end if
+       IsTriangleFoundSat_I(iSat) = .true.
+       call MPI_BCAST(WeightSat_II(:, iSat), 3, MPI_REAL, 0, iComm, iError)
+       ! if this is the test for the triangulation, just exit
+       if(DoTestTri) EXIT TRI_SATELLITE
+    end do TRI_SATELLITE ! iSat
+  end subroutine write_satellite_file
   !============================================================================
 end module SP_ModSatellite
 !==============================================================================
