@@ -530,7 +530,7 @@ contains
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
              call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
-                  iRIn = iRPerp, Log10DistrInterp_II=                         &
+                  iRIn = iRPerp, DistrInterp_II=                         &
                   DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
           end do
        end do
@@ -545,7 +545,6 @@ contains
             (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
       end do
     end if
-    DistrRPerp_5D = exp(DistrRPerp_5D*log(10.0)) ! log10(VDF) => VDF
     ! Check the error message from after interpolate_trmesh
     if(iError /= 0) then
        write(*,*) 'iProc = ', iProc, &
