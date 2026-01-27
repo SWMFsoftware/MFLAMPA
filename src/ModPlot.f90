@@ -2050,7 +2050,7 @@ contains
 
          if(iProc==0)then
             File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1) = &
-                 Distribution_III(:, :, iSat)
+                 log10(Distribution_III(:, :, iSat))
             call make_file_name( &
                  StringBase    = TypeDistr // trim(NameSat_I(iSat)), &
                  Time = SPTime,                                      &

@@ -44,7 +44,7 @@ module SP_ModTriangulate
   ! points or absence of bad lines not reaching the boundary.
   integer, allocatable :: iLineReach_II(:,:)
   ! Distribution function interpolated to the points at the spherical surface
-  real,  allocatable    :: Log10DistrR_IIBI(:,:,:,:)
+  real,  allocatable    :: DistrR_IIBI(:,:,:,:)
   ! The result of triangulation
   integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
 contains
@@ -93,7 +93,7 @@ contains
     ! shaped as subroutine init
     if(.not.allocated(Xyz_DII))then
        allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, 1))
-       allocate(Log10DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2,1))
+       allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2,1))
        allocate(iLineReach_II(1:nLineAll+2 , 1))
        allocate(nTriMesh_I(1))
        allocate(iList_I(6*nLineAll))
@@ -107,9 +107,9 @@ contains
     !    integer, intent(in) :: iRfirst, iRlast ! First and last # of surfaces
     !                                           ! assigned to a given Proc
     !    !---------------------------------------------------------------------
-    !    deallocate(Xyz_DII, iLineReach_II, Log10DistrR_II, nTriMesh_I)
+    !    deallocate(Xyz_DII, iLineReach_II, DistrR_II, nTriMesh_I)
     !    allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, nR))
-    !    allocate(Log10DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2,nR))
+    !    allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2,nR))
     !    allocate((iLineReach_II(1:nLineAll+2 , iRfirst:iRlast))
     !    allocate(nTriMesh_I(iRfirst:iRlast))
     ! end subroutine reset_array
@@ -124,7 +124,7 @@ contains
        iR = 1
     end if
     Xyz_DII(:,:,iR) = 0.0; iLineReach_II(:,iR) = 0
-    Log10DistrR_IIBI(:,:,:,iR) = 0.0
+    DistrR_IIBI(:,:,:,iR) = 0.0
 
     ! go over all lines on the processor and find the point of
     ! intersection with output sphere if present
@@ -144,9 +144,9 @@ contains
        Xyz_DII(:, iLineAll, iR) = ( &
             MHData_VIB(X_:Z_, iAboveR-1, iLine)*(1-WeightR) +  &
             MHData_VIB(X_:Z_, iAboveR,   iLine)*   WeightR )
-       Log10DistrR_IIBI(:, :, iLineAll, iR) = ( &
-            log10(Distribution_CB(:, :, iAboveR,   iLine))* WeightR + &
-            log10(Distribution_CB(:, :, iAboveR-1, iLine))*(1-WeightR))
+       DistrR_IIBI(:, :, iLineAll, iR) = ( &
+            Distribution_CB(:, :, iAboveR,   iLine)* WeightR + &
+            Distribution_CB(:, :, iAboveR-1, iLine)*(1-WeightR))
     end do LINE !  iLine
 
     ! Gather interpolated coordinates on the source processor and Broadcast
@@ -155,7 +155,7 @@ contains
        ! line intersections are marked with all coordinates set to zero.
        call mpi_reduce_real_array(Xyz_DII(:,:,iR), 3*nLineAll, MPI_SUM, &
             iRoot, iComm, iError)
-       call mpi_reduce_real_array(Log10DistrR_IIBI(:,:,:,iR), &
+       call mpi_reduce_real_array(DistrR_IIBI(:,:,:,iR), &
             (nP+2)*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
     end if
     if(iProc /= iRoot) RETURN
@@ -167,7 +167,7 @@ contains
        ! Store and normalize coordinates to get points on the unit square
        Xyz_DII(:, iReachR,iR) = Xyz_DII(:,iLineAll,iR)/rSurf
        iLineReach_II(iReachR,iR) = iLineAll
-       Log10DistrR_IIBI(:,:,iReachR,iR) = Log10DistrR_IIBI(:,:,iLineAll,iR)
+       DistrR_IIBI(:,:,iReachR,iR) = DistrR_IIBI(:,:,iLineAll,iR)
     end do
     nReachR = iReachR
     ! For poles
@@ -180,8 +180,7 @@ contains
        iLineReach_II(2:nTriMesh_I(iR)-1,iR) = iLineReach_II(1:nReachR,iR)
        iLineReach_II(1,iR)                  = iSouthPoleTri_
        iLineReach_II(nTriMesh_I(iR),iR)     = iNorthPoleTri_
-       Log10DistrR_IIBI(:,:,2:nTriMesh_I(iR)-1,iR) = &
-            Log10DistrR_IIBI(:,:,1:nReachR,iR)
+       DistrR_IIBI(:,:,2:nTriMesh_I(iR)-1,iR) = DistrR_IIBI(:,:,1:nReachR,iR)
     else
        nTriMesh_I(iR)= nReachR
     end if
@@ -221,7 +220,7 @@ contains
                iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
                Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
                nVar       = nP+2,       &
-               State_VI   = Log10DistrR_IIBI(:,iMu,1:nTriMesh_I(iR),iR))
+               State_VI   = DistrR_IIBI(:,iMu,1:nTriMesh_I(iR),iR))
           ! South:
           call fix_state( &
                iNodeToFix = 1,                                 &
@@ -231,13 +230,13 @@ contains
                iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
                Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
                nVar       = nP+2,                              &
-               State_VI   = Log10DistrR_IIBI(:, iMu, 1:nTriMesh_I(iR),iR))
+               State_VI   = DistrR_IIBI(:, iMu, 1:nTriMesh_I(iR),iR))
        end do
     end if
   end subroutine build_trmesh
   !============================================================================
   subroutine interpolate_trmesh(XyzInterp_D,  iRIn, &
-        Log10DistrInterp_II, iStencilOut_I, WeightOut_I)
+        DistrInterp_II, iStencilOut_I, WeightOut_I)
 
     use ModTriangulateSpherical, ONLY: find_triangle_orig, find_triangle_sph
     ! Input: Xyz coordinates of the point for interpolations
@@ -245,7 +244,7 @@ contains
     integer, optional, intent(in) :: iRIn
     ! Inputs: Arrays to construct a triangular mesh on a sphere
     ! Output: Interpolated values at XyzInterp_D
-    real, optional, intent(out):: Log10DistrInterp_II(0:nP+1, 1:nMu)
+    real, optional, intent(out):: DistrInterp_II(0:nP+1, 1:nMu)
     ! variables for interpolation in a triangular mesh
     integer, optional, intent(out) :: iStencilOut_I(3)
     real,    optional, intent(out) :: WeightOut_I(3)
@@ -265,7 +264,7 @@ contains
     end if
     if(present(iStencilOut_I)) iStencilOut_I = -1
     if(present(WeightOut_I)) WeightOut_I = 0.0
-    if(present(Log10DistrInterp_II)) Log10DistrInterp_II = 0.0
+    if(present(DistrInterp_II)) DistrInterp_II = 0.0
 
     ! Find the triangle where the satellite locates
     if(UsePlanarTri) then
@@ -294,11 +293,12 @@ contains
             'triangulated sphere, at the location =', XyzInterp_D
        RETURN
     end if
-    if(present(Log10DistrInterp_II))then
+    Weight_I = max(Weight_I, 0.0)
+    if(present(DistrInterp_II))then
        ! Interpolate the log10(distribution) at satellite as outputs
        do i = 1, 3
-          Log10DistrInterp_II = Log10DistrInterp_II +    &
-               Log10DistrR_IIBI(:,:,iStencil_I(i),iR)*Weight_I(i)
+          DistrInterp_II = DistrInterp_II +    &
+               DistrR_IIBI(:,:,iStencil_I(i),iR)*Weight_I(i)
        end do
     end if
     if(present(iStencilOut_I))then

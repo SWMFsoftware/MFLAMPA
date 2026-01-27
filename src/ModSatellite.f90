@@ -7,6 +7,7 @@ module SP_ModSatellite
   use SP_ModProc, ONLY: iProc, iComm, iError
   use ModMpi
   use SP_ModSize, ONLY: nDim
+  use SP_ModGrid, ONLY: nP, nMu
   use SP_ModTestFunc, ONLY: lVerbose, test_start, test_stop
   use SP_ModGrid, ONLY: TypeCoordSystem
   use SP_ModTime, ONLY: SPTime, StartTime
@@ -109,8 +110,6 @@ contains
   subroutine init
     ! Initialize arrays for satellite triangulation
 
-    use SP_ModSize, ONLY: nDim
-    use SP_ModGrid, ONLY: nP, nMu
     !--------------------------------------------------------------------------
     if(.not.UseSatellite) RETURN
 
@@ -332,6 +331,8 @@ contains
 
     use SP_ModTriangulate, ONLY:  &
          intersect_surf, build_trmesh, interpolate_trmesh
+    use SP_ModChannel, ONLY: FluxChannelInit_V, Flux0_, FluxMax_, &
+         NameFluxChannel_I, distr_to_flux
     use ModIoUnit, ONLY: UnitTmp_
 
     logical, intent(in) :: IsFirstCall
@@ -378,7 +379,7 @@ contains
           call build_trmesh()
           ! Interpolate the values to the specific point(s)
           call interpolate_trmesh(XyzSat_DI(:, iSat),       &
-               Log10DistrInterp_II = Distribution_III(:,:,iSat),&
+               DistrInterp_II = Distribution_III(:,:,iSat),&
                iStencilOut_I=iStencilSat_II(:, iSat),   &
                WeightOut_I=WeightSat_II(:, iSat))
        end if
@@ -399,6 +400,7 @@ contains
           String=''
           call get_date_time_string(SPTime, String)
           call get_lon_lat(iSat, String(len_trim(String)+1:))
+          call get_flux(iSat, String(len_trim(String)+1:))
           write(UnitTmp_,'(a)') trim(String)
           call close_file
        end if
@@ -443,6 +445,20 @@ contains
       call ilineall_to_lon_lat(iLineAll, iLon, iLat)
       write(StringLonLat,'(a,i3.3,a,i3.3,a)')' ', iLon, ' ', iLat, ' '
     end subroutine get_lon_lat
+    !==========================================================================
+    subroutine get_flux(iSat, StringFlux)
+
+      integer, intent(in) :: iSat
+      character(len=250), intent(out) :: StringFlux
+      real :: Flux_V(Flux0_:FluxMax_)
+      integer :: i
+      !------------------------------------------------------------------------
+
+      call distr_to_flux(Distribution_III(1:nP, :, iSat),&
+           Flux_V)
+      write(StringFlux,'(a,20(es12.4,1X))')' ', &
+           (Flux_V(i), i=Flux0_,FluxMax_)
+    end subroutine get_flux
     !==========================================================================
   end subroutine write_satellite_file
   !============================================================================
