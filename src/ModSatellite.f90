@@ -52,13 +52,12 @@ module SP_ModSatellite
   ! by #NOUTPUT in SP_ModPlot so we do not read StartTime/EndTime/DtTraj.
 
   ! Variables for interpolation in a triangular mesh
-  logical, public, allocatable :: IsTriangleFoundSat_I(:) ! if we find tri.
-  integer, public, allocatable :: iStencilSat_II(:,:) ! orig. sat stencils
-  real,    public, allocatable :: WeightSat_II(:,:) ! weights for interpolation
+  integer  :: iStencil_I(3)
+  real     :: Weight_I(3) ! weights for interpolation
   real,    public, allocatable :: Distribution_III(:,:,:)
   ! Test triangulation
   logical, public :: DoTestTri = .false.
-  real,    public :: XyzLocTestTri_I(nDim)
+  real :: XyzLocTestTri_I(nDim)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -113,15 +112,6 @@ contains
     !--------------------------------------------------------------------------
     if(.not.UseSatellite) RETURN
 
-    if(allocated(IsTriangleFoundSat_I)) deallocate(IsTriangleFoundSat_I)
-    allocate(IsTriangleFoundSat_I(nSat))
-    IsTriangleFoundSat_I = .false.
-    if(allocated(iStencilSat_II)) deallocate(iStencilSat_II)
-    allocate(iStencilSat_II(nDim, nSat))
-    iStencilSat_II = 0
-    if(allocated(WeightSat_II)) deallocate(WeightSat_II)
-    allocate(WeightSat_II(nDim, nSat))
-    WeightSat_II = 0.0
     if(allocated(Distribution_III))deallocate(Distribution_III)
     allocate(Distribution_III(0:nP+1,nMu,nSat))
   end subroutine init
@@ -332,8 +322,9 @@ contains
     use SP_ModTriangulate, ONLY:  &
          intersect_surf, build_trmesh, interpolate_trmesh
     use SP_ModChannel, ONLY: FluxChannelInit_V, Flux0_, FluxMax_, &
-         NameFluxChannel_I, distr_to_flux
+         NameFluxChannel_I, distr_to_flux, NameFluxUnit_I
     use ModIoUnit, ONLY: UnitTmp_
+    use ModUtilities, ONLY: cTab
 
     logical, intent(in) :: IsFirstCall
 
@@ -341,24 +332,60 @@ contains
     character(len=100) :: NameFile
     character(len=400) :: String
     ! loop variables
-    integer :: iSat
+    integer :: iSat, iLon, iLat, iFlux
 
     character(len=*), parameter:: NameSub = 'write_satellite_file'
     !--------------------------------------------------------------------------
     if(IsFirstCall)then
        ! write headers to satellite files
-       if(iProc/=0)RETURN
        do iSat = 1, nSat
           call set_satellite_positions(iSat)
-          if(.not.(DoTrackSatellite_I(iSat)))CYCLE
-          NameFile = trim(NamePlotDir)//trim(NameSat_I(iSat))//'_sat.out'
-          call open_file(file=NameFile, status='replace', NameCaller=NameSub)
-          String = 'Data along the '//trim(NameSat_I(iSat))//' trajectory:'//&
-               '[# # # # # s ms # # deg deg]'
-          write(UnitTmp_,'(a)')trim(String)
-          String = 'yyyy mm dd HH MM ss ms lon lat'
-          write(UnitTmp_,'(a)')trim(String)
-          call close_file
+          ! if this is a test for the triangulation: NOT real SatelliteTraj
+          if(DoTestTri) XyzSat_DI(:, iSat) = XyzLocTestTri_I
+          ! If we can track the satellite: we do triangulation and interpolation
+          ! Otherwise the outputs will be 0.0 but the simulations will not stop
+          if(.not.(DoTrackSatellite_I(iSat) .or. DoTestTri))CYCLE
+          ! Intersect multiple field lines with the sphere
+          call intersect_surf(norm2(XyzSat_DI(:, iSat)))
+          if(iProc==0)then
+             call build_trmesh()
+             ! Interpolate the values to the specific point(s)
+             call interpolate_trmesh(XyzSat_DI(:, iSat),   &
+                  iStencilOut_I=iStencil_I,   &
+                  WeightOut_I=Weight_I)
+             if(all(iStencil_I==-1))then
+                if(DoTestTri) EXIT
+                CYCLE
+             end if
+             NameFile = trim(NamePlotDir)//'satflux_'//&
+                  trim(NameSat_I(iSat))//'.out'
+             call open_file(file=NameFile, status='replace', &
+                  NameCaller=NameSub)
+             String = 'Data along the '//trim(NameSat_I(iSat))//&
+                  ' trajectory:'//'[# # # # # s ms'
+             do iFlux = Flux0_, FluxMax_
+                String = trim(String)//' '//trim(NameFluxUnit_I(iFlux))
+             end do
+             write(UnitTmp_,'(a)')trim(String)//']'
+             String = 'yyyy mm dd HH MM ss ms '
+             do iFlux = Flux0_, FluxMax_
+                String = trim(String)//' '//trim(NameFluxChannel_I(iFlux))
+             end do
+             write(UnitTmp_,'(a)')trim(String)
+             call close_file
+             String = ''
+             call get_lon_lat(iSat, String)
+             read(String,*)iLon, iLat
+             NameFile = trim(NamePlotDir)//'LONLAT.'//&
+                  trim(NameSat_I(iSat))
+             call open_file(file=NameFile, status='replace', &
+                  NameCaller=NameSub)
+             write(UnitTmp_,'(i3,a)') iLon, cTab//cTab//cTab//'iLon'
+             write(UnitTmp_,'(i3,a)') iLat, cTab//cTab//cTab//'iLat'
+             write(UnitTmp_,'(a)') '#END'
+             call close_file
+          end if
+          if(DoTestTri) EXIT
        end do
        RETURN
     end if
@@ -380,26 +407,24 @@ contains
           ! Interpolate the values to the specific point(s)
           call interpolate_trmesh(XyzSat_DI(:, iSat),       &
                DistrInterp_II = Distribution_III(:,:,iSat),&
-               iStencilOut_I=iStencilSat_II(:, iSat),   &
-               WeightOut_I=WeightSat_II(:, iSat))
+               iStencilOut_I=iStencil_I,   &
+               WeightOut_I=Weight_I)
        end if
        ! Save IsTriangleFound, iStencil and Weights
-       call MPI_BCAST(iStencilSat_II(:, iSat),          &
-            3, MPI_INTEGER, 0, iComm, iError)
+       call MPI_BCAST(iStencil_I,  3, MPI_INTEGER, 0, iComm, iError)
        ! If triangulation fails, iStencil is not assigned
-       if(all(iStencilSat_II(:, iSat)==-1))then
-          if(DoTestTri) EXIT TRI_SATELLITE
-          CYCLE TRI_SATELLITE
+       if(all(iStencil_I==-1))then
+          if(DoTestTri) EXIT
+          CYCLE
        end if
-       IsTriangleFoundSat_I(iSat) = .true.
-       call MPI_BCAST(WeightSat_II(:, iSat), 3, MPI_REAL, 0, iComm, iError)
+       call MPI_BCAST(Weight_I, 3, MPI_REAL, 0, iComm, iError)
        if(iProc==0)then
-          NameFile = trim(NamePlotDir)//trim(NameSat_I(iSat))//'_sat.out'
+          NameFile = trim(NamePlotDir)//'satflux_'//&
+                  trim(NameSat_I(iSat))//'.out'
           call open_file(file=NameFile, position='append', status='unknown', &
                NameCaller=NameSub)
           String=''
           call get_date_time_string(SPTime, String)
-          call get_lon_lat(iSat, String(len_trim(String)+1:))
           call get_flux(iSat, String(len_trim(String)+1:))
           write(UnitTmp_,'(a)') trim(String)
           call close_file
@@ -440,8 +465,8 @@ contains
       integer :: iLon, iLat, iLineAll, iLoc
       !------------------------------------------------------------------------
 
-      iLoc = maxloc(WeightSat_II(:, iSat), DIM=1)
-      iLineAll = iStencilSat_II(iLoc, iSat)
+      iLoc = maxloc(Weight_I, DIM=1)
+      iLineAll = iStencil_I(iLoc)
       call ilineall_to_lon_lat(iLineAll, iLon, iLat)
       write(StringLonLat,'(a,i3.3,a,i3.3,a)')' ', iLon, ' ', iLat, ' '
     end subroutine get_lon_lat
