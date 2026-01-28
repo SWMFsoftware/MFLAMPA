@@ -362,12 +362,12 @@ contains
              call open_file(file=NameFile, status='replace', &
                   NameCaller=NameSub)
              String = 'Data along the '//trim(NameSat_I(iSat))//&
-                  ' trajectory:'//'[# # # # # s ms'
+                  ' trajectory:'//'[# # # # # s ms # #'
              do iFlux = Flux0_, FluxMax_
                 String = trim(String)//' '//trim(NameFluxUnit_I(iFlux))
              end do
              write(UnitTmp_,'(a)')trim(String)//']'
-             String = 'yyyy mm dd HH MM ss ms '
+             String = 'yyyy mm dd HH MM ss ms ilon ilat'
              do iFlux = Flux0_, FluxMax_
                 String = trim(String)//' '//trim(NameFluxChannel_I(iFlux))
              end do
@@ -414,6 +414,7 @@ contains
        call MPI_BCAST(iStencil_I,  3, MPI_INTEGER, 0, iComm, iError)
        ! If triangulation fails, iStencil is not assigned
        if(all(iStencil_I==-1))then
+          DoTrackSatellite_I(iSat) = .false.
           if(DoTestTri) EXIT
           CYCLE
        end if
@@ -425,6 +426,7 @@ contains
                NameCaller=NameSub)
           String=''
           call get_date_time_string(SPTime, String)
+          call get_lon_lat(iSat, String(len_trim(String)+1:))
           call get_flux(iSat, String(len_trim(String)+1:))
           write(UnitTmp_,'(a)') trim(String)
           call close_file
