@@ -323,6 +323,8 @@ contains
          intersect_surf, build_trmesh, interpolate_trmesh
     use SP_ModChannel, ONLY: FluxChannelInit_V, Flux0_, FluxMax_, &
          NameFluxChannel_I, distr_to_flux, NameFluxUnit_I
+    use SP_ModGrid, ONLY: nLine, iLineAll0, X_, Z_, FootPoint_VB
+    use ModCoordTransform, ONLY: xyz_to_rlonlat
     use ModIoUnit, ONLY: UnitTmp_
     use ModUtilities, ONLY: cTab
 
@@ -332,7 +334,9 @@ contains
     character(len=100) :: NameFile
     character(len=400) :: String
     ! loop variables
-    integer :: iSat, iLon, iLat, iFlux
+    integer :: iSat, iLon, iLat, iFlux, iStencil, iLineAll
+    ! Footpoint parameters
+    real :: XyzFoot_D(3), Rfoot, LonFoot, LatFoot, LonLatFoot_I(2)
 
     character(len=*), parameter:: NameSub = 'write_satellite_file'
     !--------------------------------------------------------------------------
@@ -366,15 +370,17 @@ contains
              do iFlux = Flux0_, FluxMax_
                 String = trim(String)//' '//trim(NameFluxUnit_I(iFlux))
              end do
+             String =trim(String)//' deg deg'
              write(UnitTmp_,'(a)')trim(String)//']'
              String = 'yyyy mm dd HH MM ss ms ilon ilat'
              do iFlux = Flux0_, FluxMax_
                 String = trim(String)//' '//trim(NameFluxChannel_I(iFlux))
              end do
+             String = trim(String)//' lonfoot latfoot'
              write(UnitTmp_,'(a)')trim(String)
              call close_file
              String = ''
-             call get_lon_lat(iSat, String)
+             call get_lon_lat(String)
              read(String,*)iLon, iLat
              NameFile = trim(NamePlotDir)//'LONLAT.'//&
                   trim(NameSat_I(iSat))
@@ -419,6 +425,17 @@ contains
           CYCLE
        end if
        call MPI_BCAST(Weight_I, 3, MPI_REAL, 0, iComm, iError)
+       ! Calculate magnetic connectivity
+       LonLatFoot_I = 0.0
+       do iStencil = 1,3
+          iLineAll = iStencil_I(iStencil)
+          ! Check if the line is at the given processor
+          if(iLineAll <= iLineAll0 .or. iLineAll > iLineAll0 + nLine) CYCLE
+          XyzFoot_D = FootPoint_VB(X_:Z_, iLineAll-iLineAll0)
+          call xyz_to_rlonlat(XyzFoot_D, Rfoot, LonFoot, LatFoot)
+          LonLatFoot_I = LonLatFoot_I + [LonFoot, LatFoot]*Weight_I(iStencil)
+       end do
+       call MPI_reduce_real_array(LonLatFoot_I, 2, MPI_SUM, 0, iComm, iError)
        if(iProc==0)then
           NameFile = trim(NamePlotDir)//'satflux_'//&
                   trim(NameSat_I(iSat))//'.out'
@@ -426,8 +443,10 @@ contains
                NameCaller=NameSub)
           String=''
           call get_date_time_string(SPTime, String)
-          call get_lon_lat(iSat, String(len_trim(String)+1:))
+          call get_lon_lat(String(len_trim(String)+1:))
           call get_flux(iSat, String(len_trim(String)+1:))
+          call get_mag_connectivity(LonLatFoot_I(1), LonLatFoot_I(2),&
+               String(len_trim(String)+1:))
           write(UnitTmp_,'(a)') trim(String)
           call close_file
        end if
@@ -458,10 +477,9 @@ contains
 
     end subroutine get_date_time_string
     !==========================================================================
-    subroutine get_lon_lat(iSat, StringLonLat)
+    subroutine get_lon_lat(StringLonLat)
 
       use SP_ModGrid, ONLY: ilineall_to_lon_lat
-      integer, intent(in) :: iSat
       character(len=9), intent(out):: StringLonLat
 
       integer :: iLon, iLat, iLineAll, iLoc
@@ -486,6 +504,17 @@ contains
       write(StringFlux,'(a,20(es12.4,1X))')' ', &
            (Flux_V(i), i=Flux0_,FluxMax_)
     end subroutine get_flux
+    !==========================================================================
+    subroutine get_mag_connectivity(LonFoot, LatFoot, StringFoot)
+
+      use ModNumConst, ONLY: cRadToDeg
+      real, intent(in) :: LonFoot, LatFoot
+      character(len=13), intent(out) :: StringFoot
+      !------------------------------------------------------------------------
+
+      write(StringFoot,'(a,2(F5.1,1X))')' ', &
+           LonFoot*cRadToDeg, LatFoot*cRadToDeg
+    end subroutine get_mag_connectivity
     !==========================================================================
   end subroutine write_satellite_file
   !============================================================================
