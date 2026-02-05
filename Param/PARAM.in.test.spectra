@@ -100,7 +100,7 @@ SP/TRAJECTORY/psp.dat		NameTrajectoryFile
 SP/TRAJECTORY/solo.dat		NameTrajectoryFile
 
 #SAVEPLOT
-8			nFileOut
+9			nFileOut
 mh1d single flux ascii		StringPlot
 2    	    	 	iLon
 2			iLat
@@ -129,6 +129,10 @@ distrtime range energy def ascii		StringPlot
 2
 215.0			Radius
 distrtraj energy def ascii		StringPlot
+flux2d ascii	     			StringPlot
+215.0			Radius
+72			nLonFlux2d
+36			nLatFlux2d
 
 #NOUTPUT
 -1			nOutput

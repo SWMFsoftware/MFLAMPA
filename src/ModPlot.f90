@@ -375,11 +375,10 @@ contains
                 File_I(iFile) % StringHeaderAux = &
                      trim(File_I(iFile)%StringHeaderAux)//' deg deg'
              end select
-             File_I(iFile) % NameAuxPlot = &
-                  trim(File_I(iFile) % NameAuxPlot) // &
-                  ' StartTime StartTimeJulian'
-             ! get radius
              call read_var('Radius', File_I(iFile) % Radius)
+             File_I(iFile)%iRange_I = 1
+             call read_var('nLonFlux2d', File_I(iFile)%iRange_I(2))
+             call read_var('nLatFlux2d', File_I(iFile)%iRange_I(4))
           case(FluxTime_)
              ! mark flux to be written
              File_I(iFile) % DoPlotFlux = .true.
@@ -799,13 +798,9 @@ contains
        case(DistrTraj_)
           allocate(File_I(iFile) % Buffer_II(0:nP+1, 1:nMu, 1))
        case(Flux2D_)
-          if(.not.IsReadySpreadGrid) call CON_stop(NameSub//   &
-               ": Angular spread parameters haven't been set;" &
-               //" use #SPREADGRID and #SPREADSOLIDANGLE in PARAM.in")
-          allocate(File_I(iFile) % Spread_II(nSpreadLon, nSpreadLat))
           ! extra space is reserved for sum of spreads
-          allocate(File_I(iFile) % Buffer_II( &
-               File_I(iFile)%nFluxVar * nSpreadLon, nSpreadLat, 1))
+          allocate(File_I(iFile) % Buffer_II(File_I(iFile)%nFluxVar, &
+               File_I(iFile)%iRange_I(2), File_I(iFile)%iRange_I(4)))
        case(FluxTime_)
           if(.not.IsReadySpreadPoint) call CON_stop(NameSub//  &
                ": Angular spread parameters haven't been set;" &
@@ -2110,24 +2105,22 @@ contains
     !==========================================================================
     subroutine write_flux_2d
 
+      use SP_ModTriangulate, ONLY:  &
+           intersect_surf, build_trmesh, interpolate_trmesh
+      use SP_ModChannel, ONLY: distr_to_flux
+      use SP_ModGrid, ONLY: nP, nMu
+      use ModCoordTransform, ONLY: rlonlat_to_xyz
+      use ModNumConst, ONLY: cDegToRad
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
       ! single file is created for all field lines, name format is
       ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
       ! name of the output file
-
+      real :: Distr_II(0:nP+1,nMu), Xyz_D(3), Longitude, Latitude
       character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
       ! loop variables
-      integer:: iLine, iFlux
-      ! index of particle just above the radius
-      integer:: iAbove
-      ! interpolation weight
-      real:: Weight
-      ! for better readability
-      integer:: nFlux
-      ! skip a field line not reaching radius of output sphere
-      logical:: DoPrint
+      integer:: iLon, iLat, iStencil_I(3)
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
@@ -2135,8 +2128,6 @@ contains
 
       character(len=*), parameter:: NameSub = 'write_flux_2d'
       !------------------------------------------------------------------------
-      nFlux = File_I(iFile) % nFluxVar
-
       ! header for the output file
       StringHeader = &
            'MFLAMPA: flux data on a sphere at fixed heliocentric distance;'//&
@@ -2147,52 +2138,32 @@ contains
       call make_file_name( &
            StringBase    = NameFluxData,                      &
            Radius        = File_I(iFile) % Radius,            &
-           iIter         = iIter,                             &
+           Time = SPTime,                                     &
            NameExtension = File_I(iFile) % NameFileExtension, &
            NameOut       = NameFile)
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0.0
-
-      ! go over all lines on the processor and find the point of
-      ! intersection with output sphere if present
-      do iLine = 1, nLine
-         if(.not.Used_B(iLine))CYCLE
-         ! reset, all field lines are printed reaching output sphere
-         DoPrint = .true.
-
-         ! find the particle just above the given radius
-         call search_line(iLine, File_I(iFile)%Radius, iAbove, DoPrint, Weight)
-         DoPrint = DoPrint .and. iAbove /= 1
-
-         ! if no intersection found -> proceed to the next line
-         if(.not.DoPrint) CYCLE
-
-         ! intersection is found -> get data at that location;
-         ! compute spread over grid for current line
-         call get_normalized_spread(iLine, File_I(iFile) % Radius, &
-              File_I(iFile) % Spread_II)
-
-         ! apply spread to excess fluxes above background/initial flux
-         do iFlux = 1, nFlux
-            File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :, 1) = &
-                 File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux,    &
-                 :, 1) + File_I(iFile) % Spread_II(:, :) * (                &
-                 Flux_VIB(Flux0_+iFlux-1, iAbove-1, iLine) * (1-Weight) +   &
-                 Flux_VIB(Flux0_+iFlux-1, iAbove,   iLine) *    Weight  -   &
-                 FluxChannelInit_V(Flux0_+iFlux-1))
+      call intersect_surf(File_I(iFile)%Radius)
+      if(iProc/=0)RETURN
+      call build_trmesh()
+      do iLat = File_I(iFile)%iRange_I(3), File_I(iFile)%iRange_I(4)
+         Latitude = -90.0 + (iLat - 0.50)*180.0/File_I(iFile)%iRange_I(4)
+         do iLon = File_I(iFile)%iRange_I(1), File_I(iFile)%iRange_I(2)
+            Longitude = (iLon - 0.50)*360.0/File_I(iFile)%iRange_I(2)
+            call rlonlat_to_xyz([File_I(iFile)%Radius,     &
+                 Longitude*cDegToRad, Latitude*cDegToRad], Xyz_D)
+            call interpolate_trmesh(Xyz_D, DistrInterp_II = Distr_II, &
+                 iStencilOut_I=iStencil_I)
+            if(all(iStencil_I==-1))then
+               File_I(iFile)%Buffer_II(:, iLon, iLat) = &
+                    FluxChannelInit_V(Flux0_:FluxMax_)
+            else
+               call distr_to_flux(Distr_II(1:nP, :),&
+                    File_I(iFile)%Buffer_II(:, iLon, iLat))
+            end if
          end do
       end do !  iLine
-
-      ! gather interpolated data on the source processor
-      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
-                 nFlux * nSpreadLon * nSpreadLat, MPI_SUM, 0, iComm, iError)
-      ! add background/initial flux back
-      do iFlux = 1, nFlux
-         File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux, :, 1) = &
-              File_I(iFile) % Buffer_II(iFlux:nFlux*nSpreadLon:nFlux,    &
-              :, 1) + FluxChannelInit_V(Flux0_+iFlux-1)
-      end do
 
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
@@ -2207,16 +2178,12 @@ contains
            TypeFileIn    = File_I(iFile) % TypeFile, &
            nDimIn        = 2, &
            TimeIn        = SPTime,  &
-           nStepIn       = iIter,   &
-           ParamIn_I     = Param_I, &
-           Coord1In_I    = SpreadLon_I * cRadToDeg,&
-           Coord2In_I    = SpreadLat_I * cRadToDeg,&
-           NameVarIn     = &
-           trim(File_I(iFile) % NameVarPlot) // ' ' // &
-           trim(File_I(iFile) % NameAuxPlot), &
-           VarIn_VII      =  reshape(&
-           File_I(iFile) % Buffer_II(1:nFlux*nSpreadLon, :, 1),&
-           [nFlux, nSpreadLon, nSpreadLat]))
+           CoordMinIn_D  = [ 180.0/File_I(iFile)%iRange_I(2),&
+           -90.0 + 90.0/File_I(iFile)%iRange_I(4)],&
+           CoordMaxIn_D  = [ 360.0 - 180.0/File_I(iFile)%iRange_I(2),&
+           90.0 - 90.0/File_I(iFile)%iRange_I(4)], &
+           NameVarIn     = trim(File_I(iFile) % NameVarPlot), &
+           VarIn_VII     = File_I(iFile) % Buffer_II)
 
     end subroutine write_flux_2d
     !==========================================================================

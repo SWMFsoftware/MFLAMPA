@@ -288,11 +288,7 @@ contains
             Weight_I(3), IsTriangleFound,     &
             iStencil_I(1), iStencil_I(2), iStencil_I(3))
     end if
-    if(.not.IsTriangleFound) then
-       write(*,*) NameSub, ' WARNING: Interpolation fails on the ', &
-            'triangulated sphere, at the location =', XyzInterp_D
-       RETURN
-    end if
+    if(.not.IsTriangleFound) RETURN
     Weight_I = max(Weight_I, 0.0)
     if(present(DistrInterp_II))then
        ! Interpolate the log10(distribution) at satellite as outputs

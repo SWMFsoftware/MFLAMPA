@@ -321,8 +321,8 @@ contains
 
     use SP_ModTriangulate, ONLY:  &
          intersect_surf, build_trmesh, interpolate_trmesh
-    use SP_ModChannel, ONLY: FluxChannelInit_V, Flux0_, FluxMax_, &
-         NameFluxChannel_I, distr_to_flux, NameFluxUnit_I
+    use SP_ModChannel, ONLY: Flux0_, FluxMax_, distr_to_flux, &
+         NameFluxChannel_I, NameFluxUnit_I
     use SP_ModGrid, ONLY: nLine, iLineAll0, X_, Z_, FootPoint_VB
     use ModCoordTransform, ONLY: xyz_to_rlonlat
     use ModIoUnit, ONLY: UnitTmp_
