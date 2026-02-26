@@ -415,7 +415,7 @@ contains
 
     use ModCoordTransform, ONLY: sph_to_xyz
     integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
-    integer :: iProcChunk, iRPerpRemainder
+    integer :: iProcChunk, iRPerpRemainder, iPE
     character(len=*), parameter:: NameSub = 'setup_multi_uniform_spheres'
     !--------------------------------------------------------------------------
     ! setup the mesh arrays for triangulation used in perpendicular diffusion
@@ -438,19 +438,20 @@ contains
     iProcChunk = nRPerp/nProc             ! Base chunk size
     iRPerpRemainder = mod(nRPerp, nProc)  ! Leftover elements
     ! Loop over processors to compute start and end indices
-    do iProc = 0, nProc-1
-       if(iProc < iRPerpRemainder) then
-          iRPerpStart_I(iProc) = iProc*(iProcChunk+1) + 1
-          iRPerpEnd_I(iProc)   = iRPerpStart_I(iProc) + iProcChunk
+    do iPE = 0, nProc-1
+       if(iPE < iRPerpRemainder) then
+          iRPerpStart_I(iPE) = iPE*(iProcChunk+1) + 1
+          iRPerpEnd_I(iPE)   = iRPerpStart_I(iPE) + iProcChunk
        else
-          iRPerpStart_I(iProc) = iProc*iProcChunk + iRPerpRemainder+1
-          iRPerpEnd_I(iProc)   = iRPerpStart_I(iProc) + iProcChunk-1
+          iRPerpStart_I(iPE) = iPE*iProcChunk + iRPerpRemainder+1
+          iRPerpEnd_I(iPE)   = iRPerpStart_I(iPE) + iProcChunk-1
        endif
     end do
 
     ! R: radial direction
     select case(trim(ScaleRPerp))
     case("Linear", "linear")
+       ! Linear (i.e., Uniform) Grid
        dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
        dRPerpFace_I = dRPerpMesh_I(1) ! Same=Const.
        do iRPerp = 1, nRPerp
@@ -459,9 +460,21 @@ contains
        RPerp_F(nRPerp+1) = RMaxPerp
        RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
     case("Exp", "exp", "Exponential", "exponential")
+       ! Exponential Grid
        dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
        do iRPerp = 1, nRPerp+1
           RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
+       end do
+       RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+       dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
+       dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
+    case("HalfExp", "halfexp", "HalfLinear", "halflinear")
+       ! Half Exponential + Half Linear Grid
+       dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
+       dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
+       do iRPerp = 1, nRPerp+1
+          RPerp_F(iRPerp) = 0.5*RMinPerp * exp(iRPerp*dLogRFacePerp) &
+               + 0.5*(RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1))
        end do
        RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
        dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
@@ -487,7 +500,7 @@ contains
        PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
     end do
 
-    ! (R, Theta, Phi) => (X, Y, Z) + parallelization
+    ! (R, Theta, Phi) => (X, Y, Z) + Parallelization
     do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
