@@ -375,7 +375,7 @@ contains
        end do
     end if
     if(present(iStencilOut_I)) then
-       do i = 1,3
+       do i = 1, 3
           ! Recover iLineAll corresponding to iStencil
           iStencilOut_I(i) = iLineReach_II(iStencil_I(i),iR)
        end do

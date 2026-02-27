@@ -420,6 +420,7 @@ contains
   end subroutine diffuse_distribution_c
   !============================================================================
   subroutine setup_multi_uniform_spheres
+    ! setup the uniform spheres used in perpendicular diffusion 
 
     use ModCoordTransform, ONLY: sph_to_xyz
     integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
@@ -526,56 +527,64 @@ contains
 
   end subroutine setup_multi_uniform_spheres
   !============================================================================
-  subroutine diffuseperp_distribution()
+  subroutine diffuseperp_distribution(IsFirstCall)
+    ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModGrid, ONLY: nLineAll
     use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
          build_trmesh, interpolate_trmesh
 
-    logical :: IsFirstCall = .false.
+    logical, intent(in) :: IsFirstCall
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real :: DistrRPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     real :: Dperp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
-    ! cross-field (perpendicular) diffusion
-    DistrRPerp_5D = 0.0; Dperp_5D = 0.0
+    if(IsFirstCall) then
+       ! In the 1st call of DPerp: we set up the skeleton, coefficient, and VDF
+       DistrRPerp_5D = 0.0; Dperp_5D = 0.0
 
-    ! Step 1: field lines => intersection points on multiple uniform layers
-    ! here, iProc is for field lines, not for sub-slices/layers.
-    ! In fact, this step of getting the intersection points is needed ONLY
-    ! the 1st time, since MHData would be changed every coupling interval.
-    do iPE = 0, nProc-1
-       call reset_intersect_surf(nRPerp)
-       do iRPerp = iRPerpStart_I(iPE), iRPerpEnd_I(iPE)
-          call intersect_surf(RPerp_C(iRPerp), iPE, iRPerp)
-       end do
-    end do
-
-    ! Step 2: Get Dperp at the cell center in the uniform grid (ONLY 1st time)
-    ! Now, iProc is for sub-slices/layers in the `DistrRPerp_5D` array
-    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-       ! intersection points => construct the triangulation skeleton
-       call build_trmesh(iRPerp)
-       do iThetaPerp = 1, nThetaPerp
-          do iPhiPerp = 1, nPhiPerp
-             ! Get DPerp coefficient at the cell center in the uniform grid
-             call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
-                  iRIn = iRPerp, DPerp_II =                                   &
-                  Dperp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+       ! Step 1: field lines => intersection points on multiple uniform layers
+       ! here, iProc is for field lines, not for sub-slices/layers.
+       ! In fact, this step of getting the intersection points is needed ONLY
+       ! the 1st time, since MHData would be changed every coupling interval.
+       do iPE = 0, nProc-1
+          call reset_intersect_surf(nRPerp)
+          do iRPerp = iRPerpStart_I(iPE), iRPerpEnd_I(iPE)
+             call intersect_surf(RPerp_C(iRPerp), iPE, iRPerp)
           end do
        end do
-    end do
-    ! Broadcast Dperp coefficient to all processes
-    if(nProc > 1) then
-       do iPE = 0, nProc-1
-          call MPI_BCAST(Dperp_5D(:,:,:,:,         &
-               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
-               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-               nP*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
+
+       ! Step 2: Get Dperp at the cell center in the uniform grid (ONLY 1st time)
+       ! Now, iProc is for sub-slices/layers in the `DistrRPerp_5D` array
+       do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
+          ! intersection points => construct the triangulation skeleton
+          call build_trmesh(iRPerp)
+          do iThetaPerp = 1, nThetaPerp
+             do iPhiPerp = 1, nPhiPerp
+                ! Get DPerp coefficient at the cell center in the uniform grid
+                call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
+                     iRIn = iRPerp, DPerp_II =                                   &
+                     Dperp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+             end do
+          end do
        end do
+       ! Broadcast Dperp coefficient to all processes
+       if(nProc > 1) then
+          do iPE = 0, nProc-1
+             call MPI_BCAST(Dperp_5D(:,:,:,:,         &
+                  iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+                  (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+                  nP*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
+          end do
+       end if
+       ! Check the error message from after interpolate_trmesh
+       if(iError /= 0) then
+          write(*,*) 'iProc = ', iProc, NameSub//&
+               ': interpolate_trmesh for Dperp_5D failed, Dperp stopped'
+          RETURN
+       end if
     end if
-    IsFirstCall = .true.
 
     ! Step 3: Triangulation skeleton => Interpolate the VDF
     do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
@@ -599,14 +608,14 @@ contains
     end if
     ! Check the error message from after interpolate_trmesh
     if(iError /= 0) then
-       write(*,*) 'iProc = ', iProc, &
-            NameSub//': interpolate_trmesh failed, Dperp stopped'
+       write(*,*) 'iProc = ', iProc, NameSub//&
+            ': interpolate_trmesh for DistrRPerp_5D failed, Dperp stopped'
        RETURN
     end if
 
-    ! Step 4: solve the Dperp distribution Eq in multiple uniform layers
+    ! Step 4: Solve the Dperp distribution Eq in multiple uniform layers
 
-    ! Step 5: interpolate back to the intersection points along field lines
+    ! Step 5: Interpolate back to the intersection points along field lines
 
   end subroutine diffuseperp_distribution
   !============================================================================
