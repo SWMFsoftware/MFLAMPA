@@ -57,7 +57,7 @@ module SP_ModDiffusion
   real, public, dimension(nVertexMax) :: DOuterSi_I, CoefLambdaxx_I ! mfp, mu=1
 
   ! Perpendicular diffusion
-  real,    public :: DPerpRatio = 0.065         ! Simple ratio of Dperp/Dpara
+  real            :: DPerpRatio = 0.065         ! Simple ratio of Dperp/Dpara
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
   integer         :: nRPerp, nThetaPerp, nPhiPerp
   real            :: dThetaPerp, dPhiPerp       ! dTheta and dPhi
@@ -69,7 +69,7 @@ module SP_ModDiffusion
   real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
        RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:)
 
-  ! Local parameters!
+  ! Local parameters for turbulence and Dpara coefficient:
   ! Diffusion as in Li et al. 2003, doi:10.1029/2002JA009666
   logical         :: UseBtotal = .false., UseFixedUps = .false.
   real            :: MeanFreePath0InAu = 1.0
@@ -469,7 +469,7 @@ contains
        dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
        dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
     case("HalfExp", "halfexp", "HalfLinear", "halflinear")
-       ! Half Exponential + Half Linear Grid
+       ! Half Exponential + Half Linear Grid -- From Experience
        dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
        dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
        do iRPerp = 1, nRPerp+1
@@ -518,45 +518,53 @@ contains
   subroutine diffuseperp_distribution()
 
     use SP_ModGrid, ONLY: nLineAll
-    use SP_ModTriangulate, ONLY: intersect_surf, build_trmesh, &
-         interpolate_trmesh
+    use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
+         build_trmesh, interpolate_trmesh
 
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
-    real    :: DistrRPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real, dimension(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp) :: &
+         DistrRPerp_5D, Dperp_5D
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
     ! cross-field (perpendicular) diffusion
-    DistrRPerp_5D = 0.0
+    DistrRPerp_5D = 0.0; Dperp_5D = 0.0
 
     ! step 1: field lines => intersection points on multiple uniform layers
-    ! here, iProc is for field lines, not for sub-slices/layers
+    ! here, iProc is for field lines, not for sub-slices/layers.
+    ! In fact, this step of getting the intersection points is needed ONLY
+    ! every 2 min, since MHData would be changed every coupling interval.
     do iPE = 0, nProc-1
+       if (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE) > 1) &
+            call reset_intersect_surf(iRPerpStart_I(iPE), iRPerpEnd_I(iPE))
        do iRPerp = iRPerpStart_I(iPE), iRPerpEnd_I(iPE)
-          call intersect_surf(RPerp_C(iRPerp), iPE, iRperp)
+          call intersect_surf(RPerp_C(iRPerp), iPE, iRPerp)
        end do
     end do
 
-    ! then, iProc is for sub-slices/layers now
+    ! Now, iProc is for sub-slices/layers in the `DistrRPerp_5D` array
     do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
        ! step 2: intersection points => construct the triangulation skeleton
        call build_trmesh(iRPerp)
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
+             ! Get VDF at the cell center in the uniform grid
              call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
-                  iRIn = iRPerp, DistrInterp_II=                         &
+                  iRIn = iRPerp, DistrInterp_II =                             &
                   DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+             ! Get Dperp at the cell center in the uniform grid (ONLY 1st time)
+
           end do
        end do
     end do
 
     ! Broadcast results to all processes
     if(nProc > 1) then
-      do iPE = 0, nProc-1
-       call MPI_BCAST(DistrRPerp_5D(:,:,:,:,             &
-            iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
-            (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-            (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
-      end do
+       do iPE = 0, nProc-1
+          call MPI_BCAST(DistrRPerp_5D(:,:,:,:,         &
+               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+               (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
+       end do
     end if
     ! Check the error message from after interpolate_trmesh
     if(iError /= 0) then
@@ -565,9 +573,9 @@ contains
        RETURN
     end if
 
-    ! step 4: solve the Dperp distribution Eq in multiple uniform layers
+    ! step 3: solve the Dperp distribution Eq in multiple uniform layers
 
-    ! step 5: interpolate back to the intersection points along field lines
+    ! step 4: interpolate back to the intersection points along field lines
 
   end subroutine diffuseperp_distribution
   !============================================================================

@@ -18,10 +18,11 @@ module SP_ModTriangulate
 
   PRIVATE ! Except
 
-  public:: read_param         ! Read module parameters
-  public:: intersect_surf     ! Intersect on a sphere with a given radius
-  public:: build_trmesh       ! Triangulation on a sphere
-  public:: interpolate_trmesh ! Interpolate at the specified location
+  public:: read_param           ! Read module parameters
+  public:: reset_intersect_surf ! Reset arrays used in intersect_surf
+  public:: intersect_surf       ! Intersect on a sphere with a given radius
+  public:: build_trmesh         ! Triangulation on a sphere
+  public:: interpolate_trmesh   ! Interpolate at the specified location
 
   ! In all names below "Tri" means "Triangulation"
   ! If we use poles in triangulation
@@ -44,7 +45,7 @@ module SP_ModTriangulate
   ! points or absence of bad lines not reaching the boundary.
   integer, allocatable :: iLineReach_II(:,:)
   ! Distribution function interpolated to the points at the spherical surface
-  real,  allocatable    :: DistrR_IIBI(:,:,:,:)
+  real, allocatable    :: DistrR_IIBI(:,:,:,:)
   ! The result of triangulation
   integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
 contains
@@ -66,6 +67,24 @@ contains
     end select
 
   end subroutine read_param
+  !============================================================================
+  subroutine reset_intersect_surf(iRfirst, iRlast)
+    ! Since there can be multiple calls of `intersect_surf`, another
+    ! subroutine should be called from ModDiffusion to reset array bounds:
+    integer, intent(in) :: iRfirst, iRlast ! First and last # of surfaces
+    ! assigned to a given Proc
+    character(len=*), parameter:: NameSub = 'reset_intersect_surf'
+    !---------------------------------------------------------------------
+    deallocate(Xyz_DII, iLineReach_II, DistrR_IIBI, nTriMesh_I)
+    deallocate(iList_I, iPointer_I, iEnd_I)
+    allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, iRfirst:iRlast))
+    allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, iRfirst:iRlast))
+    allocate(iLineReach_II(1:nLineAll+2, iRfirst:iRlast))
+    allocate(nTriMesh_I(iRfirst:iRlast))
+    allocate(iList_I(6*nLineAll))
+    allocate(iPointer_I(6*nLineAll))
+    allocate(iEnd_I(nLineAll+2))
+  end subroutine reset_intersect_surf
   !============================================================================
   subroutine intersect_surf(rSurf, iRootIn, iRIn)
 
@@ -93,26 +112,13 @@ contains
     ! shaped as subroutine init
     if(.not.allocated(Xyz_DII))then
        allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, 1))
-       allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2,1))
-       allocate(iLineReach_II(1:nLineAll+2 , 1))
+       allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, 1))
+       allocate(iLineReach_II(1:nLineAll+2, 1))
        allocate(nTriMesh_I(1))
        allocate(iList_I(6*nLineAll))
        allocate(iPointer_I(6*nLineAll))
        allocate(iEnd_I(nLineAll+2))
     end if
-    ! Another subroutine should be called from ModDiffusion to reset
-    ! the array bounds:
-    ! subroutine reset_array_size(nR, iRfirst, iRlast)
-    !    integer, intent(in) :: nR ! total # of spherical coordinate surfaces
-    !    integer, intent(in) :: iRfirst, iRlast ! First and last # of surfaces
-    !                                           ! assigned to a given Proc
-    !    !---------------------------------------------------------------------
-    !    deallocate(Xyz_DII, iLineReach_II, DistrR_II, nTriMesh_I)
-    !    allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, nR))
-    !    allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2,nR))
-    !    allocate((iLineReach_II(1:nLineAll+2 , iRfirst:iRlast))
-    !    allocate(nTriMesh_I(iRfirst:iRlast))
-    ! end subroutine reset_array
     if(present(iRootIn))then
        iRoot = iRootIn
     else
@@ -133,8 +139,7 @@ contains
        iLineAll = iLineAll0 + iLine
 
        ! Find the particle just above the given radius
-       call search_line(iLine, rSurf, &
-            iAboveR, DoReachR, WeightR)
+       call search_line(iLine, rSurf, iAboveR, DoReachR, WeightR)
        DoReachR = DoReachR .and. iAboveR /= 1
        ! if no intersection found -> proceed to the next line
        if(.not.DoReachR) CYCLE LINE
@@ -169,7 +174,9 @@ contains
        iLineReach_II(iReachR,iR) = iLineAll
        DistrR_IIBI(:,:,iReachR,iR) = DistrR_IIBI(:,:,iLineAll,iR)
     end do
+    if(iReachR == 0) call CON_stop(NameSub//': No valid intersection points!')
     nReachR = iReachR
+
     ! For poles
     if(UsePoleTri) then
        ! Add two grid nodes at the poles:
@@ -219,7 +226,7 @@ contains
                iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
                iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
                Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
-               nVar       = nP+2,       &
+               nVar       = nP+2,                              &
                State_VI   = DistrR_IIBI(:,iMu,1:nTriMesh_I(iR),iR))
           ! South:
           call fix_state( &
@@ -235,8 +242,8 @@ contains
     end if
   end subroutine build_trmesh
   !============================================================================
-  subroutine interpolate_trmesh(XyzInterp_D,  iRIn, &
-        DistrInterp_II, iStencilOut_I, WeightOut_I)
+  subroutine interpolate_trmesh(XyzInterp_D, iRIn, &
+       DistrInterp_II, iStencilOut_I, WeightOut_I)
 
     use ModTriangulateSpherical, ONLY: find_triangle_orig, find_triangle_sph
     ! Input: Xyz coordinates of the point for interpolations
