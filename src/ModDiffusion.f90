@@ -16,9 +16,10 @@ module SP_ModDiffusion
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, GammaLorentz_G, &
        MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
-  use SP_ModGrid, ONLY: nP, nMu, State_VIB, MHData_VIB, &
+  use SP_ModGrid, ONLY: nP, nMu, nLine, State_VIB, MHData_VIB, &
        D_, R_, X_, Z_, Wave1_, Wave2_
   use SP_ModProc, ONLY: nProc, iProc, iComm, iError
+  use SP_ModTriangulate, ONLY: DPerp_CB
   use SP_ModUnit, ONLY: Io2Si_V, UnitX_
   use ModUtilities, ONLY: CON_stop
 
@@ -57,7 +58,8 @@ module SP_ModDiffusion
   real, public, dimension(nVertexMax) :: DOuterSi_I, CoefLambdaxx_I ! mfp, mu=1
 
   ! Perpendicular diffusion
-  real            :: DPerpRatio = 0.065         ! Simple ratio of Dperp/Dpara
+  character(len=15) :: TypeDPerp = 'UseDParaRatio'
+  real            :: DParaRatio = 0.065         ! Simple ratio of Dperp/Dpara
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
   integer         :: nRPerp, nThetaPerp, nPhiPerp
   real            :: dThetaPerp, dPhiPerp       ! dTheta and dPhi
@@ -115,8 +117,14 @@ contains
        call read_var('UseDiffusionPerp', UseDiffusionPerp)
        ! Setup perpendicular diffusion coefficients only when using it
        if(UseDiffusionPerp) then
-          ! Simply assume DPerp/DPara = DPerpRatio
-          call read_var('DPerpRatio', DPerpRatio)
+          call read_var('TypeDPerp', TypeDPerp)
+          select case(trim(TypeDPerp))
+          case('UseDParaRatio')
+             ! Simply assume DPerp/DPara = DParaRatio
+             call read_var('DParaRatio', DParaRatio)
+          case default
+             call CON_stop(NameSub//": Unknown type of DPerp")
+          end select
 
           ! Handle triangulated mesh in radial direction
           call read_var('nRPerp', nRPerp)
@@ -320,7 +328,7 @@ contains
     ! on momentum is D \propto r_L*v \propto Momentum**2/TotalEnergy
     if(UseTurbulentSpectrum) then
        DInnerSi_II(1:nX, 1:nP) = Dxx(nX, BSi_I(1:nX))/ &
-            spread(BSi_I(1:nX), DIM=2, NCOPIES=nP)
+            spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP)
     else
        ! Lower limit to floor the spatial diffusion coefficient For a
        ! given spatial and temporal resolution, the value of the
@@ -430,6 +438,9 @@ contains
     if(allocated(XyzPerp_CB)) deallocate(XyzPerp_CB)
     allocate(XyzPerp_CB(X_:Z_, nPhiPerp, nThetaPerp, nRPerp))
     XyzPerp_CB = 0.0
+    if(allocated(DPerp_CB)) deallocate(DPerp_CB)
+    allocate(DPerp_CB(nP, nMu, nVertexMax, nLine), stat=iError)
+    DPerp_CB = 0.0
 
     ! Determine chunk size, start and end indices for each processor
     if(allocated(iRPerpStart_I)) deallocate(iRPerpStart_I)
@@ -521,43 +532,63 @@ contains
     use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
          build_trmesh, interpolate_trmesh
 
+    logical :: IsFirstCall = .false.
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
-    real, dimension(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp) :: &
-         DistrRPerp_5D, Dperp_5D
+    real :: DistrRPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real :: Dperp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
     ! cross-field (perpendicular) diffusion
     DistrRPerp_5D = 0.0; Dperp_5D = 0.0
 
-    ! step 1: field lines => intersection points on multiple uniform layers
+    ! Step 1: field lines => intersection points on multiple uniform layers
     ! here, iProc is for field lines, not for sub-slices/layers.
     ! In fact, this step of getting the intersection points is needed ONLY
-    ! every 2 min, since MHData would be changed every coupling interval.
+    ! the 1st time, since MHData would be changed every coupling interval.
     do iPE = 0, nProc-1
-       if (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE) > 1) &
-            call reset_intersect_surf(iRPerpStart_I(iPE), iRPerpEnd_I(iPE))
+       call reset_intersect_surf(nRPerp)
        do iRPerp = iRPerpStart_I(iPE), iRPerpEnd_I(iPE)
           call intersect_surf(RPerp_C(iRPerp), iPE, iRPerp)
        end do
     end do
 
+    ! Step 2: Get Dperp at the cell center in the uniform grid (ONLY 1st time)
     ! Now, iProc is for sub-slices/layers in the `DistrRPerp_5D` array
     do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-       ! step 2: intersection points => construct the triangulation skeleton
+       ! intersection points => construct the triangulation skeleton
        call build_trmesh(iRPerp)
+       do iThetaPerp = 1, nThetaPerp
+          do iPhiPerp = 1, nPhiPerp
+             ! Get DPerp coefficient at the cell center in the uniform grid
+             call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
+                  iRIn = iRPerp, DPerp_II =                                   &
+                  Dperp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+          end do
+       end do
+    end do
+    ! Broadcast Dperp coefficient to all processes
+    if(nProc > 1) then
+       do iPE = 0, nProc-1
+          call MPI_BCAST(Dperp_5D(:,:,:,:,         &
+               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+               nP*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
+       end do
+    end if
+    IsFirstCall = .true.
+
+    ! Step 3: Triangulation skeleton => Interpolate the VDF
+    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
              ! Get VDF at the cell center in the uniform grid
              call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
                   iRIn = iRPerp, DistrInterp_II =                             &
                   DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
-             ! Get Dperp at the cell center in the uniform grid (ONLY 1st time)
-
           end do
        end do
     end do
-
-    ! Broadcast results to all processes
+    ! Broadcast VDf results to all processes
     if(nProc > 1) then
        do iPE = 0, nProc-1
           call MPI_BCAST(DistrRPerp_5D(:,:,:,:,         &
@@ -573,9 +604,9 @@ contains
        RETURN
     end if
 
-    ! step 3: solve the Dperp distribution Eq in multiple uniform layers
+    ! Step 4: solve the Dperp distribution Eq in multiple uniform layers
 
-    ! step 4: interpolate back to the intersection points along field lines
+    ! Step 5: interpolate back to the intersection points along field lines
 
   end subroutine diffuseperp_distribution
   !============================================================================
@@ -760,7 +791,12 @@ contains
 
     ! for perpendicular diffusion: it becomes "Dpara - Dperp" here
     if(UseDiffusionPerp) then
-       DInnerSi_II = DInnerSi_II * (1.0-DPerpRatio)
+       DInnerSi_II = DInnerSi_II * (1.0-DParaRatio)
+       ! gather Dperp along multiple field lines on each processor
+       do iP = 1, nP
+          DPerp_CB(iP, nMu, 1:nX, iLine) = DParaRatio* &
+               DInnerSi_II(1:nX, iP)*BSi_I(1:nX)
+       end do
     end if
 
     if(nMu > 1) then
