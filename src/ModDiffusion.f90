@@ -527,7 +527,7 @@ contains
 
   end subroutine setup_multi_uniform_spheres
   !============================================================================
-  subroutine diffuseperp_distribution(IsFirstCall)
+  subroutine diffuseperp_distribution(IsFirstCall, dtIn)
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModGrid, ONLY: nLineAll
@@ -535,14 +535,15 @@ contains
          build_trmesh, interpolate_trmesh
 
     logical, intent(in) :: IsFirstCall
+    real, intent(in)    :: dtIn
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
-    real :: DistrRPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
-    real :: Dperp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real :: DPerp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
     if(IsFirstCall) then
        ! In the 1st call of DPerp: we set up the skeleton, coefficient, and VDF
-       DistrRPerp_5D = 0.0; Dperp_5D = 0.0
+       DistrPerp_5D = 0.0; DPerp_5D = 0.0
 
        ! Step 1: field lines => intersection points on multiple uniform layers
        ! here, iProc is for field lines, not for sub-slices/layers.
@@ -556,7 +557,7 @@ contains
        end do
 
        ! Step 2: Get Dperp at the cell center in the uniform grid (ONLY 1st time)
-       ! Now, iProc is for sub-slices/layers in the `DistrRPerp_5D` array
+       ! Now, iProc is for sub-slices/layers in the `DistrPerp_5D` array
        do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
           ! intersection points => construct the triangulation skeleton
           call build_trmesh(iRPerp)
@@ -565,14 +566,14 @@ contains
                 ! Get DPerp coefficient at the cell center in the uniform grid
                 call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
                      iRIn = iRPerp, DPerp_II =                                   &
-                     Dperp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+                     DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
              end do
           end do
        end do
        ! Broadcast Dperp coefficient to all processes
        if(nProc > 1) then
           do iPE = 0, nProc-1
-             call MPI_BCAST(Dperp_5D(:,:,:,:,         &
+             call MPI_BCAST(DPerp_5D(:,:,:,:,              &
                   iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
                   (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
                   nP*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
@@ -581,7 +582,7 @@ contains
        ! Check the error message from after interpolate_trmesh
        if(iError /= 0) then
           write(*,*) 'iProc = ', iProc, NameSub//&
-               ': interpolate_trmesh for Dperp_5D failed, Dperp stopped'
+               ': interpolate_trmesh for DPerp_5D failed, Dperp stopped'
           RETURN
        end if
     end if
@@ -593,14 +594,14 @@ contains
              ! Get VDF at the cell center in the uniform grid
              call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
                   iRIn = iRPerp, DistrInterp_II =                             &
-                  DistrRPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+                  DistrPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
           end do
        end do
     end do
-    ! Broadcast VDf results to all processes
+    ! Broadcast VDF (uniform grid) to all processes
     if(nProc > 1) then
        do iPE = 0, nProc-1
-          call MPI_BCAST(DistrRPerp_5D(:,:,:,:,         &
+          call MPI_BCAST(DistrPerp_5D(:,:,:,:,          &
                iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
                (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
                (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
@@ -609,15 +610,159 @@ contains
     ! Check the error message from after interpolate_trmesh
     if(iError /= 0) then
        write(*,*) 'iProc = ', iProc, NameSub//&
-            ': interpolate_trmesh for DistrRPerp_5D failed, Dperp stopped'
+            ': interpolate_trmesh for DistrPerp_5D failed, Dperp stopped'
        RETURN
     end if
 
     ! Step 4: Solve the Dperp distribution Eq in multiple uniform layers
+    call solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
+         iRPerpStart_I(iProc), iRPerpEnd_I(iProc), dtIn)
 
     ! Step 5: Interpolate back to the intersection points along field lines
 
   end subroutine diffuseperp_distribution
+  !============================================================================
+  subroutine solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, iRStart, iREnd, dtIn)
+    ! FVM solver for pure 3d diffusion equation: df/dt = div (DPerp grad_f)
+
+    integer, intent(in) :: iRStart, iREnd
+    real,    intent(in) :: dtIn
+    real, intent(in):: DistrPerp_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real, intent(in):: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
+    integer :: nRCount, iProcPrev, iProcNext, iLocal, iGlobal, root
+    integer :: kp, km, nStep
+
+    ! loop variables
+    integer :: i, j, k, iStep
+    ! time step
+    real :: dtMax, dt, dt_tmp
+    ! face areas and cell volumes
+    real :: Volume_CB(nPhiPerp, nThetaPerp, nRPerp)
+    real :: ThetaPerpSin_C(nThetaPerp)
+    real :: AreaR_IIF(nPhiPerp, nThetaPerp, nRPerp+1), &
+         AreaTheta_IFI(nPhiPerp, nThetaPerp+1, nRPerp), &
+         AreaPhi_FII(nPhiPerp+1, nThetaPerp, nRPerp)
+    ! ghost VDF when sendrecv across prev-current-next processors
+    real :: DistrPrevProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp), &
+         DistrNextProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp)
+    ! arrays for FVM internal fluxes (p: plus; m: minus)
+    real, allocatable, dimension(:,:,:,:,:) :: fluxNet_5D, &
+         vdfip_5D, vdfim_5D, vdfjp_5D, vdfjm_5D, vdfkp_5D, vdfkm_5D
+    character(len=100) :: num_str
+    !--------------------------------------------------------------------------
+
+    nRCount = iREnd - iRStart + 1
+    iProcPrev = iProc - 1
+    iProcNext = iProc + 1
+    call init_fvm_diffuse
+
+    ! Precompute: Grid, face area and cell volume
+    call calc_area_volume
+
+    ! Stability check: Determine dtMax = 0.5*min(dx)**2/max(DPerp)
+    dtMax = 0.5*min(minval(dRPerpFace_I)**2, &
+         (RMinPerp*dThetaPerp)**2, &
+         (RMinPerp*minval(ThetaPerpSin_C(2:nThetaPerp-1))*dPhiPerp)**2) &
+         *Io2Si_V(UnitX_)**2 & ! convert to SI unit [m**2]
+         /maxval(DPerp_5D, mask=(DPerp_5D>0))
+    nStep = int(dtIn/dtMax) + 1
+    dt = dtIn/real(nStep)
+    write(*,*) 'dtIn=', dtIn, ';Allowed dtMax=', dtMax, '; use dt=', dt
+
+    ! Time stepping: Diffusion in 3D by FVM
+    DIFFUSE3D:do iStep = 1, nStep
+       ! Exchange ghostVDF: iProcPrev |<=| (Start) iProc (End) |=>| iProcNext
+       call exchange_ghostVDF
+
+    end do DIFFUSE3D
+
+  contains
+    !==========================================================================
+    subroutine init_fvm_diffuse
+      ! Initialize the arrays for internal fluxes in the FVM solver
+      !------------------------------------------------------------------------
+      allocate(fluxNet_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd))
+      allocate(vdfip_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
+           vdfim_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
+           vdfjp_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
+           vdfjm_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
+           vdfkp_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
+           vdfkm_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd))
+
+      fluxNet_5D = 0.0
+      vdfip_5D = 0.0; vdfim_5D = 0.0
+      vdfjp_5D = 0.0; vdfjm_5D = 0.0
+      vdfkp_5D = 0.0; vdfkm_5D = 0.0
+
+    end subroutine init_fvm_diffuse
+    !==========================================================================
+    subroutine calc_area_volume
+      ! Pre-calculate the face areas and cell volumes
+
+      real :: dVolumeR_I(nRPerp), dRPerpFace2_I(nRPerp)  ! radial direction
+      real :: dCosTheta_I(nThetaPerp)                    ! theta direction
+      !------------------------------------------------------------------------
+      ! Grids
+      ! Radial: RPerp_C, RPerp_F, dRPerpMesh_I, dRPerpFace_I, dRPerpFace2_I
+      dRPerpFace2_I = 0.5*(RPerp_F(2:nRPerp+1)**2 - RPerp_F(1:nRPerp)**2)
+      ! Theta: ThetaPerp_C, ThetaPerp_F, dThetaPerp
+      ThetaPerpSin_C = sin(ThetaPerp_C) ! needed also in FVM internal fluxes
+      ! Phi: PhiPerp_C, PhiPerp_F, dPhiPerp -- Ready
+
+      ! Precompute: Face area and cell volume
+      dVolumeR_I = (RPerp_F(2:nRPerp+1)**3 - RPerp_F(1:nRPerp)**3)/3.0
+      dCosTheta_I = cos(ThetaPerp_F(1:nThetaPerp)) - &
+           cos(ThetaPerp_F(2:nThetaPerp+1))
+      do i = 1, nRPerp+1
+         do j = 1, nThetaPerp
+            AreaR_IIF(:,j,i) = RPerp_F(i)**2*dCosTheta_I(j)*dPhiPerp
+         end do
+      end do
+      do i = 1, nRPerp
+         do j = 1, nThetaPerp
+            Volume_CB(:,j,i) = dVolumeR_I(i)*dCosTheta_I(j)*dPhiPerp
+            AreaTheta_IFI(:,j,i) = dRPerpFace2_I(i)* &
+                 sin(ThetaPerp_F(j))*dPhiPerp
+         end do
+         AreaTheta_IFI(:,nThetaPerp+1,i) = dRPerpFace2_I(i)* &
+              sin(ThetaPerp_F(nThetaPerp+1))*dPhiPerp
+         AreaPhi_FII(:,:,i) = dRPerpFace2_I(i)*dThetaPerp
+      end do
+
+    end subroutine calc_area_volume
+    !==========================================================================
+    subroutine exchange_ghostVDF
+      ! Exchange ghostVDF: iProcPrev |<=| (Start) iProc (End) |=>| iProcNext
+      !------------------------------------------------------------------------
+      ! Exchange VDF at ghost cells 1: iProc End |=>| iProcNext Start
+      if (iProcNext < nProc) then
+         call MPI_SENDRECV(DistrPerp_5D(:,:,:,:,iREnd), &
+              (nP+2)*nMu*nPhiPerp*nThetaPerp, &
+              MPI_DOUBLE_PRECISION, iProcNext, 0, &
+              DistrNextProc_G, (nP+2)*nMu*nPhiPerp*nThetaPerp, &
+              MPI_DOUBLE_PRECISION, iProcNext, 1, &
+              MPI_COMM_WORLD, MPI_STATUS_IGNORE, iError)
+      else
+         ! zero-gradient (Neumann BC) at outer boundary
+         DistrNextProc_G = DistrPerp_5D(:,:,:,:,iREnd)
+      end if
+
+      ! Exchange VDF at ghost cells 2: iProcPrev End |<=| iProc Start
+      if (iProcPrev >= 0) then
+         call MPI_SENDRECV(DistrPerp_5D(:,:,:,:,iRStart), &
+              (nP+2)*nMu*nPhiPerp*nThetaPerp, &
+              MPI_DOUBLE_PRECISION, iProcPrev, 1, &
+              DistrPrevProc_G, (nP+2)*nMu*nPhiPerp*nThetaPerp, &
+              MPI_DOUBLE_PRECISION, iProcPrev, 0, &
+              MPI_COMM_WORLD, MPI_STATUS_IGNORE, iError)
+      else
+         ! zero-gradient (Neumann BC) at inner boundary
+         DistrPrevProc_G = DistrPerp_5D(:,:,:,:,iRStart)
+      end if
+
+    end subroutine exchange_ghostVDF
+    !==========================================================================
+  end subroutine solver_fvm_diffuse3d
   !============================================================================
   subroutine scatter_distribution_s(iLine, nX, nSi_I, BSi_I, Dt)
     ! Calculate scattering: \deltaf/\deltat = (Dmumu*f_mu)_mu with global Dt
