@@ -538,6 +538,7 @@ contains
     real, intent(in)    :: dtIn
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real :: source_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     real :: DPerp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
@@ -582,7 +583,7 @@ contains
        ! Check the error message from after interpolate_trmesh
        if(iError /= 0) then
           write(*,*) 'iProc = ', iProc, NameSub//&
-               ': interpolate_trmesh for DPerp_5D failed, Dperp stopped'
+               ': interpolate_trmesh for DPerp_5D failed, DPerp stopped'
           RETURN
        end if
     end if
@@ -610,34 +611,40 @@ contains
     ! Check the error message from after interpolate_trmesh
     if(iError /= 0) then
        write(*,*) 'iProc = ', iProc, NameSub//&
-            ': interpolate_trmesh for DistrPerp_5D failed, Dperp stopped'
+            ': interpolate_trmesh for DistrPerp_5D failed, DPerp stopped'
        RETURN
     end if
 
-    ! Step 4: Solve the Dperp distribution Eq in multiple uniform layers
+    ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
+    source_5D = 0.0
     call solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
+         source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)), &
          iRPerpStart_I(iProc), iRPerpEnd_I(iProc), dtIn)
 
-    ! Step 5: Interpolate back to the intersection points along field lines
+    ! Step 5: Interpolate source back to the intersection points on field lines
 
   end subroutine diffuseperp_distribution
   !============================================================================
-  subroutine solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, iRStart, iREnd, dtIn)
+  subroutine solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
+       source_5D, iRStart, iREnd, dtIn)
     ! FVM solver for pure 3d diffusion equation: df/dt = div (DPerp grad_f)
 
     integer, intent(in) :: iRStart, iREnd
     real,    intent(in) :: dtIn
-    real, intent(in):: DistrPerp_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real, intent(in):: DistrPerp_5D(0:nP+1, nMu, &
+         nPhiPerp, nThetaPerp, iRStart:iREnd)
     real, intent(in):: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
-    integer :: nRCount, iProcPrev, iProcNext, iLocal, iGlobal, root
-    integer :: kp, km, nStep
+    real, intent(out):: source_5D(0:nP+1,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
 
+    ! Proc index used for exchanging ghost VDF
+    integer :: iProcPrev, iProcNext
     ! loop variables
     integer :: i, j, k, iStep
-    ! time step
-    real :: dtMax, dt, dt_tmp
+    ! time step and iterations
+    real :: dtMax, dt
+    integer :: nStep
     ! face areas and cell volumes
-    real :: Volume_CB(nPhiPerp, nThetaPerp, nRPerp)
+    real :: VolumeInv_CB(nPhiPerp, nThetaPerp, nRPerp)
     real :: ThetaPerpSin_C(nThetaPerp)
     real :: AreaR_IIF(nPhiPerp, nThetaPerp, nRPerp+1), &
          AreaTheta_IFI(nPhiPerp, nThetaPerp+1, nRPerp), &
@@ -645,17 +652,10 @@ contains
     ! ghost VDF when sendrecv across prev-current-next processors
     real :: DistrPrevProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp), &
          DistrNextProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp)
-    ! arrays for FVM internal fluxes (p: plus; m: minus)
-    real, allocatable, dimension(:,:,:,:,:) :: fluxNet_5D, &
-         vdfip_5D, vdfim_5D, vdfjp_5D, vdfjm_5D, vdfkp_5D, vdfkm_5D
-    character(len=100) :: num_str
     !--------------------------------------------------------------------------
-
-    nRCount = iREnd - iRStart + 1
     iProcPrev = iProc - 1
     iProcNext = iProc + 1
-    call init_fvm_diffuse
-
+    source_5D = 0.0
     ! Precompute: Grid, face area and cell volume
     call calc_area_volume
 
@@ -667,34 +667,16 @@ contains
          /maxval(DPerp_5D, mask=(DPerp_5D>0))
     nStep = int(dtIn/dtMax) + 1
     dt = dtIn/real(nStep)
-    write(*,*) 'dtIn=', dtIn, ';Allowed dtMax=', dtMax, '; use dt=', dt
+    write(*,*) 'DPerp: dtIn=', dtIn, '; Stable dtMax=', dtMax, '; Use dt=', dt
 
     ! Time stepping: Diffusion in 3D by FVM
     DIFFUSE3D:do iStep = 1, nStep
        ! Exchange ghostVDF: iProcPrev |<=| (Start) iProc (End) |=>| iProcNext
        call exchange_ghostVDF
-
+       ! Compute internal fluxes of the FVM solver = source term of df/dt
+       call calc_fvm_netflux
     end do DIFFUSE3D
-
   contains
-    !==========================================================================
-    subroutine init_fvm_diffuse
-      ! Initialize the arrays for internal fluxes in the FVM solver
-      !------------------------------------------------------------------------
-      allocate(fluxNet_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd))
-      allocate(vdfip_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
-           vdfim_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
-           vdfjp_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
-           vdfjm_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
-           vdfkp_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd), &
-           vdfkm_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, iRStart:iREnd))
-
-      fluxNet_5D = 0.0
-      vdfip_5D = 0.0; vdfim_5D = 0.0
-      vdfjp_5D = 0.0; vdfjm_5D = 0.0
-      vdfkp_5D = 0.0; vdfkm_5D = 0.0
-
-    end subroutine init_fvm_diffuse
     !==========================================================================
     subroutine calc_area_volume
       ! Pre-calculate the face areas and cell volumes
@@ -720,7 +702,7 @@ contains
       end do
       do i = 1, nRPerp
          do j = 1, nThetaPerp
-            Volume_CB(:,j,i) = dVolumeR_I(i)*dCosTheta_I(j)*dPhiPerp
+            VolumeInv_CB(:,j,i) = 1.0/(dVolumeR_I(i)*dCosTheta_I(j)*dPhiPerp)
             AreaTheta_IFI(:,j,i) = dRPerpFace2_I(i)* &
                  sin(ThetaPerp_F(j))*dPhiPerp
          end do
@@ -761,6 +743,125 @@ contains
       end if
 
     end subroutine exchange_ghostVDF
+    !==========================================================================
+    subroutine calc_fvm_netflux
+      ! calculate internal net fluxes in the FVM solver
+
+      integer :: jPlus, jMinus, kPlus, kMinus
+      real, dimension(1:nP, 1:nMu) :: DPerpPlus_II, DPerpMinus_II, source_II
+      real, dimension(0:nP+1, 1:nMu) :: DistrPlus_II, DistrMinus_II
+      !------------------------------------------------------------------------
+      do i = iRStart, iREnd
+         do j = 1, nThetaPerp
+            ! Ready for Theta fluxes
+            jPlus = min(j+1, nThetaPerp) ! j or nThetaPerp
+            jMinus = max(j-1, 1) ! j or 1
+
+            do k = 1, nPhiPerp
+               source_II = 0.0
+               ! Part 1 -- Face_r: Radial fluxes
+               ! VDF at i+1 (ip)
+               if (i < iREnd) then
+                  DistrPlus_II = DistrPerp_5D(:,:,k,j,i+1)
+               else
+                  DistrPlus_II = DistrNextProc_G(:,:,k,j)
+               end if
+               ! VDF at i-1 (im)
+               if (i > iRStart) then
+                  DistrMinus_II = DistrPerp_5D(:,:,k,j,i-1)
+               else
+                  DistrMinus_II = DistrPrevProc_G(:,:,k,j)
+               end if
+               ! DPerp coefficient at face(i, i+1)
+               if (i < nRPerp) then
+                  DPerpPlus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
+                       + Dperp_5D(:,:,k,j,i+1))
+               else
+                  DPerpPlus_II = Dperp_5D(:,:,k,j,i) + &
+                       0.5*(Dperp_5D(:,:,k,j,i) - Dperp_5D(:,:,k,j,i-1))
+               end if
+               ! DPerp coefficient at face(i-1, i)
+               if (i > 1) then
+                  DPerpMinus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
+                       + Dperp_5D(:,:,k,j,i+1))
+               else
+                  DPerpMinus_II = Dperp_5D(:,:,k,j,i) - &
+                       0.5*(Dperp_5D(:,:,k,j,i+1) - Dperp_5D(:,:,k,j,i))
+               end if
+               ! FVM net flux: source += (flux_ip - flux_im)
+               source_II = source_II + &
+                    DPerpPlus_II &        ! + DPerp at face(i, ip)
+                    *(DistrPlus_II(1:nP,:) - DistrPerp_5D(1:nP,:,k,j,i))&
+                    /dRPerpFace_I(i) &    ! * gradF at face(i, ip)
+                    *AreaR_IIF(k,j,i+1)   ! * area of face(i, ip)
+               source_II = source_II - &
+                    DPerpMinus_II &       ! - DPerp at face(im, i)
+                    *(DistrPerp_5D(1:nP,:,k,j,i) - DistrMinus_II(1:nP,:))&
+                    /dRPerpFace_I(i) &    ! * gradF at face(im, i)
+                    *AreaR_IIF(k,j,i)     ! * area of face(im, i)
+
+               ! Part 2 -- Face_theta: Theta fluxes
+               ! DPerp coefficient at face(j, j+1)
+               if (j < nThetaPerp) then
+                  DPerpPlus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
+                       + Dperp_5D(:,:,k,j+1,i))
+               else
+                  DPerpPlus_II = Dperp_5D(:,:,k,j,i) + &
+                       0.5*(Dperp_5D(:,:,k,j,i) - Dperp_5D(:,:,k,j-1,i))
+               end if
+               ! DPerp coefficient at face(j-1, j)
+               if (j > 1) then
+                  DPerpMinus_II = 0.5*(Dperp_5D(:,:,k,j-1,i) &
+                       + Dperp_5D(:,:,k,j,i))
+               else
+                  DPerpMinus_II = Dperp_5D(:,:,k,j,i) - &
+                       0.5*(Dperp_5D(:,:,k,j+1,i) - Dperp_5D(:,:,k,j,i))
+               end if
+               ! FVM net flux: source_II += (flux_jp - flux_jm)
+               source_II = source_II + &
+                    DPerpPlus_II &              ! + DPerp at face(j, jp)
+                    *(DistrPerp_5D(1:nP,:,k,jPlus,i)&
+                    -DistrPerp_5D(1:nP,:,k,j,i))&
+                    /(RPerp_C(i)*dThetaPerp) &  ! * gradF at face(j, jp)
+                    *AreaTheta_IFI(k,j+1,i)     ! * area of face(j, jp)
+               source_II = source_II - &
+                    DPerpMinus_II &             ! - DPerp at face(jm, j)
+                    *(DistrPerp_5D(1:nP,:,k,j,i)&
+                    -DistrPerp_5D(1:nP,:,k,jMinus,i))&
+                    /(RPerp_C(i)*dThetaPerp) &  ! * gradF at face(jm, j)
+                    *AreaTheta_IFI(k,j,i)       ! * area of face(jm, j)
+
+               ! Part 3 -- Face_phi: Phi fluxes
+               kPlus = mod(k,nPhiPerp)+1              ! next index with wrap
+               kMinus = mod(k-2+nPhiPerp,nPhiPerp)+1  ! prev index with wrap
+               ! DPerp coefficient at face(k, k+1)
+               DPerpPlus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
+                    + Dperp_5D(:,:,kPlus,j,i))
+               ! DPerp coefficient at face(k-1, k)
+               DPerpMinus_II = 0.5*(Dperp_5D(:,:,kMinus,j,i) &
+                    + Dperp_5D(:,:,k,j,i))
+               ! FVM net flux: source_II += (flux_kp - flux_km)
+               source_II = source_II + &
+                    DPerpPlus_II &              ! + DPerp at face(k, kp)
+                    *(DistrPerp_5D(1:nP,:,kPlus,j,i)& ! * gradF at face(k, kp)
+                    -DistrPerp_5D(1:nP,:,k,j,i))&
+                    /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp) &
+                    *AreaPhi_FII(kPlus,j,i)     ! * area of face(k, kp)
+               source_II = source_II - &
+                    DPerpMinus_II &             ! - DPerp at face(km, k)
+                    *(DistrPerp_5D(1:nP,:,k,j,i)& ! * gradF at face(km, k)
+                    -DistrPerp_5D(1:nP,:,kMinus,j,i))&
+                    /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp) &
+                    *AreaPhi_FII(kMinus,j,i)    ! * area of face(km, k)
+
+               ! Part 4 -- Summation: source_5D += source_II/Volume_CB
+               source_5D(1:nP,:,k,j,i) = source_5D(1:nP,:,k,j,i) + &
+                    source_II*VolumeInv_CB(k,j,i)
+            end do
+         end do
+      end do
+
+    end subroutine calc_fvm_netflux
     !==========================================================================
   end subroutine solver_fvm_diffuse3d
   !============================================================================
