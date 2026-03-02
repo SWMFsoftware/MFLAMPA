@@ -532,13 +532,14 @@ contains
 
     use SP_ModGrid, ONLY: nLineAll
     use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
-         build_trmesh, interpolate_trmesh
+         build_trmesh, interpolate_trmesh, XyzOrig_DII
 
     logical, intent(in) :: IsFirstCall
     real, intent(in)    :: dtIn
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     real :: source_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real :: source_IV(0:nP+1, 1:nMu, nLineAll, nRPerp)
     real :: DPerp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
@@ -620,9 +621,96 @@ contains
     call solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
          source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)), &
          iRPerpStart_I(iProc), iRPerpEnd_I(iProc), dtIn)
+    ! Broadcast source_5D (uniform grid) to all processes
+    if(nProc > 1) then
+       do iPE = 0, nProc-1
+          call MPI_BCAST(source_5D(:,:,:,:,          &
+               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+               (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
+       end do
+    end if
+    ! Check the error message from after interpolate_trmesh
+    if(iError /= 0) then
+       write(*,*) 'iProc = ', iProc, NameSub//&
+            ': interpolate_trmesh for source_5D failed, DPerp stopped'
+       RETURN
+    end if
 
     ! Step 5: Interpolate source back to the intersection points on field lines
+    call interpolate_source_intersect
+  contains
+    !==========================================================================
+    subroutine interpolate_source_intersect
+      ! Interpolate the df/dt source term from the uniform grid to
+      ! all intersection points of the lines and multiple slices
 
+      use ModCoordTransform, ONLY: xyz_to_rlonlat
+      integer :: iLine, iTheta1, iTheta2, iPhi1, iPhi2
+      real    :: XyzPoint_D(X_:Z_), rPoint, lonPoint, latPoint, phiPoint
+      real    :: thetaFrac, phiFrac
+      !------------------------------------------------------------------------
+      do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
+         do iLine = 1, nLineAll
+            ! Extract the intersection point coordinates
+            XyzPoint_D = XyzOrig_DII(:, iLine, iRPerp)
+            if(sum(XyzPoint_D**2) > cTiny) then
+               ! CoordTransform: XyzPoint_D => (rPoint, lonPoint, phiPoint)
+               call xyz_to_rlonlat(XyzPoint_D, rPoint, lonPoint, latPoint)
+               phiPoint = cPi/2.0 - latPoint
+
+               ! Find the indices of the quadrilateral vertices
+               iTheta1 = floor(mod(lonPoint-PhiPerp_C(1), cTwoPi)/dPhiPerp) + 1
+               iTheta2 = iTheta1 + 1
+               iPhi1 = floor((phiPoint - ThetaPerp_C(1))/dThetaPerp) + 1
+               iPhi2 = iPhi1 + 1
+               ! Handle periodicity in the theta (longitude) direction
+               if(iTheta2 > nPhiPerp) iTheta2 = 1  ! Wrap around
+               ! Ensure indices are within bounds
+               iTheta1 = max(1, min(iTheta1, nPhiPerp))
+               iTheta2 = max(1, min(iTheta2, nPhiPerp))
+               iPhi1 = max(1, min(iPhi1, nThetaPerp))
+               iPhi2 = max(1, min(iPhi2, nThetaPerp))
+
+               ! Compute fractional distances for interpolation
+               thetaFrac = (lonPoint - PhiPerp_C(iTheta1))/dPhiPerp
+               phiFrac = (phiPoint - ThetaPerp_C(iPhi1))/dThetaPerp
+               ! Perform bilinear interpolation on the uniform LON-LAT grid
+               source_IV(:,:,iLine,iRPerp) = (1.0-thetaFrac)*(1.0-phiFrac)* &
+                    source_5D(:, :, iTheta1, iPhi1, iRPerp) + &   ! value11
+                    (1.0-thetaFrac)*phiFrac* &
+                    source_5D(:, :, iTheta1, iPhi2, iRPerp) + &   ! value12
+                    thetaFrac * (1.0-phiFrac)* &
+                    source_5D(:, :, iTheta2, iPhi1, iRPerp) + &   ! value21
+                    thetaFrac*phiFrac* &
+                    source_5D(:, :, iTheta2, iPhi2, iRPerp)       ! value22
+            else
+               source_IV(:,:,iLine,iRPerp) = 0.0
+            end if
+         end do
+      end do
+
+      ! Broadcast source_IV (line intersections, uniform grid) to all processes
+      if(nProc > 1) then
+         do iPE = 0, nProc-1
+            call MPI_BCAST(source_IV(:,:,:,          &
+                 iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+                 (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+                 (nP+2)*nMu*nLineAll, MPI_REAL, iPE, iComm, iError)
+         end do
+      end if
+      ! Check the error message from after interpolate_trmesh
+      if(iError /= 0) then
+         write(*,*) 'iProc = ', iProc, NameSub//&
+              ': interpolate_trmesh for source_IV failed, DPerp stopped'
+         RETURN
+      end if
+    end subroutine interpolate_source_intersect
+    !==========================================================================
+    subroutine interpolate_source_linenode
+      !------------------------------------------------------------------------
+    end subroutine interpolate_source_linenode
+    !==========================================================================
   end subroutine diffuseperp_distribution
   !============================================================================
   subroutine solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
@@ -717,7 +805,7 @@ contains
       ! Exchange ghostVDF: iProcPrev |<=| (Start) iProc (End) |=>| iProcNext
       !------------------------------------------------------------------------
       ! Exchange VDF at ghost cells 1: iProc End |=>| iProcNext Start
-      if (iProcNext < nProc) then
+      if(iProcNext < nProc) then
          call MPI_SENDRECV(DistrPerp_5D(:,:,:,:,iREnd), &
               (nP+2)*nMu*nPhiPerp*nThetaPerp, &
               MPI_DOUBLE_PRECISION, iProcNext, 0, &
@@ -730,7 +818,7 @@ contains
       end if
 
       ! Exchange VDF at ghost cells 2: iProcPrev End |<=| iProc Start
-      if (iProcPrev >= 0) then
+      if(iProcPrev >= 0) then
          call MPI_SENDRECV(DistrPerp_5D(:,:,:,:,iRStart), &
               (nP+2)*nMu*nPhiPerp*nThetaPerp, &
               MPI_DOUBLE_PRECISION, iProcPrev, 1, &
@@ -761,19 +849,19 @@ contains
                source_II = 0.0
                ! Part 1 -- Face_r: Radial fluxes
                ! VDF at i+1 (ip)
-               if (i < iREnd) then
+               if(i < iREnd) then
                   DistrPlus_II = DistrPerp_5D(:,:,k,j,i+1)
                else
                   DistrPlus_II = DistrNextProc_G(:,:,k,j)
                end if
                ! VDF at i-1 (im)
-               if (i > iRStart) then
+               if(i > iRStart) then
                   DistrMinus_II = DistrPerp_5D(:,:,k,j,i-1)
                else
                   DistrMinus_II = DistrPrevProc_G(:,:,k,j)
                end if
                ! DPerp coefficient at face(i, i+1)
-               if (i < nRPerp) then
+               if(i < nRPerp) then
                   DPerpPlus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
                        + Dperp_5D(:,:,k,j,i+1))
                else
@@ -781,7 +869,7 @@ contains
                        0.5*(Dperp_5D(:,:,k,j,i) - Dperp_5D(:,:,k,j,i-1))
                end if
                ! DPerp coefficient at face(i-1, i)
-               if (i > 1) then
+               if(i > 1) then
                   DPerpMinus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
                        + Dperp_5D(:,:,k,j,i+1))
                else
@@ -802,7 +890,7 @@ contains
 
                ! Part 2 -- Face_theta: Theta fluxes
                ! DPerp coefficient at face(j, j+1)
-               if (j < nThetaPerp) then
+               if(j < nThetaPerp) then
                   DPerpPlus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
                        + Dperp_5D(:,:,k,j+1,i))
                else
@@ -810,7 +898,7 @@ contains
                        0.5*(Dperp_5D(:,:,k,j,i) - Dperp_5D(:,:,k,j-1,i))
                end if
                ! DPerp coefficient at face(j-1, j)
-               if (j > 1) then
+               if(j > 1) then
                   DPerpMinus_II = 0.5*(Dperp_5D(:,:,k,j-1,i) &
                        + Dperp_5D(:,:,k,j,i))
                else

@@ -40,6 +40,7 @@ module SP_ModTriangulate
   ! may be added. If some lines are unused or do not reach the surface, the
   ! last elements of the array are not used
   real, allocatable :: Xyz_DII(:,:,:)
+  real, public, allocatable :: XyzOrig_DII(:,:,:)
   ! Index of the line correspoinding to a given point at the radial surface
   ! It may differ from just the array index because of the presence of polar
   ! points or absence of bad lines not reaching the boundary.
@@ -80,9 +81,11 @@ contains
     ! assigned to a given Proc
     character(len=*), parameter:: NameSub = 'reset_intersect_surf'
     !--------------------------------------------------------------------------
-    deallocate(Xyz_DII, iLineReach_II, DistrR_IIBI, DPerp_IIBI, nTriMesh_I)
+    deallocate(Xyz_DII, iLineReach_II, DistrR_IIBI, nTriMesh_I)
+    deallocate(XyzOrig_DII, DPerp_IIBI)
     deallocate(iList_I, iPointer_I, iEnd_I)
     allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, nR))
+    allocate(XyzOrig_DII(X_:Z_, nLineAll, nR))
     allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, nR))
     allocate(DPerp_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, nR))
     allocate(iLineReach_II(1:nLineAll+2, nR))
@@ -129,7 +132,11 @@ contains
     if(.not.allocated(Xyz_DII)) then
        allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, 1))
        allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, 1))
-       if(IsIncludeDPerp) allocate(DPerp_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, 1))
+       if(IsIncludeDPerp) then
+          ! In DPerp
+          allocate(XyzOrig_DII(X_:Z_, 1:nLineAll+2, 1))
+          allocate(DPerp_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, 1))
+       end if
        allocate(iLineReach_II(1:nLineAll+2, 1))
        allocate(nTriMesh_I(1))
        allocate(iList_I(6*nLineAll))
@@ -186,14 +193,17 @@ contains
        if(IsIncludeDPerp) call mpi_reduce_real_array(DPerp_IIBI(:,:,:,iR), &
             (nP+2)*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
     end if
+    ! Save original intersection points
+    if(IsIncludeDPerp) XyzOrig_DII(:,:,iR) = Xyz_DII(:,:,iR)
     if(iProc /= iRoot) RETURN
+
     ! Sort out unused points
     iReachR = 0
     do iLineAll = 1, nLineAll
        if(all(Xyz_DII(:,iLineAll,iR)==0.0)) CYCLE
        iReachR = iReachR + 1
        ! Store and normalize coordinates to get points on the unit square
-       Xyz_DII(:, iReachR,iR) = Xyz_DII(:,iLineAll,iR)/rSurf
+       Xyz_DII(:,iReachR,iR) = Xyz_DII(:,iLineAll,iR)/rSurf
        iLineReach_II(iReachR,iR) = iLineAll
        DistrR_IIBI(:,:,iReachR,iR) = DistrR_IIBI(:,:,iLineAll,iR)
        if(IsIncludeDPerp) &
