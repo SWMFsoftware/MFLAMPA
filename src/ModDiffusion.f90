@@ -527,7 +527,7 @@ contains
 
   end subroutine setup_multi_uniform_spheres
   !============================================================================
-  subroutine diffuseperp_distribution(IsFirstCall, dtIn)
+  subroutine diffuseperp_distribution(IsFirstCall, nX, dtIn)
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModGrid, ONLY: nLineAll
@@ -535,6 +535,7 @@ contains
          build_trmesh, interpolate_trmesh, XyzOrig_DII
 
     logical, intent(in) :: IsFirstCall
+    integer, intent(in) :: nX
     real, intent(in)    :: dtIn
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
@@ -637,8 +638,9 @@ contains
        RETURN
     end if
 
-    ! Step 5: Interpolate source back to the intersection points on field lines
-    call interpolate_source_intersect
+    ! Step 5: Interpolate source back to the nodes along field lines
+    call interpolate_source_intersect ! uniform grid => intersection points
+    call interpolate_source_linenode  ! intersection points => field line nodes
   contains
     !==========================================================================
     subroutine interpolate_source_intersect
@@ -708,7 +710,46 @@ contains
     end subroutine interpolate_source_intersect
     !==========================================================================
     subroutine interpolate_source_linenode
+      ! Interpolate the df/dt source term from the intersection points of the
+      ! lines and multiple slices to the original points along the field line
+
+      integer :: iLine, iX, iPoint
+      real :: rNode, r1, r2, Weight
+      real :: v1_II(0:nP+1, nMu), v2_II(0:nP+1, nMu)
       !------------------------------------------------------------------------
+      ! Loop over all field lines on this processor
+      do iLine = 1, nLine
+         ! Loop over all nodes along the field line
+         do iX = 1, nX
+            ! Extract the radial coordinate of the current node
+            rNode = MHData_VIB(R_, iX, iLine)
+
+            ! Check that rNode is within grid range
+            if(rNode <= RPerp_C(nRPerp)) then
+               ! Find first index where grid radius exceeds rNode
+               iPoint = minloc(RPerp_C(1:nRPerp), DIM=1, &
+                    MASK = RPerp_C(1:nRPerp) > rNode)
+
+               if(iPoint > 1) then
+                  ! rNode is between r1 and r2
+                  r1 = RPerp_C(iPoint-1)
+                  r2 = RPerp_C(iPoint)
+                  ! Linear interpolation between r1 and r2
+                  Weight = (rNode - r1)/(r2 - r1)
+                  v1_II = source_IV(:, :, iPoint-1, iLine)
+                  v2_II = source_IV(:, :, iPoint,   iLine)
+                  Distribution_CB(:, :, iX, iLine) = &
+                       Distribution_CB(:, :, iX, iLine) + &
+                       v1_II + (v2_II-v1_II)*Weight
+               else
+                  ! rNode is at or below first grid point
+                  Distribution_CB(:, :, iX, iLine) = &
+                       Distribution_CB(:, :, iX, iLine) + &
+                       source_IV(:, :, 1, iLine)
+               end if
+            end if
+         end do
+      end do
     end subroutine interpolate_source_linenode
     !==========================================================================
   end subroutine diffuseperp_distribution
