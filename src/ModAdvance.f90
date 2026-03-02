@@ -4,7 +4,8 @@
 module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
-  use SP_ModDiffusion, ONLY: UseDiffusion, set_diffusion_coef
+  use SP_ModDiffusion, ONLY: UseDiffusion, set_diffusion_coef, &
+       UseDiffusionPerp, diffuseperp_distribution
   use SP_ModDistribution, ONLY: IsDistNeg
   use SP_ModGrid, ONLY: nLine, Used_B, nVertex_B, &
        State_VIB, MHData_VIB, Rho_, B_, iShock_IB, Shock_, IsMuAvg
@@ -197,6 +198,11 @@ contains
           BOldSi_I(1:iEnd) = BSi_I(1:iEnd)
        end do PROGRESS
     end do LINE
+
+    ! second: perpendicular diffusion
+    if(UseDiffusion .and. UseDiffusionPerp) then
+       call diffuseperp_distribution(IsFirstCall=.true., dtIn=DtFull)
+    end if
 
   end subroutine advance
   !============================================================================

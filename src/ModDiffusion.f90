@@ -15,7 +15,7 @@ module SP_ModDiffusion
   use ModConst, ONLY: cAu, cLightSpeed, ckeV, cGeV, cMu, Rsun, cGyroRadius
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModDistribution, ONLY: SpeedSi_G, Momentum_G, GammaLorentz_G, &
-       MomentumInjSi, Mu_F, DeltaMu, Distribution_CB
+       Mu_F, DeltaMu, Distribution_CB, IsDistNeg, check_dist_neg
   use SP_ModGrid, ONLY: nP, nMu, nLine, State_VIB, MHData_VIB, &
        D_, R_, X_, Z_, Wave1_, Wave2_
   use SP_ModProc, ONLY: nProc, iProc, iComm, iError
@@ -527,7 +527,7 @@ contains
 
   end subroutine setup_multi_uniform_spheres
   !============================================================================
-  subroutine diffuseperp_distribution(IsFirstCall, nX, dtIn)
+  subroutine diffuseperp_distribution(IsFirstCall, dtIn)
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModGrid, ONLY: nLineAll
@@ -535,7 +535,6 @@ contains
          build_trmesh, interpolate_trmesh, XyzOrig_DII
 
     logical, intent(in) :: IsFirstCall
-    integer, intent(in) :: nX
     real, intent(in)    :: dtIn
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
@@ -619,9 +618,9 @@ contains
 
     ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
     source_5D = 0.0
-    call solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
-         source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)), &
-         iRPerpStart_I(iProc), iRPerpEnd_I(iProc), dtIn)
+    call solver_fvm_diffuse3d(DPerp_5D, &
+         iRPerpStart_I(iProc), iRPerpEnd_I(iProc), dtIn, DistrPerp_5D, &
+         source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)))
     ! Broadcast source_5D (uniform grid) to all processes
     if(nProc > 1) then
        do iPE = 0, nProc-1
@@ -713,14 +712,16 @@ contains
       ! Interpolate the df/dt source term from the intersection points of the
       ! lines and multiple slices to the original points along the field line
 
+      use SP_ModGrid, ONLY: Used_B, nVertex_B
       integer :: iLine, iX, iPoint
       real :: rNode, r1, r2, Weight
       real :: v1_II(0:nP+1, nMu), v2_II(0:nP+1, nMu)
       !------------------------------------------------------------------------
       ! Loop over all field lines on this processor
-      do iLine = 1, nLine
-         ! Loop over all nodes along the field line
-         do iX = 1, nX
+      LINE:do iLine = 1, nLine
+         if(.not.Used_B(iLine)) CYCLE LINE
+         ! Loop over all nodes along the valid field line
+         do iX = 1, nVertex_B(iLine)
             ! Extract the radial coordinate of the current node
             rNode = MHData_VIB(R_, iX, iLine)
 
@@ -749,20 +750,24 @@ contains
                end if
             end if
          end do
-      end do
+         ! Check if the VDF includes negative values after Dperp
+         call check_dist_neg(NameSub// &
+              ' after perpendicular diffusion', 1, nVertex_B(iLine), iLine)
+         if(IsDistNeg) RETURN
+      end do LINE
     end subroutine interpolate_source_linenode
     !==========================================================================
   end subroutine diffuseperp_distribution
   !============================================================================
-  subroutine solver_fvm_diffuse3d(DistrPerp_5D, DPerp_5D, &
-       source_5D, iRStart, iREnd, dtIn)
+  subroutine solver_fvm_diffuse3d(DPerp_5D, iRStart, iREnd, dtIn, &
+       DistrPerp_5D, source_5D)
     ! FVM solver for pure 3d diffusion equation: df/dt = div (DPerp grad_f)
 
     integer, intent(in) :: iRStart, iREnd
     real,    intent(in) :: dtIn
-    real, intent(in):: DistrPerp_5D(0:nP+1, nMu, &
+    real, intent(in)    :: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real, intent(inout) :: DistrPerp_5D(0:nP+1, nMu, &
          nPhiPerp, nThetaPerp, iRStart:iREnd)
-    real, intent(in):: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
     real, intent(out):: source_5D(0:nP+1,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
 
     ! Proc index used for exchanging ghost VDF
@@ -985,7 +990,9 @@ contains
 
                ! Part 4 -- Summation: source_5D += source_II/Volume_CB
                source_5D(1:nP,:,k,j,i) = source_5D(1:nP,:,k,j,i) + &
-                    source_II*VolumeInv_CB(k,j,i)
+                    dt*source_II*VolumeInv_CB(k,j,i)
+               DistrPerp_5D(1:nP,:,k,j,i) = DistrPerp_5D(1:nP,:,k,j,i) + &
+                    source_5D(1:nP,:,k,j,i)
             end do
          end do
       end do
@@ -1090,6 +1097,7 @@ contains
     ! Set spatial diffusion and mu scattering coefficients for given field line
 
     use ModConst, ONLY: cElectronCharge, cProtonMass
+    use SP_ModDistribution, ONLY: MomentumInjSi
     integer, intent(in):: iLine, nX, iShock
     integer            :: iP
     real, intent(in)   :: BSi_I(1:nX)

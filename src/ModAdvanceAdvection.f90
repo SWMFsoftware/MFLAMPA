@@ -26,8 +26,7 @@ contains
     ! The subroutine encapsulates the logarithmic advection scheme,
     ! which is non-conservative, and the diffusion
 
-    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution, &
-         UseDiffusionPerp, diffuseperp_distribution
+    use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
     use SP_ModBc, ONLY: set_momentum_bc, iStart, set_lower_end_vdf, &
          UseLowerEndBc, set_lower_end_bc, LowerEndBc_I, &
          UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
@@ -125,14 +124,6 @@ contains
           call check_dist_neg(NameSub// &
                ' after parallel diffusion', 1, nX, iLine)
           if(IsDistNeg) RETURN
-
-          ! second: perpendicular diffusion
-          if(UseDiffusionPerp) then
-             ! Check if the VDF includes negative values after Dperp
-             call check_dist_neg(NameSub// &
-                  ' after perpendicular diffusion', 1, nX, iLine)
-             if(IsDistNeg) RETURN
-          end if
        end if
     end do STEP
   end subroutine advect_via_log
