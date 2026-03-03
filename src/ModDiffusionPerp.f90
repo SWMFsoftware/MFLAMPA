@@ -209,10 +209,10 @@ contains
     logical, intent(in) :: IsFirstCall
     real, intent(in)    :: dtIn
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
-    real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
-    real :: source_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
-    real :: source_IV(0:nP+1, 1:nMu, nLineAll, nRPerp)
-    real :: DPerp_5D(1:nP, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
+         iRPerpStart_I(iProc):iRPerpEnd_I(iProc)) :: DistrPerp_5D, source_5D
+    real :: source_IV(0:nP+1, nMu, nLineAll, nRPerp)
+    real :: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
     if(IsFirstCall) then
@@ -272,21 +272,6 @@ contains
           end do
        end do
     end do
-    ! Broadcast VDF (uniform grid) to all processes
-    if(nProc > 1) then
-       do iPE = 0, nProc-1
-          call MPI_BCAST(DistrPerp_5D(:,:,:,:,          &
-               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
-               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-               (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
-       end do
-    end if
-    ! Check the error message from after interpolate_trmesh
-    if(iError /= 0) then
-       write(*,*) 'iProc = ', iProc, NameSub//&
-            ': interpolate_trmesh for DistrPerp_5D failed, DPerp stopped'
-       RETURN
-    end if
 
     ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
     source_5D = 0.0
@@ -409,8 +394,8 @@ contains
                   r2 = RPerp_C(iPoint)
                   ! Linear interpolation between r1 and r2
                   Weight = (rNode - r1)/(r2 - r1)
-                  v1_II = source_IV(:, :, iPoint-1, iLine)
-                  v2_II = source_IV(:, :, iPoint,   iLine)
+                  v1_II = source_IV(:, :, iLine, iPoint-1)
+                  v2_II = source_IV(:, :, iLine, iPoint)
                   Distribution_CB(:, :, iX, iLine) = &
                        Distribution_CB(:, :, iX, iLine) + &
                        v1_II + (v2_II-v1_II)*Weight
@@ -418,7 +403,7 @@ contains
                   ! rNode is at or below first grid point
                   Distribution_CB(:, :, iX, iLine) = &
                        Distribution_CB(:, :, iX, iLine) + &
-                       source_IV(:, :, 1, iLine)
+                       source_IV(:, :, iLine, 1)
                end if
             end if
          end do
