@@ -14,6 +14,7 @@ module SP_ModAdvancePoisson
   use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_F, &
        Distribution_CB, IsDistNeg, check_dist_neg, dLogP
   use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
+  use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, Dt_CB
   use ModUtilities, ONLY: CON_stop
   use ModPoissonBracket, ONLY: explicit
 
@@ -283,6 +284,8 @@ contains
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
+    ! Save local time stepping
+    if(UseDiffusionPerp) Dt_CB(:, nMu, 1:nX, iLine) = Dt_C
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
@@ -741,6 +744,8 @@ contains
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
+    ! Save local time stepping
+    if(UseDiffusionPerp) Dt_CB(:, :, 1:nX, iLine) = Dt_C
 
     ! For pitch angle scattering
     if(UseMuScattering) then

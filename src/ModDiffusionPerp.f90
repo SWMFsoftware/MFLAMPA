@@ -10,6 +10,7 @@ module SP_ModPerpDiffusion
   use SP_ModDistribution, ONLY: Distribution_CB, IsDistNeg, check_dist_neg
   use SP_ModGrid, ONLY: nP, nMu, nLine, MHData_VIB, R_, X_, Z_
   use SP_ModSize, ONLY: nVertexMax
+  use SP_ModTime, ONLY: IsSteadyState
   use SP_ModProc, ONLY: nProc, iProc, iComm, iError
   use SP_ModUnit, ONLY: Io2Si_V, UnitX_
   use SP_ModTurbulence, ONLY: DPerp_CB
@@ -21,12 +22,19 @@ module SP_ModPerpDiffusion
   SAVE
 
   ! Public members:
-  public :: read_param, diffuseperp_distribution
+  public :: read_param, init, diffuseperp_distribution
+  ! Diffusion in space
+  interface diffuseperp_distribution
+     ! Global time step Dt
+     module procedure diffuseperp_distribution_s
+     ! DtLocal for (nP, nMu, nVertexMax, nLine)
+     module procedure diffuseperp_distribution_c
+  end interface diffuseperp_distribution
 
   ! Whether to include Perpendicular Diffusion
   logical, public :: UseDiffusionPerp = .false.
   character(len=15), public :: TypeDPerp = 'UseDParaRatio'
-  real, public      :: DParaRatio = 0.065         ! Simple ratio of Dperp/Dpara
+  real, public      :: DParaRatio = 0.065       ! Simple ratio of Dperp/Dpara
 
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
   integer         :: nRPerp, nThetaPerp, nPhiPerp
@@ -38,6 +46,7 @@ module SP_ModPerpDiffusion
   integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
   real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
        RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:)
+  real, public, allocatable :: Dt_CB(:,:,:,:)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -48,7 +57,7 @@ contains
     select case(NameCommand)
     case('#DIFFUSIONPERP')
        call read_var('UseDiffusionPerp', UseDiffusionPerp)
-       ! Setup perpendicular diffusion coefficients only when using it
+       ! Read in perpendicular diffusion information only when using it
        if(UseDiffusionPerp) then
           call read_var('TypeDPerp', TypeDPerp)
           select case(trim(TypeDPerp))
@@ -82,22 +91,19 @@ contains
                   nThetaPerp+1, "to avoid singularity when theta=0"
              nThetaPerp = nThetaPerp + 1
           end if
-
-          ! Setup the mesh used for triangulation in perpendicular diffusion
-          call setup_multi_uniform_spheres
        end if
     case default
        call CON_stop('SP:'//NameSub//': unknown command '//NameCommand)
     end select
   end subroutine read_param
   !============================================================================
-  subroutine setup_multi_uniform_spheres
-    ! setup the uniform spheres used in perpendicular diffusion 
+  subroutine init
+    ! setup the uniform spheres and time stepping in perpendicular diffusion
 
     use ModCoordTransform, ONLY: sph_to_xyz
     integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
     integer :: iProcChunk, iRPerpRemainder, iPE
-    character(len=*), parameter:: NameSub = 'setup_multi_uniform_spheres'
+    character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
     ! setup the mesh arrays for triangulation used in perpendicular diffusion
     if(allocated(RPerp_C)) deallocate(RPerp_C)
@@ -197,9 +203,21 @@ contains
     if(nProc > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, XyzPerp_CB, &
          3*nPhiPerp*nThetaPerp*nRPerp, MPI_REAL, MPI_SUM, iComm, iError)
 
-  end subroutine setup_multi_uniform_spheres
+    ! Allocate Dt_CB
+    if(IsSteadyState) allocate(Dt_CB(nP, nMu, nVertexMax, nLine), stat=iError)
+
+  end subroutine init
   !============================================================================
-  subroutine diffuseperp_distribution(IsFirstCall, dtIn)
+  subroutine diffuseperp_distribution_s(IsFirstCall, dtIn)
+    logical, intent(in) :: IsFirstCall
+    real, intent(in)    :: dtIn
+    real :: dtFake_C(nP, nMu, nVertexMax, nLine)
+    !--------------------------------------------------------------------------
+    dtFake_C = dtIn
+    call diffuseperp_distribution_c(IsFirstCall, dtFake_C)
+  end subroutine diffuseperp_distribution_s
+  !============================================================================
+  subroutine diffuseperp_distribution_c(IsFirstCall, dtIn_CB)
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModGrid, ONLY: nLineAll
@@ -207,14 +225,14 @@ contains
          build_trmesh, interpolate_trmesh, XyzOrig_DII
 
     logical, intent(in) :: IsFirstCall
-    real, intent(in)    :: dtIn
+    real, intent(in)    :: dtIn_CB(nP, nMu, nVertexMax, nLine)
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
          iRPerpStart_I(iProc):iRPerpEnd_I(iProc)) :: DistrPerp_5D, source_5D
-    real :: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, &
+    real :: DPerp_5D(nP, nMu, nPhiPerp, nThetaPerp, &
          iRPerpStart_I(iProc):iRPerpEnd_I(iProc))
-    real :: source_IV(0:nP+1, nMu, nLineAll, nRPerp)
-    character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
+    real :: source_IV(nP, nMu, nLineAll, nRPerp)
+    character(len=*), parameter:: NameSub = 'diffuseperp_distribution_c'
     !--------------------------------------------------------------------------
     if(IsFirstCall) then
        ! In the 1st call of DPerp: we set up the skeleton, coefficient, and VDF
@@ -239,9 +257,9 @@ contains
           do iThetaPerp = 1, nThetaPerp
              do iPhiPerp = 1, nPhiPerp
                 ! Get DPerp coefficient at the cell center in the uniform grid
-                call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
-                     iRIn = iRPerp, DPerp_II =                                   &
-                     DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+                call interpolate_trmesh( &
+                     XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp), iRIn = iRPerp, &
+                     DPerp_II = DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
              end do
           end do
        end do
@@ -277,12 +295,13 @@ contains
     ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
     source_5D = 0.0
     call solver_fvm_diffuse3d(DPerp_5D, &
-         iRPerpStart_I(iProc), iRPerpEnd_I(iProc), dtIn, DistrPerp_5D, &
+         iRPerpStart_I(iProc), iRPerpEnd_I(iProc), &
+         IsSteadyState, dtIn_CB(1,1,1,1), DistrPerp_5D, &
          source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)))
     ! Broadcast source_5D (uniform grid) to all processes
     if(nProc > 1) then
        do iPE = 0, nProc-1
-          call MPI_BCAST(source_5D(:,:,:,:,          &
+          call MPI_BCAST(source_5D(:,:,:,:,             &
                iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
                (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
                (nP+2)*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
@@ -298,6 +317,7 @@ contains
     ! Step 5: Interpolate source back to the nodes along field lines
     call interpolate_source_intersect ! uniform grid => intersection points
     call interpolate_source_linenode  ! intersection points => field line nodes
+
   contains
     !==========================================================================
     subroutine interpolate_source_intersect
@@ -336,13 +356,13 @@ contains
                phiFrac = (phiPoint - ThetaPerp_C(iPhi1))/dThetaPerp
                ! Perform bilinear interpolation on the uniform LON-LAT grid
                source_IV(:,:,iLine,iRPerp) = (1.0-thetaFrac)*(1.0-phiFrac)* &
-                    source_5D(:, :, iTheta1, iPhi1, iRPerp) + &   ! value11
+                    source_5D(1:nP, :, iTheta1, iPhi1, iRPerp) + &  ! value11
                     (1.0-thetaFrac)*phiFrac* &
-                    source_5D(:, :, iTheta1, iPhi2, iRPerp) + &   ! value12
+                    source_5D(1:nP, :, iTheta1, iPhi2, iRPerp) + &  ! value12
                     thetaFrac * (1.0-phiFrac)* &
-                    source_5D(:, :, iTheta2, iPhi1, iRPerp) + &   ! value21
+                    source_5D(1:nP, :, iTheta2, iPhi1, iRPerp) + &  ! value21
                     thetaFrac*phiFrac* &
-                    source_5D(:, :, iTheta2, iPhi2, iRPerp)       ! value22
+                    source_5D(1:nP, :, iTheta2, iPhi2, iRPerp)      ! value22
             else
                source_IV(:,:,iLine,iRPerp) = 0.0
             end if
@@ -352,10 +372,10 @@ contains
       ! Broadcast source_IV (line intersections, uniform grid) to all processes
       if(nProc > 1) then
          do iPE = 0, nProc-1
-            call MPI_BCAST(source_IV(:,:,:,          &
+            call MPI_BCAST(source_IV(:,:,:,               &
                  iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
                  (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-                 (nP+2)*nMu*nLineAll, MPI_REAL, iPE, iComm, iError)
+                 nP*nMu*nLineAll, MPI_REAL, iPE, iComm, iError)
          end do
       end if
       ! Check the error message from after interpolate_trmesh
@@ -373,7 +393,7 @@ contains
       use SP_ModGrid, ONLY: Used_B, nVertex_B
       integer :: iLine, iX, iPoint
       real :: rNode, r1, r2, Weight
-      real :: v1_II(0:nP+1, nMu), v2_II(0:nP+1, nMu)
+      real :: v1_II(nP, nMu), v2_II(nP, nMu)
       !------------------------------------------------------------------------
       ! Loop over all field lines on this processor
       LINE:do iLine = 1, nLine
@@ -397,17 +417,18 @@ contains
                   Weight = (rNode - r1)/(r2 - r1)
                   v1_II = source_IV(:, :, iLine, iPoint-1)
                   v2_II = source_IV(:, :, iLine, iPoint)
-                  Distribution_CB(:, :, iX, iLine) = &
-                       Distribution_CB(:, :, iX, iLine) + &
-                       v1_II + (v2_II-v1_II)*Weight
+                  Distribution_CB(1:nP, :, iX, iLine) = &
+                       Distribution_CB(1:nP, :, iX, iLine) + &
+                       (v1_II+(v2_II-v1_II)*Weight)*dtIn_CB(:, :, iX, iLine)
                else
                   ! rNode is at or below first grid point
-                  Distribution_CB(:, :, iX, iLine) = &
-                       Distribution_CB(:, :, iX, iLine) + &
-                       source_IV(:, :, iLine, 1)
+                  Distribution_CB(1:nP, :, iX, iLine) = &
+                       Distribution_CB(1:nP, :, iX, iLine) + &
+                       source_IV(:, :, iLine, 1)*dtIn_CB(:, :, iX, iLine)
                end if
             end if
          end do
+
          ! Check if the VDF includes negative values after Dperp
          call check_dist_neg(NameSub// &
               ' after perpendicular diffusion', 1, nVertex_B(iLine), iLine)
@@ -415,13 +436,14 @@ contains
       end do LINE
     end subroutine interpolate_source_linenode
     !==========================================================================
-  end subroutine diffuseperp_distribution
+  end subroutine diffuseperp_distribution_c
   !============================================================================
-  subroutine solver_fvm_diffuse3d(DPerp_5D, iRStart, iREnd, dtIn, &
-       DistrPerp_5D, source_5D)
+  subroutine solver_fvm_diffuse3d(DPerp_5D, iRStart, iREnd, &
+       IsSteadyStateIn, dtIn, DistrPerp_5D, source_5D)
     ! FVM solver for pure 3d diffusion equation: df/dt = div (DPerp grad_f)
 
     integer, intent(in) :: iRStart, iREnd
+    logical, intent(in) :: IsSteadyStateIn
     real,    intent(in) :: dtIn
     real,    intent(in) :: DPerp_5D(1:nP,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
     real, intent(inout) :: DistrPerp_5D(0:nP+1, nMu, &
@@ -444,6 +466,8 @@ contains
     ! ghost VDF when sendrecv across prev-current-next processors
     real :: DistrPrevProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp), &
          DistrNextProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp)
+    real :: sourceIncrement_5D(nP,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
+    character(len=*), parameter:: NameSub = 'solver_fvm_diffuse3d'
     !--------------------------------------------------------------------------
     iProcPrev = iProc - 1
     iProcNext = iProc + 1
@@ -451,17 +475,25 @@ contains
     ! Precompute: Grid, face area and cell volume
     call calc_area_volume
 
-    ! Stability check: Determine dtMax = 0.5*min(dx)**2/max(DPerp)
-    call MPI_ALLREDUCE(maxval(DPerp_5D, mask=(DPerp_5D>0)), DPerpMax, &
-         1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, iError)
-    dtMax = 0.5*min(minval(dRPerpFace_I)**2, &
-         (RMinPerp*dThetaPerp)**2, &
-         (RMinPerp*minval(ThetaPerpSin_C(2:nThetaPerp-1))*dPhiPerp)**2) &
-         *Io2Si_V(UnitX_)**2 & ! convert to SI unit [m**2]
-         /DPerpMax
-    nStep = int(dtIn/dtMax) + 1
-    dt = dtIn/real(nStep)
-    write(*,*) 'DPerp: dtIn=', dtIn, '; Stable dtMax=', dtMax, '; Use dt=', dt
+    if(IsSteadyStateIn) then
+       ! Steady-state mode: Only 1 step, no use of dt indeed
+       nStep = 1
+       dt = 0.0
+    else
+       ! Time-accurate mode: Use exact dt; otherwise, no time marching
+       ! Stability check: Determine dtMax = 0.5*min(dx)**2/max(DPerp)
+       call MPI_ALLREDUCE(maxval(DPerp_5D, mask=(DPerp_5D>0)), DPerpMax, &
+            1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, iError)
+       dtMax = 0.5*min(minval(dRPerpFace_I)**2, &
+            (RMinPerp*dThetaPerp)**2, &
+            (RMinPerp*minval(ThetaPerpSin_C(2:nThetaPerp-1))*dPhiPerp)**2) &
+            *Io2Si_V(UnitX_)**2 & ! convert to SI unit [m**2]
+            /DPerpMax
+       nStep = int(dtIn/dtMax) + 1
+       dt = dtIn/real(nStep)
+       write(*,*) 'DPerp: nStep=', nStep, &
+            '; Stable dtMax=', dtMax, '; Use dt=', dt
+    end if
 
     ! Time stepping: Diffusion in 3D by FVM
     DIFFUSE3D:do iStep = 1, nStep
@@ -469,7 +501,12 @@ contains
        call exchange_ghostVDF
        ! Compute internal fluxes of the FVM solver = source term of df/dt
        call calc_fvm_netflux
+       ! Update source_5D (= df/dt) and DistrPerp_5D
+       source_5D(1:nP,:,:,:,:) = source_5D(1:nP,:,:,:,:) + sourceIncrement_5D
+       DistrPerp_5D(1:nP,:,:,:,:) = DistrPerp_5D(1:nP,:,:,:,:) + &
+            sourceIncrement_5D*dt   ! f^{n+1} = f^{n} + (df/dt)*delta_t
     end do DIFFUSE3D
+
   contains
     !==========================================================================
     subroutine calc_area_volume
@@ -542,9 +579,10 @@ contains
       ! calculate internal net fluxes in the FVM solver
 
       integer :: jPlus, jMinus, kPlus, kMinus
-      real, dimension(1:nP, 1:nMu) :: DPerpPlus_II, DPerpMinus_II, source_II
+      real, dimension(1:nP, 1:nMu) :: DPerpPlus_II, DPerpMinus_II
       real, dimension(0:nP+1, 1:nMu) :: DistrPlus_II, DistrMinus_II
       !------------------------------------------------------------------------
+      sourceIncrement_5D = 0.0
       do i = iRStart, iREnd
          do j = 1, nThetaPerp
             ! Ready for Theta fluxes
@@ -552,7 +590,6 @@ contains
             jMinus = max(j-1, 1) ! j or 1
 
             do k = 1, nPhiPerp
-               source_II = 0.0
                ! Part 1 -- Face_r: Radial fluxes
                ! VDF at i+1 (ip)
                if(i < iREnd) then
@@ -582,17 +619,19 @@ contains
                   DPerpMinus_II = Dperp_5D(:,:,k,j,i) - &
                        0.5*(Dperp_5D(:,:,k,j,i+1) - Dperp_5D(:,:,k,j,i))
                end if
-               ! FVM net flux: source += (flux_ip - flux_im)
-               source_II = source_II + &
+               ! FVM net flux: sourceIncrement_5D += (flux_ip - flux_im)
+               sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)+ &
                     DPerpPlus_II &        ! + DPerp at face(i, ip)
                     *(DistrPlus_II(1:nP,:) - DistrPerp_5D(1:nP,:,k,j,i))&
                     /dRPerpFace_I(i) &    ! * gradF at face(i, ip)
-                    *AreaR_IIF(k,j,i+1)   ! * area of face(i, ip)
-               source_II = source_II - &
+                    *AreaR_IIF(k,j,i+1) & ! * area of face(i, ip)
+                    *VolumeInv_CB(k,j,i)  ! / volume of (k, j, i)
+               sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &       ! - DPerp at face(im, i)
                     *(DistrPerp_5D(1:nP,:,k,j,i) - DistrMinus_II(1:nP,:))&
                     /dRPerpFace_I(i) &    ! * gradF at face(im, i)
-                    *AreaR_IIF(k,j,i)     ! * area of face(im, i)
+                    *AreaR_IIF(k,j,i) &   ! * area of face(im, i)
+                    *VolumeInv_CB(k,j,i)  ! / volume of (k, j, i)
 
                ! Part 2 -- Face_theta: Theta fluxes
                ! DPerp coefficient at face(j, j+1)
@@ -611,19 +650,21 @@ contains
                   DPerpMinus_II = Dperp_5D(:,:,k,j,i) - &
                        0.5*(Dperp_5D(:,:,k,j+1,i) - Dperp_5D(:,:,k,j,i))
                end if
-               ! FVM net flux: source_II += (flux_jp - flux_jm)
-               source_II = source_II + &
+               ! FVM net flux: sourceIncrement_5D += (flux_jp - flux_jm)
+               sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)+ &
                     DPerpPlus_II &              ! + DPerp at face(j, jp)
                     *(DistrPerp_5D(1:nP,:,k,jPlus,i)&
                     -DistrPerp_5D(1:nP,:,k,j,i))&
                     /(RPerp_C(i)*dThetaPerp) &  ! * gradF at face(j, jp)
-                    *AreaTheta_IFI(k,j+1,i)     ! * area of face(j, jp)
-               source_II = source_II - &
+                    *AreaTheta_IFI(k,j+1,i) &   ! * area of face(j, jp)
+                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
+               sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &             ! - DPerp at face(jm, j)
                     *(DistrPerp_5D(1:nP,:,k,j,i)&
                     -DistrPerp_5D(1:nP,:,k,jMinus,i))&
                     /(RPerp_C(i)*dThetaPerp) &  ! * gradF at face(jm, j)
-                    *AreaTheta_IFI(k,j,i)       ! * area of face(jm, j)
+                    *AreaTheta_IFI(k,j,i) &     ! * area of face(jm, j)
+                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
 
                ! Part 3 -- Face_phi: Phi fluxes
                kPlus = mod(k,nPhiPerp)+1              ! next index with wrap
@@ -634,25 +675,21 @@ contains
                ! DPerp coefficient at face(k-1, k)
                DPerpMinus_II = 0.5*(Dperp_5D(:,:,kMinus,j,i) &
                     + Dperp_5D(:,:,k,j,i))
-               ! FVM net flux: source_II += (flux_kp - flux_km)
-               source_II = source_II + &
+               ! FVM net flux: sourceIncrement_5D += (flux_kp - flux_km)
+               sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)+ &
                     DPerpPlus_II &              ! + DPerp at face(k, kp)
                     *(DistrPerp_5D(1:nP,:,kPlus,j,i)& ! * gradF at face(k, kp)
                     -DistrPerp_5D(1:nP,:,k,j,i))&
                     /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp) &
-                    *AreaPhi_FII(kPlus,j,i)     ! * area of face(k, kp)
-               source_II = source_II - &
+                    *AreaPhi_FII(kPlus,j,i) &   ! * area of face(k, kp)
+                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
+               sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &             ! - DPerp at face(km, k)
                     *(DistrPerp_5D(1:nP,:,k,j,i)& ! * gradF at face(km, k)
                     -DistrPerp_5D(1:nP,:,kMinus,j,i))&
                     /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp) &
-                    *AreaPhi_FII(kMinus,j,i)    ! * area of face(km, k)
-
-               ! Part 4 -- Summation: source_5D += source_II/Volume_CB
-               source_5D(1:nP,:,k,j,i) = source_5D(1:nP,:,k,j,i) + &
-                    dt*source_II*VolumeInv_CB(k,j,i)
-               DistrPerp_5D(1:nP,:,k,j,i) = DistrPerp_5D(1:nP,:,k,j,i) + &
-                    source_5D(1:nP,:,k,j,i)
+                    *AreaPhi_FII(kMinus,j,i) &  ! * area of face(km, k)
+                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
             end do
          end do
       end do

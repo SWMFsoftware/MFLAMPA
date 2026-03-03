@@ -5,7 +5,8 @@ module SP_ModAdvance
 
   ! The module contains methods for advancing the solution in time
   use SP_ModDiffusion, ONLY: UseDiffusion, set_diffusion_coef
-  use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, diffuseperp_distribution
+  use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, &
+       diffuseperp_distribution, Dt_CB
   use SP_ModDistribution, ONLY: IsDistNeg
   use SP_ModGrid, ONLY: nLine, Used_B, nVertex_B, &
        State_VIB, MHData_VIB, Rho_, B_, iShock_IB, Shock_, IsMuAvg
@@ -200,9 +201,8 @@ contains
     end do LINE
 
     ! second: perpendicular diffusion
-    if(UseDiffusion .and. UseDiffusionPerp) then
-       call diffuseperp_distribution(IsFirstCall=.true., dtIn=DtFull)
-    end if
+    if(UseDiffusion .and. UseDiffusionPerp) &
+         call diffuseperp_distribution(IsFirstCall=.true., dtIn=DtFull)
 
   end subroutine advance
   !============================================================================
@@ -229,7 +229,7 @@ contains
 
        ! get data along the line in SI units: Temperature is in the unit
        ! of kinetic energy, all others are in SI units.
-       BSi_I(1:iEnd) = State_VIB(   B_, 1:iEnd, iLine)
+       BSi_I(1:iEnd) = State_VIB (  B_, 1:iEnd, iLine)
        ! nSi is needed to set up the distribution at the injection.
        nSi_I(1:iEnd) = MhData_VIB(Rho_, 1:iEnd, iLine)
        ! find how far shock has travelled on this line
@@ -256,6 +256,10 @@ contains
        ! for any scheme, check if any VDF along this line is negative
        if(IsDistNeg) CYCLE LINE
     end do LINE
+
+    ! second: perpendicular diffusion
+    if(UseDiffusion .and. UseDiffusionPerp) &
+         call diffuseperp_distribution(IsFirstCall=.true., dtIn_CB=Dt_CB)
 
   end subroutine iterate_steady_state
   !============================================================================

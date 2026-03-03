@@ -187,16 +187,17 @@ contains
   subroutine initialize
 
     use SP_ModAngularSpread, ONLY: init_spread     => init
-    use SP_ModChannel, ONLY: init_channel    => init
-    use SP_ModDistribution, ONLY: init_dist       => init
-    use SP_ModPlot, ONLY: init_plot       => init
-    use SP_ModReadMhData, ONLY: init_mhdata     => init
-    use SP_ModRestart, ONLY: read_restart
-    use SP_ModSatellite, ONLY: init_sat        => init
-    use SP_ModShock, ONLY: init_shock      => init
-    use SP_ModTurbulence, ONLY: init_turbulence => init, &
+    use SP_ModChannel,       ONLY: init_channel    => init
+    use SP_ModDistribution,  ONLY: init_dist       => init
+    use SP_ModPerpDiffusion, ONLY: init_dperp      => init, UseDiffusionPerp
+    use SP_ModPlot,          ONLY: init_plot       => init
+    use SP_ModReadMhData,    ONLY: init_mhdata     => init
+    use SP_ModRestart,       ONLY: read_restart
+    use SP_ModSatellite,     ONLY: init_sat        => init
+    use SP_ModShock,         ONLY: init_shock      => init
+    use SP_ModTurbulence,    ONLY: init_turbulence => init, &
          UseTurbulentSpectrum
-    use SP_ModUnit, ONLY: init_unit       => init
+    use SP_ModUnit,          ONLY: init_unit       => init
 
     character(len=*), parameter:: NameSub = 'initialize'
     !--------------------------------------------------------------------------
@@ -214,6 +215,8 @@ contains
     call init_unit
     ! Allocate distribution function and set uniform background
     call init_dist
+    ! Setup the mesh used for triangulation in perpendicular diffusion
+    if(UseDiffusionPerp) call init_dperp
     ! Initialize the energy channels for specified satellites
     call init_channel
     ! Initialize arrays for outputs and plotting
