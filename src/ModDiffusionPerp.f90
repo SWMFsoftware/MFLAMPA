@@ -211,8 +211,9 @@ contains
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
     real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
          iRPerpStart_I(iProc):iRPerpEnd_I(iProc)) :: DistrPerp_5D, source_5D
+    real :: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, &
+         iRPerpStart_I(iProc):iRPerpEnd_I(iProc))
     real :: source_IV(0:nP+1, nMu, nLineAll, nRPerp)
-    real :: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution'
     !--------------------------------------------------------------------------
     if(IsFirstCall) then
@@ -422,7 +423,7 @@ contains
 
     integer, intent(in) :: iRStart, iREnd
     real,    intent(in) :: dtIn
-    real,    intent(in) :: DPerp_5D(1:nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
+    real,    intent(in) :: DPerp_5D(1:nP,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
     real, intent(inout) :: DistrPerp_5D(0:nP+1, nMu, &
          nPhiPerp, nThetaPerp, iRStart:iREnd)
     real, intent(out):: source_5D(0:nP+1,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
@@ -432,7 +433,7 @@ contains
     ! loop variables
     integer :: i, j, k, iStep
     ! time step and iterations
-    real :: dtMax, dt
+    real :: dtMax, dt, DPerpMax
     integer :: nStep
     ! face areas and cell volumes
     real :: VolumeInv_CB(nPhiPerp, nThetaPerp, nRPerp)
@@ -451,11 +452,13 @@ contains
     call calc_area_volume
 
     ! Stability check: Determine dtMax = 0.5*min(dx)**2/max(DPerp)
+    call MPI_ALLREDUCE(maxval(DPerp_5D, mask=(DPerp_5D>0)), DPerpMax, &
+         1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, iError)
     dtMax = 0.5*min(minval(dRPerpFace_I)**2, &
          (RMinPerp*dThetaPerp)**2, &
          (RMinPerp*minval(ThetaPerpSin_C(2:nThetaPerp-1))*dPhiPerp)**2) &
          *Io2Si_V(UnitX_)**2 & ! convert to SI unit [m**2]
-         /maxval(DPerp_5D, mask=(DPerp_5D>0))
+         /DPerpMax
     nStep = int(dtIn/dtMax) + 1
     dt = dtIn/real(nStep)
     write(*,*) 'DPerp: dtIn=', dtIn, '; Stable dtMax=', dtMax, '; Use dt=', dt
