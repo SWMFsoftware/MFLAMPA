@@ -11,6 +11,7 @@ module SP_ModTriangulate
        search_line, MHData_VIB, X_, Y_, Z_, nP, nMu
   use SP_ModProc, ONLY: iProc, nProc, iComm, iError
   use SP_ModSize, ONLY: nDim
+  use SP_ModTurbulence, ONLY: DPerp_CB, DPerp_IIBI
 
   implicit none
 
@@ -47,9 +48,6 @@ module SP_ModTriangulate
   integer, allocatable :: iLineReach_II(:,:)
   ! Distribution function interpolated to the points at the spherical surface
   real, allocatable    :: DistrR_IIBI(:,:,:,:)
-  ! DPerp coefficient interpolated to the points at the spherical surface
-  real, public, allocatable :: DPerp_CB(:,:,:,:)   ! Along lines
-  real,         allocatable :: DPerp_IIBI(:,:,:,:) ! Uniform grid
   ! The result of triangulation
   integer, allocatable :: iList_I(:), iPointer_I(:), iEnd_I(:)
 contains

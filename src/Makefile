@@ -18,6 +18,7 @@ OBJECTS = \
 	ModChannel.o \
 	ModDistribution.o \
 	ModDiffusion.o \
+	ModDiffusionPerp.o \
 	ModGrid.o \
 	ModMain.o \
 	ModOriginPoints.o \

@@ -53,6 +53,10 @@ module SP_ModTurbulence
   real,allocatable,private:: BK_II(:,:)
   real,allocatable,private:: CFL_I(:)
   integer,allocatable::      CorrectionMode_X(:)
+
+  ! DPerp coefficient interpolated to the points at the spherical surface
+  real, public, allocatable :: DPerp_CB(:,:,:,:)   ! Along lines
+  real, public, allocatable :: DPerp_IIBI(:,:,:,:) ! Uniform grid
 contains
   !============================================================================
   subroutine read_param(NameCommand)
