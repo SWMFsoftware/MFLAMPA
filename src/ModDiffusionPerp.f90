@@ -135,7 +135,7 @@ contains
        else
           iRPerpStart_I(iPE) = iPE*iProcChunk + iRPerpRemainder+1
           iRPerpEnd_I(iPE)   = iRPerpStart_I(iPE) + iProcChunk-1
-       endif
+       end if
     end do
 
     ! R: radial direction

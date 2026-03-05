@@ -70,9 +70,10 @@ module SP_ModPlot
                                 ! Flux
        Flux2D_    = 7, & ! at a given radius on rectangular Lon-Lat grid
        FluxTime_  = 8, & ! at a given radius as time series on Lon-Lat grid
+       FluxZ0_    = 9, & ! on the Z=0 plane (latitude = 0)
                                 ! Shock Skeleton
-       Shock2D_   = 9, & ! shock stencils as Lon-Lat plot at each time step
-       ShockTime_ = 10   ! shock stencils saved as time series for field lines
+       Shock2D_   = 10,& ! shock stencils as Lon-Lat plot at each time step
+       ShockTime_ = 11   ! shock stencils saved as time series for field lines
   ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
@@ -132,12 +133,15 @@ module SP_ModPlot
      real:: Radius
      ! whether to compute and ouput average position and angular spread
      logical:: DoPlotSpread
-     ! Flux through sphere
+     !
+     ! ------ Flux through sphere ------
      ! angular coords of point where output is requested
      real:: Lon, Lat
      ! spread of flux of an individual line over grid
      real, pointer:: Spread_II(:,:)
      integer :: iRange_I(4)
+     real    :: RMin, RMax
+     integer :: iCutRange_I(2)
   end type TypePlotFile
   ! Indexes in iRange_I
   integer, parameter :: iLonMin_ = 1, iLonMax_ = 2, iLatMin_ = 3, iLatMax_ = 4
@@ -212,6 +216,7 @@ contains
        do iFile = 1, nFileOut
           File_I(iFile)%iRange_I = 0
        end do
+
        ! read info about each file
        do iFile = 1, nFileOut
           ! reset and read the file info
@@ -258,6 +263,8 @@ contains
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
+          case('fluxz=0')
+             File_I(iFile) % iKindData = FluxZ0_
           case('shock2d')
              File_I(iFile) % iKindData = Shock2D_
           case('shocktime')
@@ -375,6 +382,9 @@ contains
                 File_I(iFile) % StringHeaderAux = &
                      trim(File_I(iFile)%StringHeaderAux)//' deg deg'
              end select
+             File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot) // &
+                  ' StartTime StartTimeJulian'
              call read_var('Radius', File_I(iFile) % Radius)
              File_I(iFile)%iRange_I = 1
              call read_var('nLonFlux2d', File_I(iFile)%iRange_I(2))
@@ -395,6 +405,25 @@ contains
              File_I(iFile) % Lat = File_I(iFile) % Lat * cDegToRad
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
+          case(FluxZ0_)
+             ! mark flux to be written
+             File_I(iFile) % DoPlotFlux = .true.
+             ! add longitude and latitude with units to variable names
+             select case(File_I(iFile) % TypeFile)
+             case('tec', 'tcp')
+                File_I(iFile) % NameVarPlot = 'Radius_[RSun] Longitude_[deg]'
+             case default
+                File_I(iFile) % NameVarPlot = 'Radius Longitude '
+                File_I(iFile) % StringHeaderAux = &
+                     trim(File_I(iFile)%StringHeaderAux)//' RSun deg'
+             end select
+             File_I(iFile) % NameAuxPlot = &
+                  trim(File_I(iFile) % NameAuxPlot) // &
+                  ' StartTime StartTimeJulian'
+             call read_var('RadiusMin', File_I(iFile) % RMin)
+             call read_var('RadiusMax', File_I(iFile) % RMax)
+             call read_var('nRFlux2d', File_I(iFile) % iCutRange_I(1))
+             call read_var('nLonFlux2d', File_I(iFile) % iCutRange_I(2))
           case(Shock2D_)
              call process_shock
              ! add line index to variable names
@@ -807,6 +836,10 @@ contains
                //" use #SPREADSOLIDANGLE in PARAM.in")
           ! extra space reserved for time of the output
           allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1, 1))
+       case(FluxZ0_)
+          ! extra space is reserved for sum of spreads
+          allocate(File_I(iFile) % Buffer_II(File_I(iFile)%nFluxVar, &
+               File_I(iFile)%iCutRange_I(2), File_I(iFile)%iCutRange_I(1)))
        case(Shock2D_)
           ! extra space reserved for line index
           allocate(File_I(iFile) % Buffer_II( &
@@ -830,7 +863,7 @@ contains
     if(iProc/=0) RETURN ! done only by the root
     ! full file name
     NameFile = trim(NamePlotDir)//trim(NameTagFile)
-    if(nTag > 0)then
+    if(nTag > 0) then
        allocate(StringTag_I(nTag))
        call open_file(file=NameFile, status='old', NameCaller=NameSub)
        do iTag = 1, nTag
@@ -839,7 +872,7 @@ contains
        call close_file
     end if
     call open_file(file=NameFile, status='replace', NameCaller=NameSub)
-    if(nTag > 0)then
+    if(nTag > 0) then
        do iTag = 1, nTag
           write(UnitTmp_,'(a)') StringTag_I(iTag)
        end do
@@ -930,6 +963,8 @@ contains
           call write_flux_2d
        case(FluxTime_)
           call write_flux_time
+       case(FluxZ0_)
+          call write_flux_z0
        case(Shock2D_)
           call write_shock_2d
        case(ShockTime_)
@@ -1154,7 +1189,7 @@ contains
 
          ! intersection is found => get data at that location;
          ! find coordinates of intersection
-         Xyz_D =  &
+         Xyz_D = &
               MHData_VIB(X_:Z_, iAbove-1, iLine) * (1-Weight) + &
               MHData_VIB(X_:Z_, iAbove,   iLine) *    Weight
          call xyz_to_rlonlat(Xyz_D, Aux, LonPoint, LatPoint)
@@ -1181,8 +1216,8 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
-                 nLineAll*(iVarLat + nFluxVar),  MPI_SUM, 0, iComm, iError)
+      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+           nLineAll*(iVarLat + nFluxVar), MPI_SUM, 0, iComm, iError)
 
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
@@ -1213,7 +1248,7 @@ contains
            File_I(iFile) % Buffer_II([iVarLon,iVarLat], :, 1) * cRadToDeg
 
       ! print data to file
-      if(iProc==0)&
+      if(iProc==0) &
            call save_plot_file(&
            NameFile      = NameFile, &
            StringHeaderIn= StringHeader, &
@@ -1702,7 +1737,7 @@ contains
       end do !  iLine
 
       ! account for the requested output, only on the source processor
-      if(iProc==0)then
+      if(iProc==0) then
          select case(File_I(iFile) % iTypeDistr)
          case(CDF_)
             ! do nothing
@@ -1718,8 +1753,8 @@ contains
       end if
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II,&
-                 (nP+2)*nMu*nLineAll, MPI_SUM, 0, iComm, iError)
+      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+           (nP+2)*nMu*nLineAll, MPI_SUM, 0, iComm, iError)
       ! print data to file
       if(iProc==0) then
          ! Note: here, by including nDimIn, all the Coord{1, 2(, 3)}In_I
@@ -2105,17 +2140,18 @@ contains
     !==========================================================================
     subroutine write_flux_2d
 
+      ! write file with fluxes in the format to be read by IDL/TECPLOT;
+      ! single file is created for all field lines, and the name format is
+      ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
+      ! name of the output file
+
       use SP_ModTriangulate, ONLY:  &
            intersect_surf, build_trmesh, interpolate_trmesh
       use SP_ModChannel, ONLY: distr_to_flux
       use SP_ModGrid, ONLY: nP, nMu
       use ModCoordTransform, ONLY: rlonlat_to_xyz
       use ModNumConst, ONLY: cDegToRad
-      ! write file with fluxes in the format to be read by IDL/TECPLOT;
-      ! single file is created for all field lines, name format is
-      ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
-      ! name of the output file
-      real :: Distr_II(0:nP+1,nMu), Xyz_D(3), Longitude, Latitude
+      real :: Distr_II(0:nP+1,nMu), Xyz_D(nDim), Longitude, Latitude
       character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
@@ -2138,28 +2174,29 @@ contains
       call make_file_name( &
            StringBase    = NameFluxData,                      &
            Radius        = File_I(iFile) % Radius,            &
-           Time = SPTime,                                     &
+           Time          = SPTime,                            &
+           iIter         = iIter,                             &
            NameExtension = File_I(iFile) % NameFileExtension, &
            NameOut       = NameFile)
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0.0
       call intersect_surf(File_I(iFile)%Radius)
-      if(iProc/=0)RETURN
+      if(iProc/=0) RETURN
       call build_trmesh()
       do iLat = File_I(iFile)%iRange_I(3), File_I(iFile)%iRange_I(4)
-         Latitude = -90.0 + (iLat - 0.50)*180.0/File_I(iFile)%iRange_I(4)
+         Latitude = -90.0 + (iLat - 0.5)*180.0/File_I(iFile)%iRange_I(4)
          do iLon = File_I(iFile)%iRange_I(1), File_I(iFile)%iRange_I(2)
-            Longitude = (iLon - 0.50)*360.0/File_I(iFile)%iRange_I(2)
-            call rlonlat_to_xyz([File_I(iFile)%Radius,     &
+            Longitude = (iLon - 0.5)*360.0/File_I(iFile)%iRange_I(2)
+            call rlonlat_to_xyz([File_I(iFile)%Radius, &
                  Longitude*cDegToRad, Latitude*cDegToRad], Xyz_D)
             call interpolate_trmesh(Xyz_D, DistrInterp_II = Distr_II, &
                  iStencilOut_I=iStencil_I)
-            if(all(iStencil_I==-1))then
+            if(all(iStencil_I==-1)) then
                File_I(iFile)%Buffer_II(:, iLon, iLat) = &
                     FluxChannelInit_V(Flux0_:FluxMax_)
             else
-               call distr_to_flux(Distr_II(1:nP, :),&
+               call distr_to_flux(Distr_II(1:nP, :), &
                     File_I(iFile)%Buffer_II(:, iLon, iLat))
             end if
          end do
@@ -2177,12 +2214,15 @@ contains
            StringHeaderIn= StringHeader, &
            TypeFileIn    = File_I(iFile) % TypeFile, &
            nDimIn        = 2, &
-           TimeIn        = SPTime,  &
+           TimeIn        = SPTime, &
+           nStepIn       = iIter, &
            CoordMinIn_D  = [ 180.0/File_I(iFile)%iRange_I(2),&
            -90.0 + 90.0/File_I(iFile)%iRange_I(4)],&
            CoordMaxIn_D  = [ 360.0 - 180.0/File_I(iFile)%iRange_I(2),&
            90.0 - 90.0/File_I(iFile)%iRange_I(4)], &
-           NameVarIn     = trim(File_I(iFile) % NameVarPlot), &
+           NameVarIn     = &
+           trim(File_I(iFile) % NameVarPlot) // ' ' // &
+           trim(File_I(iFile) % NameAuxPlot), &
            VarIn_VII     = File_I(iFile) % Buffer_II)
 
     end subroutine write_flux_2d
@@ -2190,7 +2230,7 @@ contains
     subroutine write_flux_time
 
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
-      ! single time series file is created for all field line, name format is
+      ! single time series file is created for all field lines with name format
       ! Flux_R=<Radius [AU]>_Lon=<Longitude[deg]>_Lat=<Latitude[deg]>.{out/dat}
 
       ! name of the output file
@@ -2313,7 +2353,7 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II(&
+      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II( &
            1:nFluxVar, nDataLine, 1), nFluxVar, MPI_SUM, 0, iComm, iError)
       if(iProc==0)then
          ! add background/initial flux back
@@ -2348,6 +2388,136 @@ contains
       end if
 
     end subroutine write_flux_time
+    !==========================================================================
+    subroutine write_flux_z0
+
+      ! write file with fluxes in the format to be read by IDL/TECPLOT;
+      ! single file is created for the z=0 plane, and the name format is
+      ! Flux_z=0_t<ddhhmmss>_n<iIter>.{out/dat}
+      ! name of the output file
+
+      use SP_ModTriangulate, ONLY:  &
+           intersect_surf, build_trmesh, interpolate_trmesh
+      use SP_ModChannel, ONLY: distr_to_flux
+      use SP_ModGrid, ONLY: nP, nMu
+      use ModCoordTransform, ONLY: rlonlat_to_xyz
+      use ModNumConst, ONLY: cDegToRad
+      real :: Distr_II(0:nP+1,nMu), Xyz_D(nDim)
+      ! get the radius of each shell
+      integer, allocatable :: iRStart_I(:), iREnd_I(:)
+      integer :: iProcChunk, iRRemainder, iPE
+      real, allocatable :: Radius_I(:), Longitude_I(:)
+      real :: dR, dLogR
+      character(len=100):: NameFile
+      ! header of the output file
+      character(len=500):: StringHeader
+      ! loop variables
+      integer:: iR, iLon, iStencil_I(3)
+      ! for better readability
+      integer :: nFluxVar
+      ! additional parameters
+      integer, parameter:: StartTime_  = 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      real :: Param_I(1:StartJulian_)
+      character(len=*), parameter:: NameSub = 'write_flux_z0'
+      !------------------------------------------------------------------------
+      nFluxVar  = File_I(iFile)%nFluxVar
+
+      ! header for the output file
+      StringHeader = &
+           'MFLAMPA: flux data on a sphere at fixed heliocentric distance;'//&
+           ' Coordindate system: '//trim(TypeCoordSystem)//'; '&
+           //trim(File_I(iFile)%StringHeaderAux)
+
+      ! set the file name
+      call make_file_name( &
+           StringBase    = NameFluxData//'_z=0_',             &
+           Time          = SPTime,                            &
+           iIter         = iIter,                             &
+           NameExtension = File_I(iFile) % NameFileExtension, &
+           NameOut       = NameFile)
+
+      ! Determine chunk size, start and end indices for each processor
+      if(allocated(iRStart_I)) deallocate(iRStart_I)
+      if(allocated(iREnd_I)) deallocate(iREnd_I)
+      allocate(iRStart_I(0:nProc-1), iREnd_I(0:nProc-1))
+      iProcChunk = File_I(iFile)%iCutRange_I(1)/nProc        ! Base chunk size
+      iRRemainder = mod(File_I(iFile)%iCutRange_I(1), nProc) ! Leftover element
+      ! Loop over processors to compute start and end indices
+      do iPE = 0, nProc-1
+         if(iPE < iRRemainder) then
+            iRStart_I(iPE) = iPE*(iProcChunk+1) + 1
+            iREnd_I(iPE)   = iRStart_I(iPE) + iProcChunk
+         else
+            iRStart_I(iPE) = iPE*iProcChunk + iRRemainder+1
+            iREnd_I(iPE)   = iRStart_I(iPE) + iProcChunk-1
+         end if
+      end do
+
+      ! radius & longitude of each shell
+      allocate(Radius_I(File_I(iFile)%iCutRange_I(1)))
+      dR = (File_I(iFile)%RMax - File_I(iFile)%RMin) &
+           /real(File_I(iFile)%iCutRange_I(1))
+      dLogR = log(File_I(iFile)%RMax/File_I(iFile)%RMin) &
+           /real(File_I(iFile)%iCutRange_I(1))
+      do iR = 1, File_I(iFile)%iCutRange_I(1)
+         ! get the radius: combination of linear and exponential growth
+         Radius_I = 0.5*File_I(iFile)%RMin * exp(iR*dLogR) &
+              + 0.5*(File_I(iFile)%RMin + (real(iR)-1.0)*dR)
+      end do
+      allocate(Longitude_I(File_I(iFile)%iCutRange_I(2)))
+      do iLon = 1, File_I(iFile)%iCutRange_I(2)
+         Longitude_I(iLon) = (iLon - 0.5)*360.0/File_I(iFile)%iCutRange_I(2)
+      end do
+
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0.0
+      do iR = iRStart_I(iProc), iREnd_I(iProc)
+         call intersect_surf(Radius_I(iR))
+         call build_trmesh()
+         do iLon = 1, File_I(iFile)%iCutRange_I(2)
+            call rlonlat_to_xyz([Radius_I(iR), &
+                 Longitude_I(iLon)*cDegToRad, 0.0], Xyz_D)
+            call interpolate_trmesh(Xyz_D, DistrInterp_II = Distr_II, &
+                 iStencilOut_I=iStencil_I)
+            if(all(iStencil_I==-1)) then
+               File_I(iFile)%Buffer_II(:, iLon, iR) = &
+                    FluxChannelInit_V(Flux0_:FluxMax_)
+            else
+               call distr_to_flux(Distr_II(1:nP, :), &
+                    File_I(iFile)%Buffer_II(:, iLon, iR))
+            end if
+         end do
+      end do !  iR on iProc
+
+      ! gather interpolated data on the source processor
+      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+           nFluxVar*product(File_I(iFile)%iCutRange_I), &
+           MPI_SUM, 0, iComm, iError)
+
+      ! start time in seconds from base year
+      Param_I(StartTime_)   = StartTime
+      ! start time in Julian date
+      Param_I(StartJulian_) = StartTimeJulian
+
+      ! print data to file
+      if(iProc==0) &
+           call save_plot_file( &
+           NameFile      = NameFile, &
+           StringHeaderIn= StringHeader, &
+           TypeFileIn    = File_I(iFile) % TypeFile, &
+           nDimIn        = 2, &
+           TimeIn        = SPTime, &
+           nStepIn       = iIter, &
+           Coord1In_I    = Radius_I, &
+           Coord2In_I    = Longitude_I, &
+           NameVarIn     = &
+           trim(File_I(iFile) % NameVarPlot) // ' ' // &
+           trim(File_I(iFile) % NameAuxPlot), &
+           VarIn_VII     = File_I(iFile) % Buffer_II)
+      deallocate(Radius_I)
+
+    end subroutine write_flux_z0
     !==========================================================================
     subroutine write_shock_2d
 
@@ -2415,8 +2585,8 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1)call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
-                 nLineAll * nExtraVar, MPI_SUM, 0, iComm, iError)
+      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+           nLineAll*nExtraVar, MPI_SUM, 0, iComm, iError)
 
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
@@ -2424,7 +2594,7 @@ contains
       Param_I(StartJulian_) = StartTimeJulian
 
       ! print data to file
-      if(iProc==0)&
+      if(iProc==0) &
            call save_plot_file(&
            NameFile      = NameFile, &
            StringHeaderIn= StringHeader, &
@@ -2669,7 +2839,7 @@ contains
 
   end subroutine get_date_time_string
   !============================================================================
-  subroutine make_file_name(StringBase, Radius, Longitude, Latitude,&
+  subroutine make_file_name(StringBase, Radius, Longitude, Latitude, &
        iLine, iIter, Time, NameExtension, NameOut)
 
     ! creates a string with file name and stores in NameOut;

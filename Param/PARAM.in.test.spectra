@@ -102,37 +102,42 @@ SP/TRAJECTORY/solo.dat		NameTrajectoryFile
 #SAVEPLOT
 9			nFileOut
 mh1d single flux ascii		StringPlot
-2    	    	 	iLon
+2			iLon
 2			iLat
 mh2d flux ascii		StringPlot
 215.0			Radius
 mhtime range flux ascii		StringPlot
-2      	     	  	iLonMin
+2			iLonMin
 2			iLonMax
 2			iLatMin
 2			iLatMax
 215.0			Radius
 distr1d single energy distance def ascii		StringPlot
-2	      	     	iLon
+2			iLon
 2			iMax
 distr1d range momentum length cdf ascii		StringPlot
-2	      	       iLonMin
-2		       iLonMax
-2		       iLatMin
-2		       iLatMax
+2			iLonMin
+2			iLonMax
+2			iLatMin
+2			iLatMax
 distr2d energy def ascii		StringPlot
 215.0			Radius
 distrtime range energy def ascii		StringPlot
-2
-2
-2
-2
+2			iLonMin
+2			iLonMax
+2			iLatMin
+2			iLatMax
 215.0			Radius
 distrtraj energy def ascii		StringPlot
 flux2d ascii	     			StringPlot
 215.0			Radius
 72			nLonFlux2d
 36			nLatFlux2d
+fluxz=0 ascii	     			StringPlot
+1.2			RadiusMin
+240.0			RadiusMax
+72			nRFlux2d
+36			nLonFlux2d
 
 #NOUTPUT
 -1			nOutput
