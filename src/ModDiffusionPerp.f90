@@ -37,7 +37,7 @@ module SP_ModPerpDiffusion
   real, public      :: DParaRatio = 0.065       ! Simple ratio of Dperp/Dpara
 
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
-  integer         :: nRPerp, nThetaPerp, nPhiPerp
+  integer, public :: nRPerp, nThetaPerp, nPhiPerp
   real            :: dThetaPerp, dPhiPerp       ! dTheta and dPhi
   real, allocatable:: dRPerpMesh_I(:), dRPerpFace_I(:) ! dR of cell center+face
   real            :: RMinPerp = 1.2, RMaxPerp = 240.0  ! RMin and RMax of Grid
@@ -46,6 +46,13 @@ module SP_ModPerpDiffusion
   integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
   real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &    ! default:
        RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:) ! SI units
+
+  ! For the FVM solver on the uniform grid: face areas and cell volumes
+  real, allocatable:: dVolumeR_I(:), dRPerpFace2_I(:)   ! radial direction
+  real, allocatable:: ThetaPerpSin_C(:), dCosTheta_I(:) ! theta direction
+  real, allocatable:: &
+       AreaR_IIF(:,:,:), AreaTheta_IFI(:,:,:), AreaPhi_FII(:,:,:)    ! faces
+  real, public, allocatable :: Volume_CB(:,:,:)                      ! volume
   real, public, allocatable :: Dt_CB(:,:,:,:)
 contains
   !============================================================================
@@ -100,23 +107,32 @@ contains
   subroutine init
     ! setup the uniform spheres and time stepping in perpendicular diffusion
 
-    use ModCoordTransform, ONLY: sph_to_xyz
-    integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
     integer :: iProcChunk, iRPerpRemainder, iPE
     character(len=*), parameter:: NameSub = 'init'
     !--------------------------------------------------------------------------
     ! setup the mesh arrays for triangulation used in perpendicular diffusion
-    if(allocated(RPerp_C)) deallocate(RPerp_C)
-    allocate(RPerp_C(nRPerp))
-    if(allocated(RPerp_F)) deallocate(RPerp_F)
-    allocate(RPerp_F(nRPerp+1))
-    if(allocated(dRPerpMesh_I)) deallocate(dRPerpMesh_I)
-    allocate(dRPerpMesh_I(nRPerp-1))
-    if(allocated(dRPerpFace_I)) deallocate(dRPerpFace_I)
-    allocate(dRPerpFace_I(nRPerp))
-    if(allocated(XyzPerp_CB)) deallocate(XyzPerp_CB)
-    allocate(XyzPerp_CB(X_:Z_, nPhiPerp, nThetaPerp, nRPerp))
+    ! Grid
+    if(allocated(RPerp_C)) &
+         deallocate(RPerp_C, RPerp_F, &
+         dRPerpMesh_I, dRPerpFace_I, XyzPerp_CB)
+    allocate(RPerp_C(nRPerp), RPerp_F(nRPerp+1), &
+         dRPerpMesh_I(nRPerp-1), dRPerpFace_I(nRPerp), &
+         XyzPerp_CB(X_:Z_, nPhiPerp, nThetaPerp, nRPerp))
     XyzPerp_CB = 0.0
+
+    ! Faces and volume used in the FVM solver
+    if(allocated(Volume_CB)) &
+         deallocate(dVolumeR_I, dRPerpFace2_I, &
+         ThetaPerpSin_C, dCosTheta_I, &
+         AreaR_IIF, AreaTheta_IFI, AreaPhi_FII, Volume_CB)
+    allocate(dVolumeR_I(nRPerp), dRPerpFace2_I(nRPerp), &
+         ThetaPerpSin_C(nThetaPerp), dCosTheta_I(nThetaPerp), &
+         AreaR_IIF(nPhiPerp, nThetaPerp, nRPerp+1), &
+         AreaTheta_IFI(nPhiPerp, nThetaPerp+1, nRPerp), &
+         AreaPhi_FII(nPhiPerp+1, nThetaPerp, nRPerp), &
+         Volume_CB(nPhiPerp, nThetaPerp, nRPerp))
+
+    ! DPerp coefficient
     if(allocated(DPerp_CB)) deallocate(DPerp_CB)
     allocate(DPerp_CB(nP, nMu, nVertexMax, nLine), stat=iError)
     DPerp_CB = 0.0
@@ -138,78 +154,127 @@ contains
        end if
     end do
 
-    ! R: radial direction
-    select case(trim(ScaleRPerp))
-    case("Linear", "linear")
-       ! Linear (i.e., Uniform) Grid
-       dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
-       dRPerpFace_I = dRPerpMesh_I(1) ! Same=Const.
-       do iRPerp = 1, nRPerp
-          RPerp_F(iRPerp) = RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1)
-       end do
-       RPerp_F(nRPerp+1) = RMaxPerp
-       RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
-    case("Exp", "exp", "Exponential", "exponential")
-       ! Exponential Grid
-       dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
-       do iRPerp = 1, nRPerp+1
-          RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
-       end do
-       RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
-       dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
-       dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
-    case("HalfExp", "halfexp", "HalfLinear", "halflinear")
-       ! Half Exponential + Half Linear Grid -- From Experience
-       dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
-       dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
-       do iRPerp = 1, nRPerp+1
-          RPerp_F(iRPerp) = 0.5*RMinPerp * exp(iRPerp*dLogRFacePerp) &
-               + 0.5*(RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1))
-       end do
-       RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
-       dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
-       dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
-    case default
-       call CON_stop(NameSub// &
-            'Error in ScaleRPerp for Perpendicular Diffusion.')
-    end select
-    dRPerpMesh_I = dRPerpMesh_I*Io2Si_V(UnitX_)
-    dRPerpFace_I = dRPerpFace_I*Io2Si_V(UnitX_)
-    RPerp_C = RPerp_C*Io2Si_V(UnitX_)
-    RPerp_F = RPerp_F*Io2Si_V(UnitX_)
-
-    ! Theta: zenith/latitudinal direction
-    dThetaPerp = cPi/real(nThetaPerp)
-    if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C)
-    allocate(ThetaPerp_C(nThetaPerp))
-    do iThetaPerp = 1, nThetaPerp
-       ThetaPerp_C(iThetaPerp) = (real(iThetaPerp)-0.5)*dThetaPerp
-    end do
-
-    ! Phi: azimuthal/longitudinal direction
-    dPhiPerp = cTwoPi/real(nPhiPerp)
-    if(allocated(PhiPerp_C)) deallocate(PhiPerp_C)
-    allocate(PhiPerp_C(nPhiPerp))
-    do iPhiPerp = 1, nPhiPerp
-       PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
-    end do
-
-    ! (R, Theta, Phi) => (X, Y, Z) + Parallelization
-    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-       do iThetaPerp = 1, nThetaPerp
-          do iPhiPerp = 1, nPhiPerp
-             call sph_to_xyz(RPerp_C(iRPerp), &
-                  ThetaPerp_C(iThetaPerp), PhiPerp_C(iPhiPerp), &
-                  XyzPerp_CB(:, iPhiPerp, iThetaPerp, iRPerp))
-          end do
-       end do
-    end do
-    if(nProc > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, XyzPerp_CB, &
-         3*nPhiPerp*nThetaPerp*nRPerp, MPI_REAL, MPI_SUM, iComm, iError)
+    ! Initialize the uniform grid
+    call init_uniform_grid
+    ! Precompute the face area and volume of the uniform grid
+    call calc_uniform_grid_area_volume
 
     ! Allocate Dt_CB
     if(IsSteadyState) allocate(Dt_CB(nP, nMu, nVertexMax, nLine), stat=iError)
 
+  contains
+    !==========================================================================
+    subroutine init_uniform_grid
+      ! Initialize the uniform grid
+
+      use ModCoordTransform, ONLY: sph_to_xyz
+      integer :: iRPerp, iThetaPerp, iPhiPerp ! loop variables
+      !------------------------------------------------------------------------
+      ! R: radial direction
+      select case(trim(ScaleRPerp))
+      case("Linear", "linear")
+         ! Linear (i.e., Uniform) Grid
+         dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
+         dRPerpFace_I = dRPerpMesh_I(1) ! Same=Const.
+         do iRPerp = 1, nRPerp
+            RPerp_F(iRPerp) = RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1)
+         end do
+         RPerp_F(nRPerp+1) = RMaxPerp
+         RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+      case("Exp", "exp", "Exponential", "exponential")
+         ! Exponential Grid
+         dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
+         do iRPerp = 1, nRPerp+1
+            RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
+         end do
+         RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+         dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
+         dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
+      case("HalfExp", "halfexp", "HalfLinear", "halflinear")
+         ! Half Exponential + Half Linear Grid -- From Experience
+         dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
+         dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
+         do iRPerp = 1, nRPerp+1
+            RPerp_F(iRPerp) = 0.5*RMinPerp * exp(iRPerp*dLogRFacePerp) &
+                 + 0.5*(RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1))
+         end do
+         RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
+         dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
+         dRPerpMesh_I = RPerp_C(2:nRPerp) - RPerp_C(1:nRPerp-1)
+      case default
+         call CON_stop(NameSub// &
+              'Error in ScaleRPerp for Perpendicular Diffusion.')
+      end select
+      dRPerpMesh_I = dRPerpMesh_I*Io2Si_V(UnitX_)
+      dRPerpFace_I = dRPerpFace_I*Io2Si_V(UnitX_)
+      RPerp_C = RPerp_C*Io2Si_V(UnitX_)
+      RPerp_F = RPerp_F*Io2Si_V(UnitX_)
+
+      ! Theta: zenith/latitudinal direction
+      dThetaPerp = cPi/real(nThetaPerp)
+      if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C)
+      allocate(ThetaPerp_C(nThetaPerp))
+      do iThetaPerp = 1, nThetaPerp
+         ThetaPerp_C(iThetaPerp) = (real(iThetaPerp)-0.5)*dThetaPerp
+      end do
+
+      ! Phi: azimuthal/longitudinal direction
+      dPhiPerp = cTwoPi/real(nPhiPerp)
+      if(allocated(PhiPerp_C)) deallocate(PhiPerp_C)
+      allocate(PhiPerp_C(nPhiPerp))
+      do iPhiPerp = 1, nPhiPerp
+         PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
+      end do
+
+      ! (R, Theta, Phi) => (X, Y, Z) + Parallelization
+      do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
+         do iThetaPerp = 1, nThetaPerp
+            do iPhiPerp = 1, nPhiPerp
+               call sph_to_xyz(RPerp_C(iRPerp), &
+                    ThetaPerp_C(iThetaPerp), PhiPerp_C(iPhiPerp), &
+                    XyzPerp_CB(:, iPhiPerp, iThetaPerp, iRPerp))
+            end do
+         end do
+      end do
+      if(nProc > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, XyzPerp_CB, &
+           3*nPhiPerp*nThetaPerp*nRPerp, MPI_REAL, MPI_SUM, iComm, iError)
+
+    end subroutine init_uniform_grid
+    !==========================================================================
+    subroutine calc_uniform_grid_area_volume
+      ! Pre-calculate the face areas and cell volumes
+
+      integer :: i, j
+      !------------------------------------------------------------------------
+      ! Grids
+      ! Radial: RPerp_C, RPerp_F, dRPerpMesh_I, dRPerpFace_I, dRPerpFace2_I
+      dRPerpFace2_I = 0.5*(RPerp_F(2:nRPerp+1)**2 - RPerp_F(1:nRPerp)**2)
+      ! Theta: ThetaPerp_C, ThetaPerp_F, dThetaPerp
+      ThetaPerpSin_C = sin(ThetaPerp_C) ! needed also in FVM internal fluxes
+      ! Phi: PhiPerp_C, PhiPerp_F, dPhiPerp -- Ready
+
+      ! Precompute: Face area and cell volume
+      dVolumeR_I = (RPerp_F(2:nRPerp+1)**3 - RPerp_F(1:nRPerp)**3)/3.0
+      dCosTheta_I = cos(ThetaPerp_F(1:nThetaPerp)) - &
+           cos(ThetaPerp_F(2:nThetaPerp+1))
+      do i = 1, nRPerp+1
+         do j = 1, nThetaPerp
+            AreaR_IIF(:,j,i) = RPerp_F(i)**2*dCosTheta_I(j)*dPhiPerp
+         end do
+      end do
+      do i = 1, nRPerp
+         do j = 1, nThetaPerp
+            Volume_CB(:,j,i) = dVolumeR_I(i)*dCosTheta_I(j)*dPhiPerp
+            AreaTheta_IFI(:,j,i) = dRPerpFace2_I(i)* &
+                 sin(ThetaPerp_F(j))*dPhiPerp
+         end do
+         AreaTheta_IFI(:,nThetaPerp+1,i) = dRPerpFace2_I(i)* &
+              sin(ThetaPerp_F(nThetaPerp+1))*dPhiPerp
+         AreaPhi_FII(:,:,i) = dRPerpFace2_I(i)*dThetaPerp
+      end do
+
+    end subroutine calc_uniform_grid_area_volume
+    !==========================================================================
   end subroutine init
   !============================================================================
   subroutine diffuseperp_distribution_s(IsFirstCall, dtIn)
@@ -462,12 +527,7 @@ contains
     ! time step and iterations
     real :: dtMax, dt, DPerpMax
     integer :: nStep
-    ! face areas and cell volumes
-    real :: VolumeInv_CB(nPhiPerp, nThetaPerp, nRPerp)
-    real :: ThetaPerpSin_C(nThetaPerp)
-    real :: AreaR_IIF(nPhiPerp, nThetaPerp, nRPerp+1), &
-         AreaTheta_IFI(nPhiPerp, nThetaPerp+1, nRPerp), &
-         AreaPhi_FII(nPhiPerp+1, nThetaPerp, nRPerp)
+
     ! ghost VDF when sendrecv across prev-current-next processors
     real :: DistrPrevProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp), &
          DistrNextProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp)
@@ -477,8 +537,6 @@ contains
     iProcPrev = iProc - 1
     iProcNext = iProc + 1
     source_5D = 0.0
-    ! Precompute: Grid, face area and cell volume
-    call calc_area_volume
 
     if(IsSteadyStateIn) then
        ! Steady-state mode: Only 1 step, no use of dt indeed
@@ -492,7 +550,6 @@ contains
        dtMax = 0.5*min(minval(dRPerpFace_I)**2, &
             (RMinPerp*dThetaPerp)**2, &
             (RMinPerp*minval(ThetaPerpSin_C(2:nThetaPerp-1))*dPhiPerp)**2) &
-            *Io2Si_V(UnitX_)**2 & ! convert to SI unit [m**2]
             /DPerpMax
        nStep = int(dtIn/dtMax) + 1
        dt = dtIn/real(nStep)
@@ -513,41 +570,6 @@ contains
     end do DIFFUSE3D
 
   contains
-    !==========================================================================
-    subroutine calc_area_volume
-      ! Pre-calculate the face areas and cell volumes
-
-      real :: dVolumeR_I(nRPerp), dRPerpFace2_I(nRPerp)  ! radial direction
-      real :: dCosTheta_I(nThetaPerp)                    ! theta direction
-      !------------------------------------------------------------------------
-      ! Grids
-      ! Radial: RPerp_C, RPerp_F, dRPerpMesh_I, dRPerpFace_I, dRPerpFace2_I
-      dRPerpFace2_I = 0.5*(RPerp_F(2:nRPerp+1)**2 - RPerp_F(1:nRPerp)**2)
-      ! Theta: ThetaPerp_C, ThetaPerp_F, dThetaPerp
-      ThetaPerpSin_C = sin(ThetaPerp_C) ! needed also in FVM internal fluxes
-      ! Phi: PhiPerp_C, PhiPerp_F, dPhiPerp -- Ready
-
-      ! Precompute: Face area and cell volume
-      dVolumeR_I = (RPerp_F(2:nRPerp+1)**3 - RPerp_F(1:nRPerp)**3)/3.0
-      dCosTheta_I = cos(ThetaPerp_F(1:nThetaPerp)) - &
-           cos(ThetaPerp_F(2:nThetaPerp+1))
-      do i = 1, nRPerp+1
-         do j = 1, nThetaPerp
-            AreaR_IIF(:,j,i) = RPerp_F(i)**2*dCosTheta_I(j)*dPhiPerp
-         end do
-      end do
-      do i = 1, nRPerp
-         do j = 1, nThetaPerp
-            VolumeInv_CB(:,j,i) = 1.0/(dVolumeR_I(i)*dCosTheta_I(j)*dPhiPerp)
-            AreaTheta_IFI(:,j,i) = dRPerpFace2_I(i)* &
-                 sin(ThetaPerp_F(j))*dPhiPerp
-         end do
-         AreaTheta_IFI(:,nThetaPerp+1,i) = dRPerpFace2_I(i)* &
-              sin(ThetaPerp_F(nThetaPerp+1))*dPhiPerp
-         AreaPhi_FII(:,:,i) = dRPerpFace2_I(i)*dThetaPerp
-      end do
-
-    end subroutine calc_area_volume
     !==========================================================================
     subroutine exchange_ghostVDF
       ! Exchange ghostVDF: iProcPrev |<=| (Start) iProc (End) |=>| iProcNext
@@ -584,6 +606,7 @@ contains
       ! calculate internal net fluxes in the FVM solver
 
       integer :: jPlus, jMinus, kPlus, kMinus
+      real    :: VolumeInv
       real, dimension(1:nP, 1:nMu) :: DPerpPlus_II, DPerpMinus_II
       real, dimension(0:nP+1, 1:nMu) :: DistrPlus_II, DistrMinus_II
       !------------------------------------------------------------------------
@@ -595,6 +618,8 @@ contains
             jMinus = max(j-1, 1) ! j or 1
 
             do k = 1, nPhiPerp
+               VolumeInv = 1.0/Volume_CB(k,j,i)
+
                ! Part 1 -- Face_r: Radial fluxes
                ! VDF at i+1 (ip)
                if(i < iREnd) then
@@ -630,13 +655,13 @@ contains
                     *(DistrPlus_II(1:nP,:) - DistrPerp_5D(1:nP,:,k,j,i))&
                     /dRPerpFace_I(i) &    ! * gradF at face(i, ip)
                     *AreaR_IIF(k,j,i+1) & ! * area of face(i, ip)
-                    *VolumeInv_CB(k,j,i)  ! / volume of (k, j, i)
+                    *VolumeInv            ! / volume of (k, j, i)
                sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &       ! - DPerp at face(im, i)
                     *(DistrPerp_5D(1:nP,:,k,j,i) - DistrMinus_II(1:nP,:))&
                     /dRPerpFace_I(i) &    ! * gradF at face(im, i)
                     *AreaR_IIF(k,j,i) &   ! * area of face(im, i)
-                    *VolumeInv_CB(k,j,i)  ! / volume of (k, j, i)
+                    *VolumeInv            ! / volume of (k, j, i)
 
                ! Part 2 -- Face_theta: Theta fluxes
                ! DPerp coefficient at face(j, j+1)
@@ -662,14 +687,14 @@ contains
                     -DistrPerp_5D(1:nP,:,k,j,i))&
                     /(RPerp_C(i)*dThetaPerp) &  ! * gradF at face(j, jp)
                     *AreaTheta_IFI(k,j+1,i) &   ! * area of face(j, jp)
-                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
+                    *VolumeInv                  ! / volume of (k, j, i)
                sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &             ! - DPerp at face(jm, j)
                     *(DistrPerp_5D(1:nP,:,k,j,i)&
                     -DistrPerp_5D(1:nP,:,k,jMinus,i))&
                     /(RPerp_C(i)*dThetaPerp) &  ! * gradF at face(jm, j)
                     *AreaTheta_IFI(k,j,i) &     ! * area of face(jm, j)
-                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
+                    *VolumeInv                  ! / volume of (k, j, i)
 
                ! Part 3 -- Face_phi: Phi fluxes
                kPlus = mod(k,nPhiPerp)+1              ! next index with wrap
@@ -687,14 +712,14 @@ contains
                     -DistrPerp_5D(1:nP,:,k,j,i))&
                     /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp) &
                     *AreaPhi_FII(kPlus,j,i) &   ! * area of face(k, kp)
-                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
+                    *VolumeInv                  ! / volume of (k, j, i)
                sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &             ! - DPerp at face(km, k)
                     *(DistrPerp_5D(1:nP,:,k,j,i)& ! * gradF at face(km, k)
                     -DistrPerp_5D(1:nP,:,kMinus,j,i))&
                     /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp) &
                     *AreaPhi_FII(kMinus,j,i) &  ! * area of face(km, k)
-                    *VolumeInv_CB(k,j,i)        ! / volume of (k, j, i)
+                    *VolumeInv                  ! / volume of (k, j, i)
             end do
          end do
       end do
