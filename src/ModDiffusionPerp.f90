@@ -12,7 +12,7 @@ module SP_ModPerpDiffusion
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: IsSteadyState
   use SP_ModProc, ONLY: nProc, iProc, iComm, iError
-  use SP_ModUnit, ONLY: Io2Si_V, UnitX_
+  use SP_ModUnit, ONLY: Io2Si_V, Si2Io_V, UnitX_
   use SP_ModTurbulence, ONLY: DPerp_CB
 
   implicit none
@@ -44,8 +44,8 @@ module SP_ModPerpDiffusion
   real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
   character(len=6):: ScaleRPerp                 ! Scale (Linear/Log) along R_
   integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
-  real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
-       RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:)
+  real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &    ! default:
+       RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:) ! SI units
   real, public, allocatable :: Dt_CB(:,:,:,:)
 contains
   !============================================================================
@@ -173,6 +173,10 @@ contains
        call CON_stop(NameSub// &
             'Error in ScaleRPerp for Perpendicular Diffusion.')
     end select
+    dRPerpMesh_I = dRPerpMesh_I*Io2Si_V(UnitX_)
+    dRPerpFace_I = dRPerpFace_I*Io2Si_V(UnitX_)
+    RPerp_C = RPerp_C*Io2Si_V(UnitX_)
+    RPerp_F = RPerp_F*Io2Si_V(UnitX_)
 
     ! Theta: zenith/latitudinal direction
     dThetaPerp = cPi/real(nThetaPerp)
@@ -285,8 +289,9 @@ contains
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
              ! Get VDF at the cell center in the uniform grid
-             call interpolate_trmesh(XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp),&
-                  iRIn = iRPerp, DistrInterp_II =                             &
+             call interpolate_trmesh(XyzPerp_CB(:, &
+                  iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
+                  iRIn = iRPerp, DistrInterp_II =              &
                   DistrPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
           end do
        end do
