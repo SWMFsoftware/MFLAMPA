@@ -326,9 +326,10 @@ contains
           do iThetaPerp = 1, nThetaPerp
              do iPhiPerp = 1, nPhiPerp
                 ! Get DPerp coefficient at the cell center in the uniform grid
-                call interpolate_trmesh( &
-                     XyzPerp_CB(:,iPhiPerp,iThetaPerp,iRPerp), iRIn = iRPerp, &
-                     DPerp_II = DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+                call interpolate_trmesh(XyzPerp_CB(:,             &
+                     iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
+                     iRIn = iRPerp, DPerp_II =                    &
+                     DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
              end do
           end do
        end do
@@ -354,7 +355,7 @@ contains
        do iThetaPerp = 1, nThetaPerp
           do iPhiPerp = 1, nPhiPerp
              ! Get VDF at the cell center in the uniform grid
-             call interpolate_trmesh(XyzPerp_CB(:, &
+             call interpolate_trmesh(XyzPerp_CB(:,             &
                   iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
                   iRIn = iRPerp, DistrInterp_II =              &
                   DistrPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
@@ -364,8 +365,8 @@ contains
 
     ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
     source_5D = 0.0
-    call solver_fvm_diffuse3d(DPerp_5D, &
-         iRPerpStart_I(iProc), iRPerpEnd_I(iProc), &
+    call solver_fvm_diffuse3d(DPerp_5D,                 &
+         iRPerpStart_I(iProc), iRPerpEnd_I(iProc),      &
          IsSteadyState, dtIn_CB(1,1,1,1), DistrPerp_5D, &
          source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)))
     ! Broadcast source_5D (uniform grid) to all processes
