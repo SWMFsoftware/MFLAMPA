@@ -152,7 +152,7 @@ contains
        iR = 1
     end if
     Xyz_DII(:,:,iR) = 0.0; iLineReach_II(:,iR) = 0
-    DistrR_IIBI(:,:,:,iR) = 0.0
+    nTriMesh_I = 0; DistrR_IIBI(:,:,:,iR) = 0.0
     if(IsIncludeDPerp) DPerp_IIBI(:,:,:,iR) = 0.0
 
     ! go over all lines on the processor and find the point of

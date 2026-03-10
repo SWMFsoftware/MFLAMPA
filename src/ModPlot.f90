@@ -411,11 +411,11 @@ contains
              ! add longitude and latitude with units to variable names
              select case(File_I(iFile) % TypeFile)
              case('tec', 'tcp')
-                File_I(iFile) % NameVarPlot = 'Radius_[RSun] Longitude_[deg]'
+                File_I(iFile) % NameVarPlot = 'Longitude_[deg] Radius_[RSun]'
              case default
-                File_I(iFile) % NameVarPlot = 'Radius Longitude '
+                File_I(iFile) % NameVarPlot = 'Longitude Radius'
                 File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)//' RSun deg'
+                     trim(File_I(iFile)%StringHeaderAux)//' deg RSun'
              end select
              File_I(iFile) % NameAuxPlot = &
                   trim(File_I(iFile) % NameAuxPlot) // &
@@ -2148,13 +2148,11 @@ contains
       use SP_ModTriangulate, ONLY:  &
            intersect_surf, build_trmesh, interpolate_trmesh
       use SP_ModChannel, ONLY: distr_to_flux
-      use SP_ModGrid, ONLY: nP, nMu
       use ModCoordTransform, ONLY: rlonlat_to_xyz
-      use ModNumConst, ONLY: cDegToRad
       real :: Distr_II(0:nP+1,nMu), Xyz_D(nDim), Longitude, Latitude
-      character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
+      character(len=100):: NameFile
       ! loop variables
       integer:: iLon, iLat, iStencil_I(3)
       ! additional parameters
@@ -2216,6 +2214,7 @@ contains
            nDimIn        = 2, &
            TimeIn        = SPTime, &
            nStepIn       = iIter, &
+           ParamIn_I     = Param_I(StartTime_:StartJulian_), &
            CoordMinIn_D  = [ 180.0/File_I(iFile)%iRange_I(2),&
            -90.0 + 90.0/File_I(iFile)%iRange_I(4)],&
            CoordMaxIn_D  = [ 360.0 - 180.0/File_I(iFile)%iRange_I(2),&
@@ -2399,18 +2398,14 @@ contains
       use SP_ModTriangulate, ONLY:  &
            intersect_surf, build_trmesh, interpolate_trmesh
       use SP_ModChannel, ONLY: distr_to_flux
-      use SP_ModGrid, ONLY: nP, nMu
       use ModCoordTransform, ONLY: rlonlat_to_xyz
-      use ModNumConst, ONLY: cDegToRad
       real :: Distr_II(0:nP+1,nMu), Xyz_D(nDim)
-      ! get the radius of each shell
-      integer, allocatable :: iRStart_I(:), iREnd_I(:)
-      integer :: iProcChunk, iRRemainder, iPE
+      ! get the radius and longitude of each shell
       real, allocatable :: Radius_I(:), Longitude_I(:)
       real :: dR, dLogR
-      character(len=100):: NameFile
       ! header of the output file
       character(len=500):: StringHeader
+      character(len=100):: NameFile
       ! loop variables
       integer:: iR, iLon, iStencil_I(3)
       ! for better readability
@@ -2431,28 +2426,11 @@ contains
 
       ! set the file name
       call make_file_name( &
-           StringBase    = NameFluxData//'_z=0_',             &
+           StringBase    = NameFluxData//'_z=0',              &
            Time          = SPTime,                            &
            iIter         = iIter,                             &
            NameExtension = File_I(iFile) % NameFileExtension, &
            NameOut       = NameFile)
-
-      ! Determine chunk size, start and end indices for each processor
-      if(allocated(iRStart_I)) deallocate(iRStart_I)
-      if(allocated(iREnd_I)) deallocate(iREnd_I)
-      allocate(iRStart_I(0:nProc-1), iREnd_I(0:nProc-1))
-      iProcChunk = File_I(iFile)%iCutRange_I(1)/nProc        ! Base chunk size
-      iRRemainder = mod(File_I(iFile)%iCutRange_I(1), nProc) ! Leftover element
-      ! Loop over processors to compute start and end indices
-      do iPE = 0, nProc-1
-         if(iPE < iRRemainder) then
-            iRStart_I(iPE) = iPE*(iProcChunk+1) + 1
-            iREnd_I(iPE)   = iRStart_I(iPE) + iProcChunk
-         else
-            iRStart_I(iPE) = iPE*iProcChunk + iRRemainder+1
-            iREnd_I(iPE)   = iRStart_I(iPE) + iProcChunk-1
-         end if
-      end do
 
       ! radius & longitude of each shell
       allocate(Radius_I(File_I(iFile)%iCutRange_I(1)))
@@ -2462,7 +2440,7 @@ contains
            /real(File_I(iFile)%iCutRange_I(1))
       do iR = 1, File_I(iFile)%iCutRange_I(1)
          ! get the radius: combination of linear and exponential growth
-         Radius_I = 0.5*File_I(iFile)%RMin * exp(iR*dLogR) &
+         Radius_I(iR) = 0.5*File_I(iFile)%RMin * exp(iR*dLogR) &
               + 0.5*(File_I(iFile)%RMin + (real(iR)-1.0)*dR)
       end do
       allocate(Longitude_I(File_I(iFile)%iCutRange_I(2)))
@@ -2472,8 +2450,9 @@ contains
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0.0
-      do iR = iRStart_I(iProc), iREnd_I(iProc)
+      do iR = 1, File_I(iFile)%iCutRange_I(1)
          call intersect_surf(Radius_I(iR))
+         if(iProc/=0) CYCLE
          call build_trmesh()
          do iLon = 1, File_I(iFile)%iCutRange_I(2)
             call rlonlat_to_xyz([Radius_I(iR), &
@@ -2490,11 +2469,6 @@ contains
          end do
       end do !  iR on iProc
 
-      ! gather interpolated data on the source processor
-      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
-           nFluxVar*product(File_I(iFile)%iCutRange_I), &
-           MPI_SUM, 0, iComm, iError)
-
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
       ! start time in Julian date
@@ -2509,13 +2483,14 @@ contains
            nDimIn        = 2, &
            TimeIn        = SPTime, &
            nStepIn       = iIter, &
-           Coord1In_I    = Radius_I, &
-           Coord2In_I    = Longitude_I, &
+           ParamIn_I     = Param_I(StartTime_:StartJulian_), &
+           Coord1In_I    = Longitude_I, &
+           Coord2In_I    = Radius_I, &
            NameVarIn     = &
            trim(File_I(iFile) % NameVarPlot) // ' ' // &
            trim(File_I(iFile) % NameAuxPlot), &
            VarIn_VII     = File_I(iFile) % Buffer_II)
-      deallocate(Radius_I)
+      deallocate(Radius_I, Longitude_I)
 
     end subroutine write_flux_z0
     !==========================================================================
