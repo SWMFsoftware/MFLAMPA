@@ -263,7 +263,7 @@ contains
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
-          case('fluxz=0')
+          case('fluxz0')
              File_I(iFile) % iKindData = FluxZ0_
           case('shock2d')
              File_I(iFile) % iKindData = Shock2D_
@@ -406,20 +406,8 @@ contains
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
           case(FluxZ0_)
-             ! mark flux to be written
-             File_I(iFile) % DoPlotFlux = .true.
-             ! add longitude and latitude with units to variable names
-             select case(File_I(iFile) % TypeFile)
-             case('tec', 'tcp')
-                File_I(iFile) % NameVarPlot = 'Longitude_[deg] Radius_[RSun]'
-             case default
-                File_I(iFile) % NameVarPlot = 'Longitude Radius'
-                File_I(iFile) % StringHeaderAux = &
-                     trim(File_I(iFile)%StringHeaderAux)//' deg RSun'
-             end select
-             File_I(iFile) % NameAuxPlot = &
-                  trim(File_I(iFile) % NameAuxPlot) // &
-                  ' StartTime StartTimeJulian'
+             call process_flux0(Z_)
+             ! read in parameters
              call read_var('RadiusMin', File_I(iFile) % RMin)
              call read_var('RadiusMax', File_I(iFile) % RMax)
              call read_var('nRFlux2d', File_I(iFile) % iCutRange_I(1))
@@ -570,6 +558,58 @@ contains
       end do ! iVar
 
     end subroutine process_mh
+    !==========================================================================
+    subroutine process_flux0(iVarPlane)
+      integer, intent(in) :: iVarPlane
+      integer :: iCoor
+      !------------------------------------------------------------------------
+      ! reset
+      File_I(iFile) % DoPlotSpread = .false.
+      ! mark flux to be written
+      File_I(iFile) % DoPlotFlux   = .true.
+      ! together with the X and Y coordinates
+      File_I(iFile) % DoPlot_V     = .false.
+      File_I(iFile) % DoPlot_V(X_) = .true.
+      File_I(iFile) % DoPlot_V(Y_) = .true.
+      File_I(iFile) % nMhdVar = count(File_I(iFile)%DoPlot_V(1:nMhData))
+
+      select case(File_I(iFile) % TypeFile)
+      case('tec', 'tcp')
+         File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot) // &
+              'Longitude_[deg] '//trim(NameVar_V(R_))// &
+              '_['//trim(NameVarUnit_V(R_))//']'
+         do iVar = X_, Z_
+            if(iVar == iVarPlane) CYCLE
+            File_I(iFile) % NameVarPlot = &
+                 trim(File_I(iFile) % NameVarPlot)//' '// &
+                 trim(NameVar_V(iVar))//'_['//trim(NameVarUnit_V(iVar))//']'
+         end do
+      case default
+         File_I(iFile) % NameVarPlot = &
+              trim(File_I(iFile) % NameVarPlot)//'Longitude '//NameVar_V(R_)
+         File_I(iFile) % StringHeaderAux = &
+              trim(File_I(iFile) % StringHeaderAux)//' deg '//NameVarUnit_V(R_)
+         do iVar = X_, Z_
+            if(iVar == iVarPlane) CYCLE
+            File_I(iFile) % NameVarPlot = &
+                 trim(File_I(iFile) % NameVarPlot)//' '//trim(NameVar_V(iVar))
+            File_I(iFile) % StringHeaderAux = &
+                 trim(File_I(iFile) % StringHeaderAux) &
+                 //' '//trim(NameVarUnit_V(iVar))
+         end do
+      end select
+      File_I(iFile) % NameAuxPlot = trim(File_I(iFile) % NameAuxPlot) // &
+           ' StartTime StartTimeJulian'
+
+      ! handle X and Y
+      allocate(File_I(iFile)%iVarMhd_V(File_I(iFile)%nMhdVar))
+      iCoor = 1
+      do iVar = X_, Z_
+         if(iVar == iVarPlane) CYCLE
+         File_I(iFile)%iVarMhd_V(iCoor) = iVar
+         iCoor = iCoor + 1
+      end do
+    end subroutine process_flux0
     !==========================================================================
     subroutine process_distr
 
@@ -838,7 +878,8 @@ contains
           allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1, 1))
        case(FluxZ0_)
           ! extra space is reserved for sum of spreads
-          allocate(File_I(iFile) % Buffer_II(File_I(iFile)%nFluxVar, &
+          allocate(File_I(iFile) % Buffer_II( &
+               File_I(iFile)%nMhdVar + File_I(iFile)%nFluxVar, &
                File_I(iFile)%iCutRange_I(2), File_I(iFile)%iCutRange_I(1)))
        case(Shock2D_)
           ! extra space reserved for line index
@@ -2407,15 +2448,16 @@ contains
       character(len=500):: StringHeader
       character(len=100):: NameFile
       ! loop variables
-      integer:: iR, iLon, iStencil_I(3)
+      integer:: iR, iLon, iVarPlot, iStencil_I(3)
       ! for better readability
-      integer :: nFluxVar
+      integer :: nMhdVar, nFluxVar
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
       real :: Param_I(1:StartJulian_)
       character(len=*), parameter:: NameSub = 'write_flux_z0'
       !------------------------------------------------------------------------
+      nMhdVar   = File_I(iFile)%nMhdVar
       nFluxVar  = File_I(iFile)%nFluxVar
 
       ! header for the output file
@@ -2457,14 +2499,20 @@ contains
          do iLon = 1, File_I(iFile)%iCutRange_I(2)
             call rlonlat_to_xyz([Radius_I(iR), &
                  Longitude_I(iLon)*cDegToRad, 0.0], Xyz_D)
+            ! save the X and Y coordinates
+            File_I(iFile)%Buffer_II(1, iLon, iR) = &
+                 Xyz_D(File_I(iFile)%iVarMhd_V(1))
+            File_I(iFile)%Buffer_II(2, iLon, iR) = &
+                 Xyz_D(File_I(iFile)%iVarMhd_V(2))
+            ! interpolate the distribution function
             call interpolate_trmesh(Xyz_D, DistrInterp_II = Distr_II, &
                  iStencilOut_I=iStencil_I)
             if(all(iStencil_I==-1)) then
-               File_I(iFile)%Buffer_II(:, iLon, iR) = &
+               File_I(iFile)%Buffer_II(nMhdVar+1:nMhdVar+nFluxVar, iLon, iR)= &
                     FluxChannelInit_V(Flux0_:FluxMax_)
             else
-               call distr_to_flux(Distr_II(1:nP, :), &
-                    File_I(iFile)%Buffer_II(:, iLon, iR))
+               call distr_to_flux(Distr_II(1:nP, :), File_I(iFile)%Buffer_II( &
+                    nMhdVar+1:nMhdVar+nFluxVar, iLon, iR))
             end if
          end do
       end do !  iR on iProc
