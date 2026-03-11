@@ -133,11 +133,25 @@ flux2d ascii	     			StringPlot
 215.0			Radius
 72			nLonFlux2d
 36			nLatFlux2d
-fluxz=0 ascii	     			StringPlot
-1.2			RadiusMin
-240.0			RadiusMax
-72			nRFlux2d
-36			nLonFlux2d
+fluxX0 ascii			StringPlot
+1.2			RMin
+240.0			RMax
+100			nRFlux2d
+-45.0			LatMin
+45.0			LatMax
+90			nLatFlux2d
+fluxY0 ascii			StringPlot
+1.2			RMin
+240.0			RMax
+100			nRFlux2d
+-45.0			LatMin
+45.0			LatMax
+90			nLatFlux2d
+fluxZ0 ascii			StringPlot
+1.2			RMin
+240.0			RMax
+100			nRFlux2d
+360			nLonFlux2d
 
 #NOUTPUT
 -1			nOutput

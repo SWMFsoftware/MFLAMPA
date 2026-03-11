@@ -70,10 +70,12 @@ module SP_ModPlot
                                 ! Flux
        Flux2D_    = 7, & ! at a given radius on rectangular Lon-Lat grid
        FluxTime_  = 8, & ! at a given radius as time series on Lon-Lat grid
-       FluxZ0_    = 9, & ! on the Z=0 plane (latitude = 0)
+       FluxX0_    = 9, & ! on the X=0 plane (longitude = 90 or 270 deg)
+       FluxY0_    = 10,& ! on the Y=0 plane (longitude = 0 or 180 deg)
+       FluxZ0_    = 11,& ! on the Z=0 plane (latitude = 0 deg)
                                 ! Shock Skeleton
-       Shock2D_   = 10,& ! shock stencils as Lon-Lat plot at each time step
-       ShockTime_ = 11   ! shock stencils saved as time series for field lines
+       Shock2D_   = 12,& ! shock stencils as Lon-Lat plot at each time step
+       ShockTime_ = 13   ! shock stencils saved as time series for field lines
   ! Momentum or energy axis for Distribution plots
   integer, parameter:: &
        Momentum_  = 1, &
@@ -136,12 +138,15 @@ module SP_ModPlot
      !
      ! ------ Flux through sphere ------
      ! angular coords of point where output is requested
-     real:: Lon, Lat
+     real    :: Lon, Lat
      ! spread of flux of an individual line over grid
      real, pointer:: Spread_II(:,:)
-     integer :: iRange_I(4)
-     real    :: RMin, RMax
-     integer :: iCutRange_I(2)
+     integer :: iRange_I(4)      ! iLonMin, iLonMax, iLatMin, iLatMax
+     ! used in the plance cut:
+     ! RMin/MaxCut is needed for x/y/z=0 cut
+     ! LatMinCut, LatMaxCut is needed for x/y=0 cut
+     real    :: RMinCut, RMaxCut, LatMinCut, LatMaxCut
+     integer :: nRangeCut_I(2) ! {nR, nLon} for z=0 or {nR, nLat} for x/y=0
   end type TypePlotFile
   ! Indexes in iRange_I
   integer, parameter :: iLonMin_ = 1, iLonMax_ = 2, iLatMin_ = 3, iLatMax_ = 4
@@ -207,7 +212,7 @@ contains
        call read_var('nFileOut', nFileOut)
        ! check correctness
        if(nFileOut == 0) RETURN ! no output file requested
-       if(nFileOut  < 0) call CON_stop(NameSub//': incorrect SAVEPLOT section')
+       if(nFileOut < 0) call CON_stop(NameSub//': incorrect SAVEPLOT section')
        DoInit = .true.
        if(allocated(File_I))&
             call CON_stop(NameSub//'Only a single #SAVEPLOT is allowed')
@@ -263,6 +268,10 @@ contains
              if(IsSteadyState)call CON_stop(NameSub//&
                   ": mhtime kind of data isn't allowed in steady-state")
              File_I(iFile) % iKindData = FluxTime_
+          case('fluxx0')
+             File_I(iFile) % iKindData = FluxX0_
+          case('fluxy0')
+             File_I(iFile) % iKindData = FluxY0_
           case('fluxz0')
              File_I(iFile) % iKindData = FluxZ0_
           case('shock2d')
@@ -405,13 +414,31 @@ contains
              File_I(iFile) % Lat = File_I(iFile) % Lat * cDegToRad
              ! reset indicator of the first call
              File_I(iFile) % IsFirstCall = .true.
+          case(FluxX0_)
+             call process_flux0(X_)
+             ! read in parameters
+             call read_var('RMin', File_I(iFile) % RMinCut)
+             call read_var('RMax', File_I(iFile) % RMaxCut)
+             call read_var('nRFlux2d', File_I(iFile) % nRangeCut_I(1))
+             call read_var('LatMin', File_I(iFile) % LatMinCut)
+             call read_var('LatMax', File_I(iFile) % LatMaxCut)
+             call read_var('nLatFlux2d', File_I(iFile) % nRangeCut_I(2))
+          case(FluxY0_)
+             call process_flux0(Y_)
+             ! read in parameters
+             call read_var('RMin', File_I(iFile) % RMinCut)
+             call read_var('RMax', File_I(iFile) % RMaxCut)
+             call read_var('nRFlux2d', File_I(iFile) % nRangeCut_I(1))
+             call read_var('LatMin', File_I(iFile) % LatMinCut)
+             call read_var('LatMax', File_I(iFile) % LatMaxCut)
+             call read_var('nLatFlux2d', File_I(iFile) % nRangeCut_I(2))
           case(FluxZ0_)
              call process_flux0(Z_)
              ! read in parameters
-             call read_var('RadiusMin', File_I(iFile) % RMin)
-             call read_var('RadiusMax', File_I(iFile) % RMax)
-             call read_var('nRFlux2d', File_I(iFile) % iCutRange_I(1))
-             call read_var('nLonFlux2d', File_I(iFile) % iCutRange_I(2))
+             call read_var('RMin', File_I(iFile) % RMinCut)
+             call read_var('RMax', File_I(iFile) % RMaxCut)
+             call read_var('nRFlux2d', File_I(iFile) % nRangeCut_I(1))
+             call read_var('nLonFlux2d', File_I(iFile) % nRangeCut_I(2))
           case(Shock2D_)
              call process_shock
              ! add line index to variable names
@@ -437,14 +464,14 @@ contains
             call CON_stop(NameSub//&
             ": only one MH1D output file can be requested")
     case("#NOUTPUT")
-       call read_var('nOutput',nOutput)
+       call read_var('nOutput', nOutput)
        if(nOutput < 1)then
-          call read_var('DtOutput',DtOutput)
+          call read_var('DtOutput', DtOutput)
        end if
     case('#USEDATETIME')
-       call read_var('UseDateTime',UseDateTime)
+       call read_var('UseDateTime', UseDateTime)
     case('#SAVEINITIAL')
-       call read_var('DoSaveInitial',DoSaveInitial)
+       call read_var('DoSaveInitial', DoSaveInitial)
     case('#NTAG')
        call read_var('nTag', nTag)
     case default
@@ -558,58 +585,6 @@ contains
       end do ! iVar
 
     end subroutine process_mh
-    !==========================================================================
-    subroutine process_flux0(iVarPlane)
-      integer, intent(in) :: iVarPlane
-      integer :: iCoor
-      !------------------------------------------------------------------------
-      ! reset
-      File_I(iFile) % DoPlotSpread = .false.
-      ! mark flux to be written
-      File_I(iFile) % DoPlotFlux   = .true.
-      ! together with the X and Y coordinates
-      File_I(iFile) % DoPlot_V     = .false.
-      File_I(iFile) % DoPlot_V(X_) = .true.
-      File_I(iFile) % DoPlot_V(Y_) = .true.
-      File_I(iFile) % nMhdVar = count(File_I(iFile)%DoPlot_V(1:nMhData))
-
-      select case(File_I(iFile) % TypeFile)
-      case('tec', 'tcp')
-         File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot) // &
-              'Longitude_[deg] '//trim(NameVar_V(R_))// &
-              '_['//trim(NameVarUnit_V(R_))//']'
-         do iVar = X_, Z_
-            if(iVar == iVarPlane) CYCLE
-            File_I(iFile) % NameVarPlot = &
-                 trim(File_I(iFile) % NameVarPlot)//' '// &
-                 trim(NameVar_V(iVar))//'_['//trim(NameVarUnit_V(iVar))//']'
-         end do
-      case default
-         File_I(iFile) % NameVarPlot = &
-              trim(File_I(iFile) % NameVarPlot)//'Longitude '//NameVar_V(R_)
-         File_I(iFile) % StringHeaderAux = &
-              trim(File_I(iFile) % StringHeaderAux)//' deg '//NameVarUnit_V(R_)
-         do iVar = X_, Z_
-            if(iVar == iVarPlane) CYCLE
-            File_I(iFile) % NameVarPlot = &
-                 trim(File_I(iFile) % NameVarPlot)//' '//trim(NameVar_V(iVar))
-            File_I(iFile) % StringHeaderAux = &
-                 trim(File_I(iFile) % StringHeaderAux) &
-                 //' '//trim(NameVarUnit_V(iVar))
-         end do
-      end select
-      File_I(iFile) % NameAuxPlot = trim(File_I(iFile) % NameAuxPlot) // &
-           ' StartTime StartTimeJulian'
-
-      ! handle X and Y
-      allocate(File_I(iFile)%iVarMhd_V(File_I(iFile)%nMhdVar))
-      iCoor = 1
-      do iVar = X_, Z_
-         if(iVar == iVarPlane) CYCLE
-         File_I(iFile)%iVarMhd_V(iCoor) = iVar
-         iCoor = iCoor + 1
-      end do
-    end subroutine process_flux0
     !==========================================================================
     subroutine process_distr
 
@@ -745,6 +720,82 @@ contains
 
     end subroutine process_distr
     !==========================================================================
+    subroutine process_flux0(iVarPlane)
+      integer, intent(in) :: iVarPlane
+      integer :: iCoor
+      !------------------------------------------------------------------------
+      ! reset
+      File_I(iFile) % DoPlotSpread = .false.
+      ! mark flux to be written
+      File_I(iFile) % DoPlotFlux   = .true.
+      ! together with the X and Y coordinates
+      File_I(iFile) % DoPlot_V     = .false.
+      File_I(iFile) % DoPlot_V(X_) = .true.
+      File_I(iFile) % DoPlot_V(Y_) = .true.
+      File_I(iFile) % nMhdVar = count(File_I(iFile)%DoPlot_V(1:nMhData))
+
+      select case(File_I(iFile) % TypeFile)
+      case('tec', 'tcp')
+         if(iVarPlane == Z_) then
+            ! Z=0 plane: ij = Longitude, R
+            File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot)// &
+                 'Longitude_[deg] '//trim(NameVar_V(R_))// &
+                 '_['//trim(NameVarUnit_V(R_))//']'
+         else
+            ! X/Y=0 plane: ij = Latitude, R
+            ! also add lon(= 90/270 or 0/180 deg) to variable names
+            File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot)// &
+                 'Latitude_[deg] '//trim(NameVar_V(R_))// &
+                 '_['//trim(NameVarUnit_V(R_))//']'//' Longitude_[deg]'
+         end if
+         do iVar = X_, Z_
+            if(iVar == iVarPlane) CYCLE
+            File_I(iFile) % NameVarPlot = &
+                 trim(File_I(iFile) % NameVarPlot)//' '// &
+                 trim(NameVar_V(iVar))//'_['//trim(NameVarUnit_V(iVar))//']'
+         end do
+      case default
+         if(iVarPlane == Z_) then
+            ! Z=0 plane: ij = Longitude, R
+            File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot)// &
+                 'Longitude '//trim(NameVar_V(R_))
+            File_I(iFile) % StringHeaderAux = &
+                 trim(File_I(iFile) % StringHeaderAux)// &
+                 ' deg '//trim(NameVarUnit_V(R_))
+         else
+            ! X/Y=0 plane: ij = Latitude, R
+            ! also add lon(= 90/270 or 0/180 deg) to variable names
+            File_I(iFile) % NameVarPlot = trim(File_I(iFile) % NameVarPlot)// &
+                 'Latitude '//trim(NameVar_V(R_))//' Longitude'
+            File_I(iFile) % StringHeaderAux = &
+                 trim(File_I(iFile) % StringHeaderAux)// &
+                 ' deg '//trim(NameVarUnit_V(R_))//' deg'
+         end if
+         do iVar = X_, Z_
+            if(iVar == iVarPlane) CYCLE
+            File_I(iFile) % NameVarPlot = &
+                 trim(File_I(iFile) % NameVarPlot)//' '//trim(NameVar_V(iVar))
+            File_I(iFile) % StringHeaderAux = &
+                 trim(File_I(iFile) % StringHeaderAux) &
+                 //' '//trim(NameVarUnit_V(iVar))
+         end do
+      end select
+
+      ! additional parameters about the time
+      File_I(iFile) % NameAuxPlot = trim(File_I(iFile) % NameAuxPlot) // &
+           ' StartTime StartTimeJulian'
+
+      ! include coord1 and coord2 among x/y/z except for iVarPlane
+      allocate(File_I(iFile)%iVarMhd_V(File_I(iFile)%nMhdVar))
+      iCoor = 1
+      do iVar = X_, Z_
+         if(iVar == iVarPlane) CYCLE
+         File_I(iFile)%iVarMhd_V(iCoor) = iVar
+         iCoor = iCoor + 1
+      end do
+
+    end subroutine process_flux0
+    !==========================================================================
     subroutine process_shock
 
       ! process output parameters for shock skeleton
@@ -876,11 +927,15 @@ contains
                //" use #SPREADSOLIDANGLE in PARAM.in")
           ! extra space reserved for time of the output
           allocate(File_I(iFile) % Buffer_II(1+File_I(iFile)%nFluxVar, 1, 1))
+       case(FluxX0_, FluxY0_)
+          ! account for lon=90/270 or 0/180 deg situation
+          allocate(File_I(iFile) % Buffer_II( &
+               1 + File_I(iFile)%nMhdVar + File_I(iFile)%nFluxVar, &
+               2*File_I(iFile)%nRangeCut_I(2), File_I(iFile)%nRangeCut_I(1)))
        case(FluxZ0_)
-          ! extra space is reserved for sum of spreads
           allocate(File_I(iFile) % Buffer_II( &
                File_I(iFile)%nMhdVar + File_I(iFile)%nFluxVar, &
-               File_I(iFile)%iCutRange_I(2), File_I(iFile)%iCutRange_I(1)))
+               File_I(iFile)%nRangeCut_I(2), File_I(iFile)%nRangeCut_I(1)))
        case(Shock2D_)
           ! extra space reserved for line index
           allocate(File_I(iFile) % Buffer_II( &
@@ -1002,10 +1057,19 @@ contains
           call write_distr_traj
        case(Flux2D_)
           call write_flux_2d
+          call write_mh_channel
        case(FluxTime_)
           call write_flux_time
+          call write_mh_channel
+       case(FluxX0_)
+          call write_flux_xy0(X_)
+          call write_mh_channel
+       case(FluxY0_)
+          call write_flux_xy0(Y_)
+          call write_mh_channel
        case(FluxZ0_)
           call write_flux_z0
+          call write_mh_channel
        case(Shock2D_)
           call write_shock_2d
        case(ShockTime_)
@@ -2186,7 +2250,7 @@ contains
       ! Flux_R=<Radius [AU]>_t<ddhhmmss>_n<iIter>.{out/dat}
       ! name of the output file
 
-      use SP_ModTriangulate, ONLY:  &
+      use SP_ModTriangulate, ONLY: &
            intersect_surf, build_trmesh, interpolate_trmesh
       use SP_ModChannel, ONLY: distr_to_flux
       use ModCoordTransform, ONLY: rlonlat_to_xyz
@@ -2429,6 +2493,155 @@ contains
 
     end subroutine write_flux_time
     !==========================================================================
+    subroutine write_flux_xy0(iVarPlane)
+
+      ! write file with fluxes in the format to be read by IDL/TECPLOT;
+      ! single file is created for the {x/y}=0 plane, and the name format is
+      ! Flux_{x/y}=0_t<ddhhmmss>_n<iIter>.{out/dat}
+      ! name of the output file
+
+      use SP_ModTriangulate, ONLY: UsePoleTri, &
+           intersect_surf, build_trmesh, interpolate_trmesh
+      use SP_ModChannel, ONLY: distr_to_flux
+      use ModCoordTransform, ONLY: rlonlat_to_xyz
+      integer, intent(in) :: iVarPlane
+      real :: Distr_II(0:nP+1,nMu), Xyz_D(nDim)
+      ! get the radius and latitude of each shell
+      real, allocatable :: Radius_I(:), Latitude_I(:)
+      real :: dR, dLogR, dLat
+      real :: Longitude_I(2)
+      ! header of the output file
+      character(len=500):: StringHeader
+      character(len=100):: NameFile
+      ! loop variables
+      integer :: iR, iLat, iLon, iVarPlot, iStencil_I(3)
+      ! for better readability
+      integer :: nRCut, nLatCut, nMhdVar, nFluxVar, iVarLon
+      ! additional parameters
+      integer, parameter:: StartTime_  = 1
+      integer, parameter:: StartJulian_= StartTime_ + 1
+      real :: Param_I(1:StartJulian_)
+      character(len=*), parameter:: NameSub = 'write_flux_xy0'
+      !------------------------------------------------------------------------
+      nMhdVar   = File_I(iFile)%nMhdVar
+      nFluxVar  = File_I(iFile)%nFluxVar
+      iVarLon   = 1
+      nRCut     = File_I(iFile)%nRangeCut_I(1)
+      nLatCut   = File_I(iFile)%nRangeCut_I(2)
+
+      select case(iVarPlane)
+      case(X_)
+         ! header for the output file: x=0
+         StringHeader = 'MFLAMPA: flux data in the x=0 plane;'//&
+              ' Coordindate system: '//trim(TypeCoordSystem)//'; '&
+              //trim(File_I(iFile)%StringHeaderAux)
+         ! set the file name: x=0
+         call make_file_name( &
+              StringBase    = NameFluxData//'_x=0',              &
+              Time          = SPTime,                            &
+              iIter         = iIter,                             &
+              NameExtension = File_I(iFile) % NameFileExtension, &
+              NameOut       = NameFile)
+         ! Set Longitude_I: 90 and 270 deg
+         Longitude_I = [90.0, 270.0]
+      case(Y_)
+         ! header for the output file: y=0
+         StringHeader = 'MFLAMPA: flux data in the y=0 plane;'//&
+              ' Coordindate system: '//trim(TypeCoordSystem)//'; '&
+              //trim(File_I(iFile)%StringHeaderAux)
+         ! set the file name: y=0
+         call make_file_name( &
+              StringBase    = NameFluxData//'_y=0',              &
+              Time          = SPTime,                            &
+              iIter         = iIter,                             &
+              NameExtension = File_I(iFile) % NameFileExtension, &
+              NameOut       = NameFile)
+         ! Set Longitude_I: 0 and 180 deg
+         Longitude_I = [0.0, 180.0]
+      case default
+         call CON_stop('Unknown iVarPlane '// &
+              NameVar_V(iVarPlane)//'=0 in'//NameSub)
+      end select
+
+      ! radius & longitude of each shell
+      allocate(Radius_I(nRCut))
+      dR = (File_I(iFile)%RMaxCut - File_I(iFile)%RMinCut)/real(nRCut)
+      dLogR = log(File_I(iFile)%RMaxCut/File_I(iFile)%RMinCut)/real(nRCut)
+      do iR = 1, nRCut
+         ! get the radius: combination of linear and exponential growth
+         Radius_I(iR) = 0.5*File_I(iFile)%RMinCut * exp(iR*dLogR) &
+              + 0.5*(File_I(iFile)%RMinCut + (real(iR)-1.0)*dR)
+      end do
+      allocate(Latitude_I(nLatCut))
+      dLat = (File_I(iFile)%LatMaxCut - File_I(iFile)%LatMinCut)/real(nLatCut)
+      do iLat = 1, nLatCut
+         Latitude_I(iLat) = File_I(iFile)%LatMinCut + (iLat - 0.5)*dLat
+      end do
+
+      ! include the pole for triangulation just in case we need it
+      UsePoleTri = .true.
+
+      ! reset the output buffer
+      File_I(iFile) % Buffer_II = 0.0
+      do iR = 1, nRCut
+         call intersect_surf(Radius_I(iR))
+         if(iProc/=0) CYCLE
+         call build_trmesh()
+         do iLon = 1, size(Longitude_I)
+            do iLat = 1, nLatCut
+               call rlonlat_to_xyz([Radius_I(iR), &
+                    Longitude_I(iLon)*cDegToRad, &
+                    Latitude_I(iLat)*cDegToRad], Xyz_D)
+               ! save the Lon(=90/270 or 0/180 deg), Y/X and Z coordinates
+               File_I(iFile)%Buffer_II(iVarLon, &
+                    iLat+(iLon-1)*nLatCut, iR) = Longitude_I(iLon)
+               File_I(iFile)%Buffer_II(iVarLon+1, &
+                    iLat+(iLon-1)*nLatCut, iR) = &
+                    Xyz_D(File_I(iFile)%iVarMhd_V(1))
+               File_I(iFile)%Buffer_II(iVarLon+2, &
+                    iLat+(iLon-1)*nLatCut, iR) = &
+                    Xyz_D(File_I(iFile)%iVarMhd_V(2))
+               ! interpolate the distribution function
+               call interpolate_trmesh(Xyz_D, DistrInterp_II = Distr_II, &
+                    iStencilOut_I=iStencil_I)
+               if(all(iStencil_I==-1)) then
+                  File_I(iFile)%Buffer_II(iVarLon+nMhdVar+1: &
+                       iVarLon+nMhdVar+nFluxVar, iLat, iR) = &
+                       FluxChannelInit_V(Flux0_:FluxMax_)
+               else
+                  call distr_to_flux(Distr_II(1:nP, :), &
+                       File_I(iFile)%Buffer_II(iVarLon+nMhdVar+1: &
+                       iVarLon+nMhdVar+nFluxVar, iLat, iR))
+               end if
+            end do
+         end do
+      end do !  iR on iProc
+
+      ! start time in seconds from base year
+      Param_I(StartTime_)   = StartTime
+      ! start time in Julian date
+      Param_I(StartJulian_) = StartTimeJulian
+
+      ! print data to file
+      if(iProc==0) &
+           call save_plot_file( &
+           NameFile      = NameFile, &
+           StringHeaderIn= StringHeader, &
+           TypeFileIn    = File_I(iFile) % TypeFile, &
+           nDimIn        = 2, &
+           TimeIn        = SPTime, &
+           nStepIn       = iIter, &
+           ParamIn_I     = Param_I(StartTime_:StartJulian_), &
+           Coord1In_I    = [Latitude_I, Latitude_I], &
+           Coord2In_I    = Radius_I, &
+           NameVarIn     = &
+           trim(File_I(iFile) % NameVarPlot) // ' ' // &
+           trim(File_I(iFile) % NameAuxPlot), &
+           VarIn_VII     = File_I(iFile) % Buffer_II)
+      deallocate(Radius_I, Latitude_I)
+
+    end subroutine write_flux_xy0
+    !==========================================================================
     subroutine write_flux_z0
 
       ! write file with fluxes in the format to be read by IDL/TECPLOT;
@@ -2436,7 +2649,7 @@ contains
       ! Flux_z=0_t<ddhhmmss>_n<iIter>.{out/dat}
       ! name of the output file
 
-      use SP_ModTriangulate, ONLY:  &
+      use SP_ModTriangulate, ONLY: &
            intersect_surf, build_trmesh, interpolate_trmesh
       use SP_ModChannel, ONLY: distr_to_flux
       use ModCoordTransform, ONLY: rlonlat_to_xyz
@@ -2448,9 +2661,9 @@ contains
       character(len=500):: StringHeader
       character(len=100):: NameFile
       ! loop variables
-      integer:: iR, iLon, iVarPlot, iStencil_I(3)
+      integer :: iR, iLon, iVarPlot, iStencil_I(3)
       ! for better readability
-      integer :: nMhdVar, nFluxVar
+      integer :: nRCut, nLonCut, nMhdVar, nFluxVar
       ! additional parameters
       integer, parameter:: StartTime_  = 1
       integer, parameter:: StartJulian_= StartTime_ + 1
@@ -2459,10 +2672,11 @@ contains
       !------------------------------------------------------------------------
       nMhdVar   = File_I(iFile)%nMhdVar
       nFluxVar  = File_I(iFile)%nFluxVar
+      nRCut     = File_I(iFile)%nRangeCut_I(1)
+      nLonCut   = File_I(iFile)%nRangeCut_I(2)
 
       ! header for the output file
-      StringHeader = &
-           'MFLAMPA: flux data on a sphere at fixed heliocentric distance;'//&
+      StringHeader = 'MFLAMPA: flux data in the z=0 plane;'//&
            ' Coordindate system: '//trim(TypeCoordSystem)//'; '&
            //trim(File_I(iFile)%StringHeaderAux)
 
@@ -2475,28 +2689,26 @@ contains
            NameOut       = NameFile)
 
       ! radius & longitude of each shell
-      allocate(Radius_I(File_I(iFile)%iCutRange_I(1)))
-      dR = (File_I(iFile)%RMax - File_I(iFile)%RMin) &
-           /real(File_I(iFile)%iCutRange_I(1))
-      dLogR = log(File_I(iFile)%RMax/File_I(iFile)%RMin) &
-           /real(File_I(iFile)%iCutRange_I(1))
-      do iR = 1, File_I(iFile)%iCutRange_I(1)
+      allocate(Radius_I(nRCut))
+      dR = (File_I(iFile)%RMaxCut - File_I(iFile)%RMinCut)/real(nRCut)
+      dLogR = log(File_I(iFile)%RMaxCut/File_I(iFile)%RMinCut)/real(nRCut)
+      do iR = 1, nRCut
          ! get the radius: combination of linear and exponential growth
-         Radius_I(iR) = 0.5*File_I(iFile)%RMin * exp(iR*dLogR) &
-              + 0.5*(File_I(iFile)%RMin + (real(iR)-1.0)*dR)
+         Radius_I(iR) = 0.5*File_I(iFile)%RMinCut * exp(iR*dLogR) &
+              + 0.5*(File_I(iFile)%RMinCut + (real(iR)-1.0)*dR)
       end do
-      allocate(Longitude_I(File_I(iFile)%iCutRange_I(2)))
-      do iLon = 1, File_I(iFile)%iCutRange_I(2)
-         Longitude_I(iLon) = (iLon - 0.5)*360.0/File_I(iFile)%iCutRange_I(2)
+      allocate(Longitude_I(nLonCut))
+      do iLon = 1, nLonCut
+         Longitude_I(iLon) = (iLon - 0.5)*360.0/nLonCut
       end do
 
       ! reset the output buffer
       File_I(iFile) % Buffer_II = 0.0
-      do iR = 1, File_I(iFile)%iCutRange_I(1)
+      do iR = 1, nRCut
          call intersect_surf(Radius_I(iR))
          if(iProc/=0) CYCLE
          call build_trmesh()
-         do iLon = 1, File_I(iFile)%iCutRange_I(2)
+         do iLon = 1, nLonCut
             call rlonlat_to_xyz([Radius_I(iR), &
                  Longitude_I(iLon)*cDegToRad, 0.0], Xyz_D)
             ! save the X and Y coordinates
