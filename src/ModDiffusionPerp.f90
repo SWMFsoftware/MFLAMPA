@@ -8,7 +8,7 @@ module SP_ModPerpDiffusion
   use ModNumConst, ONLY: cPi, cTwoPi, cTiny
   use ModUtilities, ONLY: CON_stop
   use SP_ModDistribution, ONLY: Distribution_CB, IsDistNeg, check_dist_neg
-  use SP_ModGrid, ONLY: nP, nMu, nLine, MHData_VIB, R_, X_, Z_
+  use SP_ModGrid, ONLY: nP, nMu, nLine, nLineAll, MHData_VIB, R_, X_, Z_
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: IsSteadyState
   use SP_ModProc, ONLY: nProc, iProc, iComm, iError
@@ -22,7 +22,8 @@ module SP_ModPerpDiffusion
   SAVE
 
   ! Public members:
-  public :: read_param, init, diffuseperp_distribution
+  public :: read_param, init, diffuseperp_distribution, &
+       interp_source_intersect, interp_source_linenode
   ! Diffusion in space
   interface diffuseperp_distribution
      ! Global time step Dt
@@ -289,17 +290,21 @@ contains
   subroutine diffuseperp_distribution_c(IsFirstCall, dtIn_CB)
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
-    use SP_ModGrid, ONLY: nLineAll
     use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
-         build_trmesh, interpolate_trmesh, XyzOrig_DII
+         build_trmesh, interpolate_trmesh
 
+    ! inputs
     logical, intent(in) :: IsFirstCall
     real, intent(in)    :: dtIn_CB(nP, nMu, nVertexMax, nLine)
-    integer :: iRPerp, iThetaPerp, iPhiPerp, iPE ! loop variables
+    ! loop variables
+    integer :: iRPerp, iThetaPerp, iPhiPerp, iPE
+    ! VDF and the source term (5D)
     real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
          iRPerpStart_I(iProc):iRPerpEnd_I(iProc)) :: DistrPerp_5D, source_5D
+    ! DPerp coefficients (5D)
     real :: DPerp_5D(nP, nMu, nPhiPerp, nThetaPerp, &
          iRPerpStart_I(iProc):iRPerpEnd_I(iProc))
+    ! source term (along lines)
     real :: source_IV(nP, nMu, nLineAll, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution_c'
     !--------------------------------------------------------------------------
@@ -386,127 +391,11 @@ contains
     end if
 
     ! Step 5: Interpolate source back to the nodes along field lines
-    call interpolate_source_intersect ! uniform grid => intersection points
-    call interpolate_source_linenode  ! intersection points => field line nodes
+    ! uniform grid => intersection points
+    call interp_source_intersect(source_5D, source_IV)
+    ! intersection points => field line nodes
+    call interp_source_linenode(source_IV, dtIn_CB)
 
-  contains
-    !==========================================================================
-    subroutine interpolate_source_intersect
-      ! Interpolate the df/dt source term from the uniform grid to
-      ! all intersection points of the lines and multiple slices
-
-      use ModCoordTransform, ONLY: xyz_to_rlonlat
-      integer :: iLine, iTheta1, iTheta2, iPhi1, iPhi2
-      real    :: XyzPoint_D(X_:Z_), rPoint, lonPoint, latPoint, phiPoint
-      real    :: thetaFrac, phiFrac
-      !------------------------------------------------------------------------
-      do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-         do iLine = 1, nLineAll
-            ! Extract the intersection point coordinates
-            XyzPoint_D = XyzOrig_DII(:, iLine, iRPerp)
-            if(sum(XyzPoint_D**2) > cTiny) then
-               ! CoordTransform: XyzPoint_D => (rPoint, lonPoint, phiPoint)
-               call xyz_to_rlonlat(XyzPoint_D, rPoint, lonPoint, latPoint)
-               phiPoint = cPi/2.0 - latPoint
-
-               ! Find the indices of the quadrilateral vertices
-               iTheta1 = floor(mod(lonPoint-PhiPerp_C(1), cTwoPi)/dPhiPerp) + 1
-               iTheta2 = iTheta1 + 1
-               iPhi1 = floor((phiPoint - ThetaPerp_C(1))/dThetaPerp) + 1
-               iPhi2 = iPhi1 + 1
-               ! Handle periodicity in the theta (longitude) direction
-               if(iTheta2 > nPhiPerp) iTheta2 = 1  ! Wrap around
-               ! Ensure indices are within bounds
-               iTheta1 = max(1, min(iTheta1, nPhiPerp))
-               iTheta2 = max(1, min(iTheta2, nPhiPerp))
-               iPhi1 = max(1, min(iPhi1, nThetaPerp))
-               iPhi2 = max(1, min(iPhi2, nThetaPerp))
-
-               ! Compute fractional distances for interpolation
-               thetaFrac = (lonPoint - PhiPerp_C(iTheta1))/dPhiPerp
-               phiFrac = (phiPoint - ThetaPerp_C(iPhi1))/dThetaPerp
-               ! Perform bilinear interpolation on the uniform LON-LAT grid
-               source_IV(:,:,iLine,iRPerp) = (1.0-thetaFrac)*(1.0-phiFrac)* &
-                    source_5D(1:nP, :, iTheta1, iPhi1, iRPerp) + &  ! value11
-                    (1.0-thetaFrac)*phiFrac* &
-                    source_5D(1:nP, :, iTheta1, iPhi2, iRPerp) + &  ! value12
-                    thetaFrac * (1.0-phiFrac)* &
-                    source_5D(1:nP, :, iTheta2, iPhi1, iRPerp) + &  ! value21
-                    thetaFrac*phiFrac* &
-                    source_5D(1:nP, :, iTheta2, iPhi2, iRPerp)      ! value22
-            else
-               source_IV(:,:,iLine,iRPerp) = 0.0
-            end if
-         end do
-      end do
-
-      ! Broadcast source_IV (line intersections, uniform grid) to all processes
-      if(nProc > 1) then
-         do iPE = 0, nProc-1
-            call MPI_BCAST(source_IV(:,:,:,               &
-                 iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
-                 (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-                 nP*nMu*nLineAll, MPI_REAL, iPE, iComm, iError)
-         end do
-      end if
-      ! Check the error message from after interpolate_trmesh
-      if(iError /= 0) then
-         write(*,*) 'iProc = ', iProc, NameSub//&
-              ': interpolate_trmesh for source_IV failed, DPerp stopped'
-         RETURN
-      end if
-    end subroutine interpolate_source_intersect
-    !==========================================================================
-    subroutine interpolate_source_linenode
-      ! Interpolate the df/dt source term from the intersection points of the
-      ! lines and multiple slices to the original points along the field line
-
-      use SP_ModGrid, ONLY: Used_B, nVertex_B
-      integer :: iLine, iX, iPoint
-      real :: rNode, r1, r2, Weight
-      real :: v1_II(nP, nMu), v2_II(nP, nMu)
-      !------------------------------------------------------------------------
-      ! Loop over all field lines on this processor
-      LINE:do iLine = 1, nLine
-         if(.not.Used_B(iLine)) CYCLE LINE
-         ! Loop over all nodes along the valid field line
-         do iX = 1, nVertex_B(iLine)
-            ! Extract the radial coordinate of the current node
-            rNode = MHData_VIB(R_, iX, iLine)
-
-            ! Check that rNode is within grid range
-            if(rNode <= RPerp_C(nRPerp)) then
-               ! Find first index where grid radius exceeds rNode
-               iPoint = minloc(RPerp_C(1:nRPerp), DIM=1, &
-                    MASK = RPerp_C(1:nRPerp) > rNode)
-
-               if(iPoint > 1) then
-                  ! rNode is between r1 and r2
-                  r1 = RPerp_C(iPoint-1)
-                  r2 = RPerp_C(iPoint)
-                  ! Linear interpolation between r1 and r2
-                  Weight = (rNode - r1)/(r2 - r1)
-                  v1_II = source_IV(:, :, iLine, iPoint-1)
-                  v2_II = source_IV(:, :, iLine, iPoint)
-                  Distribution_CB(1:nP, :, iX, iLine) = &
-                       Distribution_CB(1:nP, :, iX, iLine) + &
-                       (v1_II+(v2_II-v1_II)*Weight)*dtIn_CB(:, :, iX, iLine)
-               else
-                  ! rNode is at or below first grid point
-                  Distribution_CB(1:nP, :, iX, iLine) = &
-                       Distribution_CB(1:nP, :, iX, iLine) + &
-                       source_IV(:, :, iLine, 1)*dtIn_CB(:, :, iX, iLine)
-               end if
-            end if
-         end do
-
-         ! Check if the VDF includes negative values after Dperp
-         call check_dist_neg(NameSub// &
-              ' after perpendicular diffusion', 1, nVertex_B(iLine), iLine)
-         if(IsDistNeg) RETURN
-      end do LINE
-    end subroutine interpolate_source_linenode
-    !==========================================================================
   end subroutine diffuseperp_distribution_c
   !============================================================================
   subroutine solver_fvm_diffuse3d(DPerp_5D, iRStart, iREnd, &
@@ -728,6 +617,131 @@ contains
     end subroutine calc_fvm_netflux
     !==========================================================================
   end subroutine solver_fvm_diffuse3d
+  !============================================================================
+  subroutine interp_source_intersect(source_5D, source_IV)
+    ! Interpolate the df/dt source term from the uniform grid to
+    ! all intersection points of the lines and multiple slices
+
+    use ModCoordTransform, ONLY: xyz_to_rlonlat
+    use SP_ModTriangulate, ONLY: XyzOrig_DII
+    real, intent(in) :: source_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
+         iRPerpStart_I(iProc):iRPerpEnd_I(iProc))
+    real, intent(out):: source_IV(nP, nMu, nLineAll, nRPerp)
+    integer :: iRPerp, iLine, iPE
+    integer :: iTheta1, iTheta2, iPhi1, iPhi2
+    real    :: XyzPoint_D(X_:Z_), rPoint, lonPoint, latPoint, phiPoint
+    real    :: thetaFrac, phiFrac
+    character(len=*), parameter:: NameSub = 'interp_source_intersect'
+    !--------------------------------------------------------------------------
+    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
+       do iLine = 1, nLineAll
+          ! Extract the intersection point coordinates
+          XyzPoint_D = XyzOrig_DII(:, iLine, iRPerp)
+          if(sum(XyzPoint_D**2) > cTiny) then
+             ! CoordTransform: XyzPoint_D => (rPoint, lonPoint, phiPoint)
+             call xyz_to_rlonlat(XyzPoint_D, rPoint, lonPoint, latPoint)
+             phiPoint = 0.5*cPi - latPoint
+
+             ! Find the indices of the quadrilateral vertices
+             iTheta1 = floor(mod(lonPoint-PhiPerp_C(1), cTwoPi)/dPhiPerp) + 1
+             iTheta2 = iTheta1 + 1
+             iPhi1 = floor((phiPoint - ThetaPerp_C(1))/dThetaPerp) + 1
+             iPhi2 = iPhi1 + 1
+             ! Handle periodicity in the theta (longitude) direction
+             if(iTheta2 > nPhiPerp) iTheta2 = 1  ! Wrap around
+             ! Ensure indices are within bounds
+             iTheta1 = max(1, min(iTheta1, nPhiPerp))
+             iTheta2 = max(1, min(iTheta2, nPhiPerp))
+             iPhi1 = max(1, min(iPhi1, nThetaPerp))
+             iPhi2 = max(1, min(iPhi2, nThetaPerp))
+
+             ! Compute fractional distances for interpolation
+             thetaFrac = (lonPoint - PhiPerp_C(iTheta1))/dPhiPerp
+             phiFrac = (phiPoint - ThetaPerp_C(iPhi1))/dThetaPerp
+             ! Perform bilinear interpolation on the uniform LON-LAT grid
+             source_IV(:,:,iLine,iRPerp) = (1.0-thetaFrac)*(1.0-phiFrac)* &
+                  source_5D(1:nP, :, iTheta1, iPhi1, iRPerp) + &  ! value11
+                  (1.0-thetaFrac)*phiFrac* &
+                  source_5D(1:nP, :, iTheta1, iPhi2, iRPerp) + &  ! value12
+                  thetaFrac * (1.0-phiFrac)* &
+                  source_5D(1:nP, :, iTheta2, iPhi1, iRPerp) + &  ! value21
+                  thetaFrac*phiFrac* &
+                  source_5D(1:nP, :, iTheta2, iPhi2, iRPerp)      ! value22
+          else
+             source_IV(:,:,iLine,iRPerp) = 0.0
+          end if
+       end do
+    end do
+
+    ! Broadcast source_IV (line intersections, uniform grid) to all processes
+    if(nProc > 1) then
+       do iPE = 0, nProc-1
+          call MPI_BCAST(source_IV(:,:,:,               &
+               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
+               nP*nMu*nLineAll, MPI_REAL, iPE, iComm, iError)
+       end do
+    end if
+    ! Check the error message from after interpolate_trmesh
+    if(iError /= 0) then
+       write(*,*) 'iProc = ', iProc, NameSub//&
+            ': interpolate_trmesh for source_IV failed, DPerp stopped'
+       RETURN
+    end if
+  end subroutine interp_source_intersect
+  !============================================================================
+  subroutine interp_source_linenode(source_IV, dtIn_CB)
+    ! Interpolate the df/dt source term from the intersection points of the
+    ! lines and multiple slices to the original points along the field line
+
+    use SP_ModGrid, ONLY: Used_B, nVertex_B
+    real, intent(in):: source_IV(nP, nMu, nLineAll, nRPerp)
+    real, intent(in):: dtIn_CB(nP, nMu, nVertexMax, nLine)
+    integer :: iLine, iX, iPoint
+    real :: rNode, r1, r2, Weight
+    real :: v1_II(nP, nMu), v2_II(nP, nMu)
+    character(len=*), parameter:: NameSub = 'interp_source_linenode'
+    !--------------------------------------------------------------------------
+    ! Loop over all field lines on this processor
+    LINE:do iLine = 1, nLine
+       if(.not.Used_B(iLine)) CYCLE LINE
+       ! Loop over all nodes along the valid field line
+       do iX = 1, nVertex_B(iLine)
+          ! Extract the radial coordinate of the current node
+          rNode = MHData_VIB(R_, iX, iLine)
+
+          ! Check that rNode is within grid range
+          if(rNode <= RPerp_C(nRPerp)) then
+             ! Find first index where grid radius exceeds rNode
+             iPoint = minloc(RPerp_C(1:nRPerp), DIM=1, &
+                  MASK = RPerp_C(1:nRPerp) > rNode)
+
+             if(iPoint > 1) then
+                ! rNode is between r1 and r2
+                r1 = RPerp_C(iPoint-1)
+                r2 = RPerp_C(iPoint)
+                ! Linear interpolation between r1 and r2
+                Weight = (rNode - r1)/(r2 - r1)
+                v1_II = source_IV(:, :, iLine, iPoint-1)
+                v2_II = source_IV(:, :, iLine, iPoint)
+                Distribution_CB(1:nP, :, iX, iLine) = &
+                     Distribution_CB(1:nP, :, iX, iLine) + &
+                     (v1_II+(v2_II-v1_II)*Weight)*dtIn_CB(:, :, iX, iLine)
+             else
+                ! rNode is at or below first grid point
+                Distribution_CB(1:nP, :, iX, iLine) = &
+                     Distribution_CB(1:nP, :, iX, iLine) + &
+                     source_IV(:, :, iLine, 1)*dtIn_CB(:, :, iX, iLine)
+             end if
+          end if
+       end do
+
+       ! Check if the VDF includes negative values after Dperp
+       call check_dist_neg(NameSub// &
+            ' after perpendicular diffusion', 1, nVertex_B(iLine), iLine)
+       if(IsDistNeg) RETURN
+    end do LINE
+  end subroutine interp_source_linenode
   !============================================================================
 end module SP_ModPerpDiffusion
 !==============================================================================
