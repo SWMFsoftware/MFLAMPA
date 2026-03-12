@@ -2991,11 +2991,13 @@ contains
     !==========================================================================
     logical function do_skip(iLine, iRange_I)
 
-      use SP_ModGrid, ONLY: iblock_to_lon_lat
+      use SP_ModGrid, ONLY: iblock_to_lon_lat, iLonOffset, iLatOffset
       integer, intent(in) :: iLine, iRange_I(iLonMin_:iLatMax_)
       integer :: iLon, iLat
       !------------------------------------------------------------------------
       call iblock_to_lon_lat(iLine, iLon, iLat)
+      iLon = iLon - iLonOffset
+      iLat = iLat - iLatOffset
       do_skip = any([iLon,iLat] < iRange_I(iLonMin_:iLatMin_:2)).or.&
            any([iLon,iLat] > iRange_I(iLonMax_:iLatMax_:2))
     end function do_skip

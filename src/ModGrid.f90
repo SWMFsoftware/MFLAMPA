@@ -41,8 +41,8 @@ module SP_ModGrid
   ! Angular grid at origin surface
   integer, public :: nLat = 4  ! Number of lines along Lat grid
   integer, public :: nLon = 4  ! Number of lines along Lon grid
-  integer:: iLatOffset = 0     ! Offset of line index along Lat grid
-  integer:: iLonOffset = 0     ! Offset of line index along Lon grid
+  integer, public:: iLatOffset = 0     ! Offset of line index along Lat grid
+  integer, public:: iLonOffset = 0     ! Offset of line index along Lon grid
 
   ! Total number of magnetic field lines on all PEs (a product of nLat*nLon)
   integer, public :: nLineAll = 16
