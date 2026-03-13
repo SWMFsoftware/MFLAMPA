@@ -27,13 +27,13 @@ module SP_ModTriangulate
 
   ! In all names below "Tri" means "Triangulation"
   ! If we use poles in triangulation
-  logical, public :: UsePoleTri   = .false.
+  logical, public :: UsePoleTri   = .true.
   logical, public :: UsePlanarTri = .true.
   real,    public, parameter :: iSouthPoleTri_ = -1, iNorthPoleTri_ = -2
   ! # of intersection points of the MFLAMPA grid lines with
   ! the spherical surface, nReachR
   ! # of points involed into triangilation (equals to nReachR or nReach+2)
-  integer, allocatable :: nTriMesh_I(:)
+  integer, public, allocatable :: nTriMesh_I(:)
   ! Locations of the lines intersection with the spherical surface. Regardless
   ! of the sphere radius, the coordinates are divided by this radius, hence,
   ! are the points at the unit sphere. The point number may be equal to
@@ -79,15 +79,15 @@ contains
     ! assigned to a given Proc
     character(len=*), parameter:: NameSub = 'reset_intersect_surf'
     !--------------------------------------------------------------------------
-    deallocate(Xyz_DII, iLineReach_II, DistrR_IIBI, nTriMesh_I)
-    deallocate(XyzOrig_DII, DPerp_IIBI)
-    deallocate(iList_I, iPointer_I, iEnd_I)
+    if(allocated(Xyz_DII)) deallocate(Xyz_DII, iLineReach_II, &
+         DistrR_IIBI, nTriMesh_I, iList_I, iPointer_I, iEnd_I)
+    if(allocated(XyzOrig_DII)) deallocate(XyzOrig_DII, DPerp_IIBI)
     allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, nR))
-    allocate(XyzOrig_DII(X_:Z_, nLineAll, nR))
+    allocate(XyzOrig_DII(X_:Z_, 1:nLineAll+2, nR))
     allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, nR))
-    allocate(DPerp_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, nR))
+    allocate(DPerp_IIBI(1:nP, 1:nMu, 1:nLineAll+2, nR))
     allocate(iLineReach_II(1:nLineAll+2, nR))
-    allocate(nTriMesh_I(nR))
+    allocate(nTriMesh_I(nR)); nTriMesh_I = 0
     allocate(iList_I(6*nLineAll))
     allocate(iPointer_I(6*nLineAll))
     allocate(iEnd_I(nLineAll+2))
@@ -133,10 +133,10 @@ contains
        if(IsIncludeDPerp) then
           ! In DPerp
           allocate(XyzOrig_DII(X_:Z_, 1:nLineAll+2, 1))
-          allocate(DPerp_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, 1))
+          allocate(DPerp_IIBI(1:nP, 1:nMu, 1:nLineAll+2, 1))
        end if
        allocate(iLineReach_II(1:nLineAll+2, 1))
-       allocate(nTriMesh_I(1))
+       allocate(nTriMesh_I(1)); nTriMesh_I = 0
        allocate(iList_I(6*nLineAll))
        allocate(iPointer_I(6*nLineAll))
        allocate(iEnd_I(nLineAll+2))
@@ -152,7 +152,7 @@ contains
        iR = 1
     end if
     Xyz_DII(:,:,iR) = 0.0; iLineReach_II(:,iR) = 0
-    nTriMesh_I = 0; DistrR_IIBI(:,:,:,iR) = 0.0
+    DistrR_IIBI(:,:,:,iR) = 0.0
     if(IsIncludeDPerp) DPerp_IIBI(:,:,:,iR) = 0.0
 
     ! go over all lines on the processor and find the point of
@@ -189,7 +189,7 @@ contains
        call mpi_reduce_real_array(DistrR_IIBI(:,:,:,iR), &
             (nP+2)*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
        if(IsIncludeDPerp) call mpi_reduce_real_array(DPerp_IIBI(:,:,:,iR), &
-            (nP+2)*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
+            nP*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
     end if
     ! Save original intersection points
     if(IsIncludeDPerp) XyzOrig_DII(:,:,iR) = Xyz_DII(:,:,iR)
@@ -243,7 +243,7 @@ contains
     else
        IsIncludeDPerp = .false.
     end if
-    if(present(iRIn))then
+    if(present(iRIn)) then
        iR = iRIn
     else
        iR = 1
@@ -282,7 +282,7 @@ contains
                nVar       = nP+2,                              &
                State_VI   = DistrR_IIBI(:, iMu, 1:nTriMesh_I(iR),iR))
        end do
-       if (IsIncludeDPerp) then
+       if(IsIncludeDPerp) then
           do iMu = 1, nMu
              ! North:
              call fix_state( &
@@ -292,7 +292,7 @@ contains
                   iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
                   iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
                   Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
-                  nVar       = nP+2,                              &
+                  nVar       = nP,                                &
                   State_VI   = DPerp_IIBI(:,iMu,1:nTriMesh_I(iR),iR))
              ! South:
              call fix_state( &
@@ -302,8 +302,8 @@ contains
                   iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
                   iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
                   Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
-                  nVar       = nP+2,                              &
-                  State_VI   = DPerp_IIBI(:, iMu, 1:nTriMesh_I(iR),iR))
+                  nVar       = nP,                                &
+                  State_VI   = DPerp_IIBI(:,iMu, 1:nTriMesh_I(iR),iR))
           end do
        end if
     end if

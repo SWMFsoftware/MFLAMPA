@@ -542,7 +542,7 @@ contains
 
     ! for perpendicular diffusion: it becomes "Dpara - Dperp" here
     if(UseDiffusionPerp) then
-       DInnerSi_II = DInnerSi_II * (1.0-DParaRatio)
+       DInnerSi_II(1:nX, :) = DInnerSi_II(1:nX, :)*(1.0-DParaRatio)
        ! gather Dperp along multiple field lines on each processor
        do iP = 1, nP
           DPerp_CB(iP, nMu, 1:nX, iLine) = DParaRatio* &

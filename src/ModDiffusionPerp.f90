@@ -43,7 +43,7 @@ module SP_ModPerpDiffusion
   real, allocatable:: dRPerpMesh_I(:), dRPerpFace_I(:) ! dR of cell center+face
   real            :: RMinPerp = 1.2, RMaxPerp = 240.0  ! RMin and RMax of Grid
   real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
-  character(len=6):: ScaleRPerp                 ! Scale (Linear/Log) along R_
+  character(len=15):: ScaleRPerp                ! Scale (Linear/Log) along R_
   integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
   real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &    ! default:
        RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:) ! SI units
@@ -213,19 +213,27 @@ contains
 
       ! Theta: zenith/latitudinal direction
       dThetaPerp = cPi/real(nThetaPerp)
-      if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C)
-      allocate(ThetaPerp_C(nThetaPerp))
+      if(allocated(ThetaPerp_C)) deallocate(ThetaPerp_C, ThetaPerp_F)
+      allocate(ThetaPerp_C(nThetaPerp), ThetaPerp_F(nThetaPerp+1))
       do iThetaPerp = 1, nThetaPerp
          ThetaPerp_C(iThetaPerp) = (real(iThetaPerp)-0.5)*dThetaPerp
       end do
+      ThetaPerp_F(2:nThetaPerp) = 0.5*(ThetaPerp_C(1:nThetaPerp-1) + &
+           ThetaPerp_C(2:nThetaPerp))
+      ThetaPerp_F(1) = ThetaPerp_C(1) - 0.5*dThetaPerp
+      ThetaPerp_F(nThetaPerp+1) = ThetaPerp_C(nThetaPerp) + 0.5*dThetaPerp
 
       ! Phi: azimuthal/longitudinal direction
       dPhiPerp = cTwoPi/real(nPhiPerp)
-      if(allocated(PhiPerp_C)) deallocate(PhiPerp_C)
-      allocate(PhiPerp_C(nPhiPerp))
+      if(allocated(PhiPerp_C)) deallocate(PhiPerp_C, PhiPerp_F)
+      allocate(PhiPerp_C(nPhiPerp), PhiPerp_F(nPhiPerp+1))
       do iPhiPerp = 1, nPhiPerp
          PhiPerp_C(iPhiPerp) = (real(iPhiPerp)-0.5)*dPhiPerp
       end do
+      PhiPerp_F(2:nPhiPerp) = 0.5*(PhiPerp_C(1:nPhiPerp-1) + &
+           PhiPerp_C(2:nPhiPerp))
+      PhiPerp_F(1) = PhiPerp_C(1) - 0.5*dPhiPerp
+      PhiPerp_F(nPhiPerp+1) = PhiPerp_C(nPhiPerp) + 0.5*dPhiPerp
 
       ! (R, Theta, Phi) => (X, Y, Z) + Parallelization
       do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
@@ -299,11 +307,10 @@ contains
     ! loop variables
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE
     ! VDF and the source term (5D)
-    real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
-         iRPerpStart_I(iProc):iRPerpEnd_I(iProc)) :: DistrPerp_5D, source_5D
+    real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, nRPerp)&
+         :: DistrPerp_5D, source_5D
     ! DPerp coefficients (5D)
-    real :: DPerp_5D(nP, nMu, nPhiPerp, nThetaPerp, &
-         iRPerpStart_I(iProc):iRPerpEnd_I(iProc))
+    real :: DPerp_5D(nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
     ! source term (along lines)
     real :: source_IV(nP, nMu, nLineAll, nRPerp)
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution_c'
@@ -316,57 +323,58 @@ contains
        ! here, iProc is for field lines, not for sub-slices/layers.
        ! In fact, this step of getting the intersection points is needed ONLY
        ! the 1st time, since MHData would be changed every coupling interval.
-       do iPE = 0, nProc-1
-          call reset_intersect_surf(nRPerp)
-          do iRPerp = iRPerpStart_I(iPE), iRPerpEnd_I(iPE)
-             call intersect_surf(RPerp_C(iRPerp), iPE, iRPerp)
-          end do
+       call reset_intersect_surf(nRPerp)
+       do iRPerp = 1, nRPerp
+          call intersect_surf(RPerp_C(iRPerp)*Si2Io_V(UnitX_), &
+               0, iRPerp, IsIncludeDPerpIn=.true.)
        end do
 
-       ! Step 2: Get Dperp at the cell center in the uniform grid (ONLY 1st time)
-       ! Now, iProc is for sub-slices/layers in the `DistrPerp_5D` array
-       do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-          ! intersection points => construct the triangulation skeleton
-          call build_trmesh(iRPerp)
-          do iThetaPerp = 1, nThetaPerp
-             do iPhiPerp = 1, nPhiPerp
-                ! Get DPerp coefficient at the cell center in the uniform grid
-                call interpolate_trmesh(XyzPerp_CB(:,             &
-                     iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
-                     iRIn = iRPerp, DPerp_II =                    &
-                     DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+       if(iProc == 0) then
+          ! Step 2: Get Dperp at the cell center (uniform grid; ONLY 1st time)
+          ! Now, iProc is for sub-slices/layers in the `DistrPerp_5D` array
+          do iRPerp = 1, nRPerp
+             ! intersection points => construct the triangulation skeleton
+             call build_trmesh(iRPerp)
+             do iThetaPerp = 1, nThetaPerp
+                do iPhiPerp = 1, nPhiPerp
+                   ! Get DPerp coefficient at the cell center (uniform grid)
+                   call interpolate_trmesh(XyzPerp_CB(:,             &
+                        iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
+                        iRIn = iRPerp, DPerp_II =                    &
+                        DPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+                end do
              end do
           end do
-       end do
-       ! Broadcast Dperp coefficient to all processes
-       if(nProc > 1) then
-          do iPE = 0, nProc-1
-             call MPI_BCAST(DPerp_5D(:,:,:,:,              &
-                  iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
-                  (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-                  nP*nMu*nPhiPerp*nThetaPerp, MPI_REAL, iPE, iComm, iError)
-          end do
-       end if
-       ! Check the error message from after interpolate_trmesh
-       if(iError /= 0) then
-          write(*,*) 'iProc = ', iProc, NameSub//&
-               ': interpolate_trmesh for DPerp_5D failed, DPerp stopped'
-          RETURN
+          ! Broadcast Dperp coefficient to all processes
+          if(nProc > 1) then
+             do iPE = 0, nProc-1
+                call MPI_BCAST(DPerp_5D, nPhiPerp*nThetaPerp*nRPerp* &
+                     nP*nMu, MPI_REAL, iPE, iComm, iError)
+             end do
+          end if
+          ! Check the error message from after interpolate_trmesh
+          if(iError /= 0) then
+             write(*,*) 'iProc = ', iProc, NameSub//&
+                  ': interpolate_trmesh for DPerp_5D failed, DPerp stopped'
+             RETURN
+          end if
        end if
     end if
 
     ! Step 3: Triangulation skeleton => Interpolate the VDF
-    do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
-       do iThetaPerp = 1, nThetaPerp
-          do iPhiPerp = 1, nPhiPerp
-             ! Get VDF at the cell center in the uniform grid
-             call interpolate_trmesh(XyzPerp_CB(:,             &
-                  iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
-                  iRIn = iRPerp, DistrInterp_II =              &
-                  DistrPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+    if(iProc == 0) then
+       do iRPerp = 1, nRPerp
+          do iThetaPerp = 1, nThetaPerp
+             do iPhiPerp = 1, nPhiPerp
+                ! Get VDF at the cell center in the uniform grid
+                call interpolate_trmesh(XyzPerp_CB(:,             &
+                     iPhiPerp,iThetaPerp,iRPerp)*Si2Io_V(UnitX_), &
+                     iRIn = iRPerp, DistrInterp_II =              &
+                     DistrPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
+             end do
           end do
        end do
-    end do
+    end if
 
     ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
     source_5D = 0.0
