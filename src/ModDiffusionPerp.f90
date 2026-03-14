@@ -8,7 +8,7 @@ module SP_ModPerpDiffusion
   use ModNumConst, ONLY: cPi, cTwoPi, cTiny
   use ModUtilities, ONLY: CON_stop
   use SP_ModDistribution, ONLY: Distribution_CB, IsDistNeg, check_dist_neg
-  use SP_ModGrid, ONLY: nP, nMu, nLine, nLineAll, MHData_VIB, R_, X_, Z_
+  use SP_ModGrid, ONLY: nP, nMu, nLine, nLineAll, State_VIB, R_, X_, Z_
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModTime, ONLY: IsSteadyState
   use SP_ModProc, ONLY: nProc, iProc, iComm, iError
@@ -36,6 +36,7 @@ module SP_ModPerpDiffusion
   logical, public :: UseDiffusionPerp = .false.
   character(len=15), public :: TypeDPerp = 'UseDParaRatio'
   real, public      :: DParaRatio = 0.065       ! Simple ratio of Dperp/Dpara
+  logical, public :: DoTestDPerp = .false.
 
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
   integer, public :: nRPerp, nThetaPerp, nPhiPerp
@@ -99,6 +100,9 @@ contains
                   nThetaPerp+1, "to avoid singularity when theta=0"
              nThetaPerp = nThetaPerp + 1
           end if
+
+          ! Print out test information
+          call read_var('DoTestDPerp', DoTestDPerp)
        end if
     case default
        call CON_stop('SP:'//NameSub//': unknown command '//NameCommand)
@@ -299,7 +303,7 @@ contains
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
-         build_trmesh, interpolate_trmesh
+         build_trmesh, interpolate_trmesh, nTriMesh_I
 
     ! inputs
     logical, intent(in) :: IsFirstCall
@@ -328,9 +332,15 @@ contains
           call intersect_surf(RPerp_C(iRPerp)*Si2Io_V(UnitX_), &
                0, iRPerp, IsIncludeDPerpIn=.true.)
        end do
+       if(nProc > 1) then
+          do iPE = 0, nProc-1
+             call MPI_BCAST(nTriMesh_I, nRPerp, &
+                  MPI_INTEGER, iPE, iComm, iError)
+          end do
+       end if
 
        if(iProc == 0) then
-          ! Step 2: Get Dperp at the cell center (uniform grid; ONLY 1st time)
+          ! Step 2: Get DPerp at the cell center (uniform grid; ONLY 1st time)
           ! Now, iProc is for sub-slices/layers in the `DistrPerp_5D` array
           do iRPerp = 1, nRPerp
              ! intersection points => construct the triangulation skeleton
@@ -345,25 +355,30 @@ contains
                 end do
              end do
           end do
-          ! Broadcast Dperp coefficient to all processes
-          if(nProc > 1) then
-             do iPE = 0, nProc-1
-                call MPI_BCAST(DPerp_5D, nPhiPerp*nThetaPerp*nRPerp* &
-                     nP*nMu, MPI_REAL, iPE, iComm, iError)
-             end do
-          end if
-          ! Check the error message from after interpolate_trmesh
-          if(iError /= 0) then
-             write(*,*) 'iProc = ', iProc, NameSub//&
-                  ': interpolate_trmesh for DPerp_5D failed, DPerp stopped'
-             RETURN
-          end if
        end if
+       ! Broadcast DPerp coefficient to all processes
+       if(nProc > 1) then
+          do iPE = 0, nProc-1
+             call MPI_BCAST(DPerp_5D, nPhiPerp*nThetaPerp*nRPerp* &
+                  nP*nMu, MPI_REAL, iPE, iComm, iError)
+          end do
+       end if
+       ! Check the error message from after interpolate_trmesh
+       if(iError /= 0) then
+          write(*,*) 'iProc = ', iProc, NameSub//&
+               ': interpolate_trmesh for DPerp_5D failed, DPerp stopped'
+          RETURN
+       end if
+
+       ! Output test information
+       if(DoTestDPerp) write(*,*) NameSub//'Finish FirstCall: '// &
+            'Triangulation skeleton and DPerp Coef in the uniform grid'
     end if
 
     ! Step 3: Triangulation skeleton => Interpolate the VDF
     if(iProc == 0) then
        do iRPerp = 1, nRPerp
+          call build_trmesh(iRPerp)
           do iThetaPerp = 1, nThetaPerp
              do iPhiPerp = 1, nPhiPerp
                 ! Get VDF at the cell center in the uniform grid
@@ -373,6 +388,13 @@ contains
                      DistrPerp_5D(:,:,iPhiPerp,iThetaPerp,iRPerp))
              end do
           end do
+       end do
+    end if
+    ! Broadcast Dperp coefficient to all processes
+    if(nProc > 1) then
+       do iPE = 0, nProc-1
+          call MPI_BCAST(DistrPerp_5D, nPhiPerp*nThetaPerp*nRPerp* &
+               (nP+2)*nMu, MPI_REAL, iPE, iComm, iError)
        end do
     end if
 
@@ -413,7 +435,7 @@ contains
     integer, intent(in) :: iRStart, iREnd
     logical, intent(in) :: IsSteadyStateIn
     real,    intent(in) :: dtIn
-    real,    intent(in) :: DPerp_5D(1:nP,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
+    real,    intent(in) :: DPerp_5D(1:nP,nMu,nPhiPerp,nThetaPerp,nRPerp)
     real, intent(inout) :: DistrPerp_5D(0:nP+1, nMu, &
          nPhiPerp, nThetaPerp, iRStart:iREnd)
     real, intent(out):: source_5D(0:nP+1,nMu,nPhiPerp,nThetaPerp,iRStart:iREnd)
@@ -423,7 +445,8 @@ contains
     ! loop variables
     integer :: i, j, k, iStep
     ! time step and iterations
-    real :: dtMax, dt, DPerpMax
+    real :: dt, DPerpMax
+    real :: dtLocal_III(nPhiPerp,nThetaPerp,nRPerp)
     integer :: nStep
 
     ! ghost VDF when sendrecv across prev-current-next processors
@@ -442,17 +465,28 @@ contains
        dt = 0.0
     else
        ! Time-accurate mode: Use exact dt; otherwise, no time marching
-       ! Stability check: Determine dtMax = 0.5*min(dx)**2/max(DPerp)
-       call MPI_ALLREDUCE(maxval(DPerp_5D, mask=(DPerp_5D>0)), DPerpMax, &
-            1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, iError)
-       dtMax = 0.5*min(minval(dRPerpFace_I)**2, &
-            (RMinPerp*dThetaPerp)**2, &
-            (RMinPerp*minval(ThetaPerpSin_C(2:nThetaPerp-1))*dPhiPerp)**2) &
-            /DPerpMax
-       nStep = int(dtIn/dtMax) + 1
+       ! Stability check: Determine maximal allowed global time step:
+       ! dt <= 0.5*min_{i,j,k} [D_{ijk} * (
+       !       1/DeltaR_i**2 + 1/(R_i*Delta(theta_j))**2 +
+       !       1/(R_i*sin(theta_j)*Delta(phi_k))**2 )]^{-1}
+       dtLocal_III = 0.0
+       do i = 1, nRPerp
+          do j = 1, nThetaPerp
+             do k = 1, nPhiPerp
+                dtLocal_III(k,j,i) = 0.5/(1.0/dRPerpFace_I(i)**2 + &
+                     1.0/(RPerp_C(i)*dThetaPerp)**2 + &
+                     1.0/(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp)**2)* &
+                     maxval(DPerp_5D(:,:,k,j,i), mask=(DPerp_5D(:,:,k,j,i)>0))
+             end do
+          end do
+       end do
+       dt = minval(dtLocal_III, mask=(dtLocal_III>0))
+       nStep = int(dtIn/dt) + 1
        dt = dtIn/real(nStep)
-       write(*,*) 'DPerp: nStep=', nStep, &
-            '; Stable dtMax=', dtMax, '; Use dt=', dt
+
+       ! Output test information
+       if(DoTestDPerp) &
+            write(*,*) 'DPerp: Stable (Used) dt=', dt, 'with nStep=', nStep
     end if
 
     ! Time stepping: Diffusion in 3D by FVM
@@ -542,7 +576,7 @@ contains
                ! DPerp coefficient at face(i-1, i)
                if(i > 1) then
                   DPerpMinus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
-                       + Dperp_5D(:,:,k,j,i+1))
+                       + Dperp_5D(:,:,k,j,i-1))
                else
                   DPerpMinus_II = Dperp_5D(:,:,k,j,i) - &
                        0.5*(Dperp_5D(:,:,k,j,i+1) - Dperp_5D(:,:,k,j,i))
@@ -716,7 +750,7 @@ contains
        ! Loop over all nodes along the valid field line
        do iX = 1, nVertex_B(iLine)
           ! Extract the radial coordinate of the current node
-          rNode = MHData_VIB(R_, iX, iLine)
+          rNode = State_VIB(R_, iX, iLine)
 
           ! Check that rNode is within grid range
           if(rNode <= RPerp_C(nRPerp)) then

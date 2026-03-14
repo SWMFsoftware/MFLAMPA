@@ -11,7 +11,7 @@ module SP_ModDistribution
 #endif
   use ModUtilities, ONLY: CON_stop
   use SP_ModSize, ONLY: nVertexMax
-  use SP_ModGrid, ONLY: nLine, nVertex_B, Used_B, nP, nMu, IsMuAvg
+  use SP_ModGrid, ONLY: iLineAll0, nLine, nVertex_B, Used_B, nP, nMu, IsMuAvg
 
   implicit none
 
@@ -250,17 +250,13 @@ contains
     integer :: iLon, iLat
     !--------------------------------------------------------------------------
     if(any(Distribution_CB(:, :, lVertex:rVertex, iLine)<0.0)) then
-       write(*,*) NameSub, ': Distribution_CB < 0'
+       ! Diagnose the problem: line number and iLon/iLat of the line
+       call iBlock_to_lon_lat(iLine, iLon, iLat)
+       write(*,*) NameSub//': Distribution_CB < 0 on Line', &
+               iLine+iLineAll0, 'with iLon, iLat = ', iLon, iLat
        Used_B(iLine) = .false.
        nVertex_B(iLine) = 0
        IsDistNeg = .true.
-       ! With negative values in the Poisson bracket scheme: should stop here
-       if( index(NameSub, 'poisson')>0 .or. index(NameSub, 'Poisson')>0 &
-            .or. index(NameSub, 'POISSON')>0 ) then
-            call iBlock_to_lon_lat(iLine, iLon, iLat)
-            write(*,*) NameSub//': Distribution_CB < 0 on Line', &
-               iLine, 'with iLon, iLat = ', iLon, iLat
-       end if
     end if
   end subroutine check_dist_neg
   !============================================================================
