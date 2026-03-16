@@ -46,7 +46,7 @@ module SP_ModPerpDiffusion
   real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
   character(len=15):: ScaleRPerp                ! Scale (Linear/Log) along R_
   integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
-  real, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &    ! default:
+  real, public, allocatable:: RPerp_C(:), ThetaPerp_C(:), PhiPerp_C(:), &
        RPerp_F(:), ThetaPerp_F(:), PhiPerp_F(:), XyzPerp_CB(:,:,:,:) ! SI units
 
   ! For the FVM solver on the uniform grid: face areas and cell volumes

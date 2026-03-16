@@ -42,6 +42,7 @@ contains
     use SP_ModDiffusion,      ONLY: read_param_diffuse     => read_param
     use SP_ModPerpDiffusion,  ONLY: read_param_diffuseperp => read_param
     use SP_ModDistribution,   ONLY: read_param_dist        => read_param
+    use SP_ModDrift,          ONLY: read_param_drift       => read_param
     use SP_ModGrid,           ONLY: read_param_grid        => read_param
     use SP_ModOriginPoints,   ONLY: read_param_origin      => read_param
     use SP_ModPlot,           ONLY: read_param_plot        => read_param
@@ -107,6 +108,8 @@ contains
           call read_param_diffuse(NameCommand)
        case('#DIFFUSIONPERP')
           call read_param_diffuseperp(NameCommand)
+       case('#DRIFT')
+          call read_param_drift(NameCommand)
        case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG', '#NOUTPUT')
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
@@ -190,6 +193,7 @@ contains
     use SP_ModChannel,       ONLY: init_channel    => init
     use SP_ModDistribution,  ONLY: init_dist       => init
     use SP_ModPerpDiffusion, ONLY: init_dperp      => init, UseDiffusionPerp
+    use SP_ModDrift,         ONLY: init_drift      => init, UseDrift
     use SP_ModPlot,          ONLY: init_plot       => init
     use SP_ModReadMhData,    ONLY: init_mhdata     => init
     use SP_ModRestart,       ONLY: read_restart
@@ -216,7 +220,9 @@ contains
     ! Allocate distribution function and set uniform background
     call init_dist
     ! Setup the mesh used for triangulation in perpendicular diffusion
-    if(UseDiffusionPerp) call init_dperp
+    if(UseDiffusionPerp .or. UseDrift) call init_dperp
+    ! Set up the arrays for the drift term
+    if(UseDrift) call init_drift
     ! Initialize the energy channels for specified satellites
     call init_channel
     ! Initialize arrays for outputs and plotting

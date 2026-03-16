@@ -43,7 +43,7 @@ module SP_ModBc
   ! Lower end BC, set at the firsr point along the field line
   logical, public   :: UseLowerEndBc = .true.
   ! Type of lower end BC: float/floating, escape, inject
-  character(LEN=6)  :: TypeLowerEndBc = 'inject'
+  character(LEN=6), public  :: TypeLowerEndBc = 'inject'
   ! Index of the left lower end BC
   integer, public   :: iStart = 1
   integer, parameter:: &
@@ -56,7 +56,7 @@ module SP_ModBc
   ! Upper end BC, set at the last point along the field line
   logical, public   :: UseUpperEndBc = .false.
   ! Type of upper end BC: none, float/floating, escape, lism
-  character(LEN=6)  :: TypeUpperEndBc = 'none'
+  character(LEN=6), public  :: TypeUpperEndBc = 'none'
   real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(0:nP+1)
 contains
   !============================================================================
@@ -211,7 +211,7 @@ contains
        UpperEndBc_I = Background_I(1:nP)
     case('lism')
        XyzSi_D = MhData_VIB(X_:Z_, nX, iLine)*Io2Si_V(UnitX_)
-       call local_interstellar_spectrum(&
+       call local_interstellar_spectrum(     &
             nP = nP,                         &  ! # of grid points
             MomentumSi_I = Momentum_G(1:nP)* &
             MomentumInjSi,                   &  ! momentum (SI) in grid points
