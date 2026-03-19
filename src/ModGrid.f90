@@ -341,7 +341,10 @@ contains
     integer:: iEnd, iLine
     !--------------------------------------------------------------------------
     do iLine = 1, nLine
-       if(.not.Used_B(iLine))CYCLE
+       if(.not.Used_B(iLine))then
+          MhData_VIB(1:nMhData, :, iLine) = 0.0
+          CYCLE
+       end if
        iEnd = nVertex_B(iLine)
        iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = MhData_VIB(Rho_, 1:iEnd, iLine)
@@ -393,7 +396,6 @@ contains
                 write(*,*)'iVertex+1=',  iVertex+1
                 write(*,*)'Xyz (iVertex+1)=', MHData_VIB(X_:Z_,iVertex+1,iLine)
                 call CON_stop(NameSub//': zero size of mesh')
-                Used_B(iLine) = .false.
              end if
           end if
           ! else
