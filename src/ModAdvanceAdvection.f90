@@ -69,7 +69,7 @@ contains
     FermiFirst_I = FermiFirst_I/nStep
 
     ! update bc for advection at nP = 0
-    call set_momentum_bc(iLine, nX, nSi_I(1:nX), iShock)
+    call set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
 
     STEP:do iStep = 1, nStep
        if(UseLowerEndBc) then

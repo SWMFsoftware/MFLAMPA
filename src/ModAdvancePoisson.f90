@@ -126,7 +126,7 @@ contains
     Time = 0.0
 
     ! Update Bc for VDF at minimal energy, at nP = 0
-    call set_momentum_bc(iLine, nX, nSi_I, iShock)
+    call set_momentum_bc(iLine, nX, nSi_I, iShock, log(nSi_I/nOldSi_I))
     ! Trial time step: Get DtNext
     call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
     call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
@@ -374,7 +374,7 @@ contains
     ! Loop variables
     integer :: iP, iMu, iX
     ! Inverse magetic field: time derivative, cell- and face-centered values
-    real    :: dInvBSiDt_C(nX), InvBSi_C(nX), InvBSi_F(0:nX)
+    real    :: dInvBSiDt_C(nX), InvBSi_C(nX), InvBSi_F(0:nX), dLogRho_I(nX)
     ! ------------ Volumes ------------
     ! VolumeStart_G: geometric volume when the subroutine starts
     ! VolumeX_I: geometric volume at the end of each iteration
@@ -412,6 +412,7 @@ contains
     !--------------------------------------------------------------------------
     IsDistNeg = .false.
     InvtFinal = 1.0/tFinal
+    dLogRho_I = log(nSi_I/nOldSi_I)
 
     ! Initialize time and arrays
     Time = 0.0
@@ -419,7 +420,7 @@ contains
 
     ! Here we would like to get the first trial of DtNext
     ! Update Bc for VDF at minimal energy, at nP = 0
-    call set_momentum_bc(iLine, nX, nSi_I, iShock)
+    call set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
     call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
     call advance_poisson_focused   ! Now we get DtNext
 
@@ -429,7 +430,7 @@ contains
        Dt = min(DtNext, tFinal - Time)
 
        ! Update Bc for at minimal energy, at nP = 0
-       call set_momentum_bc(iLine, nX, nSi_I, iShock)
+       call set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
        ! Update Bc for VDF
        call set_VDF(iLine, nX, VDF_G)
        ! Advance by the multiple-Poisson-bracket scheme

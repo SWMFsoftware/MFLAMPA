@@ -37,8 +37,9 @@ module SP_ModBc
   ! range k_B*T_i < Energy < EnergyInjection, to be read from PARAM.in
   real, public      :: CoefInj = 0.25, SpectralIndex = 5.0
   real, parameter   :: CoefInjTiny = 2.5E-11 ! Before Nov 2023: set to be 0.0
-  ! Injection coefficient at lower end boundary, should set 0.0 for GCRs
-  ! real, public      :: CoefInjLowBc = 0.25
+  ! Whether to account for shock compression in injection efficiency
+  logical           :: UseComprhoScale = .false.
+  real, parameter   :: ComprhoMax = 4.0 ! Max compression ratio in theory
 
   ! Lower end BC, set at the firsr point along the field line
   logical, public   :: UseLowerEndBc = .true.
@@ -69,17 +70,14 @@ contains
     character(len=*), parameter:: NameSub = 'read_param'
     !--------------------------------------------------------------------------
     select case(NameCommand)
-    ! case('#INJECTION')
-    !   call read_var('SpectralIndex',   SpectralIndex)
-    !   call read_var('EfficiencyGlob',  CoefInj)
-    !   call read_var('EfficiencyLowBc', CoefInjLowBc)
     case('#MOMENTUMBC')
-       call read_var('TypeMomentumMinBc',  TypeMomentumMinBc)
+       call read_var('TypeMomentumMinBc', TypeMomentumMinBc)
        if(TypeMomentumMinBc=='inject')then
-          call read_var('SpectralIndex',   SpectralIndex)
-          call read_var('EfficiencyInj',  CoefInj)
+          call read_var('SpectralIndex', SpectralIndex)
+          call read_var('EfficiencyInj', CoefInj)
+          call read_var('UseComprhoScale', UseComprhoScale)
        end if
-       call read_var('TypeMomentumMaxBc',  TypeMomentumMaxBc)
+       call read_var('TypeMomentumMaxBc', TypeMomentumMaxBc)
     case('#LOWERENDBC')
        ! Read whether to use LowerLowBc
        call read_var('UseLowerEndBc', UseLowerEndBc)
@@ -122,12 +120,13 @@ contains
     end select
   end subroutine read_param
   !============================================================================
-  subroutine set_momentum_bc(iLine, nX, nSi_I, iShock)
+  subroutine set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
     ! Set boundary conditions for Distribution_CB on grid point,
     ! on the given field line.
 
     integer, intent(in) :: iLine, nX, iShock
     real,    intent(in) :: nSi_I(1:nX)
+    real, optional, intent(in) :: dLogRho_I(1:nX)
     ! local variables
     integer :: iVertex     ! loop variable
     real    :: MomentumSi  ! Momentum for the thermal energy k_BTi
@@ -151,8 +150,20 @@ contains
                * nSi_I(iVertex)/MomentumSi**3          &
                * (MomentumSi/MomentumInjSi)**SpectralIndex
 
-          if(iShock /= NoShock_ .and. iVertex <= iShock + nShockWidth .and.  &
-               iVertex >= iShock - nShockWidth) CoefInjLocal = CoefInj
+          if(UseComprhoScale .and. present(dLogRho_I)) then
+             ! If dLogRho_I is present, it means we are in the time-accurate
+             ! advection step, and we need to account for the effect of shock
+             ! compression on the injection efficiency. We assume that the
+             ! injection efficiency is scaled with the density compression
+             ! ratio, which is exp(dLogRho_I). The maximum compression ratio
+             ! in theory is 4 for strong shock, so there is a scaling.
+             if(iShock /= NoShock_ .and. iVertex <= iShock+nShockWidth .and. &
+                  iVertex >= iShock-nShockWidth) CoefInjLocal = CoefInj* &
+                  exp(exp(dLogRho_I(iVertex))-ComprhoMax)
+          else
+             if(iShock /= NoShock_ .and. iVertex <= iShock+nShockWidth .and. &
+                  iVertex >= iShock-nShockWidth) CoefInjLocal = CoefInj
+          end if
 
           Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
        end do
