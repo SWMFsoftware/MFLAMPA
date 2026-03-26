@@ -305,7 +305,7 @@ contains
                call xyz_to_rlonlat(Bxyz13_IN(:,iPhi,iTheta,iR), &
                     Br, Btheta, Bphi)
                ! Hamiltonian13_N = r* p*v/(3*q) * Btheta/B**2
-               Hamiltonian13_N(iPhi,iTheta,iR) = -RPerp_F(iR)* &
+               Hamiltonian13_N(iPhi,iTheta,iR) = RPerp_F(iR)* &
                     Momentum_G(iP)*SpeedSi_G(iP)/(3.0*cElectronCharge)* &
                     Btheta/norm2(Bxyz13_IN(:,iPhi,iTheta,iR))
             end do
