@@ -343,6 +343,7 @@ contains
     do iLine = 1, nLine
        if(.not.Used_B(iLine))then
           MhData_VIB(1:nMhData, :, iLine) = 0.0
+          nVertex_B(iLine) = 1
           CYCLE
        end if
        iEnd = nVertex_B(iLine)
@@ -352,6 +353,7 @@ contains
        State_VIB(BOld_, 1:iEnd, iLine)   = State_VIB(B_, 1:iEnd, iLine)
        ! reset variables read from file or received via coupler
        MhData_VIB(1:nMhData, 1:iEnd, iLine) = 0.0
+       nVertex_B(iLine) = 1
     end do
 
   end subroutine copy_old_state
