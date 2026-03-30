@@ -73,7 +73,7 @@ contains
     use SP_ModAdvanceAdvection, ONLY: advect_via_log
     use SP_ModAdvancePoisson, ONLY: advect_via_poisson_parker, &
          calc_states_poisson_focused, advect_via_poisson_focused
-    use SP_ModGrid, ONLY: D_, RhoOld_, BOld_, ShockOld_
+    use SP_ModGrid, ONLY: D_, RhoOld_, BOld_, ShockOld_, NoShock_
     use SP_ModTime, ONLY: SPTime
     use SP_ModUnit, ONLY: Io2Si_V, UnitX_
 
@@ -130,10 +130,16 @@ contains
        iShock    = iShock_IB(Shock_,    iLine)
        iShockOld = iShock_IB(ShockOld_, iLine)
        if(DoTraceShock) then
-          ! This is how many steps should be done to allow the shock to
-          ! move not more than through one mesh size per step
-          nProgress = max(1, iShock-iShockOld)
-          iShockOld = min(iShockOld, iShock-1)
+          if(iShockOld == NoShock_) then
+             ! Shock first detected this step: do not march from vertex 1
+             ! to the detected position (unphysical). Start directly here.
+             nProgress = 1
+             iShockOld = iShock - 1
+          else
+             ! Normal case: allow shock to move one mesh per progress step
+             nProgress = max(1, iShock-iShockOld)
+             iShockOld = min(iShockOld, iShock-1)
+          end if
        else
           nProgress = 1
           iShockOld = 0
