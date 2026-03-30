@@ -284,17 +284,17 @@ contains
        ! get the forward grid index for iShockCandidate
        if (any(State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
             divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)) then
+          ! found a candidate for the shock front
           iShockForward = minloc( &
                divU_II(iShockMin:iShockMax, iLine), DIM=1, MASK= &
                State_VIB(R_,iShockMin:iShockMax,iLine) > RShockMin .and. &
                divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
+          iShockCandidate = iShockMin - 1 + iShockForward
+          iShock_IB(Shock_, iLine) = iShockCandidate
        else
-          iShockForward = 0
+          ! no candidate found
+          iShock_IB(Shock_, iLine) = NoShock_
        end if
-       iShockCandidate = iShockMin - 1 + iShockForward
-       if(iShockCandidate >= iShockMin) &
-            iShock_IB(Shock_, iLine) = iShockCandidate
-
        ! check_line_ishock: update Used_B(iLine)
        call check_line_ishock(iLine)
        if(.not.Used_B(iLine)) CYCLE
