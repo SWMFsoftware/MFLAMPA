@@ -6,7 +6,7 @@ module SP_ModShock
   ! This module contains subroutines for determining the shock location,
   ! and steepening the density and magnetic field strength at shock front.
   use SP_ModGrid, ONLY: nLine, nLineAll, Used_B, nVertex_B, &
-       NameVar_V, LagrID_, X_, Z_, State_VIB, MhData_VIB, &
+       NameVar_V, LagrID_, X_, Z_, State_VIB, MhData_VIB, R_, &
        iShock_IB, NoShock_, Shock_, ShockOld_, check_line_ishock
   use SP_ModSize, ONLY: nVertexMax
   use ModUtilities, ONLY: CON_stop
@@ -291,9 +291,19 @@ contains
                divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
           iShockCandidate = iShockMin - 1 + iShockForward
           iShock_IB(Shock_, iLine) = iShockCandidate
+          ! If the shock wave just appears, identify its "old" location with
+          ! the nearest lower vertex
+          if(iShock_IB(ShockOld_,iLine)==NoShock_.or.                 &
+               ! Same if the sensor jumps to another shock. The real shock
+               ! with a speed < 5,000 km/s passes in radial direction not
+               ! more than 600 Mm ~ 0.8 R_s
+               State_VIB(R_,iShock_IB(ShockOld_,iLine),iLine) + 0.8 < &
+               State_VIB(R_,iShock_IB(Shock_,iLine),iLine)           )&
+               iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_,iLine) - 1
        else
           ! no candidate found
           iShock_IB(Shock_, iLine) = NoShock_
+          iShock_IB(ShockOld_, iLine) = NoShock_
        end if
        ! check_line_ishock: update Used_B(iLine)
        call check_line_ishock(iLine)
