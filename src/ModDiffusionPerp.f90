@@ -510,10 +510,10 @@ contains
       if(iProcNext < nProc) then
          call MPI_SENDRECV(DistrPerp_5D(:,:,:,:,iREnd), &
               (nP+2)*nMu*nPhiPerp*nThetaPerp, &
-              MPI_DOUBLE_PRECISION, iProcNext, 0, &
+              MPI_REAL, iProcNext, 0, &
               DistrNextProc_G, (nP+2)*nMu*nPhiPerp*nThetaPerp, &
-              MPI_DOUBLE_PRECISION, iProcNext, 1, &
-              MPI_COMM_WORLD, MPI_STATUS_IGNORE, iError)
+              MPI_REAL, iProcNext, 1, &
+              iComm, MPI_STATUS_IGNORE, iError)
       else
          ! zero-gradient (Neumann BC) at outer boundary
          DistrNextProc_G = DistrPerp_5D(:,:,:,:,iREnd)
@@ -523,10 +523,10 @@ contains
       if(iProcPrev >= 0) then
          call MPI_SENDRECV(DistrPerp_5D(:,:,:,:,iRStart), &
               (nP+2)*nMu*nPhiPerp*nThetaPerp, &
-              MPI_DOUBLE_PRECISION, iProcPrev, 1, &
+              MPI_REAL, iProcPrev, 1, &
               DistrPrevProc_G, (nP+2)*nMu*nPhiPerp*nThetaPerp, &
-              MPI_DOUBLE_PRECISION, iProcPrev, 0, &
-              MPI_COMM_WORLD, MPI_STATUS_IGNORE, iError)
+              MPI_REAL, iProcPrev, 0, &
+              iComm, MPI_STATUS_IGNORE, iError)
       else
          ! zero-gradient (Neumann BC) at inner boundary
          DistrPrevProc_G = DistrPerp_5D(:,:,:,:,iRStart)
