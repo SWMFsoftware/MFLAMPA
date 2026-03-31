@@ -75,9 +75,10 @@ contains
        if(TypeMomentumMinBc=='inject')then
           call read_var('SpectralIndex', SpectralIndex)
           call read_var('EfficiencyInj', CoefInj)
-          call read_var('UseComprhoScale', UseComprhoScale)
        end if
        call read_var('TypeMomentumMaxBc', TypeMomentumMaxBc)
+    case('#INJECTION')
+       call read_var('UseComprhoScale', UseComprhoScale)
     case('#LOWERENDBC')
        ! Read whether to use LowerLowBc
        call read_var('UseLowerEndBc', UseLowerEndBc)

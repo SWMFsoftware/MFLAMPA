@@ -65,8 +65,10 @@ MH_data_e20120123/MH_data.H
 inject			TypeMomemtumMinBc
 5.0			SpectralIndex
 0.25			EfficiencyInj
-F			UseComprhoScale
 none			TypeMomemtumMaxBc
+
+#INJECTION
+F			UseComprhoScale
 
 #READMHDATA
 T			DoReadMhData
