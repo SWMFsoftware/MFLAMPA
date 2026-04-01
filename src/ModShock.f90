@@ -306,8 +306,8 @@ contains
           iShock_IB(ShockOld_, iLine) = NoShock_
        end if
        ! check_line_ishock: update Used_B(iLine)
-       call check_line_ishock(iLine)
-       if(.not.Used_B(iLine)) CYCLE
+       ! call check_line_ishock(iLine)
+       ! if(.not.Used_B(iLine)) CYCLE
 
        ! calculate values only when we save states for the shock
        if(DoSaveStateShock) then

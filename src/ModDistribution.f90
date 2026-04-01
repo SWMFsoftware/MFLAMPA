@@ -236,7 +236,6 @@ contains
     if(iShock_IB(ShockOld_, iLine)/=NoShock_) &
          iShock_IB(ShockOld_, iLine) = min(nVertex_B(iLine), &
          max(iShock_IB(ShockOld_, iLine) + iOffset, 1))
-    call check_line_ishock(iLine)
   end subroutine offset
   !============================================================================
   subroutine check_dist_neg(NameSub, lVertex, rVertex, iLine)
