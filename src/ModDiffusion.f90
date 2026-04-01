@@ -523,7 +523,7 @@ contains
     if(UseFixedUps) then
        ! Compute diffusion coefficient without the contribution of v (velocity)
        ! and p (momentum), as v and p are different for different iP
-       where(RadiusSi_I(1:nX) > 0.9*RadiusSi_I(iShock))
+       where(RadiusSi_I(1:nX) > 1.1*RadiusSi_I(iShock))
           ! upstream: reset the diffusion coefficient to
           ! (1/3)*MeanFreePath0InAu[AU]*(R/1AU)*v*(pc/1GeV)**(1/3)
           ! see Li et al. (2003), doi:10.1029/2002JA009666
