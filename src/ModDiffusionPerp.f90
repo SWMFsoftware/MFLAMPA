@@ -190,7 +190,7 @@ contains
          ! Exponential Grid
          dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
          do iRPerp = 1, nRPerp+1
-            RPerp_F(iRPerp) = RMinPerp * exp(iRPerp*dLogRFacePerp)
+            RPerp_F(iRPerp) = RMinPerp * exp((real(iRPerp)-1.0)*dLogRFacePerp)
          end do
          RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
          dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
@@ -200,8 +200,9 @@ contains
          dLogRFacePerp = log(RMaxPerp/RMinPerp)/real(nRPerp)
          dRPerpMesh_I = (RMaxPerp - RMinPerp)/real(nRPerp) ! Same=Const.
          do iRPerp = 1, nRPerp+1
-            RPerp_F(iRPerp) = 0.5*RMinPerp * exp(iRPerp*dLogRFacePerp) &
-                 + 0.5*(RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1))
+            RPerp_F(iRPerp) = &
+                 0.5*RMinPerp * exp((real(iRPerp)-1.0)*dLogRFacePerp) + &
+                 0.5*(RMinPerp + (real(iRPerp)-1.0)*dRPerpMesh_I(1))
          end do
          RPerp_C = 0.5*(RPerp_F(1:nRPerp) + RPerp_F(2:nRPerp+1))
          dRPerpFace_I = RPerp_F(2:nRPerp+1) - RPerp_F(1:nRPerp)
@@ -445,7 +446,7 @@ contains
     ! loop variables
     integer :: i, j, k, iStep
     ! time step and iterations
-    real :: dt, DPerpMax
+    real :: dt
     real :: dtLocal_III(nPhiPerp,nThetaPerp,nRPerp)
     integer :: nStep
 
@@ -475,7 +476,7 @@ contains
              do k = 1, nPhiPerp
                 dtLocal_III(k,j,i) = 0.5/(1.0/dRPerpFace_I(i)**2 + &
                      1.0/(RPerp_C(i)*dThetaPerp)**2 + &
-                     1.0/(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp)**2)* &
+                     1.0/(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp)**2)/ &
                      maxval(DPerp_5D(:,:,k,j,i), mask=(DPerp_5D(:,:,k,j,i)>0))
              end do
           end do
@@ -736,10 +737,10 @@ contains
     ! Interpolate the df/dt source term from the intersection points of the
     ! lines and multiple slices to the original points along the field line
 
-    use SP_ModGrid, ONLY: Used_B, nVertex_B
+    use SP_ModGrid, ONLY: Used_B, nVertex_B, iLineAll0
     real, intent(in):: source_IV(nP, nMu, nLineAll, nRPerp)
     real, intent(in):: dtIn_CB(nP, nMu, nVertexMax, nLine)
-    integer :: iLine, iX, iPoint
+    integer :: iLine, iX, iPoint, iLineAll
     real :: rNode, r1, r2, Weight
     real :: v1_II(nP, nMu), v2_II(nP, nMu)
     character(len=*), parameter:: NameSub = 'interp_source_linenode'
@@ -747,10 +748,11 @@ contains
     ! Loop over all field lines on this processor
     LINE:do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE LINE
+       iLineAll = iLine + iLineAll0
        ! Loop over all nodes along the valid field line
        do iX = 1, nVertex_B(iLine)
           ! Extract the radial coordinate of the current node
-          rNode = State_VIB(R_, iX, iLine)
+          rNode = State_VIB(R_, iX, iLine)*Io2Si_V(UnitX_)
 
           ! Check that rNode is within grid range
           if(rNode <= RPerp_C(nRPerp)) then
@@ -764,8 +766,8 @@ contains
                 r2 = RPerp_C(iPoint)
                 ! Linear interpolation between r1 and r2
                 Weight = (rNode - r1)/(r2 - r1)
-                v1_II = source_IV(:, :, iLine, iPoint-1)
-                v2_II = source_IV(:, :, iLine, iPoint)
+                v1_II = source_IV(:, :, iLineAll, iPoint-1)
+                v2_II = source_IV(:, :, iLineAll, iPoint)
                 Distribution_CB(1:nP, :, iX, iLine) = &
                      Distribution_CB(1:nP, :, iX, iLine) + &
                      (v1_II+(v2_II-v1_II)*Weight)*dtIn_CB(:, :, iX, iLine)
@@ -773,7 +775,7 @@ contains
                 ! rNode is at or below first grid point
                 Distribution_CB(1:nP, :, iX, iLine) = &
                      Distribution_CB(1:nP, :, iX, iLine) + &
-                     source_IV(:, :, iLine, 1)*dtIn_CB(:, :, iX, iLine)
+                     source_IV(:, :, iLineAll, 1)*dtIn_CB(:, :, iX, iLine)
              end if
           end if
        end do
