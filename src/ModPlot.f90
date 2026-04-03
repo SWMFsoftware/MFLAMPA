@@ -1276,7 +1276,7 @@ contains
       File_I(iFile) % Buffer_II = 0.0
 
       ! reset, all field lines are printed reaching output sphere
-      DoPrint_I = .true.
+      DoPrint_I = .false.
 
       ! go over all lines on the processor and find the point of
       ! intersection with output sphere if present
@@ -1321,9 +1321,13 @@ contains
       end do !  iLine
 
       ! gather interpolated data on the source processor
-      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
-           nLineAll*(iVarLat + nFluxVar), MPI_SUM, 0, iComm, iError)
-
+      if(nProc > 1)then
+         call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+              nLineAll*(iVarLat + nFluxVar), MPI_SUM, 0, iComm, iError)
+         call MPI_reduce_logical_array(DoPrint_I, &
+              nLineAll, MPI_LOR, 0, iComm, iError)
+         if(iProc > 0) RETURN
+      end if
       ! start time in seconds from base year
       Param_I(StartTime_)   = StartTime
       ! start time in Julian date
@@ -1353,8 +1357,7 @@ contains
            File_I(iFile) % Buffer_II([iVarLon,iVarLat], :, 1) * cRadToDeg
 
       ! print data to file
-      if(iProc==0) &
-           call save_plot_file(&
+      call save_plot_file(&
            NameFile      = NameFile, &
            StringHeaderIn= StringHeader, &
            TypeFileIn    = File_I(iFile) % TypeFile, &
