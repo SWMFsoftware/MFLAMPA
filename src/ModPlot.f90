@@ -1824,7 +1824,7 @@ contains
       File_I(iFile) % Buffer_II = 0.0
 
       ! reset, all field lines are printed reaching output sphere
-      DoPrint_I = .true.
+      DoPrint_I = .false.
 
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
@@ -1861,8 +1861,12 @@ contains
       end if
 
       ! gather interpolated data on the source processor
-      if(nProc > 1) call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
-           (nP+2)*nMu*nLineAll, MPI_SUM, 0, iComm, iError)
+      if(nProc > 1)then
+         call MPI_reduce_real_array(File_I(iFile) % Buffer_II, &
+              (nP+2)*nMu*nLineAll, MPI_SUM, 0, iComm, iError)
+         call MPI_reduce_logical_array(DoPrint_I, &
+              nLineAll, MPI_LOR, 0, iComm, iError)
+      end if
       ! print data to file
       if(iProc==0) then
          ! Note: here, by including nDimIn, all the Coord{1, 2(, 3)}In_I
