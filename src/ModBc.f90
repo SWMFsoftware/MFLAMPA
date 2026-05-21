@@ -25,13 +25,7 @@ module SP_ModBc
   public:: set_momentum_bc   ! Set the Distribution_CB Bc at min/max energy
   public:: set_upper_end_bc  ! Set the UpperEndBc_I Bc at the far end point
   public:: set_lower_end_bc  ! Set the LowerEndBc_I Bc at the near-Sun end
-  public:: set_lower_end_vdf ! Set the Distribution_CB Bc at the near-Sun end
-  public:: set_VDF           ! Set the VDF Bc, typically with 2 ghost cells
-  interface set_VDF
-     module procedure set_VDF2 ! VDF2: along P^3/3 and s_L
-     module procedure set_VDF3 ! VDF3: along P^3/3, mu and s_L
-  end interface set_VDF
-
+  public:: set_VDF2, set_VDF3! Set the VDF Bc, typically with 2 ghost cells
   ! Boundary condition at the injection energy
   ! Injection efficiency and assumed spectral index with the energy
   ! range k_B*T_i < Energy < EnergyInjection, to be read from PARAM.in
@@ -41,24 +35,14 @@ module SP_ModBc
   logical           :: UseComprhoScale = .false.
   real, parameter   :: ComprhoMax = 4.0 ! Max compression ratio in theory
 
-  ! Lower end BC, set at the firsr point along the field line
-  logical, public   :: UseLowerEndBc = .true.
-  ! Type of lower end BC: float/floating, escape, inject
-  character(LEN=6), public  :: TypeLowerEndBc = 'inject'
-  ! Index of the left lower end BC
-  integer, public   :: iStart = 1
-  integer, parameter:: &
-       iStartUseLeft_   = 1, & ! when UseLowerEndBc = .true.
-       iStartNoUseLeft_ = 2    ! when UseLowerEndBc = .false.
-
   ! Momentum BC
   character(LEN=6)  :: TypeMomentumMinBc = 'inject'
-  character(LEN=6)  :: TypeMomentumMaxBc = 'none'
-  ! Upper end BC, set at the last point along the field line
-  logical, public   :: UseUpperEndBc = .false.
-  ! Type of upper end BC: none, float/floating, escape, lism
-  character(LEN=6), public  :: TypeUpperEndBc = 'none'
-  real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(0:nP+1)
+  character(LEN=6)  :: TypeMomentumMaxBc = 'escape'
+  ! Type of lower end BC: float, escape, inject
+  character(LEN=6), public  :: TypeLowerEndBc = 'float'
+  ! Type of upper end BC: float, escape, lism
+  character(LEN=6), public  :: TypeUpperEndBc = 'escape'
+  real, public      :: UpperEndBc_I(1:nP), LowerEndBc_I(1:nP)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -80,42 +64,27 @@ contains
     case('#INJECTION')
        call read_var('UseComprhoScale', UseComprhoScale)
     case('#LOWERENDBC')
-       ! Read whether to use LowerLowBc
-       call read_var('UseLowerEndBc', UseLowerEndBc)
-       if(UseLowerEndBc) then
-          iStart = iStartUseLeft_
-          ! Read the type of LowerEndBc and Select
-          call read_var('TypeLowerEndBc', TypeLowerEndBc)
-          call lower_case(TypeLowerEndBc)
-       else
-          iStart = iStartNoUseLeft_
-       end if
+       ! Read the type of LowerEndBc and Select
+       call read_var('TypeLowerEndBc', TypeLowerEndBc)
+       call lower_case(TypeLowerEndBc)
     case('#UPPERENDBC')
-       ! Read whether to use UpperLowBc
-       call read_var('UseUpperEndBc', UseUpperEndBc)
-       if(UseUpperEndBc) then
-          ! Read the type of UppenEndBc and Select
-          call read_var('TypeUpperEndBc', TypeUpperEndBc)
-          call lower_case(TypeUpperEndBc)
-
-          select case(trim(TypeUpperEndBc))
-          case('none', 'f', 'false')
-             ! Reset UseUpperEndBc
-             UseUpperEndBc = .false.
-          case('float', 'floating', 'escape')
-             ! Do nothing
-          case('lism')
-             ! We want to read the type of LIS here
-             call read_var('TypeLisBc', TypeLisBc)
-             call lower_case(TypeLisBc)
-             ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
-             call read_var('UseModulationPot', UseModulationPot)
-             if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
-          case default
-             call CON_stop(NameSub//&
-                  ': Unknown type of upper end BC '//TypeUpperEndBc)
-          end select
-       end if
+       ! Read the type of UppenEndBc and Select
+       call read_var('TypeUpperEndBc', TypeUpperEndBc)
+       call lower_case(TypeUpperEndBc)
+       select case(trim(TypeUpperEndBc))
+       case('float', 'escape')
+          ! Do nothing
+       case('lism')
+          ! We want to read the type of LIS here
+          call read_var('TypeLisBc', TypeLisBc)
+          call lower_case(TypeLisBc)
+          ! Read whether using ModulationPot to get GCR spectrum at ~1 AU
+          call read_var('UseModulationPot', UseModulationPot)
+          if(UseModulationPot) call read_var('ModulationPot', ModulationPot)
+       case default
+          call CON_stop(NameSub//&
+               ': Unknown type of upper end BC '//TypeUpperEndBc)
+       end select
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -168,10 +137,7 @@ contains
 
           Distribution_CB(0, :, iVertex, iLine) = DistributionBc*CoefInjLocal
        end do
-       ! Modified for lower end boundary
-       ! Distribution_CB(0, :, 1, iLine) = &
-       !     Distribution_CB(0, :, 1, iLine)/CoefInj*CoefInjLowBc
-    case('float', 'floating', 'escape')
+    case('float', 'escape')
        ! Neumann BC: Assume gradient = 0
        Distribution_CB(0,:,1:nX,iLine) = Distribution_CB(1,:,1:nX,iLine)
     case('grad')
@@ -187,12 +153,9 @@ contains
     end select
 
     select case(trim(TypeMomentumMaxBc))
-    case('none')
-       ! Do nothing
-       ! Igor: Do nothing means "maintain the initial value of the VDF"
-       ! Distribution_CB(nP+1,:,1:nX,iLine) = Background_I(nP+1)
-       ! "escape" should be also in this case, rather than in "float"
-    case('float', 'floating', 'escape')
+    case('escape')
+       Distribution_CB(nP+1,:,1:nX,iLine) = Background_I(nP+1)
+    case('float')
        ! Neumann BC: Assume gradient = 0
        Distribution_CB(nP+1,:,1:nX,iLine) = Distribution_CB(nP,:,1:nX,iLine)
     case('grad')
@@ -215,9 +178,10 @@ contains
 
     integer, intent(in) :: iLine, nX
     real :: XyzSi_D(3)                          ! Where to set BC
+    character(len=*), parameter:: NameSub = 'set_upper_end_bc'
     !--------------------------------------------------------------------------
     select case(trim(TypeUpperEndBc))
-    case('float', 'floating')
+    case('float')
        UpperEndBc_I = Distribution_CB(1:nP, nMu, nX, iLine)
     case('escape')
        UpperEndBc_I = Background_I(1:nP)
@@ -235,6 +199,9 @@ contains
        ! The distribution used in our code is
        ! Distribution[Si]*MomentumInjSi**2*Io2Si_V(UnitEnergy_)
        UpperEndBc_I = (UpperEndBc_I/Momentum_G(1:nP)**2)*Io2Si_V(UnitEnergy_)
+    case default
+       call CON_stop(NameSub// &
+            ': Unknown type of upper end BC '//TypeUpperEndBc)
     end select
   end subroutine set_upper_end_bc
   !============================================================================
@@ -248,27 +215,16 @@ contains
     select case(trim(TypeLowerEndBc))
     case('inject')
        LowerEndBc_I = Distribution_CB(0, 1, 1, iLine) &
-            /Momentum_G(0:nP+1)**SpectralIndex
-    case('float', 'floating')
-       LowerEndBc_I = Distribution_CB(0:nP+1, nMu, 1, iLine)
+            /Momentum_G(1:nP)**SpectralIndex
+    case('float')
+       LowerEndBc_I = Distribution_CB(1:nP, nMu, 1, iLine)
     case('escape')
-       LowerEndBc_I = Background_I
+       LowerEndBc_I = Background_I(1:nP)
     case default
        call CON_stop(NameSub//&
             ': Unknown type of lower end BC '//TypeLowerEndBc)
     end select
   end subroutine set_lower_end_bc
-  !============================================================================
-  subroutine set_lower_end_vdf(iLine)
-    ! Set boundary condition for Distribution_CB at the zeroth grid point,
-    ! namely the footpoint on the solar surface, on the current field line.
-
-    integer, intent(in) :: iLine
-    !--------------------------------------------------------------------------
-    ! Set the left boundary condition of VDF for diffusion
-    Distribution_CB(1:nP+1, 1, 1, iLine) = &
-         Distribution_CB(0, 1, 1, iLine)/Momentum_G(1:nP+1)**SpectralIndex
-  end subroutine set_lower_end_vdf
   !============================================================================
   subroutine set_VDF2(iLine, nX, VDF_G)
     ! We need the VDF on the extended grid with two layers of ghost cells, to
@@ -301,39 +257,37 @@ contains
     integer, intent(in) :: nX        ! Number of meshes along s_L axis
     real, intent(inout) :: VDF_G(-1:nP+2, -1:nMu+2, -1:nX+2)
     !--------------------------------------------------------------------------
+    ! Copy distribution with one GC along the momentum coordinate
+    VDF_G(0:nP+1, 1:nMu, 1:nX) = Distribution_CB(:, :, 1:nX, iLine)
 
-    VDF_G(0:nP+1, 1:nMu, iStart:nX) = Distribution_CB(:, :, iStart:nX, iLine)
-    VDF_G(0:nP+1, 1:nMu, 1) = Distribution_CB(:, :, iStart, iLine)
+    ! Calculate the LowerEndBc_I(1:nP):
+    call set_lower_end_bc(iLine)
+    ! Apply LowerEndBc_I(1:nP) in 0th GC along line coordinate
+    VDF_G(1:nP, 1:nMu, 0) = spread(max(LowerEndBc_I, &
+         Background_I(1:nP)), DIM=2, NCOPIES=nMu)
+    ! Fill in GCs along momentum in 0th GC along line coordinate
+    VDF_G(0   , 1:nMu, 0) = max(VDF_G(0, 1:nMu, 1), Background_I(0))
+    VDF_G(nP+1, 1:nMu, 0) = max(VDF_G(nP+1,1:nMu,1), Background_I(nP+1))
 
-    ! Manipulate the LowerEndBc along the line coordinate:
-    if(UseLowerEndBc) then
-       call set_lower_end_bc(iLine)
-       VDF_G(0:nP+1, 1:nMu, 0) = spread(max(LowerEndBc_I, &
-            Background_I), DIM=2, NCOPIES=nMu)
-    else
-       call set_lower_end_vdf(iLine)
-       VDF_G(0:nP+1, 1:nMu, 0) = spread(Background_I, DIM=2, NCOPIES=nMu)
-    end if
-
-    ! Manipulate the UpperEndBc along the line coordinate:
-    if(UseUpperEndBc) then
-       call set_upper_end_bc(iLine, nX)
-       VDF_G(1:nP, 1:nMu, nX+1) = spread(max(UpperEndBc_I, &
-            Background_I(1:nP)), DIM=2, NCOPIES=nMu)
-       VDF_G(0   , 1:nMu, nX+1) = max(VDF_G(0, 1:nMu, nX), Background_I(0))
-       VDF_G(nP+1, 1:nMu, nX+1) = max(VDF_G(nP+1,1:nMu,nX), Background_I(nP+1))
-    else
-       VDF_G(0:nP+1, 1:nMu, nX+1) = spread(Background_I, DIM=2, NCOPIES=nMu)
-    end if
+    ! Calculate the UpperEndBc_I(1:nP):
+    call set_upper_end_bc(iLine, nX)
+    ! Apply UpperEndBc_I(1:nP) in (nX+1)th GC along line coordinate
+    VDF_G(1:nP, 1:nMu, nX+1) = spread(max(UpperEndBc_I, &
+         Background_I(1:nP)), DIM=2, NCOPIES=nMu)
+    ! Fill in GCs along momentum in (nX+1)th GC along line coordinate
+    VDF_G(0   , 1:nMu, nX+1) = max(VDF_G(0, 1:nMu, nX), Background_I(0))
+    VDF_G(nP+1, 1:nMu, nX+1) = max(VDF_G(nP+1,1:nMu,nX), Background_I(nP+1))
 
     ! Add a second layer of the ghost cells along the line coordinate:
     VDF_G(0:nP+1, 1:nMu,   -1) = VDF_G(0:nP+1, 1:nMu,    0)
     VDF_G(0:nP+1, 1:nMu, nX+2) = VDF_G(0:nP+1, 1:nMu, nX+1)
-    ! Add two layer of the ghost cells along the line coordinate:
-    VDF_G(0:nP+1,     0, :) = VDF_G(0:nP+1,    1,  :)
-    VDF_G(0:nP+1,    -1, :) = VDF_G(0:nP+1,    0,  :)
-    VDF_G(0:nP+1, nMu+1, :) = VDF_G(0:nP+1,   nMu, :)
-    VDF_G(0:nP+1, nMu+2, :) = VDF_G(0:nP+1, nMu+1, :)
+    if(nMu > 1)then
+       ! Add two layer of the ghost cells along the line coordinate:
+       VDF_G(0:nP+1,     0, :) = VDF_G(0:nP+1,    1,  :)
+       VDF_G(0:nP+1,    -1, :) = VDF_G(0:nP+1,    0,  :)
+       VDF_G(0:nP+1, nMu+1, :) = VDF_G(0:nP+1,   nMu, :)
+       VDF_G(0:nP+1, nMu+2, :) = VDF_G(0:nP+1, nMu+1, :)
+    end if
     ! Add a second layer of the ghost cells along the momentum coordinate:
     VDF_G(  -1, :, :) = VDF_G(   0, :, :)
     VDF_G(nP+2, :, :) = VDF_G(nP+1, :, :)

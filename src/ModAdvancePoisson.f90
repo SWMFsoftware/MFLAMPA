@@ -9,8 +9,7 @@ module SP_ModAdvancePoisson
 
   use SP_ModSize, ONLY: nVertexMax
   use SP_ModGrid, ONLY: nP, nMu, State_VIB
-  use SP_ModBc, ONLY: set_momentum_bc, set_VDF, &
-       UseUpperEndBc, UseLowerEndBc, iStart
+  use SP_ModBc, ONLY: set_momentum_bc, set_VDF2, set_VDF3
   use SP_ModDistribution, ONLY: VolumeP_I, Momentum3_F, &
        Distribution_CB, IsDistNeg, check_dist_neg, dLogP
   use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
@@ -128,7 +127,7 @@ contains
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock, log(nSi_I/nOldSi_I))
     ! Trial time step: Get DtNext
-    call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
+    call set_VDF2(iLine, nX, VDF_G) ! Set the VDF first
     call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
          dHamiltonian01_FX = dHamiltonian01_FX,       &
          dVolumeDt_G = dVolumeDt_G,                   &
@@ -143,7 +142,7 @@ contains
        Volume_G    = VolumeOld_G + Dt*dVolumeDt_G
 
        ! Update Bc for VDF
-       call set_VDF(iLine, nX, VDF_G)
+       call set_VDF2(iLine, nX, VDF_G)
        ! Advance by single-Poisson-bracket scheme
        call explicit(nP, nX, VDF_G, Volume_G, Source_C,  &
             dHamiltonian01_FX = dHamiltonian01_FX,       &
@@ -155,39 +154,19 @@ contains
        ! May need to correct the volume if the time step has been reduced
        Volume_G = VolumeOld_G + Dt*dVolumeDt_G
        ! Update velocity distribution function
-       Distribution_CB(1:nP, 1, iStart:nX, iLine) = &
-            Distribution_CB(1:nP, 1, iStart:nX, iLine) + &
-            Source_C(1:nP, iStart:nX)
+       Distribution_CB(1:nP, 1, 1:nX, iLine) = &
+            Distribution_CB(1:nP, 1, 1:nX, iLine) + &
+            Source_C(1:nP, 1:nX)
        ! Check if the VDF includes negative values
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg) RETURN
 
        ! Diffuse the distribution function
        if(UseDiffusion) then
-          if(UseUpperEndBc) then
-             if(UseLowerEndBc) then
-                ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, &
-                     iShock, nSi_I, BSi_I, Dt, &
-                     LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
-                     UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
-             else
-                ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, &
-                     iShock, nSi_I, BSi_I, Dt, &
-                     UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
-             end if
-          else
-             if(UseLowerEndBc) then
-                ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, &
-                     iShock, nSi_I, BSi_I, Dt, &
-                     LowerEndSpectrumIn_I=VDF_G(1:nP, 0))
-             else
-                ! with no lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt)
-             end if
-          end if
+          call diffuse_distribution(iLine, nX, &
+               iShock, nSi_I, BSi_I, Dt, &
+               LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
+               UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
           ! Check if the VDF includes negative values after diffusion
           call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
           if(IsDistNeg) RETURN
@@ -273,14 +252,14 @@ contains
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
     ! Update Bc for VDF
-    call set_VDF(iLine, nX, VDF_G)
+    call set_VDF2(iLine, nX, VDF_G)
     call explicit(nP, nX, VDF_G, Volume_G, Source_C, &
          Hamiltonian12_N=Hamiltonian12_N, CFLIn=CflIn, &
          IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
-    Distribution_CB(1:nP, 1, iStart:nX, iLine) = &
-         Distribution_CB(1:nP, 1, iStart:nX, iLine) + Source_C(1:nP, iStart:nX)
+    Distribution_CB(1:nP, 1, 1:nX, iLine) = &
+         Distribution_CB(1:nP, 1, 1:nX, iLine) + Source_C(1:nP, 1:nX)
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
@@ -289,31 +268,11 @@ contains
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
-       if(UseUpperEndBc) then
-          if(UseLowerEndBc) then
-             ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C(1:nP, 1:nX), &
-                  LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
-                  UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
-          else
-             ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C(1:nP, 1:nX), &
-                  UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
-          end if
-       else
-          if(UseLowerEndBc) then
-             ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C(1:nP, 1:nX), &
-                  LowerEndSpectrumIn_I=VDF_G(1:nP, 0))
-          else
-             ! with no lower or upper end BCs
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C(1:nP, 1:nX))
-          end if
-       end if
+       ! with lower or upper end BCs
+       call diffuse_distribution(iLine, nX, &
+            iShock, nSi_I, BSi_I, Dt_C(1:nP, 1:nX), &
+            LowerEndSpectrumIn_I=VDF_G(1:nP, 0), &
+            UpperEndSpectrumIn_I=VDF_G(1:nP, nX+1))
        ! Check if the VDF includes negative values after diffusion
        call check_dist_neg(NameSub//' after diffusion', 1, nX, iLine)
        if(IsDistNeg) RETURN
@@ -421,7 +380,7 @@ contains
     ! Here we would like to get the first trial of DtNext
     ! Update Bc for VDF at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
-    call set_VDF(iLine, nX, VDF_G) ! Set the VDF first
+    call set_VDF3(iLine, nX, VDF_G) ! Set the VDF first
     call advance_poisson_focused   ! Now we get DtNext
 
     ! Advect by the multiple-Poisson-bracket scheme
@@ -432,15 +391,15 @@ contains
        ! Update Bc for at minimal energy, at nP = 0
        call set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
        ! Update Bc for VDF
-       call set_VDF(iLine, nX, VDF_G)
+       call set_VDF3(iLine, nX, VDF_G)
        ! Advance by the multiple-Poisson-bracket scheme
        call advance_poisson_focused(DtIn=Dt)
 
        ! Update Distribution_CB to the CURRENT time plus Dt, with no
-       ! BC setups, only within the range of (1:nP, 1:nMu, iStart:nX).
-       Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
-            Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
-            Source_C(1:nP, 1:nMu, iStart:nX)
+       ! BC setups, only within the range of (1:nP, 1:nMu, 1:nX).
+       Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =      &
+            Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) + &
+            Source_C(1:nP, 1:nMu, 1:nX)
        ! Check if the VDF includes negative values after scattering
        call check_dist_neg(NameSub, 1, nX, iLine)
        if(IsDistNeg) RETURN
@@ -453,30 +412,11 @@ contains
           if(IsDistNeg) RETURN
        else if(UseDiffusion) then
           ! For spatial diffusion
-          if(UseUpperEndBc) then
-             if(UseLowerEndBc) then
-                ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, &
-                     iShock, nSi_I, BSi_I, Dt, &
-                     LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0), &
-                     UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
-             else
-                ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, &
-                     iShock, nSi_I, BSi_I, Dt, &
-                     UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
-             end if
-          else
-             if(UseLowerEndBc) then
-                ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, &
-                     iShock, nSi_I, BSi_I, Dt, &
-                     LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0))
-             else
-                ! with no lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt)
-             end if
-          end if
+          call diffuse_distribution(iLine, nX, &
+               iShock, nSi_I, BSi_I, Dt, &
+               LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0), &
+               UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
+       
           ! Check if the VDF includes negative values after spatial diffusion
           call check_dist_neg(NameSub//' after spatial diffusion',1,nX,iLine)
           if(IsDistNeg) RETURN
@@ -731,7 +671,7 @@ contains
     ! Update bc for at minimal energy, at nP = 0
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
     ! Update Bc for VDF
-    call set_VDF(iLine, nX, VDF_G)
+    call set_VDF3(iLine, nX, VDF_G)
     call explicit(nP, nMu, nX, VDF_G, Volume_G, Source_C, &
          Hamiltonian12_N=Hamiltonian12_N, &
          Hamiltonian13_N=Hamiltonian13_N, &
@@ -739,9 +679,9 @@ contains
          CFLIn=CflIn, IsSteadyState=.true., DtOut_C=Dt_C)
 
     ! Update velocity distribution function
-    Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) =      &
-         Distribution_CB(1:nP, 1:nMu, iStart:nX, iLine) + &
-         Source_C(1:nP, 1:nMu, iStart:nX)
+    Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) =      &
+         Distribution_CB(1:nP, 1:nMu, 1:nX, iLine) + &
+         Source_C(1:nP, 1:nMu, 1:nX)
     ! Check if the VDF includes negative values
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
@@ -757,31 +697,10 @@ contains
     end if
     if(UseDiffusion) then
        ! For spatial diffusion
-       if(UseUpperEndBc) then
-          if(UseLowerEndBc) then
-             ! with lower or upper end BCs
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C, &
-                  LowerEndSpectrumIn_II= VDF_G(1:nP, 1:nMu, 0), &
-                  UpperEndSpectrumIn_II= VDF_G(1:nP, 1:nMu, nX+1))
-          else
-             ! with upper end BC but no lower end BC
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C, &
-                  UpperEndSpectrumIn_II= VDF_G(1:nP, 1:nMu, nX+1))
-          end if
-       else
-          if(UseLowerEndBc) then
-             ! with lower end BC but no upper end BC
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C, &
-                  LowerEndSpectrumIn_II= VDF_G(1:nP, 1:nMu, 0))
-          else
-             ! with no lower or upper end BCs
-             call diffuse_distribution(iLine, nX, &
-                  iShock, nSi_I, BSi_I, Dt_C)
-          end if
-       end if
+       call diffuse_distribution(iLine, nX, &
+            iShock, nSi_I, BSi_I, Dt_C, &
+            LowerEndSpectrumIn_II= VDF_G(1:nP, 1:nMu, 0), &
+            UpperEndSpectrumIn_II= VDF_G(1:nP, 1:nMu, nX+1))
        ! Check if the VDF includes negative values after spatial diffusion
        call check_dist_neg(NameSub//' after spatial diffusion', 1, nX, iLine)
        if(IsDistNeg) RETURN

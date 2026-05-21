@@ -591,23 +591,18 @@ maximum number of energy channels is 99.
 <commandgroup name="ENDBC">
 
 <command name="LOWERENDBC">
-  <parameter name="UseLowerEndBc" type="logical" default="T"/>
-  <if expr="$UseLowerEndBc">
-    <parameter name="TypeLowerEndBc" type="string" case="lower" input="select"
-	       required="T">
-      <option name="inject" default="T" />
-      <option name="float"             />
-      <option name="escape"	          />
-    </parameter>
-  </if>
+   <parameter name="TypeLowerEndBc" type="string" case="lower" input="select"
+	      required="T">
+     <option name="inject"/>
+     <option name="float" default="T"/>
+     <option name="escape"/>
+   </parameter>
 
 #LOWERENDBC
-T			UseLowerEndBc
 inject			TypeLowerEndBc
 
-To determine whether or which type we set the lower boundary conditions.
-If so, we turn UseLowerEndBc, choose different cases of TypeLowerEndBc,
-and will have different LowerEndSpectrum_I values in diffusion.
+For different cases of TypeLowerEndBc, different LowerEndSpectrum_I values
+are used in diffusion.
 
 For LowerEndSpectrum_I, it is the spectral extrapolation following
 the power law of SpectralIndex at the lower boundary when
@@ -615,49 +610,38 @@ TypeLowerEndBc = "inject". Besides, one can set "float" (= current VDF
 at iVertex=1) and "escape" (= Background_I), especially for the
 steady-state GCR spectrum simulations. 
 
-If we use LowerEndBc, we will only set the LowerEndSpectrum_I and include
-it in diffusion; otherwise we will set the VDF for 1:nP+1 in momentum
-space at iVertex = 1 (the first cell), start from iVertex = 2 in advection,
-and exclude the LowerEndSpectrum_I when solving the diffusion term.
-
 </command>
 
 <command name="UPPERENDBC">
-  <parameter name="UseUpperEndBc" type="logical" default="F"/>
-  <if expr="$UseUpperEndBc">
-    <parameter name="TypeUpperEndBc" type="string" input="select">
-      <option name="none" default="T"/>
-      <option name="lism"/>
-      <option name="float"/>
-      <option name="escape"/>
+  <parameter name="TypeUpperEndBc" type="string" input="select">
+    <option name="lism"/>
+    <option name="float"/>
+    <option name="escape" default="T"/>
+  </parameter>
+  <if expr="$TypeUpperEndBc eq 'lism'">
+    <parameter name="TypeLisBc" type="string" input="select">
+      <option name="usoskin" default="T"/>
+      <option name="corti"/>
     </parameter>
-    <if expr="$TypeUpperEndBc eq 'lism'">
-      <parameter name="TypeLisBc" type="string" input="select">
-	<option name="usoskin" default="T"/>
-	<option name="corti"/>
-      </parameter>
-      <parameter name="UseModulationPot" type="logical" default="F"/>
-      <if expr="$UseModulationPot">
-	<parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
-      </if>
+    <parameter name="UseModulationPot" type="logical" default="F"/>
+    <if expr="$UseModulationPot">
+      <parameter name="ModulationPot" type="real" min="1.0" default="600.0"/>
     </if>
   </if>
 
 #UPPERENDBC
-T			UseUpperEndBc
 lism			TypeUpperEndBc
-default			TypeLisBc
-F			UseModulationPot
+usoskin			TypeLisBc
+T			UseModulationPot
 600.0			ModulationPot
 
-To determine whether or which type we set the upper boundary conditions.
-If so, we turn UseUpperEndBc, choose different cases of TypeUpperEndBc,
-and will have different UpperEndSpectrum_I values in diffusion.
+For different cases of TypeUpperEndBc,
+different UpperEndSpectrum_I values are used in diffusion.
 
 As for UpperEndSpectrum_I, we need to first determine the type of
 UpperEndBc, where LISM is the nominal one for use. If one wants to
 turn off the UpperEndSpectrum_I, TypeUpperEndBc should be set to
-"none", or "f", or "false" with no differences in lower and upper
+"false" with no differences in lower and upper
 cases. For LISM, there are various models fitting or simulating
 the spectrum, read as TypeLisBc. Here we set Eq.(2) in Usoskin et
 al. 2005 as default. Then, we also need to determine whether we use
@@ -676,7 +660,6 @@ in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
 <command name="MOMENTUMBC">
   <parameter name="TypeMomentumMinBc" type="string" input="select">
     <option name="inject" default="T"/>
-    <option name="none"/>
     <option name="float"/>
     <option name="escape"/>
   </parameter>
@@ -684,13 +667,13 @@ in the "Dataset 1" on https://cosmicrays.oulu.fi/phi/phi.html.
     <parameter name="SpectralIndex" type="real" default="5.0" />
     <parameter name="EfficiencyInj" type="real" min="0.0" default="1.0" />
   </if>
-  <parameter name="TypeMomentumMaxBc" type="string" default="none" />
+  <parameter name="TypeMomentumMaxBc" type="string" default="escape" />
 
 #MOMENTUMBC
 inject			TypeMomemtumMinBc
 5.0			SpectralIndex
 1.0			EfficiencyInj
-none			TypeMomemtumMaxBc
+escape			TypeMomemtumMaxBc
 
 Set up parameters for the momentum boundary condition, controlling the
 types of BC at injection/minimum and maximum particle energies or its

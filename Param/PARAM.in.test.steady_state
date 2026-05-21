@@ -40,11 +40,9 @@ T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
 #LOWERENDBC
-T			UseLowerEndBc
 inject			TypeLowerEndBc
 
 #UPPERENDBC
-T			UseUpperEndBc
 lism			TypeUpperEndBc
 usoskin			TypeLisBc
 T			UseModulationPot

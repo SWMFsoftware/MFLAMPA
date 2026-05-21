@@ -27,9 +27,8 @@ contains
     ! which is non-conservative, and the diffusion
 
     use SP_ModDiffusion, ONLY: UseDiffusion, diffuse_distribution
-    use SP_ModBc, ONLY: set_momentum_bc, iStart, set_lower_end_vdf, &
-         UseLowerEndBc, set_lower_end_bc, LowerEndBc_I, &
-         UseUpperEndBc, set_upper_end_bc, UpperEndBc_I
+    use SP_ModBc, ONLY: set_momentum_bc, set_lower_end_bc, LowerEndBc_I, &
+         set_upper_end_bc, UpperEndBc_I
     ! INPUTS:
     ! Indices of line, particle number, and shock location
     integer,intent(in):: iLine, nX, iShock
@@ -60,7 +59,7 @@ contains
     ! first-order Fermi acceleration for the current line
     FermiFirst_I = dLogRho_I/(3.0*dLogP)
     ! How many steps should be done to the CFL criterion is fulfilled
-    nStep = 1 + int(maxval(abs(FermiFirst_I(iStart:nX)))/Cfl)
+    nStep = 1 + int(maxval(abs(FermiFirst_I(1:nX)))/Cfl)
     ! Check if the number of time steps is positive:
     if(nStep < 1) call CON_stop(NameSub//': nStep <= 0????')
 
@@ -68,20 +67,12 @@ contains
     Dt = DtProgress/nStep
     FermiFirst_I = FermiFirst_I/nStep
 
-    ! update bc for advection at nP = 0
+    ! update bc in 0th and (nP+1)th GCs along the momentum coordinate
     call set_momentum_bc(iLine, nX, nSi_I, iShock, dLogRho_I)
 
     STEP:do iStep = 1, nStep
-       if(UseLowerEndBc) then
-          ! set the lower bc at each reduced time step
-          call set_lower_end_bc(iLine)
-       else
-          ! set the lower bc of VDF at each reduced time step
-          call set_lower_end_vdf(iLine)
-       end if
-
        ! advection in the momentum space
-       do iVertex = iStart, nX
+       do iVertex = 1, nX
           ! first check if the VDF includes negative values
           call check_dist_neg(NameSub, iVertex, iVertex, iLine)
           if(IsDistNeg) RETURN
@@ -93,33 +84,14 @@ contains
        ! compute diffusion along the field line
        if(UseDiffusion) then
           ! first: parallel diffusion
-          if(UseUpperEndBc) then
-             ! set and use BC at the upper end, especially for GCR
-             call set_upper_end_bc(iLine, nX)
-             if(UseLowerEndBc) then
-                ! with lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, &
-                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I= &
-                     max(LowerEndBc_I(1:nP), Background_I(1:nP)), &
-                     UpperEndSpectrumIn_I= max(              &
-                     UpperEndBc_I(1:nP), Background_I(1:nP)))
-             else
-                ! with upper end BC but no lower end BC
-                call diffuse_distribution(iLine, nX, iShock, &
-                     nSi_I, BSi_I, Dt, UpperEndSpectrumIn_I= &
-                     max(UpperEndBc_I(1:nP), Background_I(1:nP)))
-             end if
-          else
-             if(UseLowerEndBc) then
-                ! with lower end BC but no upper end BC
-                call diffuse_distribution(iLine, nX, iShock, &
-                     nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I= &
-                     max(LowerEndBc_I(1:nP), Background_I(1:nP)))
-             else
-                ! with no lower or upper end BCs
-                call diffuse_distribution(iLine, nX, iShock, nSi_I, BSi_I, Dt)
-             end if
-          end if
+          call set_lower_end_bc(iLine)
+          ! set and use BC at the upper end, especially for GCR
+          call set_upper_end_bc(iLine, nX)
+          call diffuse_distribution(iLine, nX, iShock, &
+               nSi_I, BSi_I, Dt, LowerEndSpectrumIn_I= &
+               max(LowerEndBc_I(1:nP), Background_I(1:nP)), &
+               UpperEndSpectrumIn_I= max(              &
+               UpperEndBc_I(1:nP), Background_I(1:nP)))
           ! Check if the VDF includes negative values after Dpara
           call check_dist_neg(NameSub// &
                ' after parallel diffusion', 1, nX, iLine)

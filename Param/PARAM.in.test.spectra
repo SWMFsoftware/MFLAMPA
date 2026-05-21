@@ -65,7 +65,7 @@ MH_data_e20120123/MH_data.H
 inject			TypeMomemtumMinBc
 5.0			SpectralIndex
 0.25			EfficiencyInj
-none			TypeMomemtumMaxBc
+escape			TypeMomemtumMaxBc
 
 #INJECTION
 F			UseComprhoScale
@@ -75,12 +75,10 @@ T			DoReadMhData
 MH_data_e20120123		NameInputDir
 
 #LOWERENDBC
-T			UseLowerEndBc
 inject			TypeLowerEndBc
 
 #UPPERENDBC
-F			UseUpperEndBc
-none			TypeUpperEndBc
+lism			TypeUpperEndBc
 usoskin			TypeLisBc
 T			UseModulationPot
 534.7			ModulationPot

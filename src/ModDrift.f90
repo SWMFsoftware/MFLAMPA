@@ -11,8 +11,7 @@ module SP_ModDrift
   use ModCosmicRay, ONLY: local_interstellar_spectrum
   use ModPoissonBracket, ONLY: explicit
   use ModUtilities, ONLY: CON_stop
-  use SP_ModBc, ONLY: UseLowerEndBc, UseUpperEndBc, SpectralIndex, &
-       TypeLowerEndBc, TypeUpperEndBc
+  use SP_ModBc, ONLY: SpectralIndex, TypeLowerEndBc, TypeUpperEndBc
   use SP_ModDistribution, ONLY: Distribution_CB, Momentum_G, SpeedSi_G, &
        MomentumInjSi, Background_I
   use SP_ModPerpDiffusion, ONLY: nRPerp, nThetaPerp, nPhiPerp, &
@@ -79,7 +78,7 @@ contains
     ! The Distribution function in 5D
     real :: DistrPerp_5D(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp, nRPerp)
     ! The lower and upper BCs
-    real :: LowerEndBc_I(0:nP+1), UpperEndBc_I(1:nP)
+    real :: LowerEndBc_I(1:nP), UpperEndBc_I(1:nP)
     ! Extended array for distribution function
     real :: VDF_G(0:nP+1, 1:nMu, -1:nPhiPerp+2, -1:nThetaPerp+2, -1:nRPerp+2)
     ! Advection term
@@ -157,45 +156,24 @@ contains
       VDF_G(0:nP+1, 1:nMu, 1:nPhiPerp, 1:nThetaPerp, 1:nRPerp) = &
            DistrPerp_5D(0:nP+1, 1:nMu, 1:nPhiPerp, 1:nThetaPerp, 1:nRPerp)
 
-      ! Manipulate the LowerEndBc along the line coordinate:
-      if(UseLowerEndBc) then
-         do iTheta = 1, nThetaPerp
-            do iPhi = 1, nPhiPerp
-               call set_VDF_lowerBC_uniform(iTheta, iPhi)
-               VDF_G(0:nP+1, 1:nMu, iPhi, iTheta, 0) = spread( &
-                    max(LowerEndBc_I, Background_I), DIM=2, NCOPIES=nMu)
-            end do
+      do iTheta = 1, nThetaPerp
+         do iPhi = 1, nPhiPerp
+            call set_VDF_lowerBC_uniform(iTheta, iPhi)
+            VDF_G(1:nP, 1:nMu, iPhi, iTheta, 0) = spread( &
+                 max(LowerEndBc_I, Background_I(1:nP)), DIM=2, NCOPIES=nMu)
+            VDF_G(0, 1:nMu, iPhi, iTheta, 0) = max( &
+                 VDF_G(0, 1:nMu, iPhi, iTheta, 1), Background_I(0))
+            VDF_G(nP+1, 1:nMu, iPhi, iTheta, 0) = max( &
+                 VDF_G(nP+1, 1:nMu, iPhi, iTheta, 1), Background_I(nP+1))
+            call set_VDF_upperBC_uniform(iTheta, iPhi)
+            VDF_G(1:nP, 1:nMu, iPhi, iTheta, nRPerp+1) = spread( &
+                 max(UpperEndBc_I, Background_I(1:nP)), DIM=2, NCOPIES=nMu)
+            VDF_G(0, 1:nMu, iPhi, iTheta, nRPerp+1) = max( &
+                 VDF_G(0, 1:nMu, iPhi, iTheta, nRPerp), Background_I(0))
+            VDF_G(nP+1, 1:nMu, iPhi, iTheta, nRPerp+1) = max( &
+                 VDF_G(nP+1, 1:nMu, iPhi, iTheta, nRPerp), Background_I(nP+1))
          end do
-      else
-         do iTheta = 1, nThetaPerp
-            do iPhi = 1, nPhiPerp
-               VDF_G(0:nP+1, 1:nMu, iPhi, iTheta, 0) = spread( &
-                    Background_I, DIM=2, NCOPIES=nMu)
-            end do
-         end do
-      end if
-
-      ! Manipulate the UpperEndBc along the line coordinate:
-      if(UseUpperEndBc) then
-         do iTheta = 1, nThetaPerp
-            do iPhi = 1, nPhiPerp
-               call set_VDF_upperBC_uniform(iTheta, iPhi)
-               VDF_G(1:nP, 1:nMu, iPhi, iTheta, nRPerp+1) = spread( &
-                    max(UpperEndBc_I, Background_I(1:nP)), DIM=2, NCOPIES=nMu)
-               VDF_G(0, 1:nMu, iPhi, iTheta, nRPerp+1) = max( &
-                    VDF_G(0, 1:nMu, iPhi, iTheta, nRPerp), Background_I(0))
-               VDF_G(nP+1, 1:nMu, iPhi, iTheta, nRPerp+1) = max( &
-                    VDF_G(nP+1, 1:nMu, iPhi, iTheta, nRPerp), Background_I(nP+1))
-            end do
-         end do
-      else
-         do iTheta = 1, nThetaPerp
-            do iPhi = 1, nPhiPerp
-               VDF_G(0:nP+1, 1:nMu, iPhi, iTheta, nRPerp+1) = spread( &
-                    Background_I, DIM=2, NCOPIES=nMu)
-            end do
-         end do
-      end if
+      end do
 
       ! Add a second layer of the ghost cells along R:
       VDF_G(:, :, :, :,       -1) = VDF_G(:, :, :, :,        0)
@@ -216,11 +194,11 @@ contains
       select case(trim(TypeLowerEndBc))
       case('inject')
          LowerEndBc_I = DistrPerp_5D(0, nMu, iPhi, iTheta, 1) &
-              /Momentum_G(0:nP+1)**SpectralIndex
-      case('float', 'floating')
-         LowerEndBc_I = DistrPerp_5D(0:nP+1, nMu, iPhi, iTheta, 1)
+              /Momentum_G(1:nP)**SpectralIndex
+      case('float')
+         LowerEndBc_I = DistrPerp_5D(1:nP, nMu, iPhi, iTheta, 1)
       case('escape')
-         LowerEndBc_I = Background_I
+         LowerEndBc_I = Background_I(1:nP)
       case default
          call CON_stop(NameSub//&
               ': Unknown type of lower end BC '//TypeLowerEndBc)
@@ -232,7 +210,7 @@ contains
       character(len=*), parameter:: NameSub = 'set_VDF_upperBC_uniform'
       !------------------------------------------------------------------------
       select case(trim(TypeUpperEndBc))
-      case('float', 'floating')
+      case('float')
          UpperEndBc_I = DistrPerp_5D(1:nP, nMu, iPhi, iTheta, nRPerp)
       case('escape')
          UpperEndBc_I = Background_I(1:nP)
