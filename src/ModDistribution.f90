@@ -184,7 +184,7 @@ contains
   !============================================================================
   subroutine offset(iLine, iOffset)
 
-    use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_,   &
+    use SP_ModGrid, ONLY: NoShock_, BOld_, RhoOld_, uOld_,   &
          ShockOld_, iShock_IB, State_VIB, MHData_VIB, &
          X_, Z_, FootPoint_VB, check_line_ishock
     ! shift in the data arrays is required if the grid point(s) is appended
@@ -198,8 +198,8 @@ contains
 
     if(iOffset==0)RETURN
     if(iOffset==1)then
-       State_VIB([RhoOld_,BOld_],2:nVertex_B(iLine),iLine) &
-            = State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine)-1,iLine)
+       State_VIB([RhoOld_,BOld_, uOld_],2:nVertex_B(iLine),iLine) &
+            = State_VIB([RhoOld_,BOld_, uOld_],1:nVertex_B(iLine)-1,iLine)
        Distribution_CB(:,:,2:nVertex_B(iLine), iLine)&
             = Distribution_CB(:,:,1:nVertex_B(iLine)-1, iLine)
        ! Extrapolate state vector components and VDF at iVertex=1
@@ -208,9 +208,9 @@ contains
        Distance3To2   = norm2(MHData_VIB(X_:Z_, 3, iLine) - &
             MHData_VIB(X_:Z_, 2, iLine))
        Alpha = Distance2ToMin/(Distance2ToMin + Distance3To2)
-       State_VIB([RhoOld_, BOld_], 1, iLine) = &
-            (Alpha + 1)*State_VIB([RhoOld_, BOld_], 2, iLine) &
-            -Alpha     *State_VIB([RhoOld_, BOld_], 3, iLine)
+       State_VIB([RhoOld_, BOld_, uOld_], 1, iLine) = &
+            (Alpha + 1)*State_VIB([RhoOld_, BOld_, uOld_], 2, iLine) &
+            -Alpha     *State_VIB([RhoOld_, BOld_, uOld_], 3, iLine)
        Distribution_CB(:,:,1,iLine) = Distribution_CB(:,:,2,iLine) + Alpha* &
             (Distribution_CB(:,:,2,iLine) - Distribution_CB(:,:,3,iLine))
        ! extrapolation may introduced negative values
@@ -223,8 +223,8 @@ contains
           Distribution_CB(:,:,1,iLine) = 0.01*Distribution_CB(:,:,2,iLine)
        end where
     elseif(iOffset < 0)then
-       State_VIB([RhoOld_,BOld_],1:nVertex_B(iLine),iLine) &
-            = State_VIB([RhoOld_,BOld_],1-iOffset:nVertex_B(iLine)&
+       State_VIB([RhoOld_,BOld_, uOld_],1:nVertex_B(iLine),iLine) &
+            = State_VIB([RhoOld_,BOld_, uOld_],1-iOffset:nVertex_B(iLine)&
             - iOffset, iLine)
        Distribution_CB(:,:,1:nVertex_B(iLine), iLine) &
             = Distribution_CB(:,:,1-iOffset:nVertex_B(iLine)-iOffset, iLine)
