@@ -353,7 +353,7 @@ contains
        State_VIB(BOld_, 1:iEnd, iLine)   = State_VIB(B_, 1:iEnd, iLine)
        ! reset variables read from file or received via coupler
        MhData_VIB(1:nMhData, 1:iEnd, iLine) = 0.0
-       ! nVertex_B(iLine) = 1
+       ! Lagrangian coordinate is kept only
     end do
 
   end subroutine copy_old_state
