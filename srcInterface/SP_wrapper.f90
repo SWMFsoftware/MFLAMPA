@@ -160,12 +160,27 @@ contains
     if(iProc==0)write(*,'(a,es12.5,a,es12.5,a,i6)')'SP:'//      &
          'Call run from SP_run, DataInputTime=', DataInputTime, &
          ' SPTime=', SPTime, ' nStep=', iIter
+    if(.not.DoReadMhData)call check_mhdata
     call run(TimeSimulationLimit)
     if(DoReadMhData)then
        TimeSimulation = DataInputTime
     elseif(.not.IsSteadyState)then
        TimeSimulation = TimeSimulationLimit
     end if
+  contains
+    subroutine check_mhdata
+      use CON_bline, only: save_mhd
+      use SP_ModGrid, only: Rho_, MhData_VIB, Used_B, nVertex_B, nLine
+      integer :: iLine, iVertex
+      !------------------------------------------------------------------------
+      do iLine = 1, nline
+         if(.not.Used_B(iLine))CYCLE
+         if(any(MhData_VIB(Rho_,1:nVertex_B(iLine),iLine)<=0.0))then
+            call save_mhd(DataInputTime, iLine, 'Zero or negative density')
+            Used_B(iLine) = .false.
+         end if
+      end do
+    end subroutine check_mhdata
   end subroutine SP_run
   !============================================================================
   subroutine SP_finalize(TimeSimulation)
