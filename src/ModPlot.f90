@@ -188,6 +188,7 @@ contains
     use ModUtilities, ONLY: split_string, lower_case
     use ModReadParam, ONLY: read_var
     use SP_ModTime, ONLY: IsSteadyState
+    use SP_ModConnectivity, ONLY: read_connectivity_param => read_param
     character(len=*), intent(in):: NameCommand
     ! set parameters of output files: file format, kind of output etc.
     character(len=300):: StringPlot
@@ -986,6 +987,8 @@ contains
     use SP_ModChannel, ONLY: get_integral_flux
     use SP_ModDistribution, ONLY: Mu_C
     use SP_ModSatellite, ONLY: nSat, write_satellite_file
+    use SP_ModConnectivity, ONLY: DoSaveConnectivity, &
+         write_connectivity_satellite_files
     use SP_ModGrid, ONLY: Used_B
     use SP_ModProc, ONLY: iComm, nProc, iError
     use SP_ModTime, ONLY: IsSteadyState
@@ -1005,10 +1008,14 @@ contains
     else
        IsInitialOutput = .false.
     end if
-    if(nFileOut == 0)RETURN
+    if(nFileOut == 0)then
+       if(DoSaveConnectivity) call write_connectivity_satellite_files(IsInitialOutput)
+       RETURN
+    end if
     ! check whether this is a call for initial output
     if(IsInitialOutput)then
        if(nSat > 0) call write_satellite_file(.true.)
+       if(DoSaveConnectivity) call write_connectivity_satellite_files(.true.)
        if(.not.DoSaveInitial)RETURN
     else
        call get_integral_flux
@@ -1029,6 +1036,7 @@ contains
        end if
     end if
     if(nSat > 0) call write_satellite_file(.false.)
+    if(DoSaveConnectivity) call write_connectivity_satellite_files(.false.)
     ! Save outputs into each file (according to StringPlot)
     do iFile = 1, nFileOut
        iKindData = File_I(iFile) % iKindData

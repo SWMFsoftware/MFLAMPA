@@ -20,6 +20,7 @@ OBJECTS = \
 	ModDiffusion.o \
 	ModDiffusionPerp.o \
 	ModDrift.o \
+	SP_ModConnectivity.o \
 	ModGrid.o \
 	ModMain.o \
 	ModOriginPoints.o \

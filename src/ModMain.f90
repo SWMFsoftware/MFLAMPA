@@ -40,6 +40,7 @@ contains
     use SP_ModBc,             ONLY: read_param_bc          => read_param
     use SP_ModChannel,        ONLY: read_param_channel     => read_param
     use SP_ModDiffusion,      ONLY: read_param_diffuse     => read_param
+    use SP_ModConnectivity,   ONLY: read_param_connectivity => read_param
     use SP_ModPerpDiffusion,  ONLY: read_param_diffuseperp => read_param
     use SP_ModDistribution,   ONLY: read_param_dist        => read_param
     use SP_ModDrift,          ONLY: read_param_drift       => read_param
@@ -114,6 +115,8 @@ contains
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)
+       case('#SAVECONNECTIVITY')
+          call read_param_connectivity(NameCommand)
        case('#VERBOSE')
           call read_param_testfunc(NameCommand)
        case('#SATELLITE','#TESTTRIANGULATE')
