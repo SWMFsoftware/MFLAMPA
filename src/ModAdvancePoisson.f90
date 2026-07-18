@@ -416,7 +416,7 @@ contains
                iShock, nSi_I, BSi_I, Dt, &
                LowerEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, 0), &
                UpperEndSpectrumIn_II=VDF_G(1:nP, 1:nMu, nX+1))
-       
+
           ! Check if the VDF includes negative values after spatial diffusion
           call check_dist_neg(NameSub//' after spatial diffusion',1,nX,iLine)
           if(IsDistNeg) RETURN
