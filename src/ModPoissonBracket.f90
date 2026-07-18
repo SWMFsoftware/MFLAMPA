@@ -370,8 +370,8 @@ contains
          0,  0,  1,  0,&
          0,  0,  0, -1,&
          0,  0,  0,  1], [4,8])
-    real    :: Buff_VSG(DeltaH_:Flux_,8)
-    integer :: nFlux, iFlux, iSide, iSide_SG(8), iD_D(4), iU_D(4)
+    real    :: Buff_VS(DeltaH_:Flux_,8)
+    integer :: nFlux, iFlux, iSide, iSide_S(8), iD_D(4), iU_D(4)
     ! Local CFL number:
     real :: CFLCoef_G(0:nI+1,0:nJ+1,1/nK:nK+1-1/nK,1/nP:nP+1-1/nP), CFLLocal
     ! Time step (global, local)
@@ -534,7 +534,7 @@ contains
              do i=0,nI+1
                 VDF = VDF_G(i,j,k,iP)
                 do iDim = 1, nDim
-                   ! Caalculate contributions from up faces to
+                   ! Calculate contributions from up faces to
                    ! SumDeltaHPlus and DeltaMinusF
                    iU_D = [i,j,k,iP]; iU_D(iDim) = iU_D(iDim) + 1
                    DeltaMinusH = min(0.0, DeltaH_DG(iDim,i,j,k,iP))
@@ -658,39 +658,39 @@ contains
        do iDim = 1, nDim
           iSide = 2*iDim
           if(DeltaH_DG(iDim,i,j,k,iP) > 0.0)then
-             nFlux = nFlux + 1; iSide_SG(nFlux) = iSide
-             Buff_VSG(DeltaH_:Flux_,nFlux) = DeltaH_DG(iDim,i,j,k,iP)*&
+             nFlux = nFlux + 1; iSide_S(nFlux) = iSide
+             Buff_VS(DeltaH_:Flux_,nFlux) = DeltaH_DG(iDim,i,j,k,iP)*&
                   [1.0, limiter(iSide,i,j,k,iP)]
           end if
           iSide = 2*iDim -1
           iD_D = [i,j,k,iP]; iD_D(iDim) = iD_D(iDim) - 1
           if(DeltaH_DG(iDim,iD_D(1),iD_D(2),iD_D(3),iD_D(4)) < 0.0 )then
-             nFlux = nFlux + 1; iSide_SG(nFlux) = iSide
-             Buff_VSG(DeltaH_:Flux_,nFlux) = &
+             nFlux = nFlux + 1; iSide_S(nFlux) = iSide
+             Buff_VS(DeltaH_:Flux_,nFlux) = &
                   (-DeltaH_DG(iDim,iD_D(1),iD_D(2),iD_D(3),iD_D(4)))*&
                   [1.0, limiter(iSide,i,j,k,iP)]
           end if
        end do
-       SumFluxPlus = sum(Buff_VSG(Flux_,1:nFlux))
+       SumFluxPlus = sum(Buff_VS(Flux_,1:nFlux))
        ! The value of limited \deta^+H/2 to be achieved with gamma-limiter
        DeltaPlusFLimited = minmod(SumFluxPlus/SumDeltaHPlus_G(i,j,k,iP),&
             DeltaMinusF_G(i,j,k,iP))
        ! This is the major flux, having the same sign as SumFluxPlus
-       SumMajor =  sum(Buff_VSG(Flux_,1:nFlux),&
-            MASK= SumFluxPlus*Buff_VSG(Flux_,1:nFlux) > 0.0)
+       SumMajor =  sum(Buff_VS(Flux_,1:nFlux),&
+            MASK= SumFluxPlus*Buff_VS(Flux_,1:nFlux) > 0.0)
        if(abs(SumMajor) > 0.0)then
           Gamma = 1.0 + (DeltaPlusFLimited*SumDeltaHPlus_G(i,j,k,iP) - &
                SumFluxPlus)/SumMajor
-          where(SumFluxPlus*Buff_VSG(Flux_,1:nFlux) > 0.0)&
-               Buff_VSG(Flux_,1:nFlux) = Buff_VSG(Flux_,1:nFlux)*Gamma
+          where(SumFluxPlus*Buff_VS(Flux_,1:nFlux) > 0.0)&
+               Buff_VS(Flux_,1:nFlux) = Buff_VS(Flux_,1:nFlux)*Gamma
        end if
        CFLLocal = CFLCoef_G(i,j,k,iP)
        do iFlux = 1, nFlux
-          iD_D = [i,j,k,iP] + iShift_DS(:,iSide_SG(iFlux))
+          iD_D = [i,j,k,iP] + iShift_DS(:,iSide_S(iFlux))
           SumFlux2_G(iD_D(1),iD_D(2),iD_D(3),iD_D(4)) =      &
                SumFlux2_G(iD_D(1),iD_D(2),iD_D(3),iD_D(4)) + &
-               Buff_VSG(Flux_,iFlux) - &
-               Buff_VSG(DeltaH_,iFlux)*CFLLocal*DeltaPlusFLimited
+               Buff_VS(Flux_,iFlux) - &
+               Buff_VS(DeltaH_,iFlux)*CFLLocal*DeltaPlusFLimited
        end do
        SumFlux2_G(i,j,k,iP) = SumFlux2_G(i,j,k,iP) - &
             (1 - CFLLocal)*DeltaPlusFLimited*SumDeltaHPlus_G(i,j,k,iP)
