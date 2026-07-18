@@ -312,6 +312,7 @@ contains
     ! loop variables
     integer :: iRPerp, iThetaPerp, iPhiPerp, iPE
     ! VDF and the source term (5D)
+    !--------------------------------------------------------------------------
     real, dimension(0:nP+1, nMu, nPhiPerp, nThetaPerp, nRPerp)&
          :: DistrPerp_5D, source_5D
     ! DPerp coefficients (5D)
