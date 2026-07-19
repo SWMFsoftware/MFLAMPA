@@ -196,7 +196,7 @@ contains
     allocate(Time_I(MaxPoint), Xyz_DI(nDim, MaxPoint))
     allocate(XyzSat_DII(nDim, MaxPoint, nSat))
     allocate(TimeSat_II(MaxPoint, nSat))
-    
+
     ! Allocate arrays to preserve the complete, untrimmed trajectory.
     ! These are used by steady-state connectivity sampling, which may
     ! require satellite positions before the simulation StartTime.
