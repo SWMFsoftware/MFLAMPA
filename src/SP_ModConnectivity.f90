@@ -14,12 +14,12 @@ module SP_ModConnectivity
   !   6. Write the resulting radial trace, field-line indices, and interpolation
   !      weights to a connectivity file.
 
-  use ModIoUnit,      ONLY: UnitTmp_
-  use ModNumConst,    ONLY: cRadToDeg
-  use ModUtilities,   ONLY: open_file, close_file, CON_stop
+  use ModIoUnit, ONLY: UnitTmp_
+  use ModNumConst, ONLY: cRadToDeg
+  use ModUtilities, ONLY: open_file, close_file, CON_stop
   use ModMpi
   use ModCoordTransform, ONLY: xyz_to_rlonlat
-  use ModTimeConvert,    ONLY: time_real_to_int
+  use ModTimeConvert, ONLY: time_real_to_int
 
   use SP_ModGrid, ONLY: nLine, nLineAll, iLineAll0, Used_B, &
           MHData_VIB, X_, Y_, Z_, search_line, TypeCoordSystem
@@ -39,7 +39,7 @@ module SP_ModConnectivity
   public :: trace_connectivity_target_rlonlat
   public :: DoSaveConnectivity
   public :: DoDebugConnectivity
- 
+
   logical :: DoSaveConnectivity     = .false.           ! master switch for this module
   logical :: DoDebugConnectivity    = .false.           ! detailed progress and wall-time diagnostics
   logical :: DoSaveConnectivityOnce = .true.            ! limit a steady-state trajectory sweep to one call
@@ -58,15 +58,15 @@ module SP_ModConnectivity
   integer, parameter :: nConnectivityProgress = 10      ! approximate number of progress reports per trace
 
 contains
-  !=============================================================================
+  !============================================================================
   subroutine read_param(NameCommand)
 
     use ModReadParam, ONLY: read_var
 
     character(len=*), intent(in) :: NameCommand
 
-    character(len=*), parameter :: NameSub = 'SP_ModConnectivity::read_param'
-    !---------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'read_param'
+    !--------------------------------------------------------------------------
     select case(NameCommand)
     case('#SAVECONNECTIVITY')
        call read_var('DoSaveConnectivity', DoSaveConnectivity)
@@ -131,7 +131,7 @@ contains
     end select
 
   end subroutine read_param
-  !=============================================================================
+  !============================================================================
   subroutine read_time_parameter(NameVar, TimeValue)
 
     ! Read a PARAM.in line whose value is a duration with an optional unit.
@@ -151,12 +151,12 @@ contains
     ! number, for example "30 m", "1 h", or "-14 d".
     character(len=80) :: StringValue
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     call read_var(NameVar, StringValue)
     call parse_time_duration(StringValue, NameVar, TimeValue)
 
   end subroutine read_time_parameter
-  !=============================================================================
+  !============================================================================
   subroutine parse_time_duration(StringIn, NameVar, TimeValue)
 
     use ModUtilities, ONLY: lower_case
@@ -172,7 +172,7 @@ contains
     real :: Value, Factor
     integer :: iStat, nLen
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     String = adjustl(StringIn)
     nLen = len_trim(String)
     if(nLen >= 2) then
@@ -210,7 +210,7 @@ contains
     TimeValue = Value*Factor
 
   end subroutine parse_time_duration
-  !=============================================================================
+  !============================================================================
   logical function is_next_param_line_named(NameVar)
 
     ! Non-consuming look-ahead used for optional parameters at the end of a
@@ -229,7 +229,7 @@ contains
     character(len=lStringLine) :: StringNext, StringLower, NameLower
     integer :: iLine, iLineNow, nLineLast, nLineText
 
-    !-------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     is_next_param_line_named = .false.
 
     iLineNow  = i_line_read()
@@ -258,7 +258,7 @@ contains
     deallocate(StringLine_I)
 
   end function is_next_param_line_named
-  !=============================================================================
+  !============================================================================
   subroutine write_connectivity_satellite_files(IsInitialOutput)
 
     use SP_ModSatellite, ONLY: nSat, NameSat_I, get_satellite_time_range, &
@@ -268,7 +268,7 @@ contains
     ! subroutine currently does not use the flag. Passing .true. or .false.
     ! therefore produces the same behavior.
     logical, intent(in) :: IsInitialOutput
-    
+
     integer :: iSat			! current satellite/trajectory
     integer :: iSample			! current steady-state trajectory sample
     integer :: nSampleMax		! maximum number of samples in the requested window
@@ -281,9 +281,9 @@ contains
     logical :: IsTimeAccurate		! should be straightforward
     character(len=100) :: NameTarget	! target identifier passed to the file writer
 
-    character(len=*), parameter :: NameSub = &
          'SP_ModConnectivity::write_connectivity_satellite_files'
-    !---------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'write_connectivity_satellite_files'
+    !--------------------------------------------------------------------------
     if(.not.DoSaveConnectivity) RETURN
     if(nSat <= 0) then
        if(iProc == 0) write (*,*) &
@@ -453,7 +453,7 @@ contains
          'SP:CONNECTIVITY done steady-state'
 
   end subroutine write_connectivity_satellite_files
-  !=============================================================================
+  !============================================================================
   subroutine save_connectivity_targets(nTarget, NameTarget_I, XyzTarget_DI, &
        RadiusMinIn, nTraceIn, PowerIn, NameDirIn)
 
@@ -471,8 +471,8 @@ contains
 
     integer :: iTarget
 
-    character(len=*), parameter :: NameSub = 'save_connectivity_targets'
-    !---------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'save_connectivity_targets'
+    !--------------------------------------------------------------------------
     if(nTarget < 1) RETURN
 
     do iTarget = 1, nTarget
@@ -482,8 +482,8 @@ contains
     end do
 
   end subroutine save_connectivity_targets
+  !============================================================================
 
-  !=============================================================================
   subroutine trace_connectivity_target_rlonlat(NameTarget, RadiusTarget, &
        LonTarget, LatTarget, RadiusMinIn, nTraceIn, PowerIn, NameDirIn)
 
@@ -502,7 +502,7 @@ contains
     ! calculated once and reused for both horizontal components.
     real :: XyzTarget_D(3), CosLat
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     CosLat = cos(LatTarget)
     XyzTarget_D(1) = RadiusTarget*CosLat*cos(LonTarget)
     XyzTarget_D(2) = RadiusTarget*CosLat*sin(LonTarget)
@@ -513,7 +513,7 @@ contains
          PowerIn=PowerIn, NameDirIn=NameDirIn)
 
   end subroutine trace_connectivity_target_rlonlat
-  !=============================================================================
+  !============================================================================
   subroutine trace_connectivity_target(NameTarget, XyzTarget_D, RadiusMinIn, &
        nTraceIn, PowerIn, NameDirIn, TargetTimeIn)
 
@@ -528,11 +528,11 @@ contains
     real,    optional,intent(in) :: PowerIn
     character(len=*), optional,intent(in) :: NameDirIn
     real,    optional,intent(in) :: TargetTimeIn
- 
+
     integer :: nTrace			! number of requested radial shells
     integer :: iTrace			! current shell index, progressing from the target inward
     integer :: nOut			! number of shells successfully added to the output trace
-    integer :: nValid			! number of field lines intersecting the current shell 
+    integer :: nValid			! number of field lines intersecting the current shell
     integer :: iStatus			! status returned by the spherical triangulation
 
     ! A containing triangle is represented by three field-line indices.
@@ -578,7 +578,7 @@ contains
     real(kind=8) :: TimeCollectGatherCount, TimeCollectGatherData
     real(kind=8) :: TimeCollectLookup
     real(kind=8) :: TimeCollectPart_I(5)
- 
+
     real, allocatable :: RadiusTrace_I(:)		! requested shell radii from the target inward
     real, allocatable :: XyzAll_DI(:,:)			! shell positions indexed by global field-line number
     real, allocatable :: XyzNode_DI(:,:)		! compact shell positions passed to trmesh
@@ -596,7 +596,7 @@ contains
     real :: TimeReduce_I(6)
     integer, allocatable :: StencilOut_II(:,:)
     logical, allocatable :: DoLine_I(:)
-      
+
     logical :: IsActive				! rank-0 trace can still proceed inward
     logical :: IsFound				! containing spherical triangle was found
     logical :: IsOk				! generic geometry/reordering success flag
@@ -604,8 +604,8 @@ contains
     integer :: ProgressInterval			! shell spacing between diagnostic progress messages
     character(len=300) :: StopReason		! final success or termination explanation
 
-    character(len=*), parameter :: NameSub = 'trace_connectivity_target'
-    !---------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'trace_connectivity_target'
+    !--------------------------------------------------------------------------
     call get_wall_time_seconds(TimeTrace0)
 
     TimeField = SPTime
@@ -919,7 +919,7 @@ contains
     deallocate(RadiusTrace_I)
 
   end subroutine trace_connectivity_target
-  !=============================================================================
+  !============================================================================
   subroutine collect_shell_points(Radius, nValid, XyzAll_DI, DoLine_I, &
        XyzNode_DI, iLineNode_I, DataLocal_DI, DataNode_DI, &
        nLocalValid_P, iDisp_P, nRecvData_P, iDispData_P, TimePart_I)
@@ -953,7 +953,7 @@ contains
     integer, intent(inout) :: nLocalValid_P(:), iDisp_P(:)
     integer, intent(inout) :: nRecvData_P(:), iDispData_P(:)
     real(kind=8), intent(out) :: TimePart_I(5)
-   
+
     integer :: iLine			! local field-line index on this MPI rank
     integer :: iLineAll			! corresponding global field-line index
     integer :: iNode			! node index in the compact gathered array
@@ -963,7 +963,7 @@ contains
     logical :: DoFound			! true when a usable shell crossing exists
     real(kind=8) :: Time0, Time1
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     TimePart_I = 0.0_8
     nValid = 0
 
@@ -1045,7 +1045,7 @@ contains
     TimePart_I(5) = Time1 - Time0
 
   end subroutine collect_shell_points
-  !=============================================================================
+  !============================================================================
   subroutine get_line_position_at_radius(iLine, Radius, Xyz_D, DoFound)
 
     ! Use the same line-search routine that existing MFLAMPA fixed-radius
@@ -1063,7 +1063,7 @@ contains
     real :: Weight
     logical :: DoPrint
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     Xyz_D = 0.0
     DoPrint = .true.
 
@@ -1078,7 +1078,7 @@ contains
          MHData_VIB(X_:Z_, iAbove,   iLine)*Weight
 
   end subroutine get_line_position_at_radius
-  !=============================================================================
+  !============================================================================
   subroutine make_powerlaw_radius_array(RadiusTop, RadiusBottom, Power, Radius_I)
 
     ! The target position is extracted in inwards radial steps.
@@ -1093,7 +1093,7 @@ contains
     integer :: iTrace, nTrace
     real :: s, Weight
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     nTrace = size(Radius_I)
     if(nTrace == 1) then
        Radius_I(1) = RadiusTop
@@ -1110,7 +1110,7 @@ contains
     end do
 
   end subroutine make_powerlaw_radius_array
-  !=============================================================================
+  !============================================================================
   subroutine normalize_unit_vector(Xyz_D, IsOk)
 
     real,    intent(inout) :: Xyz_D(3)
@@ -1118,13 +1118,13 @@ contains
 
     real :: Norm
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     Norm = sqrt(sum(Xyz_D**2))
     IsOk = Norm > cTiny
     if(IsOk) Xyz_D = Xyz_D/Norm
 
   end subroutine normalize_unit_vector
-  !=============================================================================
+  !============================================================================
   subroutine put_noncollinear_nodes_first(nNode, Xyz_DI, iLine_I, IsOk)
 
     ! TRMESH requires the first three nodes not to lie on one great circle.
@@ -1142,7 +1142,7 @@ contains
     integer :: i1, i2, i3, j2, j3
     real :: Cross_D(3), Triple
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     IsOk = .false.
     if(nNode < 3) RETURN
 
@@ -1168,19 +1168,19 @@ contains
     end do
 
   end subroutine put_noncollinear_nodes_first
-  !=============================================================================
+  !============================================================================
   function cross_product(A_D, B_D) result(C_D)
 
     real, intent(in) :: A_D(3), B_D(3)
     real :: C_D(3)
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     C_D(1) = A_D(2)*B_D(3) - A_D(3)*B_D(2)
     C_D(2) = A_D(3)*B_D(1) - A_D(1)*B_D(3)
     C_D(3) = A_D(1)*B_D(2) - A_D(2)*B_D(1)
 
   end function cross_product
-  !=============================================================================
+  !============================================================================
   subroutine swap_nodes(iA, iB, Xyz_DI, iLine_I)
 
     integer, intent(in)    :: iA, iB
@@ -1190,7 +1190,7 @@ contains
     real :: XyzTmp_D(3)
     integer :: iTmp
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     if(iA == iB) RETURN
 
     XyzTmp_D = Xyz_DI(:,iA)
@@ -1202,21 +1202,21 @@ contains
     iLine_I(iB) = iTmp
 
   end subroutine swap_nodes
-  !=============================================================================
+  !============================================================================
   subroutine deallocate_shell_arrays(XyzAll_DI, DoLine_I, XyzNode_DI, iLineNode_I)
 
     real, allocatable, intent(inout) :: XyzAll_DI(:,:), XyzNode_DI(:,:)
     logical, allocatable, intent(inout) :: DoLine_I(:)
     integer, allocatable, intent(inout) :: iLineNode_I(:)
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     if(allocated(XyzAll_DI)) deallocate(XyzAll_DI)
     if(allocated(DoLine_I)) deallocate(DoLine_I)
     if(allocated(XyzNode_DI)) deallocate(XyzNode_DI)
     if(allocated(iLineNode_I)) deallocate(iLineNode_I)
 
   end subroutine deallocate_shell_arrays
-  !=============================================================================
+  !============================================================================
   subroutine write_connectivity_file(NameTarget, NameDirIn, RadiusTarget, &
        LonTargetDeg, LatTargetDeg, nOut, ROut_I, LonOut_I, LatOut_I, &
        XOut_I, YOut_I, ZOut_I, StencilOut_II, WeightOut_DI, StopReason, &
@@ -1240,8 +1240,8 @@ contains
     character(len=32) :: StringFieldTime, StringTargetTime
     integer :: iOut
 
-    character(len=*), parameter :: NameSub = 'write_connectivity_file'
-    !---------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'write_connectivity_file'
+    !--------------------------------------------------------------------------
     call make_datetime_string(TimeField, StringFieldTime)
     if(DoHaveTargetTime) then
        call make_datetime_string(TimeTarget, StringTargetTime)
@@ -1294,7 +1294,7 @@ contains
     call close_file
 
   end subroutine write_connectivity_file
-  !=============================================================================
+  !============================================================================
   subroutine write_empty_connectivity_file(NameTarget, NameDirIn, Reason, &
        TimeField, TimeTarget, DoHaveTargetTime)
 
@@ -1307,8 +1307,8 @@ contains
     character(len=300) :: NameFile
     character(len=32) :: StringFieldTime, StringTargetTime
 
-    character(len=*), parameter :: NameSub = 'write_empty_connectivity_file'
-    !---------------------------------------------------------------------------
+    character(len=*), parameter:: NameSub = 'write_empty_connectivity_file'
+    !--------------------------------------------------------------------------
     if(iProc /= 0) RETURN
 
     call make_datetime_string(TimeField, StringFieldTime)
@@ -1346,7 +1346,7 @@ contains
     call close_file
 
   end subroutine write_empty_connectivity_file
-  !=============================================================================
+  !============================================================================
   subroutine make_connectivity_file_name(NameTarget, NameDirIn, NameFile, &
        TimeField, TimeTarget, DoHaveTargetTime)
 
@@ -1362,7 +1362,7 @@ contains
     character(len=180) :: NameDir
     character(len=32)  :: StringFieldTime, StringTargetTime
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     if(present(NameDirIn)) then
        NameDir = trim(NameDirIn)
     else
@@ -1388,7 +1388,7 @@ contains
        trim(StringTargetTime), '_n', iIter, '.dat'
 
   end subroutine make_connectivity_file_name
-  !=============================================================================
+  !============================================================================
   subroutine make_datetime_string(TimeRelative, StringTime)
 
     real, intent(in) :: TimeRelative
@@ -1398,13 +1398,13 @@ contains
     ! seventh sub-second field. The filename/metadata string prints the first six.
     integer :: iTime_I(7)
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     call time_real_to_int(StartTime + TimeRelative, iTime_I)
     write(StringTime,'(i4.4,i2.2,i2.2,a,i2.2,i2.2,i2.2)') &
          iTime_I(1:3), '_', iTime_I(4:6)
 
   end subroutine make_datetime_string
-  !=============================================================================
+  !============================================================================
   subroutine get_wall_time_seconds(Time)
 
     real(kind=8), intent(out) :: Time
@@ -1413,7 +1413,7 @@ contains
     integer :: CountRate		! ticks per second
     integer :: CountMax			! implementation's maximum tick value
 
-    !---------------------------------------------------------------------------
+    !--------------------------------------------------------------------------
     call system_clock(Count, CountRate, CountMax)
     if(CountRate > 0) then
        Time = real(Count, kind=8)/real(CountRate, kind=8)
@@ -1422,9 +1422,8 @@ contains
     end if
 
   end subroutine get_wall_time_seconds
-  !=============================================================================
+  !============================================================================
 
 end module SP_ModConnectivity
-!===============================================================================
-
+!==============================================================================
 
