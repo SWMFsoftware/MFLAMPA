@@ -26,6 +26,7 @@ module ModPoissonBracket
   end interface explicit
   !PUBLIC MEMBER FUNCTION:
   public :: explicit
+  public :: implicit2
 
   ! If DtIn results in CFL>CflMax, the time step is reduced
   real, parameter :: CflMax = 0.990
@@ -780,6 +781,446 @@ contains
     end function limiter
     !==========================================================================
   end subroutine explicit4
+  !============================================================================
+  subroutine implicit2(nI, nJ, VDF_G, Volume_G, Hamiltonian12_N,  &
+       Diffusion_FX, Diffusion_FY, DtIn, CFLIn, DtOut, &
+       IsTetradiagNoUu, IsTetradiagNoLl, ErrorOut)
+    ! solve the contribution to the numerical flux from multiple Poisson
+    ! brackets, 1,2,3 enumerate phase coordinates,  0 relating to time.
+
+    integer, intent(in) :: nI     !# of cells along coordinate 1
+    integer, intent(in) :: nJ     !# of cells along coordinate 2
+
+    ! Distribution function with gc. Two layers of face ghostcels
+    ! and one level of corner ghost cells are used
+    real, intent(inout) :: VDF_G(-1:nI+2,-1:nJ+2)
+
+    ! Hamiltonian functions in nodes. One layer of ghost nodes is used.
+    ! 1. Hamiltonian function for the Poisson bracket \{f,H_{12}}_{x,y}
+    !    Node-centered at XY plane, cell-centered with respect to Z
+    !    (In other words, Z-aligned-edge-centered)
+    real, intent(in) :: Hamiltonian12_N(-1:nI+1,-1:nJ+1)
+
+    ! Total Volume. One layer of face ghost cells is used
+    real, intent(in) :: Volume_G(0:nI+1,0:nJ+1)
+
+    ! Diffusion coefficient divided by delta s
+    real, optional, intent(in) :: Diffusion_FX(0:nI,1:nJ)
+    real, optional, intent(in) :: Diffusion_FY(1:nI,0:nJ)
+
+    real, optional, intent(inout) :: DtIn    ! Options to set time step
+    real, optional, intent(in)    :: CFLIn   ! Options to set time step
+    real, optional, intent(out)   :: DtOut   ! Option to report time step
+    !
+    ! Face-centered vriations of Hamiltonian functions.
+    ! one layer of ghost faces
+    real :: DeltaH_DG(2,-1:nI+1,-1:nJ+1)
+    ! Elements of matrix of the SLE as followed from the implicit scheme
+    !
+    !                        y Uu_C(i,j) = dt*delta^-H \here
+    !                        1---------<--------------------
+    !                        |                              |
+    !                        v       i,j                    ^ U_C(i,j)=&
+    ! L_C(i,j) = dt*delta^-H | M_C = Vol-dt*sum(delta^- H)  |  dt*delta^-H
+    !                 here-> |                              |<- here
+    !                        0--------->--------------------1x
+    !                        Ll_C(i,j) = dt*delta^-H /here
+    ! Main diagonal
+    real ::  M_C(1:nI, 1:nJ)
+    ! Subdiagonal (contribution from the left neighboring cell)
+    real ::  L_C(1:nI, 1:nJ)
+    ! Superdiagonal (contribution from the right neighboring cell)
+    real ::  U_C(1:nI, 1:nJ)
+    ! Subsubdiagonal (contribution from the lower neighboring cell)
+    real ::  Ll_C(1:nI, 1:nJ)
+    ! Supersuperdiagonal (contribution from the upper neighboring cell)
+    real ::  Uu_C(1:nI, 1:nJ)
+    ! The RHS of the SLE:
+    real ::  Source_C(1:nI, 1:nJ)
+    ! If all elements in Uu_C are zeroes the SLE system with tetradiagonal
+    ! matrix can be resolved explicitly by consequently applying the Thomas
+    ! algorithm row-by-row, starting from the bottom to the top
+    logical, optional, intent(in) :: IsTetraDiagNoUu
+    ! If all elements in Ll_C are zeroes the SLE system with tetradiagonal
+    ! matrix can be resolved explicitly by consequently applying the Thomas
+    ! algorithm row-by-row, starting from the top to the bottom.
+    logical, optional, intent(in) :: IsTetraDiagNoLl
+    real, optional, intent(out) :: ErrorOut
+    integer, parameter :: iShift_DS(2,4) = reshape(&
+         [-1,  0, 1,  0, 0, -1, 0, 1], [2,4])
+    real    :: Buff_S(4)
+    integer :: nFlux, iFlux, iSide, iSide_S(4), iD_D(2), iU_D(2)
+    ! Loop variables:
+    integer :: i, j, iDim, iIter
+    integer,parameter :: nDim=2, nIter = 10
+    ! Iteration control
+    real, parameter :: cConv = 1.0e-5
+    real :: VdfOld_I(1:nI), Error
+    ! Variations of VDF (one layer of ghost cell values):
+    real, dimension(0:nI+1, 0:nJ+1) :: &
+         DeltaMinusF_G, SumDeltaHPlus_G, SumDeltaHMinus_G
+    real :: DeltaMinusH, Dt, VDF
+    real :: SumMajor, Gamma, SumFluxPlus, DeltaPlusFLimited
+    real :: CFLCoef_G(0:nI+1,0:nJ+1)
+    ! Sum of all second order fluxes
+    real :: SumFlux2_G(0:nI+1,0:nJ+1)
+    character(len=*), parameter:: NameSub = 'implicit2'
+    !--------------------------------------------------------------------------
+    if(present(DtIn))then
+       Dt = DtIn
+    else
+       if(.not.present(CflIn))call CON_stop(&
+            'Either CflIn or DtIn should be provided in '//NameSub)
+    end if
+    if(present(ErrorOut)) ErrorOut = 0.0
+    ! Nullify arrays:
+    DeltaH_DG  = 0.0
+    ! Bracket {F,H12}_{x,y}
+    ! Hamiltonian 12 (xy)
+    ! y
+    ! 1---------<---------
+    ! |                  |
+    ! v       1,1        ^
+    ! |                  |
+    ! |                  |
+    ! 0--------->--------1x
+    DeltaH_DG(1,-1:nI+1, 0:nJ+1)          = &
+         Hamiltonian12_N(-1:nI+1, 0:nJ+1) - &
+         Hamiltonian12_N(-1:nI+1,-1:nJ)
+    DeltaH_DG(2, 0:nI+1,-1:nJ+1)          = &
+         Hamiltonian12_N(-1:nI  ,-1:nJ+1) - &
+         Hamiltonian12_N(0:nI+1 ,-1:nJ+1)
+
+    ! Cleanup
+    where(abs(DeltaH_DG)<=cTol) DeltaH_DG = 0.0
+
+    ! Now, for each cell the value of DeltaH for face in positive
+    ! directions of i and j may be found in the arrays, for
+    ! negative directions the should be taken with opposite sign
+    ! Nullify arrays:
+    DeltaMinusF_G = 0.0
+    SumDeltaHPlus_G = 0.0
+    SumDeltaHMinus_G = 0.0
+    M_C = 0.0; L_C = 0.0; U_C = 0.0; Ll_C = 0.0; Uu_C = 0.0
+    ! Calculate DeltaMinusF and SumDeltaHPlus_G
+    do j=0,nJ+1
+       do i=0,nI+1
+          VDF = VDF_G(i,j)
+          ! Calculate contributions from up faces to
+          ! SumDeltaHPlus and DeltaMinusF
+          ! Right face
+          DeltaMinusH = min(0.0, DeltaH_DG(1,i,j))
+          SumDeltaHMinus_G(i,j) = &
+               SumDeltaHMinus_G(i,j) + DeltaMinusH
+          DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
+               DeltaMinusH*(VDF_G(i+1,j) - VDF)
+          U_C(i,j) = DeltaMinusH
+          if(present(Diffusion_FX)) U_C(i,j) = U_C(i,j) - Diffusion_FX(i,j)
+          M_C(i,j) = M_C(i,j) - U_C(i,j)
+          SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
+               max(0.0, DeltaH_DG(1,i,j))
+          ! Left face
+          DeltaMinusH = min(0.0,-DeltaH_DG(1,i-1,j))
+          SumDeltaHMinus_G(i,j) = SumDeltaHMinus_G(i,j) + DeltaMinusH
+          DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
+               DeltaMinusH*(VDF_G(i-1,j) - VDF)
+          L_C(i,j) = DeltaMinusH
+          if(present(Diffusion_FX)) L_C(i,j) = L_C(i,j) - Diffusion_FX(i-1,j)
+          M_C(i,j) = M_C(i,j) - L_C(i,j)
+          SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
+               max(0.0,-DeltaH_DG(1,i-1,j))
+          ! Top face
+          DeltaMinusH = min(0.0, DeltaH_DG(2,i,j))
+          SumDeltaHMinus_G(i,j) = &
+               SumDeltaHMinus_G(i,j) + DeltaMinusH
+          DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
+               DeltaMinusH*(VDF_G(i,j+1) - VDF)
+          Uu_C(i,j) = DeltaMinusH
+          if(present(Diffusion_FY))Uu_C(i,j) = Uu_C(i,j) - Diffusion_FY(i,j)
+          M_C(i,j) = M_C(i,j) - Uu_C(i,j)
+          SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
+               max(0.0, DeltaH_DG(2,i,j))
+          ! Bottom face
+          DeltaMinusH = min(0.0,-DeltaH_DG(2,i,j-1))
+          SumDeltaHMinus_G(i,j) = SumDeltaHMinus_G(i,j) + DeltaMinusH
+          DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
+               DeltaMinusH*(VDF_G(i,j-1) - VDF)
+          Ll_C(i,j) = DeltaMinusH
+          if(present(Diffusion_FY))Ll_C(i,j) = Ll_C(i,j) - Diffusion_FY(i,j-1)
+          M_C(i,j) = M_C(i,j) - Ll_C(i,j)
+          SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
+               max(0.0,-DeltaH_DG(1,i,j-1))
+       end do
+    end do
+    ! Get local CFLs
+    where(SumDeltaHMinus_G == 0.0)
+       DeltaMinusF_G = 0.0
+       CFLCoef_G = 0.0
+    elsewhere
+       DeltaMinusF_G = -DeltaMinusF_G/SumDeltaHMinus_G
+       CFLCoef_G = -SumDeltaHMinus_G/Volume_G
+    end where
+
+    ! Set CFL and time step
+
+    if(present(DtIn))then
+       Dt = DtIn
+       if(present(DtOut ))&
+            DtOut = CFLIn/maxval(CFLCoef_G(1:nI,1:nJ))
+    else
+       Dt = CFLIn/maxval(CFLCoef_G(1:nI,1:nJ))
+       if(present(DtOut))DtOut = Dt
+    end if
+    ! Complete calculation of the matrix of the SLE to solve
+    ! Purely implicit scheme. For Crank-Nicolon scheme Dt should be
+    ! divided by two and a half of the first order explicit monotone
+    ! flux should be added to the source similarly to how this was done
+    ! within the framework of the explicit scheme (see explicit4):
+    ! Source_C = -CFLCoef_G(1:nI,1:nJ)*&
+    !     DeltaMinusF_G(1:nI,1:nJ)
+    U_C = Dt*U_C
+    L_C = Dt*L_C
+    Uu_C = Dt*Uu_C
+    Ll_C = Dt*Ll_C
+    M_C = Dt*M_C + Volume_G(1:nI,1:nJ)
+    ! Second-order correction
+    SumFlux2_G = 0.0
+    do j=1,nJ; do i=1,nI
+       ! Limit and store fuxes across delta plus H faces from the given cell
+       if(SumDeltaHPlus_G(i,j)==0.0)CYCLE
+       ! Apply beta-limiter to each side
+       nFlux = 0
+       do iDim = 1, nDim
+          iSide = 2*iDim
+          ! i/i+1 and j/j+1 faces
+          if(DeltaH_DG(iDim,i,j) > 0.0)then
+             nFlux = nFlux + 1; iSide_S(nFlux) = iSide
+             Buff_S(nFlux) = DeltaH_DG(iDim,i,j)*&
+                  limiter(iSide,i,j)
+          end if
+          iSide = 2*iDim -1
+          iD_D = [i,j]; iD_D(iDim) = iD_D(iDim) - 1
+          if(DeltaH_DG(iDim,iD_D(1),iD_D(2)) < 0.0 )then
+             nFlux = nFlux + 1; iSide_S(nFlux) = iSide
+             Buff_S(nFlux) = &
+                  (-DeltaH_DG(iDim,iD_D(1),iD_D(2)))*&
+                  limiter(iSide,i,j)
+          end if
+       end do
+       ! Apply gamma-limiter in a given cell
+       SumFluxPlus = sum(Buff_S(1:nFlux))
+       ! The value of limited \deta^+H/2 to be achieved with gamma-limiter
+       DeltaPlusFLimited = minmod(SumFluxPlus/SumDeltaHPlus_G(i,j),&
+            DeltaMinusF_G(i,j))
+       ! This is the major flux, having the same sign as SumFluxPlus
+       SumMajor =  sum(Buff_S(1:nFlux),&
+            MASK= SumFluxPlus*Buff_S(1:nFlux) > 0.0)
+       if(abs(SumMajor) > 0.0)then
+          Gamma = 1.0 + (DeltaPlusFLimited*SumDeltaHPlus_G(i,j) - &
+               SumFluxPlus)/SumMajor
+          where(SumFluxPlus*Buff_S(1:nFlux) > 0.0)&
+               Buff_S(1:nFlux) = Buff_S(1:nFlux)*Gamma
+       end if
+       ! Put the calculated second order flux to one of the neighboring cell
+       do iFlux = 1, nFlux
+          iD_D = [i,j] + iShift_DS(:,iSide_S(iFlux))
+          SumFlux2_G(iD_D(1),iD_D(2)) =      &
+               SumFlux2_G(iD_D(1),iD_D(2)) + &
+               Buff_S(iFlux)
+       end do
+       ! ... and, the negative of this to the given cell
+       SumFlux2_G(i,j) = SumFlux2_G(i,j) - &
+            DeltaPlusFLimited*SumDeltaHPlus_G(i,j)
+    end do; end do
+    ! Second order fluxes across the boundary
+    do j = 1,nJ
+       if(DeltaH_DG(1,0,j) > 0.0)then
+          SumFlux2_G(1,j) = SumFlux2_G(1,j) + &
+               DeltaH_DG(1,0,j)*&
+               minmod(limiter(2,0,j), DeltaMinusF_G(0,j))
+       end if
+       if(DeltaH_DG(1,nI,j) < 0.0 )then
+          SumFlux2_G(nI,j)   = SumFlux2_G(nI,j) - &
+               DeltaH_DG(1,nI,j)*&
+               minmod(limiter(1,nI+1,j), DeltaMinusF_G(nI+1,j))
+       end if
+    end do
+    do i=1,nI
+       if(DeltaH_DG(2,i,0) > 0.0)then
+          SumFlux2_G(i,1) = SumFlux2_G(i,1) + &
+               DeltaH_DG(2,i,0)*minmod( &
+               limiter(4,i,0), DeltaMinusF_G(i,0))
+       end if
+       if(DeltaH_DG(2,i,nJ) < 0.0)then
+          SumFlux2_G(i,nJ)   = SumFlux2_G(i,nJ) - &
+               DeltaH_DG(2,i,nJ)*minmod(  &
+               limiter(3,i,nJ+1), DeltaMinusF_G(i,nJ+1))
+       end if
+    end do
+    ! Rhs of the SLE:
+    Source_C = Volume_G(1:nI,1:nJ)*Vdf_G(1:nI,1:nJ) &
+         + Dt*SumFlux2_G(1:nI,1:nJ)
+    ! Account for the contributions from the states behind boundaries
+    do j = 1, nJ
+       Source_C(1,j) = Source_C(1,j) - L_C(1,j)*Vdf_G(0,j)
+       L_C(1,j) = 0.0
+       Source_C(nI,j) = Source_C(nI,j) - U_C(nI,j)*Vdf_G(nI+1,j)
+       U_C(nI,j) = 0.0
+    end do
+    do i = 1, nI
+       Source_C(i,1) = Source_C(i,1) - Ll_C(i,1)*Vdf_G(i,0)
+       Ll_C(i,1) = 0.0
+       Source_C(i,nJ) = Source_C(i,nJ) - Uu_C(i,nJ)*Vdf_G(i,nJ+1)
+       Uu_C(i,nJ) = 0.0
+    end do
+    if(present(IsTetraDiagNoUu))then
+       ! If all elements in Uu_C are zeroes the SLE system with tetradiagonal
+       ! matrix can be resolved explicitly by consequently applying the Thomas
+       ! algorithm row-by-row, starting from the bottom to the top
+       do j = 1, nJ
+          call thomas_algorithm(n=nI,&
+               L_I=L_C(:,j), &
+               M_I=M_C(:,j), &
+               U_I=U_C(:,j), &
+               R_I=Source_C(:,j) - Ll_C(:,j)*VDF_G(1:nI,j-1),&
+               W_I=VDF_G(1:nI,j))
+       end do
+    elseif(IsTetraDiagNoLl)then
+       ! If all elements in Ll_C are zeroes the SLE system with tetradiagonal
+       ! matrix can be resolved explicitly by consequently applying the Thomas
+       ! algorithm row-by-row, starting from the top to the bottom
+       do j = nJ, 1, -1
+          call thomas_algorithm(n=nI,&
+               L_I=L_C(:,j), &
+               M_I=M_C(:,j), &
+               U_I=U_C(:,j), &
+               R_I=Source_C(:,j) - Uu_C(:,j)*VDF_G(1:nI,j+1),&
+               W_I=VDF_G(1:nI,j))
+       end do
+    elseif(minval(Ll_C) < minval(Uu_C))then
+       ! Ll diagonal dominates over Uu, iterative Gauss-Seidel method works
+       ! by consequently applying the Thomas algorithm row-by-row, starting
+       ! from the bottom to the top
+       do iIter = 1, nIter
+          Error = 0.0
+          do j = 1, nJ
+             VdfOld_I = Vdf_G(1:nI,j)
+             ! In the previous cycle flux VdfOld*Uu_C(:,j-1) contributed
+             ! to the state j-1
+             call thomas_algorithm(n=nI,&
+                  L_I=L_C(:,j), &
+                  M_I=M_C(:,j), &
+                  U_I=U_C(:,j), &
+                  R_I=Source_C(:,j) - Ll_C(:,j)*Vdf_G(1:nI,j-1) &
+                  - Uu_C(:,j)*Vdf_G(1:nI,j+1),&
+                  W_I=Vdf_G(1:nI,j))
+             ! In the current cycle flux Vdf*Uu_C(:,j-1) left for cell j-1
+             ! Therefore, the defect of fluxes characterizes an error
+             if(j>1)Error = max(Error, maxval(abs(        &
+                  (VdfOld_I - Vdf_G(1:nI,j))*Uu_C(:,j-1))/&
+                  ( Vdf_G(1:nI,j)*M_C(1:nI,j) )))       
+          end do
+          if(Error <= cConv)EXIT
+       end do
+    else
+       ! Uu diagonal dominates over Ll, iterative Gauss-Seidel method works
+       ! by consequently applying the Thomas algorithm row-by-row, starting
+       ! from the top to the bottom
+       do iIter = 1, nIter
+          Error = 0.0
+          do j = nJ, 1, -1
+             VdfOld_I = Vdf_G(1:nI,j)
+             ! In the previous cycle flux VdfOld*Ll_C(:,j+1) contributed
+             ! to the state j+1
+             call thomas_algorithm(n=nI,&
+                  L_I=L_C(:,j), &
+                  M_I=M_C(:,j), &
+                  U_I=U_C(:,j), &
+                  R_I=Source_C(:,j) - Ll_C(:,j)*VDF_G(1:nI,j-1) &
+                  - Uu_C(:,j)*VDF_G(1:nI,j+1),&
+                  W_I=VDF_G(1:nI,j))
+             ! In the current cycle flux Vdf*Ll_C(:,j+1) left for cell j+1
+             ! Therefore, the defect of fluxes characterizes an error
+             if(j<nJ)Error = max(Error, maxval(abs(        &
+                  (VdfOld_I - Vdf_G(1:nI,j))*Ll_C(:,j+1))/&
+                  ( Vdf_G(1:nI,j)*M_C(1:nI,j) ) ))       
+          end do
+          if(Error <= cConv)EXIT
+       end do
+    end if
+  contains
+    !==========================================================================
+    real function limiter(iSide,i,j)
+      integer, intent(in):: iSide,i,j
+      real, parameter :: HalfBeta = 1.0
+      !  \delta^-f in the neighboring cells
+      real :: DeltaF                ! f_j -f
+      real :: UpwindDeltaF          ! f - f_j^\prime at the opposite face
+      real :: SignDeltaF, AbsDeltaF, AbsDeltaFLimited
+      !------------------------------------------------------------------------
+      iD_D = [i,j] + iShift_DS(:,iSide)
+      iU_D = [i,j] - iShift_DS(:,iSide)
+      DeltaF = VDF_G(iD_D(1),iD_D(2))  - VDF_G(i,j)      ! f_j -f
+      UpwindDeltaF = VDF_G(i,j) - VDF_G(iU_D(1),iU_D(2)) ! f - f_j^opp
+      if(abs(DeltaF) <=cTol)then
+         limiter = 0.0
+      elseif(.not.UseLimiter)then
+         limiter = 0.50*DeltaF
+      else
+         SignDeltaF = sign(1.0, DeltaF); AbsDeltaF = abs(DeltaF)
+         if(UseKoren)then
+            AbsDeltaFLimited = max(2*AbsDeltaF + &
+                 SignDeltaF*UpwindDeltaF, 0.0)/6.0
+         else
+            AbsDeltaFLimited = 0.5*max(AbsDeltaF, SignDeltaF*UpwindDeltaF)
+         end if
+         ! Eqs. (48) or (49) from Sokolov+2022
+         limiter = SignDeltaF*min(AbsDeltaF*HalfBeta, AbsDeltaFLimited)
+      end if
+    end function limiter
+    !==========================================================================
+    subroutine thomas_algorithm(n, L_I, M_I, U_I, R_I, W_I)
+      ! Solve tri-diagonal system of equations:
+      !  ||m_1 u_1  0....        || ||w_1|| ||r_1||
+      !  ||l_2 m_2 u_2...        || ||w_2|| ||r_2||
+      !  || 0  l_3 m_3 u_3       ||.||w_3||=||r_3||
+      !  ||...                   || ||...|| ||...||
+      !  ||.............0 l_n m_n|| ||w_n|| ||r_n||
+      ! From: Numerical Recipes, Chapter 2.6, p.40.
+      
+      ! input parameters
+      integer,            intent(in):: n
+      real, dimension(n), intent(in):: L_I, M_I ,U_I ,R_I
+      ! Output parameters
+      real, intent(out):: W_I(n)
+      ! Misc
+      integer:: j
+      real:: Aux, Aux_I(2:n)
+      !------------------------------------------------------------------------
+      if (M_I(1)==0.0) then
+         write(*,*)' Error in tridiag: M_I(1)=0'
+         stop
+      end if
+      Aux = M_I(1)
+      W_I(1) = R_I(1)/Aux
+      do j=2,n
+         Aux_I(j) = U_I(j-1)/Aux
+         Aux = M_I(j)-L_I(j)*Aux_I(j)
+         if (Aux == 0.0) then
+            write(*,*)'M_I(j), L_I(j), Aux_I(j) = ',&
+                 M_I(j),L_I(j),Aux_I(j)
+            write(*,*)'  For j=',j
+            write(*,*)'Tridiag failed'
+            stop
+         end if
+         W_I(j) = (R_I(j)-L_I(j)*W_I(j-1))/Aux
+      end do
+      do j=n-1,1,-1
+         W_I(j) = W_I(j)-Aux_I(j+1)*W_I(j+1)
+      end do
+    end subroutine thomas_algorithm
+    !==========================================================================
+  end subroutine implicit2
   !============================================================================
 end module ModPoissonBracket
 !==============================================================================
