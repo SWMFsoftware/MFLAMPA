@@ -825,16 +825,16 @@ contains
     !                 here-> |                              |<- here
     !                        0--------->--------------------1x
     !                        Ll_C(i,j) = dt*delta^-H /here
-    ! Main diagonal
-    real ::  M_C(1:nI, 1:nJ)
+    ! Main diagonal (the ghostcell values herewith are not used
+    real ::  M_G(0:nI+1, 0:nJ+1)
     ! Subdiagonal (contribution from the left neighboring cell)
-    real ::  L_C(1:nI, 1:nJ)
+    real ::  L_G(0:nI+1, 0:nJ+1)
     ! Superdiagonal (contribution from the right neighboring cell)
-    real ::  U_C(1:nI, 1:nJ)
+    real ::  U_G(0:nI+1, 0:nJ+1)
     ! Subsubdiagonal (contribution from the lower neighboring cell)
-    real ::  Ll_C(1:nI, 1:nJ)
+    real ::  Ll_G(0:nI+1, 0:nJ+1)
     ! Supersuperdiagonal (contribution from the upper neighboring cell)
-    real ::  Uu_C(1:nI, 1:nJ)
+    real ::  Uu_G(0:nI+1, 0:nJ+1)
     ! The RHS of the SLE:
     real ::  Source_C(1:nI, 1:nJ)
     ! If all elements in Uu_C are zeroes the SLE system with tetradiagonal
@@ -901,7 +901,7 @@ contains
     DeltaMinusF_G = 0.0
     SumDeltaHPlus_G = 0.0
     SumDeltaHMinus_G = 0.0
-    M_C = 0.0; L_C = 0.0; U_C = 0.0; Ll_C = 0.0; Uu_C = 0.0
+    M_G = 0.0; L_G = 0.0; U_G = 0.0; Ll_G = 0.0; Uu_G = 0.0
     ! Calculate DeltaMinusF and SumDeltaHPlus_G
     do j=0,nJ+1
        do i=0,nI+1
@@ -914,9 +914,8 @@ contains
                SumDeltaHMinus_G(i,j) + DeltaMinusH
           DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
                DeltaMinusH*(VDF_G(i+1,j) - VDF)
-          U_C(i,j) = DeltaMinusH
-          if(present(Diffusion_FX)) U_C(i,j) = U_C(i,j) - Diffusion_FX(i,j)
-          M_C(i,j) = M_C(i,j) - U_C(i,j)
+          U_G(i,j) = DeltaMinusH
+          M_G(i,j) = M_G(i,j) - U_G(i,j)
           SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
                max(0.0, DeltaH_DG(1,i,j))
           ! Left face
@@ -924,9 +923,8 @@ contains
           SumDeltaHMinus_G(i,j) = SumDeltaHMinus_G(i,j) + DeltaMinusH
           DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
                DeltaMinusH*(VDF_G(i-1,j) - VDF)
-          L_C(i,j) = DeltaMinusH
-          if(present(Diffusion_FX)) L_C(i,j) = L_C(i,j) - Diffusion_FX(i-1,j)
-          M_C(i,j) = M_C(i,j) - L_C(i,j)
+          L_G(i,j) = DeltaMinusH
+          M_G(i,j) = M_G(i,j) - L_G(i,j)
           SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
                max(0.0,-DeltaH_DG(1,i-1,j))
           ! Top face
@@ -935,9 +933,8 @@ contains
                SumDeltaHMinus_G(i,j) + DeltaMinusH
           DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
                DeltaMinusH*(VDF_G(i,j+1) - VDF)
-          Uu_C(i,j) = DeltaMinusH
-          if(present(Diffusion_FY))Uu_C(i,j) = Uu_C(i,j) - Diffusion_FY(i,j)
-          M_C(i,j) = M_C(i,j) - Uu_C(i,j)
+          Uu_G(i,j) = DeltaMinusH
+          M_G(i,j) = M_G(i,j) - Uu_G(i,j)
           SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
                max(0.0, DeltaH_DG(2,i,j))
           ! Bottom face
@@ -945,13 +942,27 @@ contains
           SumDeltaHMinus_G(i,j) = SumDeltaHMinus_G(i,j) + DeltaMinusH
           DeltaMinusF_G(i,j) = DeltaMinusF_G(i,j) + &
                DeltaMinusH*(VDF_G(i,j-1) - VDF)
-          Ll_C(i,j) = DeltaMinusH
-          if(present(Diffusion_FY))Ll_C(i,j) = Ll_C(i,j) - Diffusion_FY(i,j-1)
-          M_C(i,j) = M_C(i,j) - Ll_C(i,j)
+          Ll_G(i,j) = DeltaMinusH
+          M_G(i,j) = M_G(i,j) - Ll_G(i,j)
           SumDeltaHPlus_G(i,j) = SumDeltaHPlus_G(i,j) + &
                max(0.0,-DeltaH_DG(1,i,j-1))
        end do
     end do
+    ! Add diffusion if needed
+    if(present(Diffusion_FX)) then
+       do j = 1, nJ; do i=1, nI
+          L_G(i,j) = L_G(i,j) - Diffusion_FX(i-1,j)
+          U_G(i,j) = U_G(i,j) - Diffusion_FX(i,j)
+          M_G(i,j) = M_G(i,j) + Diffusion_FX(i-1,j) + Diffusion_FX(i,j)
+       end do; end do
+    end if
+    if(present(Diffusion_FY)) then
+       do j = 1, nJ; do i=1, nI
+          Ll_G(i,j) = Ll_G(i,j) - Diffusion_FY(i,j-1)
+          Uu_G(i,j) = Uu_G(i,j) - Diffusion_FY(i,j)
+          M_G(i,j) = M_G(i,j) + Diffusion_FY(i,j-1) + Diffusion_FY(i,j)
+       end do; end do
+    end if
     ! Get local CFLs
     where(SumDeltaHMinus_G == 0.0)
        DeltaMinusF_G = 0.0
@@ -978,11 +989,11 @@ contains
     ! within the framework of the explicit scheme (see explicit4):
     ! Source_C = -CFLCoef_G(1:nI,1:nJ)*&
     !     DeltaMinusF_G(1:nI,1:nJ)
-    U_C = Dt*U_C
-    L_C = Dt*L_C
-    Uu_C = Dt*Uu_C
-    Ll_C = Dt*Ll_C
-    M_C = Dt*M_C + Volume_G(1:nI,1:nJ)
+    U_G = Dt*U_G
+    L_G = Dt*L_G
+    Uu_G = Dt*Uu_G
+    Ll_G = Dt*Ll_G
+    M_G(1:nI,1:nJ) = Dt*M_G(1:nI,1:nJ) + Volume_G(1:nI,1:nJ)
     ! Second-order correction
     SumFlux2_G = 0.0
     do j=1,nJ; do i=1,nI
@@ -1062,16 +1073,16 @@ contains
          + Dt*SumFlux2_G(1:nI,1:nJ)
     ! Account for the contributions from the states behind boundaries
     do j = 1, nJ
-       Source_C(1,j) = Source_C(1,j) - L_C(1,j)*Vdf_G(0,j)
-       L_C(1,j) = 0.0
-       Source_C(nI,j) = Source_C(nI,j) - U_C(nI,j)*Vdf_G(nI+1,j)
-       U_C(nI,j) = 0.0
+       Source_C(1,j) = Source_C(1,j) - L_G(1,j)*Vdf_G(0,j)
+       L_G(:1,j) = 0.0
+       Source_C(nI,j) = Source_C(nI,j) - U_G(nI,j)*Vdf_G(nI+1,j)
+       U_G(nI:,j) = 0.0
     end do
     do i = 1, nI
-       Source_C(i,1) = Source_C(i,1) - Ll_C(i,1)*Vdf_G(i,0)
-       Ll_C(i,1) = 0.0
-       Source_C(i,nJ) = Source_C(i,nJ) - Uu_C(i,nJ)*Vdf_G(i,nJ+1)
-       Uu_C(i,nJ) = 0.0
+       Source_C(i,1) = Source_C(i,1) - Ll_G(i,1)*Vdf_G(i,0)
+       Ll_G(i,:1) = 0.0
+       Source_C(i,nJ) = Source_C(i,nJ) - Uu_G(i,nJ)*Vdf_G(i,nJ+1)
+       Uu_G(i,nJ:) = 0.0
     end do
     if(present(IsTetraDiagNoUu))then
        ! If all elements in Uu_C are zeroes the SLE system with tetradiagonal
@@ -1079,10 +1090,10 @@ contains
        ! algorithm row-by-row, starting from the bottom to the top
        do j = 1, nJ
           call thomas_algorithm(n=nI,&
-               L_I=L_C(:,j), &
-               M_I=M_C(:,j), &
-               U_I=U_C(:,j), &
-               R_I=Source_C(:,j) - Ll_C(:,j)*VDF_G(1:nI,j-1),&
+               L_I=L_G(1:nI,j), &
+               M_I=M_G(1:nI,j), &
+               U_I=U_G(1:nI,j), &
+               R_I=Source_C(:,j) - Ll_G(1:nI,j)*VDF_G(1:nI,j-1),&
                W_I=VDF_G(1:nI,j))
        end do
     elseif(IsTetraDiagNoLl)then
@@ -1091,13 +1102,13 @@ contains
        ! algorithm row-by-row, starting from the top to the bottom
        do j = nJ, 1, -1
           call thomas_algorithm(n=nI,&
-               L_I=L_C(:,j), &
-               M_I=M_C(:,j), &
-               U_I=U_C(:,j), &
-               R_I=Source_C(:,j) - Uu_C(:,j)*VDF_G(1:nI,j+1),&
+               L_I=L_G(1:nI,j), &
+               M_I=M_G(1:nI,j), &
+               U_I=U_G(1:nI,j), &
+               R_I=Source_C(:,j) - Uu_G(1:nI,j)*VDF_G(1:nI,j+1),&
                W_I=VDF_G(1:nI,j))
        end do
-    elseif(minval(Ll_C) < minval(Uu_C))then
+    elseif(minval(Ll_G(1:nI,1:nJ)) < minval(Uu_G(1:nI,1:nJ)))then
        ! Ll diagonal dominates over Uu, iterative Gauss-Seidel method works
        ! by consequently applying the Thomas algorithm row-by-row, starting
        ! from the bottom to the top
@@ -1108,17 +1119,17 @@ contains
              ! In the previous cycle flux VdfOld*Uu_C(:,j-1) contributed
              ! to the state j-1
              call thomas_algorithm(n=nI,&
-                  L_I=L_C(:,j), &
-                  M_I=M_C(:,j), &
-                  U_I=U_C(:,j), &
-                  R_I=Source_C(:,j) - Ll_C(:,j)*Vdf_G(1:nI,j-1) &
-                  - Uu_C(:,j)*Vdf_G(1:nI,j+1),&
+                  L_I=L_G(1:nI,j), &
+                  M_I=M_G(1:nI,j), &
+                  U_I=U_G(1:nI,j), &
+                  R_I=Source_C(:,j) - Ll_G(1:nI,j)*Vdf_G(1:nI,j-1) &
+                  - Uu_G(1:nI,j)*Vdf_G(1:nI,j+1),&
                   W_I=Vdf_G(1:nI,j))
              ! In the current cycle flux Vdf*Uu_C(:,j-1) left for cell j-1
              ! Therefore, the defect of fluxes characterizes an error
              if(j>1)Error = max(Error, maxval(abs(        &
-                  (VdfOld_I - Vdf_G(1:nI,j))*Uu_C(:,j-1))/&
-                  ( Vdf_G(1:nI,j)*M_C(1:nI,j) )))       
+                  (VdfOld_I - Vdf_G(1:nI,j))*Uu_G(1:nI,j-1))/&
+                  ( Vdf_G(1:nI,j)*M_G(1:nI,j) )))
           end do
           if(Error <= cConv)EXIT
        end do
@@ -1133,17 +1144,17 @@ contains
              ! In the previous cycle flux VdfOld*Ll_C(:,j+1) contributed
              ! to the state j+1
              call thomas_algorithm(n=nI,&
-                  L_I=L_C(:,j), &
-                  M_I=M_C(:,j), &
-                  U_I=U_C(:,j), &
-                  R_I=Source_C(:,j) - Ll_C(:,j)*VDF_G(1:nI,j-1) &
-                  - Uu_C(:,j)*VDF_G(1:nI,j+1),&
+                  L_I=L_G(1:nI,j), &
+                  M_I=M_G(1:nI,j), &
+                  U_I=U_G(1:nI,j), &
+                  R_I=Source_C(:,j) - Ll_G(1:nI,j)*VDF_G(1:nI,j-1) &
+                  - Uu_G(1:nI,j)*VDF_G(1:nI,j+1),&
                   W_I=VDF_G(1:nI,j))
              ! In the current cycle flux Vdf*Ll_C(:,j+1) left for cell j+1
              ! Therefore, the defect of fluxes characterizes an error
              if(j<nJ)Error = max(Error, maxval(abs(        &
-                  (VdfOld_I - Vdf_G(1:nI,j))*Ll_C(:,j+1))/&
-                  ( Vdf_G(1:nI,j)*M_C(1:nI,j) ) ))       
+                  (VdfOld_I - Vdf_G(1:nI,j))*Ll_G(1:nI,j+1))/&
+                  ( Vdf_G(1:nI,j)*M_G(1:nI,j) ) ))
           end do
           if(Error <= cConv)EXIT
        end do
@@ -1187,7 +1198,7 @@ contains
       !  ||...                   || ||...|| ||...||
       !  ||.............0 l_n m_n|| ||w_n|| ||r_n||
       ! From: Numerical Recipes, Chapter 2.6, p.40.
-      
+
       ! input parameters
       integer,            intent(in):: n
       real, dimension(n), intent(in):: L_I, M_I ,U_I ,R_I
