@@ -114,8 +114,13 @@ test_poisson_bracket_exe:
 	@(cd ${EMPIRICALCRDIR}; ${MAKE} LIB)
 	@(cd src; ${MAKE} LIB)
 	@make test_poisson_bracket.o
+	rm -rf Tmp_; mkdir Tmp_
+	cp src/ModPoissonBracket.o Tmp_/.
+	cd Tmp_; \
+		ar -x ${LIBDIR}/libSHARE.a
 	${LINK.f90} -o test_poisson.exe test_poisson_bracket.o \
-		-L${LIBDIR} -lSHARE ${Lflag}
+		Tmp_/*.o ${Lflag}
+	rm -rf Tmp_
 
 test_poisson_bracket:
 	rm -f test_poisson*.out test_dsa_*.out
