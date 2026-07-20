@@ -281,7 +281,6 @@ contains
     logical :: IsTimeAccurate		! should be straightforward
     character(len=100) :: NameTarget	! target identifier passed to the file writer
 
-         'SP_ModConnectivity::write_connectivity_satellite_files'
     character(len=*), parameter:: NameSub = 'write_connectivity_satellite_files'
     !--------------------------------------------------------------------------
     if(.not.DoSaveConnectivity) RETURN
