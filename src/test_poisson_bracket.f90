@@ -200,7 +200,7 @@ contains
 end module ModDiffusion
 !==============================================================================
 module ModTestPoissonBracket
-  use ModPoissonBracket, ONLY: explicit
+  use ModPoissonBracket, ONLY: explicit, implicit2
   use ModUtilities, ONLY: CON_stop
   use ModNumConst, ONLY: cTwoPi
   use ModPlotFile, ONLY: save_plot_file
@@ -924,6 +924,120 @@ contains
     end subroutine update_coords
     !==========================================================================
   end subroutine test_dsa_sa_mhd
+  !============================================================================
+  subroutine test_dsa_impl
+    real,    parameter :: pMax = 100, pMin = 1
+    integer,    parameter :: nStep = 1000
+    real ::  MomentumRatio, MomentumMin, MomentumMax
+    real ::  VDF_G(-1:nX+2, -1:nP+2), Dt_C(nX,nP)
+    real ::  Hamiltonian_N(-1:nX+1, -1:nP+1)
+    real ::  Volume_G(0:nX+1, 0:nP+1)
+    real ::  VolumeX_I(-1:nX+2)
+    real ::  VolumeP_I(0:nP+1)
+    real ::  DOuter_I(nX) = 1.0, dInner_I(0:nX+1) = 20.0
+    real ::  Diffusion_FX(0:nX,1:nP)
+    real ::  LogMomentum_I(0:nP+1)     ! Cell centered, for plots
+    real ::  Momentum3_I(-1:nP+1)
+    real ::  Coord_I(-1:nX+2)  ! Time-dependent coordinate of a mesh
+    real ::  Dist_I(-1:nX+1)   ! Distance from mesh i to mesh i+1
+
+    ! Loop variables
+    integer :: iX, iP, iStep
+    !--------------------------------------------------------------------------
+
+    ! Logarithmic grid in momentum. pMin is the value at the left face
+    ! of the first physical cell, pMax is the value at the right face
+    ! off the last cell. The momentum ratio at the faces of each cell is:
+    MomentumRatio   = exp(log(pMax/pMin)/nP)
+    ! The momentum at the left fface of 0th ghost cell is:
+    MomentumMax     = pMin/MomentumRatio
+    ! Calculate the generalized variable p^3/3 at each face, starting from
+    ! the left fface of 0th cell
+    Momentum3_I(-1) = MomentumMax**3/3
+    ! For cells from 0 to nP+1 calculate face values and volume factor:
+    do iP = 0, nP + 1
+       MomentumMin = MomentumMax
+       MomentumMax = MomentumMin*MomentumRatio
+       Momentum3_I(iP) = MomentumMax**3/3
+       VolumeP_I(iP)   = Momentum3_I(iP) - Momentum3_I(iP-1)
+       ! Only for visualization log10 of the cell centered momentum
+       LogMomentum_I(iP) = 0.50*log10(MomentumMin*MomentumMax)
+    end do
+    ! Initial condition for the distribution function
+    VDF_G(:,:) = 1.0e-8
+    VDF_G(:,1) = 1/VolumeP_I(1)
+    call update_coords(600.0)
+    do iStep = 1, nStep
+       call implicit2(nX, nP, VDF_G, Volume_G, &
+            Hamiltonian12_N=Hamiltonian_N,  &
+            Diffusion_FX=Diffusion_FX, CFLIn=98.0, &
+            IsTetradiagNoUu=.true.)
+       VDF_G(1:nX,-1:0 ) = 1.0e-8
+       VDF_G(1:nX,nP+1:nP+2) = 1.0e-8
+       VDF_G( 0,      :) = VDF_G(1,       :)
+       VDF_G(-1,      :) = VDF_G(1,       :)
+       VDF_G(nX+1:nX+2,1) = 1/VolumeP_I(1)
+    end do
+    call save_plot_file(NameFile='test_dsa_impl.out', &
+         TypeFileIn='ascii', nStepIn = nStep, &
+         NameVarIn='LogMomentum VDF'  ,                  &
+         CoordMinIn_D=[ LogMomentum_I(1 ) ],             &
+         CoordMaxIn_D=[ LogMomentum_I(nP) ],             &
+         StringFormatIn = '(2F16.9)',                    &
+         Coord1In_I = LogMomentum_I(1:nP),               &
+         VarIn_I = alog10(VDF_G(500,1:nP)))
+  contains
+    !==========================================================================
+    subroutine update_coords(Time)
+
+      real, intent(in):: Time
+
+      ! Effective width of the shock wave, in cell size
+      integer, parameter:: nWidth = 1
+
+      ! terms in the functions, describing the
+      ! lagrangian point motion
+      real, parameter:: cQuad = 0.375/nWidth, cConst = 0.375*nWidth
+      ! Loop variables
+      integer :: iX, iP
+      real    :: CoordLagr, DiffusionX_I(0:nX)
+      ! Shock wave with the copmtression ratio of 4, with width ~1
+      !------------------------------------------------------------------------
+      ! Coord_I is the cell-centered coordinate
+      do iX = -1, nX +2
+         CoordLagr = iX - 0.50 -Time
+         if(CoordLagr>=0.0)then
+            Coord_I(iX) = CoordLagr + Time
+         elseif(CoordLagr>=-real(nWidth))then
+            Coord_I(iX) = CoordLagr + Time + cQuad*CoordLagr**2
+         else
+            Coord_I(iX) = 0.250*CoordLagr -cConst + Time
+         end if
+      end do
+      ! Dist is the distance to the next cell center
+      Dist_I(-1:nX+1) = Coord_I(0:nX+2) - Coord_I(-1:nX+1)
+      VolumeX_I(0:nX+1) = 0.50*(Dist_I(-1:nX) + Dist_I(0:nX+1))
+      VolumeX_I(-1)  = Dist_I(-1); VolumeX_I(nX+2) =  Dist_I(nX+1)
+      do iP = 0, nP+1
+         Volume_G(0:nX+1,iP) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
+      end do
+      do iP = -1, nP+1
+         Hamiltonian_N(-1:nX+1, iP)= -0.50*Momentum3_I(iP)*&
+              (VolumeX_I(-1:nX+1) + VolumeX_I(0:nX+2))
+      end do
+      ! Get diffusion coefficients
+      ! Flot (no-flux) BC at the left boundary:
+      DiffusionX_I(0) = 0.0
+      do iX = 1, nX
+         DiffusionX_I(iX) = &
+              DOuter_I(iX)*0.50*(DInner_I(iX) + DInner_I(iX+1))/Dist_I(iX)
+      end do
+      do iP = 1, nP
+         Diffusion_FX(:,iP) =  VolumeP_I(iP)*DiffusionX_I
+      end do
+    end subroutine update_coords
+    !==========================================================================
+  end subroutine test_dsa_impl
   !============================================================================
 end module ModTestPoissonBracket
 !==============================================================================
