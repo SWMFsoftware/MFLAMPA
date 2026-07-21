@@ -964,8 +964,7 @@ contains
        LogMomentum_I(iP) = 0.50*log10(MomentumMin*MomentumMax)
     end do
     ! Initial condition for the distribution function
-    VDF_G(:,:) = 1.0e-8
-    VDF_G(:,1) = 1/VolumeP_I(1)
+    VDF_G = VDFOld_G
     call update_coords(600.0)
     do iStep = 1, nStep
        call implicit2(nX, nP, VDF_G, Volume_G, &
@@ -2233,7 +2232,7 @@ end module ModStochastic
 program test_program
   use ModTestPoissonBracket, ONLY: test_poisson_bracket, test_dsa_sa_mhd, &
        test_dsa_poisson, test_energy_conservation, test_in_action_angle,  &
-       test_poisson_2d, test_poisson_2d_smooth
+       test_poisson_2d, test_poisson_2d_smooth, test_dsa_impl
   use ModNumConst, ONLY: cTwoPi
   use ModHillVortex, ONLY: test_hill_vortex
   use ModStochastic, ONLY: test_stochastic
@@ -2252,6 +2251,7 @@ program test_program
   ! call test_energy_conservation(cTwoPi)
   ! call test_in_action_angle(cTwoPi)
   call test_dsa_sa_mhd                    ! for Fig 5.Right Panel
+  call test_dsa_impl
 
   ! Tests of focused transport equation:
   ! Advection without any scattering
