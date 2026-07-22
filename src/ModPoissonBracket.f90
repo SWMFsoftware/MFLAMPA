@@ -1096,7 +1096,7 @@ contains
                R_I=Source_C(:,j) - Ll_G(1:nI,j)*VDF_G(1:nI,j-1),&
                W_I=VDF_G(1:nI,j))
        end do
-    elseif(IsTetraDiagNoLl)then
+    elseif(present(IsTetraDiagNoLl))then
        ! If all elements in Ll_C are zeroes the SLE system with tetradiagonal
        ! matrix can be resolved explicitly by consequently applying the Thomas
        ! algorithm row-by-row, starting from the top to the bottom
@@ -1131,7 +1131,10 @@ contains
                   (VdfOld_I - Vdf_G(1:nI,j))*Uu_G(1:nI,j-1))/&
                   ( Vdf_G(1:nI,j)*M_G(1:nI,j) )))
           end do
-          if(Error <= cConv)EXIT
+          if(Error <= cConv)then
+             if(present(ErrorOut))ErrorOut = Error
+             EXIT
+          end if
        end do
     else
        ! Uu diagonal dominates over Ll, iterative Gauss-Seidel method works
@@ -1156,6 +1159,10 @@ contains
                   (VdfOld_I - Vdf_G(1:nI,j))*Ll_G(1:nI,j+1))/&
                   ( Vdf_G(1:nI,j)*M_G(1:nI,j) ) ))
           end do
+          if(Error <= cConv)then
+             if(present(ErrorOut))ErrorOut = Error
+             EXIT
+          end if
           if(Error <= cConv)EXIT
        end do
     end if
