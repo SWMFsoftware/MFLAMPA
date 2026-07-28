@@ -934,7 +934,7 @@ contains
     real ::  Volume_G(0:nX+1, 0:nP+1)
     real ::  VolumeX_I(-1:nX+2)
     real ::  VolumeP_I(0:nP+1)
-    real ::  DOuter_I(nX) = 1.0, dInner_I(0:nX+1) = 20.0
+    real ::  DOuter_I(nX) = 1.0, dInner_I(0:nX+1) = 20.0, Error
     real ::  Diffusion_FX(0:nX,1:nP)
     real ::  LogMomentum_I(0:nP+1)     ! Cell centered, for plots
     real ::  Momentum3_I(-1:nP+1)
@@ -970,7 +970,9 @@ contains
        call implicit2(nX, nP, VDF_G, Volume_G, &
             Hamiltonian12_N=Hamiltonian_N,  &
             Diffusion_FX=Diffusion_FX, CFLIn=98.0, &
-            IsTetradiagNoUu=.true.)
+            ErrorOut=Error)
+       write(*,*)'iStep, Error=', iStep, Error
+       ! IsTetradiagNoUu=.true.)
        VDF_G(1:nX,-1:0 ) = 1.0e-8
        VDF_G(1:nX,nP+1:nP+2) = 1.0e-8
        VDF_G( 0,      :) = VDF_G(1,       :)
