@@ -1021,13 +1021,15 @@ contains
        if(DoSaveConnectivity) call write_connectivity_satellite_files(IsInitialOutput)
        RETURN
     end if
+    ! Fluxes are needed by every output, the initial one included: after a
+    ! restart the initial output rewrites the record at the restart time,
+    ! which would otherwise be written with the Flux_VIB fill value.
+    call get_integral_flux
     ! check whether this is a call for initial output
     if(IsInitialOutput)then
        if(nSat > 0) call write_satellite_file(.true.)
        if(DoSaveConnectivity) call write_connectivity_satellite_files(.true.)
        if(.not.DoSaveInitial)RETURN
-    else
-       call get_integral_flux
     end if
 
     ! Check how often the output is needed
