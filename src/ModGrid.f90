@@ -43,6 +43,9 @@ module SP_ModGrid
   integer, public :: nLon = 4  ! Number of lines along Lon grid
   integer, public:: iLatOffset = 0     ! Offset of line index along Lat grid
   integer, public:: iLonOffset = 0     ! Offset of line index along Lon grid
+  ! Whether to read/write MH_data in appended format (set via #APPENDMHDATA)
+  logical, public:: UseAppendedRead  = .false.
+  logical, public:: UseAppendedWrite = .false.
 
   ! Total number of magnetic field lines on all PEs (a product of nLat*nLon)
   integer, public :: nLineAll = 16
@@ -347,7 +350,15 @@ contains
           CYCLE
        end if
        iEnd = nVertex_B(iLine)
-       iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
+       ! Only propagate Shock_ into ShockOld_ when Shock_ is a real shock
+       ! position. If Shock_ is NoShock_ (shock currently lost from this
+       ! line), preserve ShockOld_ as forward-only memory of the last known
+       ! shock position; otherwise the next get_shock_location call would
+       ! search from iShockMin = max(NoShock_, nShockWidth+1) = nShockWidth+1
+       ! and could latch onto a spurious feature near the inner boundary,
+       ! pumping the V1 injection BC.
+       if(iShock_IB(Shock_, iLine) /= NoShock_) &
+            iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_, iLine)
        State_VIB(RhoOld_, 1:iEnd, iLine) = MhData_VIB(Rho_, 1:iEnd, iLine)
        State_VIB(UOld_, 1:iEnd-1, iLine) = State_VIB(U_, 1:iEnd-1, iLine)
        State_VIB(BOld_, 1:iEnd, iLine)   = State_VIB(B_, 1:iEnd, iLine)
@@ -365,8 +376,8 @@ contains
     real   :: XyzAux1_D(x_:z_), XyzAux2_D(x_:z_)
     character(len=*), parameter:: NameSub = 'get_other_state_var'
     !--------------------------------------------------------------------------
-    do iLine = 1, nLine
-       if(.not.Used_B(iLine)) CYCLE
+    LINE: do iLine = 1, nLine
+       if(.not.Used_B(iLine)) CYCLE LINE
        iEnd = nVertex_B(iLine)
        do iVertex = 1, iEnd
           ! magnetic field
@@ -427,7 +438,7 @@ contains
           State_VIB(R_, iVertex, iLine) = &
                norm2(MhData_VIB(X_:Z_, iVertex, iLine))
        end do
-    end do
+    end do LINE
 
   end subroutine get_other_state_var
   !============================================================================

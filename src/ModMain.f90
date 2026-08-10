@@ -111,7 +111,8 @@ contains
           call read_param_diffuseperp(NameCommand)
        case('#DRIFT')
           call read_param_drift(NameCommand)
-       case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG', '#NOUTPUT')
+       case('#SAVEPLOT', '#USEDATETIME', '#SAVEINITIAL', '#NTAG', '#NOUTPUT', &
+            '#APPENDMHDATA')
           call read_param_plot(NameCommand)
        case('#READMHDATA','#MHDATA')
           call read_param_mhdata(NameCommand)

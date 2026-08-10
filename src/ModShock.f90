@@ -262,6 +262,12 @@ contains
     integer :: iShockCandidate
     ! Loop variables
     integer :: iLine, iEnd, iShockForward
+    ! Captures whether the previous call left Shock_ at NoShock_ for this
+    ! line. Read BEFORE iShock_IB(Shock_) is overwritten in the branches
+    ! below. Used to snap ShockOld_ forward on re-detection so the
+    ! advection step does not retroactively march through vertices that
+    ! were never shocked.
+    logical :: WasLost
 
     character(len=*), parameter:: NameSub = 'get_shock_location'
     !--------------------------------------------------------------------------
@@ -271,6 +277,10 @@ contains
        if(.not.Used_B(iLine)) CYCLE
        ! Number of the active particles on the line
        iEnd = nVertex_B(iLine)
+
+       ! Capture previous-call lost state for this line BEFORE overwriting
+       ! iShock_IB(Shock_) below.
+       WasLost = iShock_IB(Shock_, iLine) == NoShock_
 
        ! if it is time accurate:
        ! shock front is assumed to be location of max log(Rho/RhoOld);
@@ -291,19 +301,32 @@ contains
                divU_II(iShockMin:iShockMax, iLine) < -dLogRhoThreshold)
           iShockCandidate = iShockMin - 1 + iShockForward
           iShock_IB(Shock_, iLine) = iShockCandidate
-          ! If the shock wave just appears, identify its "old" location with
-          ! the nearest lower vertex
-          if(iShock_IB(ShockOld_,iLine)==NoShock_.or.                 &
-               ! Same if the sensor jumps to another shock. The real shock
-               ! with a speed < 5,000 km/s passes in radial direction not
-               ! more than 600 Mm ~ 0.8 R_s
+          ! Snap ShockOld_ to (Shock_ - 1) when:
+          !  (a) ShockOld_ == NoShock_  -- the very first detection ever on
+          !      this line; identify the "old" location with the nearest
+          !      lower vertex so advance() does not march from vertex 1
+          !  (b) sensor jump -- new Shock_ is > 0.8 Rs ahead of ShockOld_
+          !      (real shock at < 5,000 km/s passes < 600 Mm ~ 0.8 Rs per
+          !      coupling step; bigger jump means the sensor latched onto a
+          !      different feature)
+          !  (c) WasLost -- previous step left Shock_ at NoShock_ and we are
+          !      now re-detecting. Without this snap, ShockOld_ would still
+          !      point at the pre-disappearance position and advance() would
+          !      march nProgress = (Shock_ - ShockOld_) sub-steps,
+          !      retroactively re-injecting at every vertex in between.
+          if(iShock_IB(ShockOld_,iLine)==NoShock_ .or. WasLost .or.   &
                State_VIB(R_,iShock_IB(ShockOld_,iLine),iLine) + 0.8 < &
                State_VIB(R_,iShock_IB(Shock_,iLine),iLine)           )&
                iShock_IB(ShockOld_,iLine) = iShock_IB(Shock_,iLine) - 1
        else
-          ! no candidate found
+          ! no candidate found -- shock is lost from this line for now.
+          ! Set Shock_ to NoShock_ so set_momentum_bc does not inject at
+          ! a stale shock location. Preserve ShockOld_ as forward-only
+          ! memory of the last known shock position so the next call's
+          ! iShockMin = max(ShockOld_, nShockWidth+1) keeps the search
+          ! confined to the forward direction and cannot detect a spurious
+          ! shock near the inner boundary.
           iShock_IB(Shock_, iLine) = NoShock_
-          iShock_IB(ShockOld_, iLine) = NoShock_
        end if
        ! check_line_ishock: update Used_B(iLine)
        ! call check_line_ishock(iLine)

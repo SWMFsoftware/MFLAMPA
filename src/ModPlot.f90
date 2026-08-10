@@ -21,7 +21,8 @@ module SP_ModPlot
   use SP_ModGrid, ONLY: nVar, nMHData, nLine, nLineAll, &
        iLineAll0, search_line, MHData_VIB, State_VIB, iShock_IB, &
        nVertex_B, NameVar_V, Shock_, LagrID_, X_, Y_, Z_, R_,    &
-       TypeCoordSystem, nP, nMu, IsMuAvg
+       TypeCoordSystem, nP, nMu, IsMuAvg, &
+       UseAppendedRead, UseAppendedWrite
   use SP_ModProc, ONLY: iProc
   use SP_ModSize, ONLY: nVertexMax, nDim
   use SP_ModTime, ONLY: SPTime, iIter, StartTime, StartTimeJulian
@@ -44,6 +45,9 @@ module SP_ModPlot
 
   ! If true the time tag format is YYYYMMDDHHMMSS
   logical, public:: UseDateTime = .false.
+
+  ! UseAppendedRead and UseAppendedWrite are in ModGrid to avoid
+  ! circular dependency between ModPlot and ModReadMhData
 
   character(len=*), parameter, public :: NameMHData    = "MH_data"
   character(len=*), parameter, public :: NameDistrData = "Distr"
@@ -471,6 +475,9 @@ contains
        end if
     case('#USEDATETIME')
        call read_var('UseDateTime', UseDateTime)
+    case('#APPENDMHDATA')
+       call read_var('UseAppendedRead', UseAppendedRead)
+       call read_var('UseAppendedWrite', UseAppendedWrite)
     case('#SAVEINITIAL')
        call read_var('DoSaveInitial', DoSaveInitial)
     case('#NTAG')
@@ -958,19 +965,21 @@ contains
     ! inconsistent with nTag, therefore the file is trimmed according to nTag
 
     if(iProc/=0) RETURN ! done only by the root
+    ! Tag list file is only used in non-appended write mode
+    if(UseAppendedWrite) RETURN
     ! full file name
     NameFile = trim(NamePlotDir)//trim(NameTagFile)
-    if(nTag > 0) then
-       allocate(StringTag_I(nTag))
+    if(nTag > 1) then
+       allocate(StringTag_I(nTag - 1))
        call open_file(file=NameFile, status='old', NameCaller=NameSub)
-       do iTag = 1, nTag
+       do iTag = 1, nTag - 1
           read(UnitTmp_,'(a)') StringTag_I(iTag)
        end do
        call close_file
     end if
     call open_file(file=NameFile, status='replace', NameCaller=NameSub)
-    if(nTag > 0) then
-       do iTag = 1, nTag
+    if(nTag > 1) then
+       do iTag = 1, nTag - 1
           write(UnitTmp_,'(a)') StringTag_I(iTag)
        end do
        deallocate(StringTag_I)
@@ -1112,34 +1121,46 @@ contains
       real :: Param_I(LagrID_:StartJulian_)
       ! timetag
       character(len=15) :: StringTime
-
+      ! Flag to truncate appended files on first write after restart
+      logical, save :: DoTruncate = .true.
       character(len=*), parameter:: NameSub = 'write_mh_1d'
       !------------------------------------------------------------------------
       ! If there are more than one processors working on the same field line,
       ! we only save the data for the first nLineAll processors.
       if(nProc > nLineAll .and. iProc >= nLineAll) RETURN
 
-      ! Update number of time tags and write to tag list file
-      if(iProc==0) then
-         ! increase the file counter
-         nTag = nTag + 1
-         ! add to the tag list file
-         NameFile = trim(NamePlotDir)//trim(NameTagFile)
-         call open_file(file=NameFile, position='append', status='unknown', &
-              NameCaller=NameSub)
+      ! On first call after restart with appended write, truncate files
+      ! to nTag-1 blocks; the nTag-th block will be rewritten by
+      ! the current (initial) output
+      if(DoTruncate) then
+         if(UseAppendedWrite .and. nTag > 1) call truncate_appended(iFile)
+         DoTruncate = .false.
+      end if
 
-         if(UseDateTime) then
-            ! create date_time-iteration tag
-            call get_date_time_string(SPTime, StringTime)
-            write(UnitTmp_,'(a,i6.6)') 'e'//StringTime//'_n',iIter
-            write(*,'(a,i6.6)')'Write plot file e'//StringTime//'_n',iIter
+      ! Update number of time tags on all processors;
+      ! on restart, the initial output rewrites the nTag-th block,
+      ! so do not increment nTag in that case
+      if(.not.(IsInitialOutput .and. nTag > 0)) nTag = nTag + 1
+      ! Write tag list file only on proc 0 in non-appended mode
+      if(iProc==0) then
+         if(.not.UseAppendedWrite) then
+            ! add to the tag list file
+            NameFile = trim(NamePlotDir)//trim(NameTagFile)
+            call open_file(file=NameFile, position='append', status='unknown', &
+                 NameCaller=NameSub)
+            if(UseDateTime) then
+               call get_date_time_string(SPTime, StringTime)
+               write(UnitTmp_,'(a,i6.6)') 'e'//StringTime//'_n',iIter
+               write(*,'(a,i6.6)')'Write plot file e'//StringTime//'_n',iIter
+            else
+               call get_time_string(SPTime, StringTime(1:8))
+               write(UnitTmp_,'(a,i6.6)') 't'//StringTime(1:8)//'_n',iIter
+               write(*,'(a,i6.6)')'Write plot file t'//StringTime(1:8)//'_n',iIter
+            end if
+            call close_file
          else
-            ! create time-iteration tag
-            call get_time_string(SPTime, StringTime(1:8))
-            write(UnitTmp_,'(a,i6.6)') 't'//StringTime(1:8)//'_n',iIter
-            write(*,'(a,i6.6)')'Write plot file t'//StringTime(1:8)//'_n',iIter
+            write(*,'(a,i6,a,es12.5)')'Append MH_data step',iIter,' t=',SPTime
          end if
-         call close_file
       end if
 
       ! Write ouput files themselves
@@ -1155,12 +1176,21 @@ contains
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
          if(do_skip(iLine, File_I(iFile)%iRange_I))CYCLE
-         call make_file_name( &
-              StringBase    = NameMHData,                      &
-              iLine         = iLine,                           &
-              iIter         = iIter,                           &
-              NameExtension = File_I(iFile)%NameFileExtension, &
-              NameOut       = NameFile)
+         if(UseAppendedWrite) then
+            ! Fixed name per field line — no iteration tag
+            call make_file_name( &
+                 StringBase    = NameMHData,                      &
+                 iLine         = iLine,                           &
+                 NameExtension = File_I(iFile)%NameFileExtension, &
+                 NameOut       = NameFile)
+         else
+            call make_file_name( &
+                 StringBase    = NameMHData,                      &
+                 iLine         = iLine,                           &
+                 iIter         = iIter,                           &
+                 NameExtension = File_I(iFile)%NameFileExtension, &
+                 NameOut       = NameFile)
+         end if
 
          ! reset the output buffer
          File_I(iFile) % Buffer_II = 0.0
@@ -1193,24 +1223,86 @@ contains
          Param_I(StartJulian_)= StartTimeJulian
          ! print data to file
          call save_plot_file(&
-              NameFile      = NameFile, &
-              StringHeaderIn= StringHeader, &
-              TypeFileIn    = File_I(iFile) % TypeFile, &
-              nDimIn        = 1, &
-              TimeIn        = SPTime, &
-              nStepIn       = iIter, &
-              CoordMinIn_D  = [MHData_VIB(LagrID_,1,iLine)], &
-              CoordMaxIn_D  = [MHData_VIB(LagrID_,iEnd,iLine)], &
-              NameVarIn     = &
+              NameFile        = NameFile, &
+              TypePositionIn  = merge('append', 'rewind', &
+                   UseAppendedWrite .and. nTag > 1), &
+              StringHeaderIn  = StringHeader, &
+              TypeFileIn      = File_I(iFile) % TypeFile, &
+              nDimIn          = 1, &
+              TimeIn          = SPTime, &
+              nStepIn         = iIter, &
+              CoordMinIn_D    = [MHData_VIB(LagrID_,1,iLine)], &
+              CoordMaxIn_D    = [MHData_VIB(LagrID_,iEnd,iLine)], &
+              NameVarIn       = &
               trim(File_I(iFile) % NameVarPlot) // ' ' // &
               trim(File_I(iFile) % NameAuxPlot), &
-              VarIn_VI      = &
+              VarIn_VI        = &
               File_I(iFile) % Buffer_II(1:nMhdVar + nExtraVar + nFluxVar, &
               1:iEnd, 1),&
-              ParamIn_I     = Param_I(LagrID_:StartJulian_))
+              ParamIn_I       = Param_I(LagrID_:StartJulian_))
       end do !  iLine
 
     end subroutine write_mh_1d
+    !==========================================================================
+    subroutine truncate_appended(iFile)
+      ! Truncate appended MH_data output files: keep only blocks
+      ! with nStep < iIter. The block at iIter will be rewritten
+      ! by the initial output.
+      use ModIoUnit, ONLY: io_unit_new
+      integer, intent(in) :: iFile
+      integer :: iLine, iUnit, nVertex, iVertex, nStepBlock
+      logical :: IsFound
+      character(len=100) :: NameFile, NameFileTmp
+      character(len=500) :: StringLine, StringLine1, StringLine2
+      !------------------------------------------------------------------------
+      do iLine = 1, nLine
+         if(.not.Used_B(iLine)) CYCLE
+         if(do_skip(iLine, File_I(iFile)%iRange_I)) CYCLE
+         call make_file_name( &
+              StringBase    = NameMHData,                      &
+              iLine         = iLine,                           &
+              NameExtension = File_I(iFile)%NameFileExtension, &
+              NameOut       = NameFile)
+         inquire(file=NameFile, exist=IsFound)
+         if(.not.IsFound) CYCLE
+         NameFileTmp = trim(NameFile)//'.tmp'
+         iUnit = io_unit_new()
+         call open_file(iUnitIn=iUnit, file=NameFile, status='old', &
+              NameCaller='truncate_appended')
+         call open_file(file=NameFileTmp, &
+              NameCaller='truncate_appended')
+         do
+            ! Read first two header lines
+            read(iUnit, '(a)', end=200) StringLine1
+            read(iUnit, '(a)', end=200) StringLine2
+            read(StringLine2, *) nStepBlock
+            ! Stop if block step >= restart step
+            if(nStepBlock >= iIter) EXIT
+            ! Write the two header lines
+            write(UnitTmp_, '(a)') trim(StringLine1)
+            write(UnitTmp_, '(a)') trim(StringLine2)
+            ! Read and copy nVertex line
+            read(iUnit, '(a)', end=200) StringLine
+            write(UnitTmp_, '(a)') trim(StringLine)
+            read(StringLine, *) nVertex
+            ! Copy params and column name lines
+            read(iUnit, '(a)', end=200) StringLine
+            write(UnitTmp_, '(a)') trim(StringLine)
+            read(iUnit, '(a)', end=200) StringLine
+            write(UnitTmp_, '(a)') trim(StringLine)
+            ! Copy data lines
+            do iVertex = 1, nVertex
+               read(iUnit, '(a)', end=200) StringLine
+               write(UnitTmp_, '(a)') trim(StringLine)
+            end do
+         end do
+200      continue
+         close(iUnit)
+         call close_file
+         call execute_command_line( &
+              'mv '//trim(NameFileTmp)//' '//trim(NameFile))
+      end do
+    end subroutine truncate_appended
     !==========================================================================
     subroutine write_mh_2d
 
@@ -3038,8 +3130,8 @@ contains
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#CHECKGRIDSIZE'
     write(UnitTmp_,'(i8,a)') nVertexMax, cTab//cTab//'nVertexMax'
-    write(UnitTmp_,'(i8,a)') nLon,       cTab//cTab//'nLon'
     write(UnitTmp_,'(i8,a)') nLat,       cTab//cTab//'nLat'
+    write(UnitTmp_,'(i8,a)') nLon,       cTab//cTab//'nLon'
     write(UnitTmp_,*)
     write(UnitTmp_,'(a)')'#MHDATA'
     write(UnitTmp_,'(a)') trim(TypeMHDataFile)//cTab//cTab//'TypeFile'

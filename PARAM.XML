@@ -950,7 +950,7 @@ previous run.
 
 #READMHDATA
 T			DoReadMhData
-MH_data			NameInputDir
+MH_data/		NameInputDir
 
 Sets the name of input directory with MHD data.
 </command>
@@ -971,9 +971,27 @@ idl			TypeFile
 120			nFileRead
 MH_data.lst		NameTagFile
 
-Sets type, number and names of the MHD input files. While running MFLAMPA
-in cinjunction with the MHD code, these parameters are usually saved into
-the header file, which is then included into the MFLAMPA parameter file.
+Sets type and format of the MHD input files. nFileRead and NameTagFile
+are always read but only used when UseAppendedRead is false in #READMHDATA.
+</command>
+
+<command name="APPENDMHDATA">
+  <parameter name="UseAppendedRead" type="logical" default="F"/>
+  <parameter name="UseAppendedWrite" type="logical" default="F"/>
+
+#APPENDMHDATA
+F			UseAppendedRead
+F			UseAppendedWrite
+
+Controls the format of MH_data input and output files. Both default to
+false and this command is optional.
+If UseAppendedRead is true, each field line is read from a single file
+with all time steps appended (MH_data_iLon_iLat.out).
+If UseAppendedWrite is true, all time steps for each field line are
+appended to a single output file (MH_data_iLon_iLat.out). The file is
+overwritten on the first write and appended to on subsequent writes.
+Note: input and output directories must be different when both
+UseAppendedRead and UseAppendedWrite are true.
 </command>
 
 <command name="NTAG">
