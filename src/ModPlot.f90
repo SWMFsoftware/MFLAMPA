@@ -1255,7 +1255,7 @@ contains
       integer :: iLine, iUnit, nVertex, iVertex, nStepBlock
       logical :: IsFound
       character(len=100) :: NameFile, NameFileTmp
-      character(len=500) :: StringLine, StringLine1, StringLine2
+      character(len=2000) :: StringLine, StringLine1, StringLine2
       !------------------------------------------------------------------------
       do iLine = 1, nLine
          if(.not.Used_B(iLine)) CYCLE
