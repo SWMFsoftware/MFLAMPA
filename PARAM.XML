@@ -747,6 +747,12 @@ The local pseudo-time steps use the Courant number Cfl of #CFL, which may
 exceed the explicit limit here (for example #CFL 9800); with the default
 0.9 the steps are valid but converge slowly. This command does not
 change the time-accurate or pitch-angle-resolved transport paths. The default is F.
+
+For the steady-state GCR spectrum, inject no particles and let the
+spectrum enter at the outer end of the lines, for example with the
+settings #TIMEACCURATE F, #IMPLICIT T, #CFL 9800, #MOMENTUMBC grad
+grad, #LOWERENDBC float and #UPPERENDBC lism usoskin T 534.7, where
+534.7 is the modulation potential in MV.
 </command>
 
 <command name="FOCUSEDTRANSPORT">

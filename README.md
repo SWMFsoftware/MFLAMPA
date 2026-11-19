@@ -226,6 +226,57 @@ iterations are valid but converge slowly, so a large value such as 9800 should
 be set. With `#VERBOSE` above 1, every iteration prints the number of sweeps,
 the Gauss–Seidel error and the range of Δt_c.
 
+### Steady-state GCR runs
+
+For the steady-state galactic cosmic ray (GCR) spectrum along the lines, no
+particles are injected: the spectrum enters through the outer end of each line
+and is modulated inward by advection, adiabatic cooling and diffusion.
+
+```
+#TIMEACCURATE
+F			IsTimeAccurate
+
+#IMPLICIT
+T			UseImplicit
+
+#CFL
+9800.0			Cfl
+
+#MOMENTUMBC
+grad			TypeMomentumMinBc
+grad			TypeMomentumMaxBc
+
+#LOWERENDBC
+float			TypeLowerEndBc
+
+#UPPERENDBC
+lism			TypeUpperEndBc
+usoskin			TypeLisBc
+T			UseModulationPot
+534.7			ModulationPot
+
+#STOP
+100			nIterMax
+-1.0			TimeMax
+```
+
+- `#MOMENTUMBC grad grad`: at both ends of the momentum grid the ghost cell
+  continues the local power law, f₀ = f₁²/f₂ and f_(nP+1) = f_nP²/f_(nP−1).
+  `float` instead sets a zero gradient, f₀ = f₁; `inject` (the default at the
+  lower end) adds the suprathermal seed population of SEP runs.
+- `#UPPERENDBC lism`: the outer end of each line holds the local interstellar
+  spectrum (`usoskin`, Usoskin et al. 2005, or `corti`), modulated by the
+  potential `ModulationPot` in MV when `UseModulationPot` is T, e.g. the Oulu
+  neutron monitor value for the date of the run.
+- `#LOWERENDBC float`: the inner end of each line copies the spectrum of the
+  first vertex; `escape` sets the background spectrum there.
+- `#STOP` `nIterMax` is the number of implicit iterations; with `#VERBOSE`
+  above 1 the Gauss–Seidel error of every iteration shows the convergence.
+
+The nightly steady-state decks (`Param/PARAM.in.test.steady*`) use the same
+`#UPPERENDBC` with the explicit iteration and the default momentum boundary
+conditions.
+
 ## Build, run, test
 
 M-FLAMPA builds inside an installed SWMF tree (`SWMF/SP/MFLAMPA`).
@@ -234,8 +285,11 @@ M-FLAMPA builds inside an installed SWMF tree (`SWMF/SP/MFLAMPA`).
 ./Config.pl -s                                   # show grid configuration
 make MFLAMPA                                     # bin/MFLAMPA.exe (standalone)
 make rundir RUNDIR=run_test STANDALONE=YES SPDIR=`pwd`
-make test                                        # upwind, Poisson bracket, steady-state/restart
+make test                                        # nightly test: upwind, Poisson bracket, steady-state/restart
 make test_poisson_bracket                        # unit and analytical tests of the Poisson bracket schemes
+make test_poisson_bracket_exe                    # build test_poisson.exe only
+./test_poisson.exe                               # nightly Poisson bracket tests (also explicitorig)
+./test_poisson.exe Comprho4Shock                 # steady shock acceleration test, explicit and implicit
 ```
 
 Parameters are documented in `PARAM.XML`; examples are in `Param/`; the user
