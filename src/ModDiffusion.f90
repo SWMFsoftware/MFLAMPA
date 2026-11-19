@@ -28,6 +28,7 @@ module SP_ModDiffusion
   ! Public members:
   public :: read_param, diffuse_distribution, &
        scatter_distribution, set_diffusion_coef
+  public :: get_diffusion_face
   ! Diffusion in space
   interface diffuse_distribution
      module procedure diffuse_distribution_s   ! Global time step Dt
@@ -44,6 +45,8 @@ module SP_ModDiffusion
   logical, public :: UseDiffusion = .true.
   ! Determine which type of the diffusion in upstream and from mhd turbulence
   character(len=15) :: TypeMhdDiffusion = 'sokolov2004'
+  ! Parallel diffusion floor shared by the split and implicit Parker paths.
+  real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
   ! Set diffusion or scatter coefficients in the diffusion operator
   ! df/dt = DOuter * d(DInner * df/dx)/dx
   ! DOuter = BSi in the cell center
@@ -201,7 +204,6 @@ contains
     real, dimension(nP, nMu) :: LowerEndSpectrum_II, UpperEndSpectrum_II
     ! Logical variable for whether or not to use given lower and upper spectra
     logical :: UseLowerSpectrum = .false., UseUpperSpectrum = .false.
-    real, parameter :: DiffCoeffMinSi = 1.0E+04*Rsun
     ! Mesh spacing and face spacing.
     real :: DsMeshSi_I(1:nX-1), DsFaceSi_I(2:nX-1)
     ! Main, upper, and lower diagonals, source
@@ -358,6 +360,44 @@ contains
     end do MU
 
   end subroutine diffuse_distribution_c
+  !============================================================================
+  subroutine get_diffusion_face(iLine, nX, BSi_I, Diffusion_FI)
+    ! The diffusion along the field line in the form of the implicit Poisson
+    ! bracket scheme: the flux through the face between the meshes i and
+    ! i+1 is Diffusion_FI(i,iP)*(f(i+1) - f(i)), per unit volume in
+    ! momentum, with the control volume DsFace/B of the mesh, as in
+    ! diffuse_distribution_c: the inner face values are the averages of
+    ! DInner in the neighboring meshes over their distance, and the end
+    ! faces, to the given spectra behind the ends, take the values in the
+    ! end meshes over the distance to their neighbor
+
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+
+    integer, intent(in) :: iLine, nX
+    real,    intent(in) :: BSi_I(nX)
+    real,    intent(out):: Diffusion_FI(0:nX, nP)
+
+    ! Mesh spacing and DInner, floored as in diffuse_distribution_c
+    real :: DsMeshSi_I(1:nX-1), DInner_II(nX, nP)
+    integer :: iP
+    !--------------------------------------------------------------------------
+    DsMeshSi_I(1:nX-1) = max(State_VIB(D_,1:nX-1,iLine)*Io2Si_V(UnitX_), cTiny)
+    if(UseTurbulentSpectrum) then
+       call set_dxx(nX, BSi_I(1:nX))
+       DInner_II = Dxx(nX, BSi_I(1:nX))/ &
+            spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP)
+    else
+       DInner_II = max(DInnerSi_II(1:nX, 1:nP), &
+            DiffCoeffMinSi/spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP))
+    end if
+    do iP = 1, nP
+       Diffusion_FI(0, iP)      = DInner_II(1, iP)/DsMeshSi_I(1)
+       Diffusion_FI(1:nX-1, iP) = 0.5*(DInner_II(1:nX-1, iP) &
+            + DInner_II(2:nX, iP))/DsMeshSi_I(1:nX-1)
+       Diffusion_FI(nX, iP)     = DInner_II(nX, iP)/DsMeshSi_I(nX-1)
+    end do
+
+  end subroutine get_diffusion_face
   !============================================================================
   subroutine scatter_distribution_s(iLine, nX, nSi_I, BSi_I, Dt)
     ! Calculate scattering: \deltaf/\deltat = (Dmumu*f_mu)_mu with global Dt
