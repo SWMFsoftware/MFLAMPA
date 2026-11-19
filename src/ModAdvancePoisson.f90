@@ -41,6 +41,10 @@ module SP_ModAdvancePoisson
   logical, public :: UseMuScattering = .false.
   ! Time derivative over DtFull (linear interpolation for time):
   real, public, dimension(nVertexMax) :: DbuDt_C
+  ! Steady state of the Parker equation by the implicit (backward Euler)
+  ! scheme, with local pseudo-time steps at the Courant number Cfl of #CFL.
+  ! Only the local-time Parker driver uses this switch.
+  logical :: UseImplicit = .false.
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -54,6 +58,8 @@ contains
        call read_var('UseBetatron',      UseBetatron)
        call read_var('UseInertialForce', UseInertialForce)
        call read_var('UseMuScattering',  UseMuScattering)
+    case('#IMPLICIT')
+       call read_var('UseImplicit', UseImplicit)
     case default
        call CON_stop(NameSub//': Unknown command '//NameCommand)
     end select
@@ -181,7 +187,8 @@ contains
   !============================================================================
   subroutine iterate_poisson_parker(iLine, nX, iShock, CflIn, BSi_I, nSi_I)
     ! Advect via Possion Bracket scheme to the steady state: (p**3/3, s_L)
-    ! First advect and then diffuse the VDF by splitting method
+    ! First advect and then diffuse the VDF by splitting method; with
+    ! UseImplicit, a backward Euler step of both together (iterate_implicit)
 
     use SP_ModGrid, ONLY: D_, U_
     use SP_ModUnit, ONLY: UnitX_, Io2Si_V
@@ -253,6 +260,10 @@ contains
     call set_momentum_bc(iLine, nX, nSi_I, iShock)
     ! Update Bc for VDF
     call set_VDF2(iLine, nX, VDF_G)
+    if(UseImplicit) then
+       call iterate_implicit
+       RETURN
+    end if
     call explicit(nP, nX, VDF_G, Volume_G, Source_C, &
          Hamiltonian12_N=Hamiltonian12_N, CFLIn=CflIn, &
          IsSteadyState=.true., DtOut_C=Dt_C)
@@ -278,6 +289,113 @@ contains
        if(IsDistNeg) RETURN
     end if
 
+  contains
+    !==========================================================================
+    subroutine iterate_implicit
+      ! One backward Euler step of the Poisson bracket scheme with the
+      ! limited correction of the explicit one and the diffusion along the
+      ! line in one implicit system, with local time steps at Cfl (#CFL):
+      ! calc_implicit_source with the coordinates exchanged, so that its
+      ! tridiagonal lines run along s_L (the diffusion and the advection
+      ! along the line) and its Gauss-Seidel sweeps across the momentum
+      ! bins, which the adiabatic cooling couples one way where the flow
+      ! expands
+
+      use ModPoissonBracketSemi, ONLY: calc_implicit_source
+      use SP_ModDiffusion, ONLY: get_diffusion_face
+      use SP_ModTestFunc, ONLY: lVerbose
+      use SP_ModTime, ONLY: iIter
+
+      ! The arrays with the coordinates exchanged: (s_L, p**3/3)
+      real, allocatable :: VdfTranspose_G(:,:), VolTranspose_G(:,:), &
+           HamiltonianTranspose_N(:,:), SourceTranspose_C(:,:),       &
+           DtTranspose_C(:,:)
+      ! Diffusion coefficients at the faces along s_L times the volume in
+      ! momentum, zero without diffusion
+      real, allocatable :: Diffusion_FX(:,:)
+      integer :: iP
+      ! Gauss-Seidel sweeps of the step (negative if not converged), the
+      ! last relative change of the sweeps, the largest |df|/f and |df|
+      integer :: nSweep
+      real    :: GsError, DfMax, DfAbsMax
+      ! The most line Gauss-Seidel sweeps of a step. Each sweep solves every
+      ! momentum row along s_L exactly (Thomas algorithm) with the other
+      ! rows at their latest values, alternating the direction of the
+      ! sweep; the sweeps stop once the largest change is 1e-12 of the
+      ! largest increment, and the run stops if that is not reached. The
+      ! coupling between the rows comes from the adiabatic cooling. Where
+      ! it is strong compared with the coupling along the line (advection
+      ! dominated lines, a short mean free path), the convergence is
+      ! slower. The Courant number matters too: with a larger Cfl of #CFL
+      ! the local time steps are longer, the diagonal of the matrix
+      ! dominates less and more sweeps are needed; a smaller Cfl needs
+      ! fewer sweeps per step, but more steps. The tolerance 1e-12 is GsTol
+      ! of ModPoissonBracketSemi, relative to the largest increment of f in
+      ! the step. The limit 100 is an estimate, not a measurement: the
+      ! analytical DSA test (test_dsa_impl in test_poisson_bracket.f90, Cfl
+      ! 98 and 9800) allows 2000 sweeps and converged, but its sweep counts
+      ! were not recorded, and no real event has been run. Extend this to
+      ! 1000 or more if a run stops for lack of convergence
+      integer, parameter :: nSweepMaxImplicit = 100
+      !------------------------------------------------------------------------
+      allocate(VdfTranspose_G(-1:nX+2,-1:nP+2),         &
+           VolTranspose_G(0:nX+1,0:nP+1),                &
+           HamiltonianTranspose_N(-1:nX+1,-1:nP+1),      &
+           SourceTranspose_C(nX,nP), DtTranspose_C(nX,nP), &
+           Diffusion_FX(0:nX,nP))
+      VdfTranspose_G = transpose(VDF_G)
+      VolTranspose_G = transpose(Volume_G)
+      ! The Poisson bracket changes sign with the order of the coordinates
+      HamiltonianTranspose_N = -transpose(Hamiltonian12_N)
+      ! The ghost meshes along the line hold the spectra behind the ends
+      Diffusion_FX = 0.0
+      if(UseDiffusion) then
+         call get_diffusion_face(iLine, nX, BSi_I, Diffusion_FX)
+         do iP = 1, nP
+            Diffusion_FX(:,iP) = VolumeP_I(iP)*Diffusion_FX(:,iP)
+         end do
+      end if
+      ! The limited correction uses the Koren limiter of the semi-implicit
+      ! scheme (UseKorenSemi), as in the manuscript; the limiter of the
+      ! explicit scheme is not changed
+      call calc_implicit_source(nX, nP, VdfTranspose_G, VolTranspose_G, &
+           SourceTranspose_C, HamiltonianTranspose_N, AlphaIn=1.0,      &
+           UseTvdIn=.true., Diffusion_FX=Diffusion_FX,                  &
+           IsSteadyState=.true., CFLIn=CflIn,                           &
+           DtOut_C=DtTranspose_C, TypeSolverIn='lGS', nSweepOut=nSweep, &
+           GsErrorOut=GsError, nSweepMaxIn=nSweepMaxImplicit)
+      ! Stop if the sweeps did not converge: an unconverged increment is
+      ! not a valid steady-state update
+      if(nSweep < 0) then
+         write(*,*) NameSub, ': implicit GS did not converge on line ', &
+              iLine, ' sweeps=', -nSweep, ' relative change=', GsError
+         call CON_stop(NameSub//': implicit Parker solve did not converge')
+      end if
+      ! With #VERBOSE above 1: the sweeps and the change of each step
+      if(lVerbose > 1) then
+         DfMax = maxval(abs(SourceTranspose_C) &
+              /max(VdfTranspose_G(1:nX,1:nP), tiny(1.0)))
+         DfAbsMax = maxval(abs(SourceTranspose_C))
+         write(*,'(a,i7,a,i5,a,i4,a,es9.2,a,es9.2,a,2es9.2,a,es9.2)') &
+              NameSub//' implicit: iIter=', iIter, ' iLine=', iLine,   &
+              ' nSweep=', nSweep, ' GsError=', GsError,                &
+              ' max|df/f|=', DfMax, ' Dt min,max=',                    &
+              minval(DtTranspose_C), maxval(DtTranspose_C),            &
+              ' max|df|=', DfAbsMax
+      end if
+
+      ! Update velocity distribution function
+      Distribution_CB(1:nP, 1, 1:nX, iLine) = &
+           Distribution_CB(1:nP, 1, 1:nX, iLine) + transpose(SourceTranspose_C)
+      ! Check if the VDF includes negative values
+      call check_dist_neg(NameSub//' implicit', 1, nX, iLine)
+      if(IsDistNeg) RETURN
+      ! Save local time stepping
+      if(UseDiffusionPerp) &
+           Dt_CB(:, nMu, 1:nX, iLine) = transpose(DtTranspose_C)
+
+    end subroutine iterate_implicit
+    !==========================================================================
   end subroutine iterate_poisson_parker
   !============================================================================
   subroutine calc_states_poisson_focused(iLine, nX, DtFull)
