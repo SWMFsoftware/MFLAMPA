@@ -35,7 +35,7 @@ contains
   subroutine read_param
 
     use SP_ModAdvance, ONLY: read_param_adv         => read_param
-    use SP_ModAdvancePoisson, ONLY: read_param_focused     => read_param
+    use SP_ModAdvancePoisson, ONLY: read_param_poisson     => read_param
     use SP_ModAngularSpread, ONLY: read_param_spread      => read_param
     use SP_ModBc, ONLY: read_param_bc          => read_param
     use SP_ModChannel, ONLY: read_param_channel     => read_param
@@ -97,8 +97,8 @@ contains
           call read_param_dist(NameCommand)
        case('#CFL', '#ADVECTION')
           call read_param_adv(NameCommand)
-       case('#FOCUSEDTRANSPORT')
-          call read_param_focused(NameCommand)
+       case('#FOCUSEDTRANSPORT', '#IMPLICIT')
+          call read_param_poisson(NameCommand)
        case('#INJECTION', '#MOMENTUMBC', '#LOWERENDBC', '#UPPERENDBC')
           call read_param_bc(NameCommand)
        case('#ECHANNEL', '#ECHANNELSAT')

@@ -104,17 +104,127 @@ recovers the Parker solver with no other change to PARAM.in.
 
 ## Parker transport solver
 
-For `nMu = 1` the code solves
+### Equation solved
+
+For `nMu = 1`, M-FLAMPA advances the omnidirectional (pitch-angle averaged)
+distribution f(s_L, p, t), which applies when pitch-angle scattering keeps
+the particles nearly isotropic in the plasma frame. Each field line is a thin
+magnetic flux tube with cross section ∝ 1/B, and its mesh points move with the
+plasma, so D/Dt below is the Lagrangian derivative:
 
 ```
-∂f/∂t + (1/3) (D ln ρ/Dt) ∂f/∂ ln p = B ∂/∂s (D_xx/B ∂f/∂s)
+Df/Dt + (1/3) (D ln ρ/Dt) ∂f/∂ln p = B ∂/∂s (D_xx/B ∂f/∂s)
 ```
 
 along each Lagrangian line, with either the legacy upwind scheme in ln p
 (`src/ModAdvanceAdvection.f90`) or the conservative Poisson bracket scheme
-(`#ADVECTION`). Optional perpendicular diffusion across lines
-(`src/ModDiffusionPerp.f90`) and self-generated turbulence
-(`src/ModTurbulence.f90`) are available. 
+(`src/ModAdvancePoisson.f90`, `#ADVECTION`).
+
+The physical processes carried by each term:
+
+| Process | Term | Control |
+|---------|------|---------|
+| Advection with the plasma along the line | Df/Dt: the mesh moves with the plasma | always on |
+| Adiabatic cooling where the plasma expands, D ln ρ/Dt < 0 | (1/3) (D ln ρ/Dt) ∂f/∂ln p | always on |
+| First-order Fermi (diffusive shock) acceleration where the plasma is compressed, D ln ρ/Dt > 0, mainly across the CME-driven shock; particles gain momentum each time diffusion carries them back across the shock, giving f ∝ p^(−3r/(r−1)) for compression ratio r | the same term, together with parallel diffusion | always on |
+| Parallel spatial diffusion, D_xx = v λ_xx / 3, along the diverging flux tube | B ∂/∂s (D_xx/B ∂f/∂s), `diffuse_distribution` in `src/ModDiffusion.f90` | `#DIFFUSION` |
+
+The parallel mean free path λ_xx is computed from the Alfvén wave turbulence
+amplitudes (`Wave1_`, `Wave2_`) delivered by AWSoM along each line, or from
+the prescribed upstream mean free path. Particles are injected from the
+suprathermal tail at the shock (`SP_ModBc`). Optional perpendicular diffusion
+across lines (`src/ModDiffusionPerp.f90`) and self-generated turbulence
+(`src/ModTurbulence.f90`) are available.
+
+In the steady-state mode (`#TIMEACCURATE F`) the MHD background is fixed and
+the plasma velocity u along the line enters explicitly. Advection and the
+adiabatic momentum change then form one Poisson bracket on the (p³/3, s_L)
+plane, with the reduced Hamiltonian H̃ = −(u/B) p³/3:
+
+```
+∂f/∂t + B {f; H̃}_(p³/3, s_L) = B ∂/∂s (D_xx/B ∂f/∂s)
+```
+
+since B {f; H̃} = u ∂f/∂s − (1/3) (∇·u) p ∂f/∂p and ∇·u = B ∂(u/B)/∂s in the
+flux tube. The control volume is Δ(p³/3) Δs/B. The difference δH̃ of H̃
+across a cell face gives the flux through it: along s_L it is advection with
+the flow, along p³/3 it is the adiabatic momentum change, upward where the flow
+is compressed and downward where it expands. The steady state is reached by
+iterating in pseudo-time.
+
+### Numerical methods
+
+- **Time accurate** (`#TIMEACCURATE T`, the default): explicit, CFL-limited
+  (`#CFL` ≤ 1) advection in momentum with either the legacy upwind scheme in
+  ln p (`src/ModAdvanceAdvection.f90`, `#ADVECTION F`) or the conservative
+  Poisson bracket scheme (`src/ModAdvancePoisson.f90`, `#ADVECTION T`);
+  parallel diffusion is applied by operator splitting after every advection
+  sub-step.
+- **Steady state, explicit** (`#TIMEACCURATE F`): `iterate_poisson_parker`
+  always uses the Poisson bracket scheme, whatever `#ADVECTION` says. It takes
+  a local pseudo-time step in each (p, s_L) cell at `Cfl` ≤ 1 and then applies
+  the diffusion by operator splitting.
+- **Steady state, implicit** (`#IMPLICIT T`): one backward-Euler step that
+  couples advection, the adiabatic momentum change and parallel diffusion,
+  with local pseudo-time steps far above the explicit limit (below).
+
+### Implicit steady-state solver
+
+Each iteration solves one linear system for the increment
+δf = f^(n+1) − f^n on the (p³/3, s_L) plane of each line:
+
+```
+(1 + Σ_k b_ck) δf_c − Σ_k b_ck δf_n(k) = τ_c R_c(f^n),    b_ck = τ_c (|δH̃_k⁻| + D_k) ≥ 0
+```
+
+- R_c(f^n) is the steady-state residual of cell c at the old state: upwind
+  fluxes |δH̃_k⁻| (f_n(k) − f_c) through the inflow faces (δH̃_k < 0),
+  diffusion fluxes D_k (f_n(k) − f_c) through the faces along s_L, and the
+  second-order correction with the Koren limiter.
+- τ_c = Δt_c / V_c, with the local pseudo-time step
+  Δt_c = Cfl · V_c / Σ_k |δH̃_k⁻|, the cell volume V_c = Δ(p³/3) Δs/B and
+  `Cfl` from `#CFL`.
+- The matrix is a strictly diagonally dominant M-matrix. It is solved by line
+  Gauss–Seidel: each momentum row is a tridiagonal (Thomas) solve along s_L,
+  and the sweeps over the rows alternate in direction until the largest change
+  is 10⁻¹² of the largest increment, with at most 100 sweeps
+  (`nSweepMaxImplicit`).
+- δf = 0 exactly when R(f^n) = 0, so the converged solution is the steady
+  state of the second-order scheme for any `Cfl`; `Cfl` sets only how fast it
+  is reached. In the planar diffusive shock acceleration test (compression
+  ratio 4), the implicit solver converges to round-off in 100 iterations at
+  `Cfl` = 980 or 9800, against 12 000 explicit iterations at `Cfl` = 0.98,
+  and gives the p⁻⁴ spectrum to 2%.
+
+The kernel is `calc_implicit_source` in `src/ModPoissonBracketSemi.f90`, the
+driver `iterate_implicit` in `src/ModAdvancePoisson.f90`, and the diffusion
+face conductances `get_diffusion_face` in `src/ModDiffusion.f90`.
+
+### How to enable the implicit solver
+
+```bash
+./Config.pl -g=20000,100,1        # nVertexMax, nMomentum, nMu  (nMu = 1: Parker transport)
+make MFLAMPA
+```
+
+```
+#TIMEACCURATE
+F			IsTimeAccurate
+
+#IMPLICIT
+T			UseImplicit
+
+#CFL
+9800.0			Cfl
+```
+
+`#IMPLICIT` (default `F`) acts only in the steady-state Parker solver;
+time-accurate runs and the focused transport solver (`nMu > 1`) are
+unchanged. `Cfl` is the Courant number of the local
+pseudo-time steps and may far exceed 1 here; with the default 0.9 the
+iterations are valid but converge slowly, so a large value such as 9800 should
+be set. With `#VERBOSE` above 1, every iteration prints the number of sweeps,
+the Gauss–Seidel error and the range of Δt_c.
 
 ## Build, run, test
 
@@ -125,7 +235,7 @@ M-FLAMPA builds inside an installed SWMF tree (`SWMF/SP/MFLAMPA`).
 make MFLAMPA                                     # bin/MFLAMPA.exe (standalone)
 make rundir RUNDIR=run_test STANDALONE=YES SPDIR=`pwd`
 make test                                        # upwind, Poisson bracket, steady-state/restart
-make test_poisson_bracket                        # unit tests of ModPoissonBracket
+make test_poisson_bracket                        # unit and analytical tests of the Poisson bracket schemes
 ```
 
 Parameters are documented in `PARAM.XML`; examples are in `Param/`; the user
@@ -133,6 +243,13 @@ manual is `Doc/Tex/USERMANUAL.tex`.
 
 ## References
 
+- Liu, W., Sokolov, I. V., Zhao, L., et al. (2025), Physics-based simulation
+  of the 2013 April 11 solar energetic particle event, Astrophys. J., 985, 82,
+  doi:10.3847/1538-4357/adc4e3.
+- Liu, W., Liu, X., Lario, D., et al. (2026), Counterintuitive magnetic
+  connectivity and energetic particle flux differences among nearby
+  spacecraft during the 2023 February 24 solar energetic particle event,
+  Astrophys. J., 1008, 6, doi:10.3847/1538-4357/ae9097.
 - Sokolov, I. V., et al. (2023), High resolution finite volume method for
   kinetic equations with Poisson brackets, J. Comput. Phys., 476, 111923,
   doi:10.1016/j.jcp.2023.111923.

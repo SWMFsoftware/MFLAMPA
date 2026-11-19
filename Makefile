@@ -115,7 +115,7 @@ test_poisson_bracket_exe:
 	@(cd src; ${MAKE} LIB)
 	@make test_poisson_bracket.o
 	rm -rf Tmp_; mkdir Tmp_
-	cp src/ModPoissonBracket.o Tmp_/.
+	cp src/ModPoissonBracket.o src/ModPoissonBracketSemi.o Tmp_/.
 	cd Tmp_; \
 		ar -x ${LIBDIR}/libSHARE.a
 	${LINK.f90} -o test_poisson.exe test_poisson_bracket.o \

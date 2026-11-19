@@ -26,6 +26,7 @@ OBJECTS = \
 	ModOriginPoints.o \
 	ModPlot.o \
 	ModPoissonBracket.o \
+	ModPoissonBracketSemi.o \
 	ModProc.o \
 	ModReadMhData.o \
 	ModRestart.o \

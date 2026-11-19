@@ -707,13 +707,16 @@ Any other type is regarded as an unrecognized one at this stage.
 
 
 <command name="CFL">
-  <parameter name="Cfl" type="real" min="0.0" max="1.0" default="0.9" />
+  <parameter name="Cfl" type="real" min="0.0" default="0.9" />
 
 #CFL
 0.9			Cfl
 
 The CFL number for explicit scheme solving, for example, advection along
-energy axis in the phase space.
+energy axis in the phase space. It must not exceed 1 for the explicit
+schemes. With #IMPLICIT T it is the Courant number of the local pseudo-time
+steps of the implicit steady-state Parker solve and may be much larger,
+for example 9800.
 </command>
 
 <command name="ADVECTION">
@@ -729,6 +732,21 @@ This will be implemented later:
 parameter name="UseMuFocusing" type="logical" default="F"
 
 The default value is false.
+</command>
+
+<command name="IMPLICIT">
+  <parameter name="UseImplicit" type="logical" default="F" />
+
+#IMPLICIT
+T                       UseImplicit
+
+When enabled for steady-state Parker transport (#TIMEACCURATE F), one
+backward-Euler step couples upwind Poisson-bracket advection and parallel
+diffusion; the Koren-limited flux correction is evaluated at the old state.
+The local pseudo-time steps use the Courant number Cfl of #CFL, which may
+exceed the explicit limit here (for example #CFL 9800); with the default
+0.9 the steps are valid but converge slowly. This command does not
+change the time-accurate or pitch-angle-resolved transport paths. The default is F.
 </command>
 
 <command name="FOCUSEDTRANSPORT">
