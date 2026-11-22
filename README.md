@@ -170,8 +170,8 @@ iterating in pseudo-time.
 
 ### Implicit steady-state solver
 
-Each iteration solves one linear system for the increment
-δf = f^(n+1) − f^n on the (p³/3, s_L) plane of each line:
+Each iteration is one backward Euler step on the (p³/3, s_L) plane of each
+line, written here for the increment δf = f^(n+1) − f^n:
 
 ```
 (1 + Σ_k b_ck) δf_c − Σ_k b_ck δf_n(k) = τ_c R_c(f^n),    b_ck = τ_c (|δH̃_k⁻| + D_k) ≥ 0
@@ -181,24 +181,19 @@ Each iteration solves one linear system for the increment
   fluxes |δH̃_k⁻| (f_n(k) − f_c) through the inflow faces (δH̃_k < 0),
   diffusion fluxes D_k (f_n(k) − f_c) through the faces along s_L, and the
   second-order correction with the Koren limiter.
-- τ_c = Δt_c / V_c, with the local pseudo-time step
-  Δt_c = Cfl · V_c / Σ_k |δH̃_k⁻|, the cell volume V_c = Δ(p³/3) Δs/B and
-  `Cfl` from `#CFL`.
-- The matrix is a strictly diagonally dominant M-matrix. It is solved by line
-  Gauss–Seidel: each momentum row is a tridiagonal (Thomas) solve along s_L,
-  and the sweeps over the rows alternate in direction until the largest change
-  is 10⁻¹² of the largest increment, with at most 100 sweeps
-  (`nSweepMaxImplicit`).
+- τ_c = Δt / V_c, with one pseudo-time step for the line,
+  Δt = Cfl · min_c (V_c / Σ_k |δH̃_k⁻|), the cell volume V_c = Δ(p³/3) Δs/B
+  and `Cfl` from `#CFL`.
+- The matrix is solved by Gauss–Seidel iterations over the momentum rows,
+  each row a tridiagonal (Thomas) solve along s_L, with at most 10 iterations
+  and a relative tolerance of 10⁻⁵ (`implicit2` of `ModPoissonBracket`).
 - δf = 0 exactly when R(f^n) = 0, so the converged solution is the steady
   state of the second-order scheme for any `Cfl`; `Cfl` sets only how fast it
-  is reached. In the planar diffusive shock acceleration test (compression
-  ratio 4), the implicit solver converges to round-off in 100 iterations at
-  `Cfl` = 980 or 9800, against 12 000 explicit iterations at `Cfl` = 0.98,
-  and gives the p⁻⁴ spectrum to 2%.
+  is reached.
 
-The kernel is `calc_implicit_source` in `src/ModPoissonBracketSemi.f90`, the
-driver `iterate_implicit` in `src/ModAdvancePoisson.f90`, and the diffusion
-face conductances `get_diffusion_face` in `src/ModDiffusion.f90`.
+The kernel is `implicit2` in `src/ModPoissonBracket.f90`, the driver
+`iterate_implicit` in `src/ModAdvancePoisson.f90`, and the diffusion face
+conductances `get_diffusion_face` in `src/ModDiffusion.f90`.
 
 ### How to enable the implicit solver
 

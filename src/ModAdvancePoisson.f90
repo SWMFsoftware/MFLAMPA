@@ -294,55 +294,34 @@ contains
     subroutine iterate_implicit
       ! One backward Euler step of the Poisson bracket scheme with the
       ! limited correction of the explicit one and the diffusion along the
-      ! line in one implicit system, with local time steps at Cfl (#CFL):
-      ! calc_implicit_source with the coordinates exchanged, so that its
-      ! tridiagonal lines run along s_L (the diffusion and the advection
-      ! along the line) and its Gauss-Seidel sweeps across the momentum
-      ! bins, which the adiabatic cooling couples one way where the flow
-      ! expands
+      ! line in one implicit system: implicit2 of ModPoissonBracket with the
+      ! coordinates exchanged, so that its tridiagonal lines run along s_L
+      ! (the diffusion and the advection along the line) and its
+      ! Gauss-Seidel iterations across the momentum bins, which the
+      ! adiabatic cooling couples. implicit2 uses one time step for the
+      ! line, Cfl (#CFL) over the largest coefficient, and updates the
+      ! distribution function in place
 
-      use ModPoissonBracketSemi, ONLY: calc_implicit_source
+      use ModPoissonBracket, ONLY: implicit2
       use SP_ModDiffusion, ONLY: get_diffusion_face
       use SP_ModTestFunc, ONLY: lVerbose
       use SP_ModTime, ONLY: iIter
 
       ! The arrays with the coordinates exchanged: (s_L, p**3/3)
       real, allocatable :: VdfTranspose_G(:,:), VolTranspose_G(:,:), &
-           HamiltonianTranspose_N(:,:), SourceTranspose_C(:,:),       &
-           DtTranspose_C(:,:)
+           HamiltonianTranspose_N(:,:), DfTranspose_C(:,:)
       ! Diffusion coefficients at the faces along s_L times the volume in
       ! momentum, zero without diffusion
       real, allocatable :: Diffusion_FX(:,:)
       integer :: iP
-      ! Gauss-Seidel sweeps of the step (negative if not converged), the
-      ! last relative change of the sweeps, the largest |df|/f and |df|
-      integer :: nSweep
-      real    :: GsError, DfMax, DfAbsMax
-      ! The most line Gauss-Seidel sweeps of a step. Each sweep solves every
-      ! momentum row along s_L exactly (Thomas algorithm) with the other
-      ! rows at their latest values, alternating the direction of the
-      ! sweep; the sweeps stop once the largest change is 1e-12 of the
-      ! largest increment, and the run stops if that is not reached. The
-      ! coupling between the rows comes from the adiabatic cooling. Where
-      ! it is strong compared with the coupling along the line (advection
-      ! dominated lines, a short mean free path), the convergence is
-      ! slower. The Courant number matters too: with a larger Cfl of #CFL
-      ! the local time steps are longer, the diagonal of the matrix
-      ! dominates less and more sweeps are needed; a smaller Cfl needs
-      ! fewer sweeps per step, but more steps. The tolerance 1e-12 is GsTol
-      ! of ModPoissonBracketSemi, relative to the largest increment of f in
-      ! the step. The limit 100 is an estimate, not a measurement: the
-      ! analytical DSA test (test_dsa_impl in test_poisson_bracket.f90, Cfl
-      ! 98 and 9800) allows 2000 sweeps and converged, but its sweep counts
-      ! were not recorded, and no real event has been run. Extend this to
-      ! 1000 or more if a run stops for lack of convergence
-      integer, parameter :: nSweepMaxImplicit = 100
+      ! The time step of the line, the error of the Gauss-Seidel iterations
+      ! (zero if they did not converge), the largest |df|/f and |df|
+      real    :: DtImplicit, GsError, DfMax, DfAbsMax
       !------------------------------------------------------------------------
       allocate(VdfTranspose_G(-1:nX+2,-1:nP+2),         &
            VolTranspose_G(0:nX+1,0:nP+1),                &
            HamiltonianTranspose_N(-1:nX+1,-1:nP+1),      &
-           SourceTranspose_C(nX,nP), DtTranspose_C(nX,nP), &
-           Diffusion_FX(0:nX,nP))
+           DfTranspose_C(nX,nP), Diffusion_FX(0:nX,nP))
       VdfTranspose_G = transpose(VDF_G)
       VolTranspose_G = transpose(Volume_G)
       ! The Poisson bracket changes sign with the order of the coordinates
@@ -355,44 +334,31 @@ contains
             Diffusion_FX(:,iP) = VolumeP_I(iP)*Diffusion_FX(:,iP)
          end do
       end if
-      ! The limited correction uses the Koren limiter of the semi-implicit
-      ! scheme (UseKorenSemi), as in the manuscript; the limiter of the
-      ! explicit scheme is not changed
-      call calc_implicit_source(nX, nP, VdfTranspose_G, VolTranspose_G, &
-           SourceTranspose_C, HamiltonianTranspose_N, AlphaIn=1.0,      &
-           UseTvdIn=.true., Diffusion_FX=Diffusion_FX,                  &
-           IsSteadyState=.true., CFLIn=CflIn,                           &
-           DtOut_C=DtTranspose_C, TypeSolverIn='lGS', nSweepOut=nSweep, &
-           GsErrorOut=GsError, nSweepMaxIn=nSweepMaxImplicit)
-      ! Stop if the sweeps did not converge: an unconverged increment is
-      ! not a valid steady-state update
-      if(nSweep < 0) then
-         write(*,*) NameSub, ': implicit GS did not converge on line ', &
-              iLine, ' sweeps=', -nSweep, ' relative change=', GsError
-         call CON_stop(NameSub//': implicit Parker solve did not converge')
-      end if
-      ! With #VERBOSE above 1: the sweeps and the change of each step
+      ! The increment is the new minus the old distribution function
+      DfTranspose_C = VdfTranspose_G(1:nX,1:nP)
+      call implicit2(nX, nP, VdfTranspose_G, VolTranspose_G,      &
+           HamiltonianTranspose_N, Diffusion_FX=Diffusion_FX,      &
+           CFLIn=CflIn, DtOut=DtImplicit, ErrorOut=GsError)
+      DfTranspose_C = VdfTranspose_G(1:nX,1:nP) - DfTranspose_C
+      ! With #VERBOSE above 1: the time step and the change of each step
       if(lVerbose > 1) then
-         DfMax = maxval(abs(SourceTranspose_C) &
+         DfMax = maxval(abs(DfTranspose_C) &
               /max(VdfTranspose_G(1:nX,1:nP), tiny(1.0)))
-         DfAbsMax = maxval(abs(SourceTranspose_C))
-         write(*,'(a,i7,a,i5,a,i4,a,es9.2,a,es9.2,a,2es9.2,a,es9.2)') &
+         DfAbsMax = maxval(abs(DfTranspose_C))
+         write(*,'(a,i7,a,i5,a,es9.2,a,es9.2,a,es9.2,a,es9.2)') &
               NameSub//' implicit: iIter=', iIter, ' iLine=', iLine,   &
-              ' nSweep=', nSweep, ' GsError=', GsError,                &
-              ' max|df/f|=', DfMax, ' Dt min,max=',                    &
-              minval(DtTranspose_C), maxval(DtTranspose_C),            &
-              ' max|df|=', DfAbsMax
+              ' GsError=', GsError, ' max|df/f|=', DfMax,              &
+              ' Dt=', DtImplicit, ' max|df|=', DfAbsMax
       end if
 
       ! Update velocity distribution function
       Distribution_CB(1:nP, 1, 1:nX, iLine) = &
-           Distribution_CB(1:nP, 1, 1:nX, iLine) + transpose(SourceTranspose_C)
+           Distribution_CB(1:nP, 1, 1:nX, iLine) + transpose(DfTranspose_C)
       ! Check if the VDF includes negative values
       call check_dist_neg(NameSub//' implicit', 1, nX, iLine)
       if(IsDistNeg) RETURN
-      ! Save local time stepping
-      if(UseDiffusionPerp) &
-           Dt_CB(:, nMu, 1:nX, iLine) = transpose(DtTranspose_C)
+      ! Save the time step
+      if(UseDiffusionPerp) Dt_CB(:, nMu, 1:nX, iLine) = DtImplicit
 
     end subroutine iterate_implicit
     !==========================================================================

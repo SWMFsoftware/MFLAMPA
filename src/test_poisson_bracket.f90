@@ -201,8 +201,6 @@ end module ModDiffusion
 !==============================================================================
 module ModTestPoissonBracket
   use ModPoissonBracket, ONLY: explicit, implicit2
-  use ModPoissonBracketSemi, ONLY: calc_implicit_source, semi_implicit_one, &
-       semi_implicit_two, semi_implicit_tvd, UseKorenSemi
   use ModUtilities, ONLY: CON_stop
   use ModNumConst, ONLY: cTwoPi
   use ModPlotFile, ONLY: save_plot_file
@@ -228,14 +226,6 @@ module ModTestPoissonBracket
   ! compression 4 is C (p0/p)^4, C = 3(p1^4 - p0^4)/(p1^3 - p0^3) (4.25 at
   ! 20 bins per decade). LevelDsa > 0 scales it to C = LevelDsa
   real    :: LevelDsa = 0.0
-  ! Linear solver of test_dsa_semi where it uses the Gauss-Seidel
-  ! iterations (lGS; lGS1 for those of implicit2, see calc_implicit_source),
-  ! their maximum number (0: that of the solver), and the order of the
-  ! coordinates: with IsTransposedDsa the solver lines are along the
-  ! momentum, as the coordinates of ModAdvancePoisson, instead of x
-  character(len=5) :: TypeSolverDsa = 'lGS'
-  integer :: nSweepDsa = 0
-  logical :: IsTransposedDsa = .false.
   ! Iterations of the explicit scheme in test_dsa_sa_mhd and the CFL of
   ! its local time steps: 1000 at CFL = 0.98 in the nightly test, while
   ! its steady state needs about 8000 (./test_poisson.exe Comprho4Shock
@@ -248,11 +238,6 @@ module ModTestPoissonBracket
   ! test_dsa_sa_mhd and test_dsa_impl write their convergence histories
   ! (./test_poisson.exe Comprho4Shock) in NameTest_history.txt
   logical :: DoHistoryDsa = .false.
-  ! Rotation tests of the semi-implicit schemes: width of the domain
-  ! and names of the time weights 0, 1/2 and 1
-  real, parameter :: WidthRotation = 6.0
-  character(len=14), parameter :: NameAlpha_I(3) = &
-       ['explicit a=0  ', 'Crank-Nic a0.5', 'implicit a=1  ']
 contains
   !============================================================================
   subroutine test_poisson_bracket(tFinal)
@@ -329,6 +314,93 @@ contains
     !--------------------------------------------------------------------------
     Hamiltonian = sqrt(1.0 + P2)
   end function Hamiltonian
+  !============================================================================
+  subroutine test_gyration_implicit(tFinal)
+    ! The gyration of test_poisson_bracket (nightly test1) to tFinal with
+    ! fixed time steps that divide tFinal: explicit at CFL 0.9 and
+    ! implicit2 (backward Euler) at CFL 0.9, 2, 5 and 10. The periodic
+    ! ghost cells in phi are set after each step, so implicit2 uses them
+    ! from the previous step. Prints the L1 error relative to the exact
+    ! solution, the extrema of f and the CPU time
+
+    real, intent(in) :: tFinal
+
+    integer, parameter :: nQ = 300, nP = 360, nRun = 5
+    real, parameter :: qMax = 10.0, qMin = 0.01, DeltaPhi = cTwoPi/nP
+    real, parameter :: Cfl_I(nRun) = [0.9, 0.9, 2.0, 5.0, 10.0]
+    real :: MomentumRatio, MomentumMin, MomentumMax
+    real :: VDF_G(-1:nQ+2,-1:nP+2), Volume_G(0:nQ+1,0:nP+1)
+    real :: Hamiltonian_N(-1:nQ+1,-1:nP+1)
+    real :: Momentum2_I(-1:nQ+1), MomentumC_I(nQ)
+    real :: Exact_C(nQ,nP), Source_C(nQ,nP)
+    real :: DtCfl, Dt, DtImpl, Shift, PhiStart, CpuStart, CpuEnd, Error
+    integer :: iQ, iP, iRun, iStep, nStep, iCopy
+    character(len=9) :: NameScheme
+    !--------------------------------------------------------------------------
+    MomentumRatio = exp(log(qMax/qMin)/nQ)
+    MomentumMax = qMin/MomentumRatio
+    Momentum2_I(-1) = MomentumMax**2
+    Hamiltonian_N(-1,:) = Hamiltonian(Momentum2_I(-1))
+    do iQ = 0, nQ+1
+       MomentumMin = MomentumMax
+       MomentumMax = MomentumMin*MomentumRatio
+       Momentum2_I(iQ) = MomentumMax**2
+       Hamiltonian_N(iQ,:) = Hamiltonian(Momentum2_I(iQ))
+       Volume_G(iQ,:) = 0.5*DeltaPhi*(Momentum2_I(iQ) - Momentum2_I(iQ-1))
+       if(iQ >= 1 .and. iQ <= nQ) &
+            MomentumC_I(iQ) = sqrt(MomentumMin*MomentumMax)
+    end do
+    ! Exact solution: the initial band 171 < phi/DeltaPhi < 189 turns by
+    ! -tFinal/H(p) at the cell-centered momentum; average over the cell
+    do iQ = 1, nQ
+       Shift = tFinal/Hamiltonian(MomentumC_I(iQ)**2)
+       PhiStart = modulo(171*DeltaPhi - Shift, cTwoPi)
+       do iP = 1, nP
+          Exact_C(iQ,iP) = 0.0
+          do iCopy = -1, 1
+             Exact_C(iQ,iP) = Exact_C(iQ,iP) + max(0.0, &
+                  min(iP*DeltaPhi, PhiStart + 18*DeltaPhi + iCopy*cTwoPi) &
+                  - max((iP-1)*DeltaPhi, PhiStart + iCopy*cTwoPi))
+          end do
+          Exact_C(iQ,iP) = Exact_C(iQ,iP)/DeltaPhi
+       end do
+    end do
+    write(*,'(a,i4,a,i4,a)')' test_gyration_implicit:', nQ, ' x', nP, &
+         ' cells'
+    write(*,'(a)')' scheme      CFL nStep   L1 error    max f    min f'// &
+         '  CPU [s]'
+    do iRun = 1, nRun
+       VDF_G = 0.0; VDF_G(1:nQ,172:189) = 1.0
+       ! The time step at CFL = Cfl_I(iRun), reduced to divide tFinal
+       call explicit(nQ, nP, VDF_G, Volume_G, Source_C, Hamiltonian_N, &
+            CFLIn=Cfl_I(iRun), DtOut=DtCfl, IsPeriodicIn_D=[.false.,.true.])
+       nStep = ceiling(tFinal/DtCfl)
+       Dt = tFinal/nStep
+       call cpu_time(CpuStart)
+       do iStep = 1, nStep
+          if(iRun == 1)then
+             call explicit(nQ, nP, VDF_G, Volume_G, Source_C, &
+                  Hamiltonian_N, DtIn=Dt, IsPeriodicIn_D=[.false.,.true.])
+             VDF_G(1:nQ,1:nP) = VDF_G(1:nQ,1:nP) + Source_C
+          else
+             DtImpl = Dt
+             call implicit2(nQ, nP, VDF_G, Volume_G, &
+                  Hamiltonian12_N=Hamiltonian_N, DtIn=DtImpl)
+          end if
+          ! Periodic boundary conditions
+          VDF_G(1:nQ,-1:0) = VDF_G(1:nQ,nP-1:nP)
+          VDF_G(1:nQ,nP+1:nP+2) = VDF_G(1:nQ,1:2)
+       end do
+       call cpu_time(CpuEnd)
+       Error = sum(abs(VDF_G(1:nQ,1:nP) - Exact_C)*Volume_G(1:nQ,1:nP)) &
+            /sum(Exact_C*Volume_G(1:nQ,1:nP))
+       NameScheme = 'implicit2'
+       if(iRun == 1) NameScheme = 'explicit'
+       write(*,'(1x,a,f6.1,i6,es11.3,2f9.4,f9.3)')NameScheme, &
+            Cfl_I(iRun), nStep, Error, maxval(VDF_G(1:nQ,1:nP)), &
+            minval(VDF_G(1:nQ,1:nP)), CpuEnd - CpuStart
+    end do
+  end subroutine test_gyration_implicit
   !============================================================================
   subroutine test_poisson_2d(tFinal)
 
@@ -1025,8 +1097,8 @@ contains
        LogP_I, CpuStart)
     ! A line of the convergence history, for each of the first 100 steps,
     ! every 10th step to 1000, every 100th to 10000 and so on, and for
-    ! the last step: the step, the largest relative change of f in it (as
-    ! in test_dsa_semi), the spectral index at iX = 500, fitted for
+    ! the last step: the step, the largest relative change of f in it,
+    ! the spectral index at iX = 500, fitted for
     ! 0.5 < log10(p) < LogPFitMaxDsa, the mean of p^4 f there and the CPU
     ! time of the steps so far
     integer, intent(in) :: iUnit, iStep, nStep
@@ -1067,9 +1139,8 @@ contains
     ! Convergence history: f before the step, the unit of the file and
     ! the CPU time at the start
     real, allocatable :: VdfOld_C(:,:)
-    real :: CpuStart, Source_C(nX,nP)
-    integer :: iUnit, nSweep
-    logical :: UseKorenSemiOld
+    real :: CpuStart
+    integer :: iUnit
 
     ! Loop variables
     integer :: iX, iP, iStep
@@ -1099,29 +1170,12 @@ contains
     if(DoHistoryDsa)then
        allocate(VdfOld_C(nX,nP))
        call open_history_dsa('test_dsa_impl', iUnit, CpuStart)
-       UseKorenSemiOld = UseKorenSemi
-       ! The shock acceleration test uses the Koren limiter, within the
-       ! beta bound (TVD with the Koren limiter, as in the manuscript)
-       UseKorenSemi = .true.
     end if
     do iStep = 1, nStepImpl
        if(DoHistoryDsa) VdfOld_C = VDF_G(1:nX,1:nP)
-       if(DoHistoryDsa) then
-          ! Paper benchmark: use the same backward-Euler increments and
-          ! spatial line solves as the production steady Parker driver.
-          call calc_implicit_source(nX, nP, VDF_G, Volume_G, Source_C, &
-               Hamiltonian_N, AlphaIn=1.0, UseTvdIn=.true.,          &
-               Diffusion_FX=Diffusion_FX, IsSteadyState=.true.,      &
-               CFLIn=CflImpl, TypeSolverIn='lGS', nSweepMaxIn=2000,  &
-               nSweepOut=nSweep, GsErrorOut=Error)
-          if(nSweep < 0) call CON_stop('DSA benchmark: GS did not converge')
-          VDF_G(1:nX,1:nP) = VDF_G(1:nX,1:nP) + Source_C
-       else
-          ! Keep the original nightly-regression path.
-          call implicit2(nX, nP, VDF_G, Volume_G, &
-               Hamiltonian12_N=Hamiltonian_N, Diffusion_FX=Diffusion_FX, &
-               CFLIn=CflImpl, ErrorOut=Error)
-       end if
+       call implicit2(nX, nP, VDF_G, Volume_G, &
+            Hamiltonian12_N=Hamiltonian_N, Diffusion_FX=Diffusion_FX, &
+            CFLIn=CflImpl, ErrorOut=Error)
        write(*,*)'iStep, Error=', iStep, Error
        VDF_G(1:nX,-1:0 ) = FloorDsa
        VDF_G(1:nX,nP+1:nP+2) = FloorDsa
@@ -1131,10 +1185,7 @@ contains
        if(DoHistoryDsa) call save_history_dsa(iUnit, iStep, nStepImpl, &
             VdfOld_C, VDF_G(1:nX,1:nP), LogMomentum_I(1:nP), CpuStart)
     end do
-    if(DoHistoryDsa) then
-       close(iUnit)
-       UseKorenSemi = UseKorenSemiOld
-    end if
+    if(DoHistoryDsa) close(iUnit)
     call save_plot_file(NameFile='test_dsa_impl.out', &
          TypeFileIn='ascii', nStepIn = nStepImpl, &
          NameVarIn='LogMomentum VDF'  ,                  &
@@ -1195,774 +1246,6 @@ contains
     end subroutine update_coords
     !==========================================================================
   end subroutine test_dsa_impl
-  !============================================================================
-  subroutine test_semi_gyration(tFinal)
-    ! The cosine cap of test_poisson_2d_smooth advanced with the
-    ! semi-implicit scheme: forward (alpha = 0), central (1/2) and
-    ! backward (1) time weights combined with the backward (upwind),
-    ! central and forward (downwind) face values and with the limited
-    ! correction, without (tvd) and with (tvd-b) the semi-implicit
-    ! bound. Prints the L1 error, the extrema and the change of the
-    ! particle number (through the boundary) at two Courant numbers and
-    ! saves the solutions at the first one. Then the orders of accuracy
-    ! as in Tables 1 and 2 of the semi-implicit manuscript (tFinal = 2*pi
-    ! there) and their mean rates. The spatial order: the L1 error on
-    ! three grids on the short arc tFinal/16. Over tFinal, the
-    ! numerical diffusion of the first order schemes spreads the cap
-    ! over more than its width on these grids, and the rate is about
-    ! 0.5. The temporal order: the L1 difference from a time-exact
-    ! reference on the fixed grid, with 25, 50, 100 and 200 steps to
-    ! tFinal/8, also with the correction weighted with alpha = 1/2 by
-    ! Picard iterations (tvd-P).
-
-    real, intent(in) :: tFinal
-
-    integer, parameter :: nQ = 100, nGrid = 3, nDt = 4, nStepRef = 800
-    integer, parameter :: nQ_I(nGrid) = [50, 100, 200]
-    real, parameter :: Cfl_I(2) = [0.5, 4.0]
-    character(len=8), parameter :: NameTime_I(3) = &
-         ['forward ', 'central ', 'backward']
-    character(len=8), parameter :: NameSpace_I(5) = &
-         ['backward', 'central ', 'forward ', 'tvd     ', 'tvd-b   ']
-    real :: Plot_VC(16,nQ,nQ), Error_I(nGrid), Error, fMax, fMin, dMass
-    real :: Sol_VC(nDt,nQ,nQ), Ref_VC(4,nQ,nQ), Cfl
-    integer :: iCfl, iTime, iSpace, iGrid, iDt, nStep, iStepFail
-    logical :: IsFailed
-    character(len=8) :: NameRate
-    !--------------------------------------------------------------------------
-    do iCfl = 1, size(Cfl_I)
-       write(*,'(a,f4.1,a,i4,a)')' test_semi_gyration: CFL =', &
-            Cfl_I(iCfl), ',', nQ, '**2 cells'
-       write(*,'(a)')' time     space     nStep   L1 error     max f'// &
-            '    min f     dN/N'
-       do iTime = 1, 3; do iSpace = 1, 5
-          call run_gyration(nQ, tFinal, iTime, iSpace, Cfl_I(iCfl), &
-               Error, fMax, fMin, dMass, nStep, iStepFail, Plot_VC( &
-               5*(iTime-1)+iSpace,:,:), Exact_C=Plot_VC(16,:,:))
-          if(iStepFail > 0)then
-             write(*,'(1x,a,1x,a,i6,a,i5)')NameTime_I(iTime),        &
-                  NameSpace_I(iSpace), nStep, '   blows up at step', &
-                  iStepFail
-          else
-             write(*,'(1x,a,1x,a,i6,es11.3,2f9.4,es10.2)')              &
-                  NameTime_I(iTime), NameSpace_I(iSpace), nStep, Error, &
-                  fMax, fMin, dMass
-          end if
-       end do; end do
-       if(iCfl == 1) call save_plot_file(                        &
-            NameFile='test_semi_gyration.out',                   &
-            TypeFileIn='real8', TimeIn=tFinal,                   &
-            NameVarIn='-Py Px FB FC FF FT FTb CB CC CF CT CTb'// &
-            ' BB BC BF BT BTb Exact Cfl', ParamIn_I=[Cfl_I(1)],  &
-            CoordMinIn_D=[-12.0 + 12.0/nQ, -12.0 + 12.0/nQ],     &
-            CoordMaxIn_D=[ 12.0 - 12.0/nQ,  12.0 - 12.0/nQ],     &
-            VarIn_VII=Plot_VC)
-    end do
-    ! Spatial order on the arc tFinal/16 at CFL = 0.5. The backward time
-    ! weight has Dt ~ DeltaQ**2 (CFL = 25/nQ), so that its first order
-    ! temporal error stays below the spatial one
-    write(*,'(a,3i4)')' test_semi_gyration: t = tFinal/16, CFL = 0.5'// &
-         ' (25/nQ backward), L1 error for nQ =', nQ_I
-    do iTime = 1, 3; do iSpace = 1, 5
-       IsFailed = .false.
-       do iGrid = 1, nGrid
-          Cfl = Cfl_I(1)
-          if(iTime == 3) Cfl = min(Cfl, 25.0/nQ_I(iGrid))
-          call run_gyration(nQ_I(iGrid), tFinal/16, iTime, iSpace, Cfl, &
-               Error_I(iGrid), fMax, fMin, dMass, nStep, iStepFail)
-          IsFailed = IsFailed .or. iStepFail > 0
-       end do
-       call write_rate(Error_I)
-    end do; end do
-    ! Temporal order to tFinal/8 on the fixed grid. As Dt -> 0, all time
-    ! weights converge to the same semi-discrete solution, since the
-    ! Courant weight of the correction, max(0, 1 - 2*alpha)*CFL, vanishes.
-    ! The reference is Crank-Nicolson with nStepRef steps, the correction
-    ! weighted with alpha by Picard iterations. The bound of tvd-b,
-    ! (1 - alpha)*|f_j - f|, does not depend on Dt, so the bounded
-    ! schemes converge to a different solution for every time weight:
-    ! tvd-b is left out
-    do iSpace = 1, 4
-       call run_gyration(nQ, tFinal/8, 2, iSpace, Cfl_I(1), Error, fMax, &
-            fMin, dMass, nStep, iStepFail, Ref_VC(iSpace,:,:),          &
-            nStepIn=nStepRef, nPicardIn=50)
-    end do
-    write(*,'(a,i4,a,i4,a)')' test_semi_gyration: t = tFinal/8,', nQ,  &
-         '**2 cells, L1 difference from the reference with', nStepRef, &
-         ' steps for 25, 50, 100, 200 steps'
-    do iTime = 1, 3; do iSpace = 1, 4
-       IsFailed = .false.
-       do iDt = 1, nDt
-          call run_gyration(nQ, tFinal/8, iTime, iSpace, Cfl_I(1), &
-               Error, fMax, fMin, dMass, nStep, iStepFail,         &
-               Sol_VC(iDt,:,:), nStepIn=25*2**(iDt-1))
-          IsFailed = IsFailed .or. iStepFail > 0
-       end do
-       call write_rate(difference())
-    end do; end do
-    iTime = 2; iSpace = 4; IsFailed = .false.
-    do iDt = 1, nDt
-       call run_gyration(nQ, tFinal/8, iTime, iSpace, Cfl_I(1), &
-            Error, fMax, fMin, dMass, nStep, iStepFail,         &
-            Sol_VC(iDt,:,:), nStepIn=25*2**(iDt-1), nPicardIn=50)
-       IsFailed = IsFailed .or. iStepFail > 0
-    end do
-    call write_rate(difference(), 'tvd-P')
-  contains
-    !==========================================================================
-    function difference() result(Diff_I)
-      ! L1 differences between the solutions and the reference
-      real :: Diff_I(nDt)
-      !------------------------------------------------------------------------
-      do iDt = 1, nDt
-         Diff_I(iDt) = sum(abs(Sol_VC(iDt,:,:) - Ref_VC(iSpace,:,:))) &
-              *(24.0/nQ)**2/36.0
-      end do
-    end function difference
-    !==========================================================================
-    subroutine write_rate(Error_I, NameSpaceIn)
-      ! Errors and their mean rate of decrease per halving
-      real, intent(in) :: Error_I(:)
-      character(len=*), optional, intent(in) :: NameSpaceIn
-      character(len=8) :: NameSpace
-      character(len=40) :: StringFormat
-      integer :: n
-      !------------------------------------------------------------------------
-      NameSpace = NameSpace_I(iSpace)
-      if(present(NameSpaceIn)) NameSpace = NameSpaceIn
-      n = size(Error_I)
-      if(IsFailed .or. any(Error_I <= 0.0))then
-         write(*,'(1x,a,1x,a,a)')NameTime_I(iTime), NameSpace, &
-              '   blows up'
-         RETURN
-      end if
-      write(NameRate,'(f8.2)') log(Error_I(1)/Error_I(n))/log(2.0)/(n - 1)
-      write(StringFormat,'(a,i0,a)') '(1x,a,1x,a,', n, 'es11.3,a,a)'
-      write(*,StringFormat)NameTime_I(iTime), NameSpace, Error_I, &
-           '  rate', NameRate
-    end subroutine write_rate
-    !==========================================================================
-  end subroutine test_semi_gyration
-  !============================================================================
-  subroutine run_gyration(nQ, tFinal, iTime, iSpace, Cfl, Error, fMax, &
-       fMin, dMass, nStep, iStepFail, Plot_C, nStepIn, nPicardIn, Exact_C)
-    ! Advance the cosine cap on nQ**2 cells of [-12,12]**2 to tFinal,
-    ! with the time weight 0.5*(iTime-1) and the face scheme iSpace of
-    ! test_semi_gyration. The time step is fixed: tFinal is divided into
-    ! equal steps at CFL <= Cfl, or into nStepIn steps if present.
-    ! iStepFail > 0 is the step at which the solution blows up. The
-    ! diagonally dominant matrices (upwind, or central at alpha*CFL < 1)
-    ! are solved by Gauss-Seidel iterations, the others by the band LU.
-    ! Optionally, nPicardIn iterations weight the limited correction
-    ! with alpha. Plot_C and Exact_C are the numerical and the exact
-    ! solutions at tFinal.
-
-    integer, intent(in) :: nQ, iTime, iSpace
-    real,    intent(in) :: tFinal, Cfl
-    real,    intent(out):: Error, fMax, fMin, dMass
-    integer, intent(out):: nStep, iStepFail
-    real, optional, intent(out):: Plot_C(nQ,nQ), Exact_C(nQ,nQ)
-    integer, optional, intent(in):: nStepIn, nPicardIn
-
-    real, parameter :: WidthX = 6.0, WidthY = 6.0
-    real, parameter :: Sigma_I(5) = [0.0, 0.5, 1.0, 0.0, 0.0]
-    real :: DeltaQ, VDF_G(-1:nQ+2,-1:nQ+2), VDFInit_G(-1:nQ+2,-1:nQ+2)
-    real :: VDFFinal_C(nQ,nQ), Source_C(nQ,nQ)
-    real :: Volume_G(0:nQ+1,0:nQ+1), Hamiltonian_N(-1:nQ+1,-1:nQ+1)
-    real :: Dt, DtCfl, Q, P, Alpha
-    integer :: iQ, iP, iStep
-    character(len=3) :: TypeSolver
-    !--------------------------------------------------------------------------
-    DeltaQ = 24.0/nQ
-    Volume_G = DeltaQ**2
-    do iP = -1, nQ+1; do iQ = -1, nQ+1
-       Hamiltonian_N(iQ,iP) = hamiltonian( &
-            (DeltaQ*(iQ - nQ/2))**2 + (DeltaQ*(iP - nQ/2))**2)
-    end do; end do
-    do iP = -1, nQ+2
-       P = DeltaQ*(iP - nQ/2 - 0.50)
-       do iQ = -1, nQ+2
-          Q = DeltaQ*(iQ - nQ/2 - 0.50)
-          VDFInit_G(iQ,iP) = initial_cap(Q,P)
-          if(min(iQ,iP) >= 1 .and. max(iQ,iP) <= nQ) &
-               VDFFinal_C(iQ,iP) = final_cap(Q,P)
-       end do
-    end do
-    VDF_G = VDFInit_G
-    ! The time step at CFL = Cfl, reduced to divide tFinal
-    call calc_implicit_source(nQ, nQ, VDF_G, Volume_G, Source_C, &
-         Hamiltonian_N, AlphaIn=0.0, CFLIn=Cfl, DtOut=DtCfl)
-    nStep = ceiling(tFinal/DtCfl)
-    if(present(nStepIn)) nStep = nStepIn
-    Dt = tFinal/nStep
-    Alpha = 0.5*(iTime - 1)
-    TypeSolver = 'LU'
-    if(Sigma_I(iSpace) == 0.0 .or. (Sigma_I(iSpace) == 0.5 .and. &
-         Alpha*Cfl*Dt/DtCfl < 1.0)) TypeSolver = 'lGS'
-    iStepFail = 0
-    do iStep = 1, nStep
-       call calc_implicit_source(nQ, nQ, VDF_G, Volume_G, Source_C,    &
-            Hamiltonian_N, AlphaIn=Alpha, SigmaIn=Sigma_I(iSpace), &
-            UseTvdIn=iSpace >= 4, UseSemiBoundIn=iSpace == 5,      &
-            nPicardIn=nPicardIn, DtIn=Dt, TypeSolverIn=TypeSolver)
-       VDF_G(1:nQ,1:nQ) = VDF_G(1:nQ,1:nQ) + Source_C
-       if(.not.(maxval(abs(VDF_G(1:nQ,1:nQ))) < 1e3))then
-          iStepFail = iStep
-          EXIT
-       end if
-    end do
-    Error = sum(abs(VDF_G(1:nQ,1:nQ) - VDFFinal_C) &
-         *Volume_G(1:nQ,1:nQ))/(WidthX*WidthY)
-    fMax = maxval(VDF_G(1:nQ,1:nQ)); fMin = minval(VDF_G(1:nQ,1:nQ))
-    dMass = sum(VDF_G(1:nQ,1:nQ) - VDFInit_G(1:nQ,1:nQ)) &
-         /sum(VDFInit_G(1:nQ,1:nQ))
-    if(present(Plot_C))then
-       where(abs(VDF_G(1:nQ,1:nQ)) < 1e3)
-          Plot_C = VDF_G(1:nQ,1:nQ)
-       elsewhere
-          Plot_C = 1e3
-       end where
-    end if
-    if(present(Exact_C)) Exact_C = VDFFinal_C
-  contains
-    !==========================================================================
-    real function initial_cap(x,y)
-      real, intent(in) :: x,y
-      real, parameter :: xCenter = -6.0, yCenter = 0.0
-      !------------------------------------------------------------------------
-      initial_cap = 0.0
-      if(abs(x  - xCenter)<=WidthX/2.and.abs(y - yCenter)<=WidthY/2)then
-         initial_cap = cos(cPi*(x - xCenter)/WidthX)**4*&
-              cos(cPi*(y - yCenter)/WidthY)**4
-      end if
-    end function initial_cap
-    !==========================================================================
-    real function final_cap(x,y)
-      real, intent(in) :: x,y
-      real :: CosPhi,SinPhi,Phi, P, P2, OmegaT, xInit, yInit
-      !------------------------------------------------------------------------
-      P2  = x**2 + y**2
-      OmegaT = tFinal/hamiltonian(P2)
-      P  = sqrt(P2)
-      CosPhi = x/P; SinPhi = y/P
-      if(SinPhi>=0.0)then
-         Phi =  acos(CosPhi)
-      else
-         Phi = -acos(CosPhi)
-      end if
-      xInit = P*cos(Phi + OmegaT)
-      yInit = P*sin(Phi + OmegaT)
-      final_cap = initial_cap(xInit,yInit)
-    end function final_cap
-    !==========================================================================
-  end subroutine run_gyration
-  !============================================================================
-  subroutine test_dsa_semi
-    ! Steady shock acceleration of test_dsa_impl, started from the
-    ! solution of test_dsa_poisson, with the semi-implicit scheme:
-    ! forward, central and backward time weights combined with the
-    ! face schemes of test_semi_gyration. The diffusion is implicit.
-    ! Prints the number of steps (to a relative change below Tolerance,
-    ! or nStepMax, 10 per momentum bin, or to a blow-up), the last
-    ! relative change, the minimum of f and the spectral index at
-    ! iX = 500, fitted for 0.5 < log10(p) < LogPFitMaxDsa (1.5 on the
-    ! nightly grid); saves the spectra. The matrices of the upwind scheme
-    ! or of the diffusion alone are solved by Gauss-Seidel iterations
-    ! (TypeSolverDsa), the others by the band LU.
-
-    integer :: nStepMax
-    real,    parameter :: Tolerance = 1.0e-12
-    ! CFL for each time weight: local time steps at the explicit limit
-    ! for the forward weight, a global time step otherwise
-    real,    parameter :: Cfl_I(3) = [0.98, 98.0, 98.0]
-    logical, parameter :: UseLocalDt_I(3) = [.true., .false., .false.]
-    character(len=8), parameter :: NameTime_I(3) = &
-         ['forward ', 'central ', 'backward']
-    character(len=8), parameter :: NameSpace_I(5) = &
-         ['backward', 'central ', 'forward ', 'tvd     ', 'tvd-b   ']
-    real,    parameter :: Sigma_I(5) = [0.0, 0.5, 1.0, 0.0, 0.0]
-    real ::  MomentumRatio, MomentumMin, MomentumMax
-    real ::  VDF_G(-1:nX+2, -1:nP+2)
-    real ::  Hamiltonian_N(-1:nX+1, -1:nP+1)
-    real ::  Volume_G(0:nX+1, 0:nP+1)
-    real ::  VolumeX_I(-1:nX+2)
-    real ::  VolumeP_I(0:nP+1)
-    real ::  DOuter_I(nX) = 1.0, dInner_I(0:nX+1) = 20.0
-    real ::  Diffusion_FX(0:nX,1:nP)
-    real ::  LogMomentum_I(0:nP+1)     ! Cell centered, for plots
-    real ::  Momentum3_I(-1:nP+1)
-    real ::  Coord_I(-1:nX+2)  ! Time-dependent coordinate of a mesh
-    real ::  Dist_I(-1:nX+1)   ! Distance from mesh i to mesh i+1
-    real ::  Source_C(nX,nP), Plot_VI(15,nP), Change, SpectralIndex
-    logical :: IsFit_I(nP), IsFailed
-    integer :: iP, iStep, iTime, iSpace
-    character(len=12) :: NameIndex
-    character(len=5)  :: TypeSolver
-    !--------------------------------------------------------------------------
-    ! Logarithmic grid in momentum, as in test_dsa_impl
-    MomentumRatio   = exp(log(pMaxDsa/pMinDsa)/nP)
-    MomentumMax     = pMinDsa/MomentumRatio
-    Momentum3_I(-1) = MomentumMax**3/3
-    do iP = 0, nP + 1
-       MomentumMin = MomentumMax
-       MomentumMax = MomentumMin*MomentumRatio
-       Momentum3_I(iP) = MomentumMax**3/3
-       VolumeP_I(iP)   = Momentum3_I(iP) - Momentum3_I(iP-1)
-       LogMomentum_I(iP) = 0.50*log10(MomentumMin*MomentumMax)
-    end do
-    IsFit_I = LogMomentum_I(1:nP) > 0.5 .and. &
-         LogMomentum_I(1:nP) < LogPFitMaxDsa
-    nStepMax = 10*nP
-    call update_coords(600.0)
-    write(*,'(a)')' test_dsa_semi: time     space     CFL   nStep'// &
-         '  change    min f    index'
-    do iTime = 1, 3; do iSpace = 1, 5
-       VDF_G = VDFOld_G
-       TypeSolver = 'LU'
-       if(Sigma_I(iSpace) == 0.0 .or. iTime == 1) TypeSolver = TypeSolverDsa
-       do iStep = 1, nStepMax
-          if(IsTransposedDsa)then
-             call step_transposed
-          else
-             call calc_implicit_source(nX, nP, VDF_G, Volume_G, Source_C,    &
-                  Hamiltonian_N, AlphaIn=0.5*(iTime - 1),                &
-                  SigmaIn=Sigma_I(iSpace), UseTvdIn=iSpace >= 4,         &
-                  UseSemiBoundIn=iSpace == 5,                            &
-                  Diffusion_FX=Diffusion_FX, AlphaDiffIn=1.0,            &
-                  IsSteadyState=UseLocalDt_I(iTime), CFLIn=Cfl_I(iTime), &
-                  TypeSolverIn=TypeSolver, nSweepMaxIn=nSweepDsa)
-          end if
-          VDF_G(1:nX,1:nP) = VDF_G(1:nX,1:nP) + Source_C
-          Change = maxval(abs(Source_C)/(abs(VDF_G(1:nX,1:nP)) + 1e-30))
-          VDF_G(1:nX,-1:0 ) = FloorDsa
-          VDF_G(1:nX,nP+1:nP+2) = FloorDsa
-          VDF_G( 0,      :) = VDF_G(1,       :)
-          VDF_G(-1,      :) = VDF_G(1,       :)
-          VDF_G(nX+1:nX+2,iPInj) = vdf_inj(Momentum3_I(iPInj-1:iPInj))
-          IsFailed = .not.(maxval(abs(VDF_G(1:nX,1:nP))) < 1e6)
-          if(Change < Tolerance .or. IsFailed) EXIT
-       end do
-       iStep = min(iStep, nStepMax)
-       ! Least squares slope of log f versus log p
-       if(all(VDF_G(500,1:nP) > 0.0 .or. .not.IsFit_I) .and. &
-            .not.IsFailed)then
-          SpectralIndex = slope(LogMomentum_I(1:nP), &
-               log10(abs(VDF_G(500,1:nP))))
-          write(NameIndex,'(f9.3)') SpectralIndex
-       else
-          NameIndex = '   none'
-       end if
-       if(IsFailed)then
-          write(*,'(15x,a,1x,a,f6.2,i7,a)')NameTime_I(iTime), &
-               NameSpace_I(iSpace), Cfl_I(iTime), iStep, '   blows up'
-       else
-          write(*,'(15x,a,1x,a,f6.2,i7,es10.2,es10.2,a)')            &
-               NameTime_I(iTime), NameSpace_I(iSpace), Cfl_I(iTime), &
-               iStep, Change, minval(VDF_G(1:nX,1:nP)), trim(NameIndex)
-       end if
-       Plot_VI(5*(iTime-1)+iSpace,:) = &
-            log10(max(abs(VDF_G(500,1:nP)), 1e-30))
-    end do; end do
-    call save_plot_file(NameFile='test_dsa_semi.out',              &
-         TypeFileIn='ascii', nStepIn = nStepMax,                   &
-         NameVarIn='LogMomentum FB FC FF FT FTb CB CC CF CT CTb'// &
-         ' BB BC BF BT BTb',                                       &
-         CoordMinIn_D=[ LogMomentum_I(1 ) ],                       &
-         CoordMaxIn_D=[ LogMomentum_I(nP) ],                       &
-         Coord1In_I = LogMomentum_I(1:nP),                         &
-         VarIn_VI = Plot_VI)
-  contains
-    !==========================================================================
-    real function slope(x_I, y_I)
-      real, intent(in) :: x_I(nP), y_I(nP)
-      real :: xMean, yMean
-      !------------------------------------------------------------------------
-      xMean = sum(x_I, MASK=IsFit_I)/count(IsFit_I)
-      yMean = sum(y_I, MASK=IsFit_I)/count(IsFit_I)
-      slope = sum((x_I - xMean)*(y_I - yMean), MASK=IsFit_I) &
-           /sum((x_I - xMean)**2, MASK=IsFit_I)
-    end function slope
-    !==========================================================================
-    subroutine step_transposed
-      ! The step with the coordinates in the other order, the lines of
-      ! the solver along the momentum; the Poisson bracket changes sign
-      real, allocatable :: F_G(:,:), H_N(:,:), V_G(:,:), D_FY(:,:), &
-           S_C(:,:)
-      !------------------------------------------------------------------------
-      allocate(F_G(-1:nP+2,-1:nX+2), H_N(-1:nP+1,-1:nX+1), &
-           V_G(0:nP+1,0:nX+1), D_FY(1:nP,0:nX), S_C(nP,nX))
-      F_G = transpose(VDF_G); H_N = -transpose(Hamiltonian_N)
-      V_G = transpose(Volume_G); D_FY = transpose(Diffusion_FX)
-      call calc_implicit_source(nP, nX, F_G, V_G, S_C, H_N,             &
-           AlphaIn=0.5*(iTime - 1), SigmaIn=Sigma_I(iSpace),        &
-           UseTvdIn=iSpace >= 4, UseSemiBoundIn=iSpace == 5,        &
-           Diffusion_FY=D_FY, AlphaDiffIn=1.0,                      &
-           IsSteadyState=UseLocalDt_I(iTime), CFLIn=Cfl_I(iTime),   &
-           TypeSolverIn=TypeSolver, nSweepMaxIn=nSweepDsa)
-      Source_C = transpose(S_C)
-    end subroutine step_transposed
-    !==========================================================================
-    subroutine update_coords(Time)
-
-      real, intent(in):: Time
-
-      ! Effective width of the shock wave, in cell size
-      integer, parameter:: nWidth = 1
-
-      ! terms in the functions, describing the
-      ! lagrangian point motion
-      real, parameter:: cQuad = 0.375/nWidth, cConst = 0.375*nWidth
-      ! Loop variables
-      integer :: iX, iP
-      real    :: CoordLagr, DiffusionX_I(0:nX)
-      ! Shock wave with the compression ratio of 4, with width ~1
-      !------------------------------------------------------------------------
-      ! Coord_I is the cell-centered coordinate
-      do iX = -1, nX +2
-         CoordLagr = iX - 0.50 -Time
-         if(CoordLagr>=0.0)then
-            Coord_I(iX) = CoordLagr + Time
-         elseif(CoordLagr>=-real(nWidth))then
-            Coord_I(iX) = CoordLagr + Time + cQuad*CoordLagr**2
-         else
-            Coord_I(iX) = 0.250*CoordLagr -cConst + Time
-         end if
-      end do
-      ! Dist is the distance to the next cell center
-      Dist_I(-1:nX+1) = Coord_I(0:nX+2) - Coord_I(-1:nX+1)
-      VolumeX_I(0:nX+1) = 0.50*(Dist_I(-1:nX) + Dist_I(0:nX+1))
-      VolumeX_I(-1)  = Dist_I(-1); VolumeX_I(nX+2) =  Dist_I(nX+1)
-      do iP = 0, nP+1
-         Volume_G(0:nX+1,iP) = VolumeP_I(iP)*VolumeX_I(0:nX+1)
-      end do
-      do iP = -1, nP+1
-         Hamiltonian_N(-1:nX+1, iP)= -0.50*Momentum3_I(iP)*&
-              (VolumeX_I(-1:nX+1) + VolumeX_I(0:nX+2))
-      end do
-      ! Get diffusion coefficients
-      ! No-flux BC at the left boundary:
-      DiffusionX_I(0) = 0.0
-      do iX = 1, nX
-         DiffusionX_I(iX) = &
-              DOuter_I(iX)*0.50*(DInner_I(iX) + DInner_I(iX+1))/Dist_I(iX)
-      end do
-      do iP = 1, nP
-         Diffusion_FX(:,iP) =  VolumeP_I(iP)*DiffusionX_I
-      end do
-    end subroutine update_coords
-    !==========================================================================
-  end subroutine test_dsa_semi
-  !============================================================================
-  subroutine test_semi_implicit_one_rotation(tFinal)
-    ! Order of accuracy of the first order (upwind) scheme,
-    ! semi_implicit_one, with the explicit (alpha = 0), Crank-Nicolson (1/2)
-    ! and implicit (1) time weights, on the rotation of run_rotation.
-    ! Expected: spatial order (CFL = 0.5) about 1 for all three; temporal
-    ! order 1, 2 and 1.
-
-    real, intent(in) :: tFinal
-
-    integer :: iAlpha
-    character(len=*), parameter:: NameSub = 'test_semi_implicit_one_rotation'
-    !--------------------------------------------------------------------------
-    write(*,*) '=== ', NameSub, ': SPATIAL order (CFL=0.5) ==='
-    write(*,*) '   (first-order upwind -> order ~ 1 for all three schemes)'
-    do iAlpha = 1, 3
-       write(*,'(a)') ' '//NameAlpha_I(iAlpha)
-       call write_spatial_order('semi_implicit_one', 0.5*(iAlpha - 1), &
-            [40, 80, 160, 320], tFinal, Cfl=0.5)
-    end do
-    write(*,*) '=== ', NameSub, ': TEMPORAL order (nC=100, ref=tiny dt) ==='
-    write(*,*) '   (explicit -> 1, implicit -> 1, Crank-Nicolson -> 2)'
-    call write_temporal_order('semi_implicit_one', 100, 0.02, &
-         [20, 40, 80, 160], AlphaRef=0.5)
-    ! The finest Crank-Nicolson solution and the exact rotated blob
-    call save_rotation('semi_implicit_one', 0.5, .true., 0.5, tFinal)
-  end subroutine test_semi_implicit_one_rotation
-  !============================================================================
-  subroutine test_semi_implicit_two_rotation(tFinal)
-    ! Order of accuracy of the second order scheme without limiter,
-    ! semi_implicit_two, on the rotation of run_rotation. Expected: spatial
-    ! order about 2 with Crank-Nicolson (CFL = 0.1); temporal order 2 for
-    ! Crank-Nicolson, 1 for the implicit scheme.
-
-    real, intent(in) :: tFinal
-
-    character(len=*), parameter:: NameSub = 'test_semi_implicit_two_rotation'
-    !--------------------------------------------------------------------------
-    write(*,*) '=== ', NameSub, ': SPATIAL order (Crank-Nicolson, CFL=0.1) ==='
-    write(*,*) '   (centered 2nd-order operator + CN time -> order ~ 2)'
-    call write_spatial_order('semi_implicit_two', 0.5, [40, 80, 160, 320], &
-         tFinal, Cfl=0.1)
-    write(*,*) '=== ', NameSub, ': TEMPORAL order (nC=100, ref=tiny dt) ==='
-    write(*,*) '   (Crank-Nicolson -> 2, backward Euler alpha=1 -> 1)'
-    call write_temporal_order('semi_implicit_two', 100, 0.02, &
-         [20, 40, 80, 160], AlphaRef=0.5)
-    ! The finest Crank-Nicolson solution and the exact rotated blob
-    call save_rotation('semi_implicit_two', 0.5, .true., 0.5, tFinal)
-  end subroutine test_semi_implicit_two_rotation
-  !============================================================================
-  subroutine test_semi_implicit_tvd_rotation(tFinal)
-    ! Order of accuracy of the TVD scheme, semi_implicit_tvd, on the
-    ! rotation of run_rotation. On the smooth blob the limiters are
-    ! mostly inactive away from the peak. The spatial order is measured
-    ! with alpha = 1 and Dt = CsDt*Delta**2, so that the first order
-    ! temporal error does not mask the spatial one. At alpha = 1 the
-    ! bound of the correction at the extrema, (1 - alpha)*|f_j - f|, is
-    ! zero, which switches the correction off at the extrema along the
-    ! trajectories: the order is about 1 (about 2 without the bound).
-    ! With the original CsDt = 0.5 the Picard iterations do not converge
-    ! on 50**2 cells (CFL = 2.2), and 400**2 cells take more than 10
-    ! minutes. The bound does not vanish as Dt -> 0, so the schemes with
-    ! different alpha converge to different solutions: each is compared
-    ! with its own reference.
-
-    real, intent(in) :: tFinal
-
-    character(len=*), parameter:: NameSub = &
-         'test_semi_implicit_tvd_rotation'
-    !--------------------------------------------------------------------------
-    write(*,*) '=== ', NameSub, ': SPATIAL order (alpha=1, Dt=CsDt*dC^2) ==='
-    write(*,*) '   (the bound at the extrema is zero at alpha=1 -> order ~ 1)'
-    ! The finest solution and the exact rotated blob are saved
-    call write_spatial_order('semi_implicit_tvd', 1.0, [50, 100, 200], &
-         tFinal, CsDt=0.25, DoSave=.true.)
-    write(*,*) '=== ', NameSub, ': TEMPORAL order (nC=50, ref=tiny dt) ==='
-    write(*,*) '   (the reference has the same alpha)'
-    call write_temporal_order('semi_implicit_tvd', 50, 0.01, &
-         [40, 80, 160, 320])
-  end subroutine test_semi_implicit_tvd_rotation
-  !============================================================================
-  subroutine write_spatial_order(NameScheme, Alpha, nC_I, tFinal, Cfl, &
-       CsDt, DoSave)
-    ! L1 errors of run_rotation on the grids nC_I and their orders. The
-    ! time step is from the Courant number Cfl or, if CsDt is present,
-    ! CsDt times the cell size squared. With DoSave, the solution on the
-    ! finest grid is saved by write_rotation
-    character(len=*), intent(in) :: NameScheme
-    real,    intent(in) :: Alpha, tFinal
-    integer, intent(in) :: nC_I(:)
-    real,    optional, intent(in) :: Cfl, CsDt
-    logical, optional, intent(in) :: DoSave
-
-    real, allocatable :: Plot_VC(:,:,:)
-    real    :: Error, ErrorPrev, CflOrDt
-    integer :: iGrid, nC
-    !--------------------------------------------------------------------------
-    ErrorPrev = -1.0
-    do iGrid = 1, size(nC_I)
-       nC = nC_I(iGrid)
-       if(present(CsDt))then
-          CflOrDt = CsDt*(WidthRotation/nC)**2
-       else
-          CflOrDt = Cfl
-       end if
-       if(iGrid == size(nC_I) .and. present(DoSave))then
-          allocate(Plot_VC(2,nC,nC))
-          call run_rotation(NameScheme, nC, Alpha, .not.present(CsDt), &
-               CflOrDt, tFinal, Error, fSave_C=Plot_VC(1,:,:),         &
-               Exact_C=Plot_VC(2,:,:))
-          if(DoSave) call write_rotation(NameScheme, tFinal, Plot_VC)
-       else
-          call run_rotation(NameScheme, nC, Alpha, .not.present(CsDt), &
-               CflOrDt, tFinal, Error)
-       end if
-       call write_error('nC', nC, Error, ErrorPrev)
-       ErrorPrev = Error
-    end do
-  end subroutine write_spatial_order
-  !============================================================================
-  subroutine write_temporal_order(NameScheme, nC, tFinal, nStep_I, &
-       AlphaRef)
-    ! L1 differences between the solutions of run_rotation on nC**2 cells
-    ! with nStep_I steps and the reference with 1280 steps, for the time
-    ! weights 0, 1/2 and 1. The reference has the time weight AlphaRef
-    ! if present, else the same one
-    character(len=*), intent(in) :: NameScheme
-    integer, intent(in) :: nC, nStep_I(:)
-    real,    intent(in) :: tFinal
-    real, optional, intent(in) :: AlphaRef
-
-    real    :: Ref_C(nC,nC), Error, ErrorPrev
-    integer :: iAlpha, iStep
-    !--------------------------------------------------------------------------
-    if(present(AlphaRef)) call run_rotation(NameScheme, nC, AlphaRef, &
-         .false., tFinal/1280.0, tFinal, Error, fSave_C=Ref_C)
-    do iAlpha = 1, 3
-       write(*,'(a)') ' '//NameAlpha_I(iAlpha)
-       if(.not.present(AlphaRef)) call run_rotation(NameScheme, nC, &
-            0.5*(iAlpha - 1), .false., tFinal/1280.0, tFinal, Error, &
-            fSave_C=Ref_C)
-       ErrorPrev = -1.0
-       do iStep = 1, size(nStep_I)
-          call run_rotation(NameScheme, nC, 0.5*(iAlpha - 1), .false., &
-               tFinal/nStep_I(iStep), tFinal, Error, fRef_C=Ref_C)
-          call write_error('nStep', nStep_I(iStep), Error, ErrorPrev)
-          ErrorPrev = Error
-       end do
-    end do
-  end subroutine write_temporal_order
-  !============================================================================
-  subroutine write_error(NameN, n, Error, ErrorPrev)
-    ! A line of the tables: the order from the previous error, if any
-    character(len=*), intent(in) :: NameN
-    integer, intent(in) :: n
-    real,    intent(in) :: Error, ErrorPrev
-    !--------------------------------------------------------------------------
-    if(ErrorPrev > 0.0)then
-       write(*,'(a,i5,a,es11.3,a,f6.2)') '    '//NameN//'=', n, &
-            '  L1=', Error, '   order=', log(ErrorPrev/Error)/log(2.0)
-    else
-       write(*,'(a,i5,a,es11.3)') '    '//NameN//'=', n, '  L1=', Error
-    end if
-  end subroutine write_error
-  !============================================================================
-  subroutine save_rotation(NameScheme, Alpha, UseCfl, CflOrDt, tFinal)
-    ! Save the solution of run_rotation on 200**2 cells with
-    ! write_rotation
-    character(len=*), intent(in) :: NameScheme
-    real,    intent(in) :: Alpha, CflOrDt, tFinal
-    logical, intent(in) :: UseCfl
-
-    integer, parameter :: nC = 200
-    real :: Plot_VC(2,nC,nC), Error
-    !--------------------------------------------------------------------------
-    call run_rotation(NameScheme, nC, Alpha, UseCfl, CflOrDt, tFinal, &
-         Error, fSave_C=Plot_VC(1,:,:), Exact_C=Plot_VC(2,:,:))
-    call write_rotation(NameScheme, tFinal, Plot_VC)
-  end subroutine save_rotation
-  !============================================================================
-  subroutine write_rotation(NameScheme, tFinal, Plot_VC)
-    ! Write the numerical and the exact solutions of run_rotation to
-    ! test_NameScheme_rotation.out
-    character(len=*), intent(in) :: NameScheme
-    real, intent(in) :: tFinal, Plot_VC(:,:,:)
-
-    real :: dC
-    !--------------------------------------------------------------------------
-    dC = WidthRotation/size(Plot_VC, 2)
-    call save_plot_file(NameFile='test_'//NameScheme//'_rotation.out', &
-         TypeFileIn='real8', TimeIn=tFinal, nStepIn=0,                &
-         NameVarIn='x y VDF Exact',                                   &
-         CoordMinIn_D=[-0.5*WidthRotation + 0.5*dC,                   &
-         -0.5*WidthRotation + 0.5*dC],                                &
-         CoordMaxIn_D=[0.5*WidthRotation - 0.5*dC,                    &
-         0.5*WidthRotation - 0.5*dC], VarIn_VII=Plot_VC)
-  end subroutine write_rotation
-  !============================================================================
-  subroutine run_rotation(NameScheme, nC, Alpha, UseCfl, CflOrDt, tFinal, &
-       Error, fSave_C, fRef_C, Exact_C)
-    ! E x B rigid rotation of a Gaussian blob, the test of the schemes
-    ! of the semi-implicit manuscript: the Hamiltonian is
-    ! (Omega/2)*(x**2 + y**2), the period 2*pi/Omega = 1, the domain
-    ! [-3,3]**2 with nC**2 cells, and the exact solution is the initial
-    ! blob rotated rigidly. Advance it to tFinal with the scheme
-    ! NameScheme (semi_implicit_one, semi_implicit_two or semi_implicit_tvd)
-    ! and the time weight Alpha. With UseCfl the time step is from
-    ! CFL = CflOrDt, the last one reduced to reach tFinal; otherwise it is
-    ! CflOrDt, adjusted to divide tFinal. Error is the relative L1 error
-    ! with respect to fRef_C if present, else to the exact solution.
-    ! fSave_C and Exact_C are the numerical and exact solutions.
-
-    character(len=*), intent(in) :: NameScheme
-    integer, intent(in) :: nC
-    real,    intent(in) :: Alpha, CflOrDt, tFinal
-    logical, intent(in) :: UseCfl
-    real,    intent(out):: Error
-    real, optional, intent(out):: fSave_C(nC,nC), Exact_C(nC,nC)
-    real, optional, intent(in) :: fRef_C(nC,nC)
-
-    real, parameter :: Omega = cTwoPi
-    ! Initial center and width of the blob
-    real, parameter :: xBlob = -0.6, yBlob = 0.6, WidthBlob = 0.4
-    real, allocatable :: VDF_G(:,:), Volume_G(:,:), Hamiltonian_N(:,:), &
-         Source_C(:,:), Exact_II(:,:)
-    real    :: dC, Time, Dt, DtLocal
-    integer :: i, j, iStep, nStep
-    !--------------------------------------------------------------------------
-    dC = WidthRotation/nC
-    allocate(VDF_G(-1:nC+2,-1:nC+2), Volume_G(0:nC+1,0:nC+1), &
-         Hamiltonian_N(-1:nC+1,-1:nC+1), Source_C(nC,nC),    &
-         Exact_II(nC,nC))
-    Volume_G = dC*dC
-    do j = -1, nC+1; do i = -1, nC+1
-       Hamiltonian_N(i,j) = 0.5*Omega* &
-            ((dC*(i - nC/2))**2 + (dC*(j - nC/2))**2)
-    end do; end do
-    do j = -1, nC+2; do i = -1, nC+2
-       VDF_G(i,j) = blob(dC*(i - nC/2) - 0.5*dC, dC*(j - nC/2) - 0.5*dC, &
-            0.0)
-    end do; end do
-    if(UseCfl)then
-       Time = 0.0
-       do
-          call advance(CFLIn=CflOrDt, DtOut=Dt)
-          if(Time + Dt >= tFinal)then
-             Dt = tFinal - Time
-             call advance(DtIn=Dt)
-             VDF_G(1:nC,1:nC) = VDF_G(1:nC,1:nC) + Source_C
-             EXIT
-          end if
-          VDF_G(1:nC,1:nC) = VDF_G(1:nC,1:nC) + Source_C
-          Time = Time + Dt
-       end do
-    else
-       nStep = max(1, nint(tFinal/CflOrDt))
-       Dt = tFinal/nStep
-       do iStep = 1, nStep
-          DtLocal = Dt
-          call advance(DtIn=DtLocal)
-          VDF_G(1:nC,1:nC) = VDF_G(1:nC,1:nC) + Source_C
-       end do
-    end if
-    do j = 1, nC; do i = 1, nC
-       Exact_II(i,j) = blob(dC*(i - nC/2) - 0.5*dC, &
-            dC*(j - nC/2) - 0.5*dC, tFinal)
-    end do; end do
-    if(present(fRef_C))then
-       Error = sum(abs(VDF_G(1:nC,1:nC) - fRef_C))/sum(abs(fRef_C))
-    else
-       Error = sum(abs(VDF_G(1:nC,1:nC) - Exact_II))/sum(abs(Exact_II))
-    end if
-    if(present(fSave_C)) fSave_C = VDF_G(1:nC,1:nC)
-    if(present(Exact_C)) Exact_C = Exact_II
-  contains
-    !==========================================================================
-    real function blob(x, y, Time)
-      ! The blob with its center rotated by the angle Omega*Time:
-      ! dx/dt = Omega*y, dy/dt = -Omega*x
-      real, intent(in) :: x, y, Time
-      real :: xCenter, yCenter
-      !------------------------------------------------------------------------
-      xCenter =  xBlob*cos(Omega*Time) + yBlob*sin(Omega*Time)
-      yCenter = -xBlob*sin(Omega*Time) + yBlob*cos(Omega*Time)
-      blob = exp(-((x - xCenter)**2 + (y - yCenter)**2)/(2*WidthBlob**2))
-    end function blob
-    !==========================================================================
-    subroutine advance(DtIn, CFLIn, DtOut)
-      real, optional, intent(inout) :: DtIn
-      real, optional, intent(in)    :: CFLIn
-      real, optional, intent(out)   :: DtOut
-      !------------------------------------------------------------------------
-      select case(NameScheme)
-      case('semi_implicit_one')
-         call semi_implicit_one(nC, nC, VDF_G, Volume_G, Source_C, Alpha, &
-              Hamiltonian12_N=Hamiltonian_N, DtIn=DtIn, CFLIn=CFLIn,  &
-              DtOut=DtOut)
-      case('semi_implicit_two')
-         call semi_implicit_two(nC, nC, VDF_G, Volume_G, Source_C, Alpha, &
-              Hamiltonian12_N=Hamiltonian_N, DtIn=DtIn, CFLIn=CFLIn,  &
-              DtOut=DtOut)
-      case('semi_implicit_tvd')
-         call semi_implicit_tvd(nC, nC, VDF_G, Volume_G, Source_C, Alpha, &
-              Hamiltonian12_N=Hamiltonian_N, DtIn=DtIn, CFLIn=CFLIn,     &
-              DtOut=DtOut)
-      case default
-         call CON_stop('run_rotation: unknown scheme '//NameScheme)
-      end select
-    end subroutine advance
-    !==========================================================================
-  end subroutine run_rotation
   !============================================================================
 end module ModTestPoissonBracket
 !==============================================================================
@@ -3159,12 +2442,10 @@ program test_program
   use ModTestPoissonBracket, ONLY: test_poisson_bracket, test_dsa_sa_mhd, &
        test_dsa_poisson, test_energy_conservation, test_in_action_angle,  &
        test_poisson_2d, test_poisson_2d_smooth, test_dsa_impl,            &
-       test_semi_gyration, test_dsa_semi, test_semi_implicit_one_rotation,   &
-       test_semi_implicit_two_rotation, test_semi_implicit_tvd_rotation,     &
-       set_dsa_grid, TypeSolverDsa, nSweepDsa, IsTransposedDsa,           &
-       nStepSaMhd, CflSaMhd, nStepImpl, CflImpl, DoHistoryDsa, LevelDsa
+       set_dsa_grid, nStepSaMhd, CflSaMhd, nStepImpl, CflImpl,            &
+       DoHistoryDsa, LevelDsa, test_gyration_implicit
   use ModNumConst, ONLY: cTwoPi
-  use ModUtilities, ONLY: CON_stop, upper_case, lower_case
+  use ModUtilities, ONLY: CON_stop, lower_case
   use ModHillVortex, ONLY: test_hill_vortex
   use ModStochastic, ONLY: test_stochastic
   use ModTestMultiPoisson, ONLY: test_multi_poisson
@@ -3175,7 +2456,6 @@ program test_program
   ! are described at their cases below
   character(len=20) :: NameTest = '', StringArg, NameGrid = 'nightly'
   integer :: iArg, iEqual, iError
-  logical :: IsDsaVariant = .false.
   real    :: pMaxP0 = 1.0e4, FloorP0 = 1.0e-16
   integer :: nBinP0 = 20
   !----------------------------------------------------------------------------
@@ -3187,19 +2467,6 @@ program test_program
      iEqual = index(StringArg, '=')
      iError = 0
      select case(StringArg(1:max(iEqual-1,0)))
-     case('solver')
-        ! dsa: solver of test_dsa_semi, lGS (line Gauss-Seidel) or lGS1
-        ! (the iterations of implicit2)
-        TypeSolverDsa = StringArg(iEqual+1:)
-        call upper_case(TypeSolverDsa)
-        ! The line Gauss-Seidel names start with a lower-case l
-        if(TypeSolverDsa(1:2) == 'LG') TypeSolverDsa(1:1) = 'l'
-     case('sweeps')
-        ! dsa: maximum number of the Gauss-Seidel sweeps
-        read(StringArg(iEqual+1:), *, iostat=iError) nSweepDsa
-     case('transposed')
-        ! dsa: T puts the solver lines along the momentum
-        read(StringArg(iEqual+1:), *, iostat=iError) IsTransposedDsa
      case('steps')
         ! Comprho4Shock: iterations of the explicit scheme (default 1000)
         read(StringArg(iEqual+1:), *, iostat=iError) nStepSaMhd
@@ -3233,45 +2500,14 @@ program test_program
      case default
         iError = 1
      end select
-     ! steps=, cfl=, cin=, isteps=, grid=, level=, pmax=, bins= and floor=
-     ! belong to Comprho4Shock, the others to dsa
-     if(any(StringArg(1:max(iEqual-1,0)) == ['steps ', 'cfl   ', &
-          'cin   ', 'isteps', 'grid  ', 'level ', 'pmax  ', 'bins  ',  &
-          'floor ']))then
-        if(NameTest /= 'comprho4shock') iError = 1
-     elseif(NameTest /= 'dsa')then
-        iError = 1
-     end if
+     ! All the options belong to Comprho4Shock
+     if(NameTest /= 'comprho4shock') iError = 1
      if(iError /= 0) call CON_stop( &
           'test_program: unknown or wrong argument '//trim(StringArg))
-     IsDsaVariant = NameTest == 'dsa'
   end do
   write(*,*)' Start poisson bracket tests'
 
   select case(NameTest)
-  case('rotation')
-     ! Rotation of a Gaussian blob by a quarter turn with the schemes of
-     ! the semi-implicit manuscript; takes a few minutes
-     call test_semi_implicit_one_rotation(0.25)
-     call test_semi_implicit_two_rotation(0.25)
-     call test_semi_implicit_tvd_rotation(0.25)
-  case('gyration')
-     ! Gyration test of the semi-implicit scheme over one period
-     call test_semi_gyration(cTwoPi)
-  case('dsa')
-     ! 100 momentum bins from 0.1 to 1e4 instead of 40 from 1 to 100, the
-     ! injection still at p = 1; the floor is lowered to 1e-16, so that it
-     ! is the same fraction of the p^-4 spectrum at the upper boundary.
-     ! The index is fitted for 3 < p < 300 instead of 3 < p < 30.
-     ! With solver=, sweeps= or transposed= only test_dsa_poisson, the
-     ! initial state, runs before test_dsa_semi
-     call set_dsa_grid(100, 0.1, 1.0e4, 1.0e-16, 2.5)
-     call test_dsa_poisson
-     if(.not.IsDsaVariant)then
-        call test_dsa_sa_mhd
-        call test_dsa_impl
-     end if
-     call test_dsa_semi
   case('comprho4shock')
      ! The steady shock acceleration of the manuscript (compression ratio
      ! 4): the explicit scheme with local time steps and implicit2, with
@@ -3291,6 +2527,10 @@ program test_program
      call test_dsa_poisson
      call test_dsa_sa_mhd
      call test_dsa_impl
+  case('gyration')
+     ! Gyration of nightly test1 for one period: explicit and
+     ! implicit2 at several CFL numbers
+     call test_gyration_implicit(cTwoPi)
   case('', 'explicitorig')
      ! Nightly tests (make test_poisson_bracket), also explicitorig
      call test_poisson_bracket(cTwoPi)       ! nightly test1
@@ -3312,8 +2552,8 @@ program test_program
      ! Scatter only by diffusion
      ! call test_multi_poisson(100.0, TypeScatter='diffuse_scatter')
   case default
-     call CON_stop('test_program: expected gyration, Comprho4Shock, '// &
-          'dsa, explicitorig or rotation')
+     call CON_stop( &
+          'test_program: expected Comprho4Shock, gyration or explicitorig')
   end select
   write(*,*)' Finish poisson bracket tests'
 
