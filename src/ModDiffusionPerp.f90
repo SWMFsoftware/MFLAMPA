@@ -35,8 +35,8 @@ module SP_ModPerpDiffusion
 
   ! Whether to include Perpendicular Diffusion
   logical, public :: UseDiffusionPerp = .false.
-  character(len=15), public :: TypeDPerp = 'UseDParaRatio'
-  real, public      :: DParaRatio = 0.01        ! Simple ratio of Dperp/Dpara
+  character(len=15), public :: TypeDPerp = 'UseDPerpRatio'
+  real, public      :: DPerpRatio = 0.01        ! Simple ratio of Dperp/Dpara
   logical, public :: DoTestDPerp = .false.
 
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
@@ -78,9 +78,9 @@ contains
        if(UseDiffusionPerp) then
           call read_var('TypeDPerp', TypeDPerp)
           select case(trim(TypeDPerp))
-          case('UseDParaRatio')
-             ! Simply assume DPerp/DPara = DParaRatio
-             call read_var('DParaRatio', DParaRatio)
+          case('UseDPerpRatio')
+             ! Simply assume DPerp/DPara = DPerpRatio
+             call read_var('DPerpRatio', DPerpRatio)
           case default
              call CON_stop(NameSub//": Unknown type of DPerp")
           end select
@@ -543,7 +543,7 @@ contains
           do j = 1, nThetaPerp
              do k = 1, nPhiPerp
                 ! A cell with no Dperp > 0 does not limit dt (no division
-                ! by Dperp = 0, e.g. for DParaRatio = 0)
+                ! by Dperp = 0, e.g. for DPerpRatio = 0)
                 DPerpMax = maxval(DPerp_4D(:,k,j,i))
                 if(DPerpMax > 0.0) dtLocal_III(k,j,i) = 0.5/(1.0/dRMin**2 + &
                      1.0/(RPerp_C(i)*dThetaPerp)**2 + &

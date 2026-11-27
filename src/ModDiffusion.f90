@@ -181,7 +181,7 @@ contains
 
     use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx, DPerp_CB
     ! Needed to split the turbulent Dxx into along-line part and Dperp
-    use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, DParaRatio
+    use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, DPerpRatio
 
     ! Variables as inputs
     ! Input Line, End (for how many particles), and Shock indices
@@ -276,9 +276,9 @@ contains
        ! With Dperp, split Dxx as set_diffusion_coef splits the formula
        ! coefficient, so that Dxx is not also diffused in full along B
        if(UseDiffusionPerp) then
-          DInnerSi_II(1:nX, 1:nP) = DInnerSi_II(1:nX, 1:nP)*(1.0-DParaRatio)
+          DInnerSi_II(1:nX, 1:nP) = DInnerSi_II(1:nX, 1:nP)*(1.0-DPerpRatio)
           do iP = 1, nP
-             DPerp_CB(iP, 1:nX, iLine) = DParaRatio* &
+             DPerp_CB(iP, 1:nX, iLine) = DPerpRatio* &
                   DInnerSi_II(1:nX, iP)*DOuterSi_I(1:nX)
           end do
        end if
@@ -507,7 +507,7 @@ contains
     use ModConst, ONLY: cElectronCharge, cProtonMass
     use SP_ModDistribution, ONLY: MomentumInjSi
     use SP_ModTurbulence, ONLY: DPerp_CB
-    use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, DParaRatio
+    use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, DPerpRatio
     integer, intent(in):: iLine, nX, iShock
     integer            :: iP
     real, intent(in)   :: BSi_I(1:nX)
@@ -593,10 +593,10 @@ contains
 
     ! for perpendicular diffusion: it becomes "Dpara - Dperp" here
     if(UseDiffusionPerp) then
-       DInnerSi_II(1:nX, :) = DInnerSi_II(1:nX, :)*(1.0-DParaRatio)
+       DInnerSi_II(1:nX, :) = DInnerSi_II(1:nX, :)*(1.0-DPerpRatio)
        ! gather Dperp along multiple field lines on each processor
        do iP = 1, nP
-          DPerp_CB(iP, 1:nX, iLine) = DParaRatio* &
+          DPerp_CB(iP, 1:nX, iLine) = DPerpRatio* &
                DInnerSi_II(1:nX, iP)*BSi_I(1:nX)
        end do
     end if

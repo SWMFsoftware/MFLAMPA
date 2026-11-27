@@ -910,9 +910,9 @@ Used for testing, to disable diffusion, which by default is true.
   <parameter name="UseDiffusionPerp" type="logical" default="F" />
   <if expr="$UseDiffusionPerp">
     <parameter name="TypeDPerp" type="string" input="select">
-      <option name="UseDParaRatio" default="T" />
+      <option name="UseDPerpRatio" default="T" />
     </parameter>
-    <parameter name="DParaRatio" type="real" min="0.0" max="1.0"
+    <parameter name="DPerpRatio" type="real" min="0.0" max="1.0"
 	       default="0.01" />
     <parameter name="nRPerp" type="integer" min="2" default="100" />
     <parameter name="RMinPerp" type="real" min="0.0" default="1.2" />
@@ -931,8 +931,8 @@ Used for testing, to disable diffusion, which by default is true.
 
 #DIFFUSIONPERP
 T			UseDiffusionPerp
-UseDParaRatio		TypeDPerp
-0.01			DParaRatio
+UseDPerpRatio		TypeDPerp
+0.01			DPerpRatio
 100			nRPerp
 2.0			RMinPerp
 240.0			RMaxPerp
@@ -943,9 +943,9 @@ F			DoTestDPerp
 
 Perpendicular (cross-field) diffusion between the field lines. If
 UseDiffusionPerp is false (default), no other parameter is read.
-TypeDPerp='UseDParaRatio' reduces the parallel diffusion coefficient to
-(1-DParaRatio)*DPara and sets DPerp = DParaRatio times that reduced value,
-i.e. DPerp = DParaRatio*(1-DParaRatio)*DPara. The diffusion
+TypeDPerp='UseDPerpRatio' reduces the parallel diffusion coefficient to
+(1-DPerpRatio)*DPara and sets DPerp = DPerpRatio times that reduced value,
+i.e. DPerp = DPerpRatio*(1-DPerpRatio)*DPara. The diffusion
 acts on nRPerp spherical shells between RMinPerp and RMaxPerp [Rs], with
 Linear, Exp (geometric) or HalfExp (mean of the two) spacing; a line node
 is updated from the two nearest shell centres (from the first shell below
