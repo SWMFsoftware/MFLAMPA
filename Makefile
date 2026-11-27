@@ -141,6 +141,26 @@ test_poisson_bracket_check:
 		>> test_poisson.diff)
 	@ls -l test_poisson.diff
 
+# Benchmark tests with analytic solutions (src/test_transport.f90)
+test_transport.o: ./src/test_transport.f90 ./src/libMFLAMPA.a
+	${COMPILE.f90} ${Cflag0} ./src/test_transport.f90
+
+test_transport_exe:
+	@(cd ${SHAREDIR}; ${MAKE} LIB)
+	@(cd ${EMPIRICALCRDIR}; ${MAKE} LIB)
+	@(cd ${TIMINGDIR}; ${MAKE} LIB)
+	@(cd src; ${MAKE} LIB)
+	@make test_transport.o
+	rm -rf Tmp_; mkdir Tmp_
+	cd Tmp_; \
+		ar -x ../src/libMFLAMPA.a; \
+		ar -x ${LIBDIR}/libTIMING.a; \
+		ar -x ${LIBDIR}/libEMPIRICALCR.a; \
+		ar -x ${LIBDIR}/libSHARE.a
+	${LINK.f90} -o test_transport.exe test_transport.o \
+		Tmp_/*.o ${LflagMpi}
+	rm -rf Tmp_
+
 #######################################################################
 
 

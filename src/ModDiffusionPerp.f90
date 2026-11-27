@@ -25,6 +25,7 @@ module SP_ModPerpDiffusion
   ! Public members:
   public :: read_param, init, diffuseperp_distribution, &
        interp_source_intersect, interp_source_linenode
+  public :: solver_fvm_diffuse3d ! 3D FVM solver (test_transport.f90)
   ! Diffusion in space
   interface diffuseperp_distribution
      ! Global time step Dt
