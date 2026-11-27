@@ -388,10 +388,12 @@ Set the interpolated location in the unit of [AU] to test triangulation.
 <command name="TRIANGULATION" if="$_IsFirstSession">
   <parameter name="UsePoleTriangulation"  type="logical" default="F" />
   <parameter name="UsePlanarTriangles"  type="logical" default="T" />
+  <parameter name="TolMergeTriangulation"  type="real" min="0" default="1e-6" />
 
 #TESTPOS
 F			UsePoleTriangulation
 T			UsePlanarTriangles
+1e-6			TolMergeTriangulation [rad]
 
 This command can only be used in the first session.
 
@@ -399,6 +401,20 @@ Set options when making TRIANGULATION: (1) whether we manually include
 the north and south poles. Recommended to do if there are too few points;
 (2) whether we use planar or spherical triangles. Recommended to have
 spherical triangles if we set a specific radius.
+(3) TolMergeTriangulation [rad]: crossing points closer than this angle
+are merged into one node (averaged values, first line index), and a
+crossing that close to a pole replaces the added pole node. The crossing
+points are triangulated by the same STRIPACK routine, made robust: the
+points are normalized to unit length; if the first three nodes lie nearly
+on one great circle, a well-conditioned triple is put first; if all nodes
+lie on one great circle, two auxiliary nodes are added at the poles of
+that circle; the error code of STRIPACK and the mesh (number of triangles,
+positive areas) are checked, and the run stops with a clear message if
+they fail. The interpolation weights are finite, non-negative and sum to
+1. A point outside the triangulated region (possible only without the
+pole nodes) gets the value of the nearest node and the stencil -1, so flux
+maps and satellites treat it as before. Merged nodes, replaced poles and
+fallbacks are reported (at most 10 lines). Default is 1e-6 rad.
 </command>
 
 <command name="SPREADGRID">

@@ -86,6 +86,7 @@ T			UseModulationPot
 #TRIANGULATION
 F				UsePoleTriangulation
 T				UsePlanarTriangles
+1e-6				TolMergeTriangulation
 
 #TESTTRIANGULATE
 T
