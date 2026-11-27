@@ -11,7 +11,7 @@ module SP_ModTriangulate
        search_line, MHData_VIB, X_, Y_, Z_, nP, nMu
   use SP_ModProc, ONLY: iProc, nProc, iComm, iError
   use SP_ModSize, ONLY: nDim
-  use SP_ModTurbulence, ONLY: DPerp_CB, DPerp_IIBI
+  use SP_ModTurbulence, ONLY: DPerp_CB, DPerp_IBI
 
   implicit none
 
@@ -63,7 +63,7 @@ module SP_ModTriangulate
   ! for shell iRMeshSp and used by the next interpolate_trmesh calls):
   ! node coordinates, line index of each node (or -1/-2 for the poles,
   ! -3/-4 for auxiliary nodes), STRIPACK structure, states at the nodes.
-  ! Xyz_DII, DistrR_IIBI, DPerp_IIBI and iLineReach_II are not changed.
+  ! Xyz_DII, DistrR_IIBI, DPerp_IBI and iLineReach_II are not changed.
   integer :: iRMeshSp = -1, nMeshSp = 0
   logical :: IsDPerpMeshSp = .false.
   real,    allocatable :: XyzMeshSp_DI(:,:)
@@ -71,7 +71,7 @@ module SP_ModTriangulate
   integer, allocatable :: iListSp_I(:), iPointerSp_I(:), &
        iEndSp_I(:)
   real,    allocatable :: DistrMeshSp_III(:,:,:), &
-       DPerpMeshSp_III(:,:,:)
+       DPerpMeshSp_II(:,:)
   ! Input node (index in Xyz_DII) kept as mesh node, 0 for auxiliary nodes
   integer, allocatable :: iSourceSp_I(:)
   ! Notes about merged nodes and fallbacks: at most MaxNoteSp lines
@@ -152,11 +152,11 @@ contains
     !--------------------------------------------------------------------------
     if(allocated(Xyz_DII)) deallocate(Xyz_DII, iLineReach_II, &
          DistrR_IIBI, nTriMesh_I, iList_I, iPointer_I, iEnd_I)
-    if(allocated(XyzOrig_DII)) deallocate(XyzOrig_DII, DPerp_IIBI)
+    if(allocated(XyzOrig_DII)) deallocate(XyzOrig_DII, DPerp_IBI)
     allocate(Xyz_DII(X_:Z_, 1:nLineAll+2, nR))
     allocate(XyzOrig_DII(X_:Z_, 1:nLineAll+2, nR))
     allocate(DistrR_IIBI(0:nP+1, 1:nMu, 1:nLineAll+2, nR))
-    allocate(DPerp_IIBI(1:nP, 1:nMu, 1:nLineAll+2, nR))
+    allocate(DPerp_IBI(1:nP, 1:nLineAll+2, nR))
     allocate(iLineReach_II(1:nLineAll+2, nR))
     allocate(nTriMesh_I(nR)); nTriMesh_I = 0
     allocate(iList_I(6*nLineAll))
@@ -204,7 +204,7 @@ contains
        if(IsIncludeDPerp) then
           ! In DPerp
           allocate(XyzOrig_DII(X_:Z_, 1:nLineAll+2, 1))
-          allocate(DPerp_IIBI(1:nP, 1:nMu, 1:nLineAll+2, 1))
+          allocate(DPerp_IBI(1:nP, 1:nLineAll+2, 1))
        end if
        allocate(iLineReach_II(1:nLineAll+2, 1))
        allocate(nTriMesh_I(1)); nTriMesh_I = 0
@@ -224,7 +224,7 @@ contains
     end if
     Xyz_DII(:,:,iR) = 0.0; iLineReach_II(:,iR) = 0
     DistrR_IIBI(:,:,:,iR) = 0.0
-    if(IsIncludeDPerp) DPerp_IIBI(:,:,:,iR) = 0.0
+    if(IsIncludeDPerp) DPerp_IBI(:,:,iR) = 0.0
 
     ! go over all lines on the processor and find the point of
     ! intersection with output sphere if present
@@ -246,9 +246,9 @@ contains
        DistrR_IIBI(:, :, iLineAll, iR) = ( &
             Distribution_CB(:, :, iAboveR,   iLine)* WeightR + &
             Distribution_CB(:, :, iAboveR-1, iLine)*(1-WeightR))
-       if(IsIncludeDPerp) DPerp_IIBI(:, :, iLineAll, iR) = ( &
-            DPerp_CB(:, :, iAboveR,   iLine)* WeightR + &
-            DPerp_CB(:, :, iAboveR-1, iLine)*(1-WeightR))
+       if(IsIncludeDPerp) DPerp_IBI(:, iLineAll, iR) = ( &
+            DPerp_CB(:, iAboveR,   iLine)* WeightR + &
+            DPerp_CB(:, iAboveR-1, iLine)*(1-WeightR))
     end do LINE !  iLine
 
     ! Gather interpolated coordinates on the source processor and Broadcast
@@ -259,8 +259,8 @@ contains
             iRoot, iComm, iError)
        call mpi_reduce_real_array(DistrR_IIBI(:,:,:,iR), &
             (nP+2)*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
-       if(IsIncludeDPerp) call mpi_reduce_real_array(DPerp_IIBI(:,:,:,iR), &
-            nP*nMu*nLineAll, MPI_SUM, iRoot, iComm, iError)
+       if(IsIncludeDPerp) call mpi_reduce_real_array(DPerp_IBI(:,:,iR), &
+            nP*nLineAll, MPI_SUM, iRoot, iComm, iError)
     end if
     ! Save original intersection points
     if(IsIncludeDPerp) XyzOrig_DII(:,:,iR) = Xyz_DII(:,:,iR)
@@ -276,7 +276,7 @@ contains
        iLineReach_II(iReachR,iR) = iLineAll
        DistrR_IIBI(:,:,iReachR,iR) = DistrR_IIBI(:,:,iLineAll,iR)
        if(IsIncludeDPerp) &
-            DPerp_IIBI(:,:,iReachR,iR) = DPerp_IIBI(:,:,iLineAll,iR)
+            DPerp_IBI(:,iReachR,iR) = DPerp_IBI(:,iLineAll,iR)
     end do
     if(iReachR == 0) call CON_stop(NameSub//': No valid intersection points!')
     nReachR = iReachR
@@ -294,8 +294,8 @@ contains
        DistrR_IIBI(:,:,2:nTriMesh_I(iR)-1,iR) = DistrR_IIBI(:,:,1:nReachR,iR)
        ! Shift DPerp as DistrR, so node i carries the Dperp of its own line;
        ! pole values are set by fix_state in build_trmesh(IsIncludeDPerpIn)
-       if(IsIncludeDPerp) DPerp_IIBI(:,:,2:nTriMesh_I(iR)-1,iR) = &
-            DPerp_IIBI(:,:,1:nReachR,iR)
+       if(IsIncludeDPerp) DPerp_IBI(:,2:nTriMesh_I(iR)-1,iR) = &
+            DPerp_IBI(:,1:nReachR,iR)
     else
        nTriMesh_I(iR)= nReachR
     end if
@@ -361,34 +361,32 @@ contains
                State_VI   = DistrR_IIBI(:, iMu, 1:nTriMesh_I(iR),iR))
        end do
        if(IsIncludeDPerp) then
-          do iMu = 1, nMu
-             ! North:
-             call fix_state( &
-                  iNodeToFix = nTriMesh_I(iR),                    &
-                  nNode      = nTriMesh_I(iR),                    &
-                  iList_I    = iList_I(:6*(nTriMesh_I(iR)-2)),    &
-                  iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
-                  iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
-                  Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
-                  nVar       = nP,                                &
-                  State_VI   = DPerp_IIBI(:,iMu,1:nTriMesh_I(iR),iR))
-             ! South:
-             call fix_state( &
-                  iNodeToFix = 1,                                 &
-                  nNode      = nTriMesh_I(iR),                    &
-                  iList_I    = iList_I(:6*(nTriMesh_I(iR)-2)),    &
-                  iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
-                  iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
-                  Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
-                  nVar       = nP,                                &
-                  State_VI   = DPerp_IIBI(:,iMu, 1:nTriMesh_I(iR),iR))
-          end do
+          ! North:
+          call fix_state( &
+               iNodeToFix = nTriMesh_I(iR),                    &
+               nNode      = nTriMesh_I(iR),                    &
+               iList_I    = iList_I(:6*(nTriMesh_I(iR)-2)),    &
+               iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
+               iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
+               Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
+               nVar       = nP,                                &
+               State_VI   = DPerp_IBI(:,1:nTriMesh_I(iR),iR))
+          ! South:
+          call fix_state( &
+               iNodeToFix = 1,                                 &
+               nNode      = nTriMesh_I(iR),                    &
+               iList_I    = iList_I(:6*(nTriMesh_I(iR)-2)),    &
+               iPointer_I = iPointer_I(:6*(nTriMesh_I(iR)-2)), &
+               iEnd_I     = iEnd_I(:nTriMesh_I(iR)),           &
+               Xyz_DI     = Xyz_DII(:,1:nTriMesh_I(iR),iR),    &
+               nVar       = nP,                                &
+               State_VI   = DPerp_IBI(:, 1:nTriMesh_I(iR),iR))
        end if
     end if
   end subroutine build_trmesh
   !============================================================================
   subroutine interpolate_trmesh(XyzInterp_D, iRIn, &
-       DistrInterp_II, DPerp_II, iStencilOut_I, WeightOut_I)
+       DistrInterp_II, DPerp_I, iStencilOut_I, WeightOut_I)
 
     use ModTriangulateSpherical, ONLY: find_triangle_orig, find_triangle_sph
     ! Input: Xyz coordinates of the point for interpolations
@@ -396,7 +394,7 @@ contains
     integer, optional, intent(in) :: iRIn
     ! Output: Interpolated values at XyzInterp_D
     real,    optional, intent(out):: DistrInterp_II(0:nP+1,1:nMu)
-    real,    optional, intent(out):: DPerp_II(1:nP,1:nMu)
+    real,    optional, intent(out):: DPerp_I(1:nP)
     ! variables for interpolation in a triangular mesh
     integer, optional, intent(out):: iStencilOut_I(3)
     real,    optional, intent(out):: WeightOut_I(3)
@@ -417,13 +415,13 @@ contains
     ! Location and weights on the mesh of trmesh_sp, so the old
     ! find_triangle_orig/find_triangle_sph lookup below is not used
     call interpolate_trmesh_sp(XyzInterp_D, iR, DistrInterp_II, &
-         DPerp_II, iStencilOut_I, WeightOut_I)
+         DPerp_I, iStencilOut_I, WeightOut_I)
     RETURN
     IsTriangleFound = .false.
     if(present(iStencilOut_I)) iStencilOut_I = -1
     if(present(WeightOut_I)) WeightOut_I = 0.0
     if(present(DistrInterp_II)) DistrInterp_II = 0.0
-    if(present(DPerp_II)) DPerp_II = 0.0
+    if(present(DPerp_I)) DPerp_I = 0.0
 
     ! Find the triangle where the satellite locates
     if(UsePlanarTri) then
@@ -458,11 +456,11 @@ contains
                DistrR_IIBI(:,:,iStencil_I(i),iR)*Weight_I(i)
        end do
     end if
-    if(present(DPerp_II)) then
+    if(present(DPerp_I)) then
        ! Interpolate the Dperp coefficient as outputs
        do i = 1, 3
-          DPerp_II = DPerp_II + &
-               DPerp_IIBI(:,:,iStencil_I(i),iR)*Weight_I(i)
+          DPerp_I = DPerp_I + &
+               DPerp_IBI(:,iStencil_I(i),iR)*Weight_I(i)
        end do
     end if
     if(present(iStencilOut_I)) then
@@ -531,14 +529,13 @@ contains
          iEndSp_I(nMax), DistrMeshSp_III(0:nP+1,nMu,nMax), &
          iSourceSp_I(nMax))
     if(IsIncludeDPerp)then
-       if(allocated(DPerpMeshSp_III))then
-          if(size(DPerpMeshSp_III, 3) /= nMax .or. &
-               size(DPerpMeshSp_III, 1) /= nP .or. &
-               size(DPerpMeshSp_III, 2) /= nMu) &
-               deallocate(DPerpMeshSp_III)
+       if(allocated(DPerpMeshSp_II))then
+          if(size(DPerpMeshSp_II, 2) /= nMax .or. &
+               size(DPerpMeshSp_II, 1) /= nP) &
+               deallocate(DPerpMeshSp_II)
        end if
-       if(.not.allocated(DPerpMeshSp_III)) &
-            allocate(DPerpMeshSp_III(nP,nMu,nMax))
+       if(.not.allocated(DPerpMeshSp_II)) &
+            allocate(DPerpMeshSp_II(nP,nMax))
     end if
     allocate(iSource_I(nMax), iGroup_I(n), nGroup_I(nMax), IsSpecial_I(nMax))
 
@@ -573,7 +570,7 @@ contains
     ! States at the mesh nodes: average over the data nodes of each group
     nGroup_I(1:nMesh) = 0
     DistrMeshSp_III(:,:,1:nMesh) = 0.0
-    if(IsIncludeDPerp) DPerpMeshSp_III(:,:,1:nMesh) = 0.0
+    if(IsIncludeDPerp) DPerpMeshSp_II(:,1:nMesh) = 0.0
     do iNode = 1, n
        ! the added poles are not data, their state is set below
        if(iLineReach_II(iNode,iR) < 0) CYCLE
@@ -581,15 +578,15 @@ contains
        nGroup_I(iMesh) = nGroup_I(iMesh) + 1
        DistrMeshSp_III(:,:,iMesh) = DistrMeshSp_III(:,:,iMesh) &
             + DistrR_IIBI(:,:,iNode,iR)
-       if(IsIncludeDPerp) DPerpMeshSp_III(:,:,iMesh) = &
-            DPerpMeshSp_III(:,:,iMesh) + DPerp_IIBI(:,:,iNode,iR)
+       if(IsIncludeDPerp) DPerpMeshSp_II(:,iMesh) = &
+            DPerpMeshSp_II(:,iMesh) + DPerp_IBI(:,iNode,iR)
     end do
     do iMesh = 1, nMesh
        if(nGroup_I(iMesh) < 2) CYCLE
        DistrMeshSp_III(:,:,iMesh) = &
             DistrMeshSp_III(:,:,iMesh)/nGroup_I(iMesh)
-       if(IsIncludeDPerp) DPerpMeshSp_III(:,:,iMesh) = &
-            DPerpMeshSp_III(:,:,iMesh)/nGroup_I(iMesh)
+       if(IsIncludeDPerp) DPerpMeshSp_II(:,iMesh) = &
+            DPerpMeshSp_II(:,iMesh)/nGroup_I(iMesh)
     end do
 
     ! Kept poles and auxiliary nodes (north first, as in build_trmesh)
@@ -611,19 +608,24 @@ contains
                iListSp_I(:6*(nMesh-2)), iPointerSp_I(:6*(nMesh-2)), &
                iEndSp_I(:nMesh), XyzMeshSp_DI(:,1:nMesh), &
                IsSpecial_I(1:nMesh), nP+2, DistrMeshSp_III(:,iMu,1:nMesh))
-          if(IsIncludeDPerp) call fix_state_sp(iSpecial_I(k), nMesh, &
-               iListSp_I(:6*(nMesh-2)), iPointerSp_I(:6*(nMesh-2)), &
-               iEndSp_I(:nMesh), XyzMeshSp_DI(:,1:nMesh), &
-               IsSpecial_I(1:nMesh), nP, DPerpMeshSp_III(:,iMu,1:nMesh))
        end do
     end do
+    ! DPerp has no mu index: fix its special nodes once
+    if(IsIncludeDPerp)then
+       do k = 1, nSpecial
+          call fix_state_sp(iSpecial_I(k), nMesh, &
+               iListSp_I(:6*(nMesh-2)), iPointerSp_I(:6*(nMesh-2)), &
+               iEndSp_I(:nMesh), XyzMeshSp_DI(:,1:nMesh), &
+               IsSpecial_I(1:nMesh), nP, DPerpMeshSp_II(:,1:nMesh))
+       end do
+    end if
     iRMeshSp = iR
     IsDPerpMeshSp = IsIncludeDPerp
     deallocate(iSource_I, iGroup_I, nGroup_I, IsSpecial_I)
   end subroutine trmesh_sp
   !============================================================================
   subroutine interpolate_trmesh_sp(XyzInterp_D, iR, &
-       DistrInterp_II, DPerp_II, iStencilOut_I, WeightOut_I)
+       DistrInterp_II, DPerp_I, iStencilOut_I, WeightOut_I)
 
     ! Replaces the lookup of interpolate_trmesh (same arguments, iR is
     ! required) on the mesh of trmesh_sp. The weights are finite, >= 0
@@ -635,14 +637,14 @@ contains
     !   iStencilOut_I = -1 and WeightOut_I = 0 as for "not found" before,
     !   so ModPlot and ModSatellite keep their treatment of such points,
     !   while ModDiffusionPerp and ModDrift get the nearest state, not 0.
-    ! DPerp_II after a build_trmesh without IsIncludeDPerpIn (as
-    ! ModDiffusionPerp does): DPerp_IIBI of the kept input node, as
+    ! DPerp_I after a build_trmesh without IsIncludeDPerpIn (as
+    ! ModDiffusionPerp does): DPerp_IBI of the kept input node, as
     ! intersect_surf left it (not averaged, poles not fixed), like the old
     ! lookup; an auxiliary node, which has no input node, adds 0.
     real,    intent(in) :: XyzInterp_D(nDim)
     integer, intent(in) :: iR
     real,    optional, intent(out):: DistrInterp_II(0:nP+1,1:nMu)
-    real,    optional, intent(out):: DPerp_II(1:nP,1:nMu)
+    real,    optional, intent(out):: DPerp_I(1:nP)
     integer, optional, intent(out):: iStencilOut_I(3)
     real,    optional, intent(out):: WeightOut_I(3)
 
@@ -691,17 +693,17 @@ contains
                DistrMeshSp_III(:,:,iStencil_I(i))*Weight_I(i)
        end do
     end if
-    if(present(DPerp_II))then
-       DPerp_II = 0.0
+    if(present(DPerp_I))then
+       DPerp_I = 0.0
        if(IsDPerpMeshSp)then
           do i = 1, 3
-             DPerp_II = DPerp_II + &
-                  DPerpMeshSp_III(:,:,iStencil_I(i))*Weight_I(i)
+             DPerp_I = DPerp_I + &
+                  DPerpMeshSp_II(:,iStencil_I(i))*Weight_I(i)
           end do
        else
           do i = 1, 3
-             if(iSourceSp_I(iStencil_I(i)) > 0) DPerp_II = DPerp_II + &
-                  DPerp_IIBI(:,:,iSourceSp_I(iStencil_I(i)),iR)*Weight_I(i)
+             if(iSourceSp_I(iStencil_I(i)) > 0) DPerp_I = DPerp_I + &
+                  DPerp_IBI(:,iSourceSp_I(iStencil_I(i)),iR)*Weight_I(i)
           end do
        end if
     end if

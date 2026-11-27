@@ -278,7 +278,7 @@ contains
        if(UseDiffusionPerp) then
           DInnerSi_II(1:nX, 1:nP) = DInnerSi_II(1:nX, 1:nP)*(1.0-DParaRatio)
           do iP = 1, nP
-             DPerp_CB(iP, nMu, 1:nX, iLine) = DParaRatio* &
+             DPerp_CB(iP, 1:nX, iLine) = DParaRatio* &
                   DInnerSi_II(1:nX, iP)*DOuterSi_I(1:nX)
           end do
        end if
@@ -596,7 +596,7 @@ contains
        DInnerSi_II(1:nX, :) = DInnerSi_II(1:nX, :)*(1.0-DParaRatio)
        ! gather Dperp along multiple field lines on each processor
        do iP = 1, nP
-          DPerp_CB(iP, nMu, 1:nX, iLine) = DParaRatio* &
+          DPerp_CB(iP, 1:nX, iLine) = DParaRatio* &
                DInnerSi_II(1:nX, iP)*BSi_I(1:nX)
        end do
     end if

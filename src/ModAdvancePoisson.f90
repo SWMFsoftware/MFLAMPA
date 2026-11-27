@@ -275,7 +275,7 @@ contains
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
     ! Save local time stepping
-    if(UseDiffusionPerp) Dt_CB(:, nMu, 1:nX, iLine) = Dt_C
+    if(UseDiffusionPerp) Dt_CB(:, 1:nX, iLine) = Dt_C
 
     ! Diffuse the distribution function
     if(UseDiffusion) then
@@ -358,7 +358,7 @@ contains
       call check_dist_neg(NameSub//' implicit', 1, nX, iLine)
       if(IsDistNeg) RETURN
       ! Save the time step
-      if(UseDiffusionPerp) Dt_CB(:, nMu, 1:nX, iLine) = DtImplicit
+      if(UseDiffusionPerp) Dt_CB(:, 1:nX, iLine) = DtImplicit
 
     end subroutine iterate_implicit
     !==========================================================================
@@ -770,7 +770,9 @@ contains
     call check_dist_neg(NameSub, 1, nX, iLine)
     if(IsDistNeg) RETURN
     ! Save local time stepping
-    if(UseDiffusionPerp) Dt_CB(:, :, 1:nX, iLine) = Dt_C
+    ! Dperp has no mu index: keep the mu-average of the local time step
+    ! (uniform mu grid, so all weights are equal)
+    if(UseDiffusionPerp) Dt_CB(:, 1:nX, iLine) = sum(Dt_C, DIM=2)/real(nMu)
 
     ! For pitch angle scattering
     if(UseMuScattering) then
