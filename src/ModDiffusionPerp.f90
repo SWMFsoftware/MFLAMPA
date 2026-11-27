@@ -35,7 +35,7 @@ module SP_ModPerpDiffusion
   ! Whether to include Perpendicular Diffusion
   logical, public :: UseDiffusionPerp = .false.
   character(len=15), public :: TypeDPerp = 'UseDParaRatio'
-  real, public      :: DParaRatio = 0.065       ! Simple ratio of Dperp/Dpara
+  real, public      :: DParaRatio = 0.01        ! Simple ratio of Dperp/Dpara
   logical, public :: DoTestDPerp = .false.
 
   ! Grid of the triangulated mesh for solving perp. term: nR * nTheta * nPhi
@@ -43,6 +43,9 @@ module SP_ModPerpDiffusion
   real            :: dThetaPerp, dPhiPerp       ! dTheta and dPhi
   real, allocatable:: dRPerpMesh_I(:), dRPerpFace_I(:) ! dR of cell center+face
   real            :: RMinPerp = 1.2, RMaxPerp = 240.0  ! RMin and RMax of Grid
+  ! Line nodes below RMinGhostPerp (in Rs) are not changed by the perp.
+  ! update; nodes from there up to RPerp_C(1) take the shell-1 values
+  real, parameter :: RMinGhostPerp = 1.105
   real            :: dLogRFacePerp = 0.0        ! Geometric Sequence for RMesh
   character(len=15):: ScaleRPerp                ! Scale (Linear/Log) along R_
   integer, allocatable :: iRPerpStart_I(:), iRPerpEnd_I(:)
@@ -56,6 +59,10 @@ module SP_ModPerpDiffusion
        AreaR_IIF(:,:,:), AreaTheta_IFI(:,:,:), AreaPhi_FII(:,:,:)    ! faces
   real, public, allocatable :: Volume_CB(:,:,:)                      ! volume
   real, public, allocatable :: Dt_CB(:,:,:,:)
+
+  ! TEST_PERPDIFF/pos prototype (positivity-preserving line coupling):
+  ! a grid node with f at or below DistrTiny gets no relative loss rate
+  real, parameter :: DistrTiny = tiny(1.0)
 contains
   !============================================================================
   subroutine read_param(NameCommand)
@@ -85,6 +92,8 @@ contains
           if(nRPerp<nProc) then
              write(*,*) "nRPerp = ", nRPerp, "< nProc = ", nProc, &
                   "now set nRPerp = nProc = ", nProc
+             ! Ensure every processor owns at least one radial shell
+             nRPerp = nProc
           end if
 
           ! From RMinPerp to RMaxPerp: Distribution of multiple spheres
@@ -304,7 +313,7 @@ contains
     ! cross-field (perpendicular) diffusion related steps and manipulations
 
     use SP_ModTriangulate, ONLY: reset_intersect_surf, intersect_surf, &
-         build_trmesh, interpolate_trmesh, nTriMesh_I
+         build_trmesh, interpolate_trmesh, nTriMesh_I, XyzOrig_DII
 
     ! inputs
     logical, intent(in) :: IsFirstCall
@@ -317,8 +326,13 @@ contains
          :: DistrPerp_5D, source_5D
     ! DPerp coefficients (5D)
     real :: DPerp_5D(nP, nMu, nPhiPerp, nThetaPerp, nRPerp)
-    ! source term (along lines)
-    real :: source_IV(nP, nMu, nLineAll, nRPerp)
+    ! Positivity-preserving coupling: grid f before the sub-steps, and the
+    ! split of the averaged df/dt (source_5D) into an absolute gain rate
+    ! Gain >= 0 and a relative loss rate LossRel <= 0 (per unit f), on the
+    ! uniform grid (5D) and at the line-shell intersections (IV)
+    real, dimension(nP, nMu, nPhiPerp, nThetaPerp, nRPerp) :: &
+         DistrOld_5D, Gain_5D, LossRel_5D
+    real, dimension(nP, nMu, nLineAll, nRPerp) :: Gain_IV, LossRel_IV
     character(len=*), parameter:: NameSub = 'diffuseperp_distribution_c'
     !--------------------------------------------------------------------------
     if(IsFirstCall) then
@@ -339,6 +353,11 @@ contains
              call MPI_BCAST(nTriMesh_I, nRPerp, &
                   MPI_INTEGER, iPE, iComm, iError)
           end do
+          ! Intersection points of all lines are complete only on the
+          ! root (0) of intersect_surf; interp_source_intersect needs
+          ! them on every processor
+          call MPI_BCAST(XyzOrig_DII, size(XyzOrig_DII), &
+               MPI_REAL, 0, iComm, iError)
        end if
 
        if(iProc == 0) then
@@ -346,7 +365,8 @@ contains
           ! Now, iProc is for sub-slices/layers in the `DistrPerp_5D` array
           do iRPerp = 1, nRPerp
              ! intersection points => construct the triangulation skeleton
-             call build_trmesh(iRPerp)
+             ! (also fix DPerp at the polar nodes before interpolating it)
+             call build_trmesh(iRPerp, IsIncludeDPerpIn=.true.)
              do iThetaPerp = 1, nThetaPerp
                 do iPhiPerp = 1, nPhiPerp
                    ! Get DPerp coefficient at the cell center (uniform grid)
@@ -400,11 +420,17 @@ contains
        end do
     end if
 
+    ! Save the grid f before the sub-steps (the same on all processors)
+    DistrOld_5D = DistrPerp_5D(1:nP,:,:,:,:)
+
     ! Step 4: Solve the DPerp equation in multiple uniform layers by FVM
     source_5D = 0.0
+    ! Pass the shells of this processor only, so that the dummy shell
+    ! range iRStart:iREnd refers to the same global shells
     call solver_fvm_diffuse3d(DPerp_5D,                 &
          iRPerpStart_I(iProc), iRPerpEnd_I(iProc),      &
-         IsSteadyState, dtIn_CB(1,1,1,1), DistrPerp_5D, &
+         IsSteadyState, dtIn_CB(1,1,1,1),               &
+         DistrPerp_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)), &
          source_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)))
     ! Broadcast source_5D (uniform grid) to all processes
     if(nProc > 1) then
@@ -422,11 +448,29 @@ contains
        RETURN
     end if
 
-    ! Step 5: Interpolate source back to the nodes along field lines
+    ! Step 4b: split df/dt at every grid node into an absolute gain rate
+    ! and a relative loss rate. Every processor holds the full source_5D
+    ! and DistrOld_5D, so this element-wise split is identical on all.
+    Gain_5D = max(source_5D(1:nP,:,:,:,:), 0.0)
+    where(DistrOld_5D > DistrTiny)
+       LossRel_5D = min(source_5D(1:nP,:,:,:,:), 0.0)/DistrOld_5D
+    elsewhere
+       LossRel_5D = 0.0
+    end where
+    ! Time-accurate: a node cannot lose more than it had, dt*LossRel >= -1
+    ! (interp_source_linenode also clips 1 + dt*LossRel at 0 on every node)
+    if(.not.IsSteadyState .and. dtIn_CB(1,1,1,1) > 0.0) &
+         LossRel_5D = max(LossRel_5D, -1.0/dtIn_CB(1,1,1,1))
+
+    ! Step 5: Interpolate gain and relative loss back to the line nodes
     ! uniform grid => intersection points
-    call interp_source_intersect(source_5D, source_IV)
+    ! (pass the shells of this processor, matching the dummy shell range)
+    call interp_source_intersect(                                     &
+         Gain_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)),    &
+         LossRel_5D(:,:,:,:,iRPerpStart_I(iProc):iRPerpEnd_I(iProc)), &
+         Gain_IV, LossRel_IV)
     ! intersection points => field line nodes
-    call interp_source_linenode(source_IV, dtIn_CB)
+    call interp_source_linenode(Gain_IV, LossRel_IV, dtIn_CB)
 
   end subroutine diffuseperp_distribution_c
   !============================================================================
@@ -450,6 +494,12 @@ contains
     real :: dt
     real :: dtLocal_III(nPhiPerp,nThetaPerp,nRPerp)
     integer :: nStep
+    ! smallest radial spacing in the radial stencil of a cell
+    real :: dRMin
+    ! largest Dperp in a cell; largest sum of the FVM face coefficients of
+    ! a cell (the update keeps f >= 0 if dt*LambdaMax <= 1); smallest grid
+    ! f over all sub-steps (diagnostic)
+    real :: DPerpMax, LambdaMax, DistrMinGrid
 
     ! ghost VDF when sendrecv across prev-current-next processors
     real :: DistrPrevProc_G(0:nP+1, 1:nMu, nPhiPerp, nThetaPerp), &
@@ -473,23 +523,52 @@ contains
        !       1/(R_i*sin(theta_j)*Delta(phi_k))**2 )]^{-1}
        dtLocal_III = 0.0
        do i = 1, nRPerp
+          ! DeltaR_i: smallest of the cell width and the centre-to-centre
+          ! spacings of the inner radial faces of cell i (as used in
+          ! calc_fvm_netflux); it equals dRPerpFace_I(i) on Linear grid
+          dRMin = dRPerpFace_I(i)
+          if(i > 1) dRMin = min(dRMin, dRPerpMesh_I(i-1))
+          if(i < nRPerp) dRMin = min(dRMin, dRPerpMesh_I(i))
           do j = 1, nThetaPerp
              do k = 1, nPhiPerp
-                dtLocal_III(k,j,i) = 0.5/(1.0/dRPerpFace_I(i)**2 + &
+                ! A cell with no Dperp > 0 does not limit dt (no division
+                ! by Dperp = 0, e.g. for DParaRatio = 0)
+                DPerpMax = maxval(DPerp_5D(:,:,k,j,i))
+                if(DPerpMax > 0.0) dtLocal_III(k,j,i) = 0.5/(1.0/dRMin**2 + &
                      1.0/(RPerp_C(i)*dThetaPerp)**2 + &
-                     1.0/(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp)**2)/ &
-                     maxval(DPerp_5D(:,:,k,j,i), mask=(DPerp_5D(:,:,k,j,i)>0))
+                     1.0/(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp)**2)/DPerpMax
              end do
           end do
        end do
-       dt = minval(dtLocal_III, mask=(dtLocal_III>0))
-       nStep = int(dtIn/dt) + 1
+       if(any(dtLocal_III > 0.0) .and. dtIn > 0.0) then
+          dt = minval(dtLocal_III, mask=(dtLocal_III>0))
+          nStep = int(dtIn/dt) + 1
+       else
+          ! Dperp = 0 everywhere, or dtIn <= 0: one sub-step, which does
+          ! not change DistrPerp_5D (never nStep = 0, so no 0/0 below)
+          nStep = 1
+       end if
        dt = dtIn/real(nStep)
+
+       ! Positivity check of the explicit update (all processors compute
+       ! the same LambdaMax from the full DPerp_5D)
+       call calc_lambda_max
+       if(DoTestDPerp .and. iProc == 0) write(*,*) 'DPerp pos: LambdaMax=', &
+            LambdaMax, ' dt*LambdaMax (stability dt)=', dt*LambdaMax
+       ! The stability dt above can exceed 1/LambdaMax slightly on the
+       ! spherical grid; if so, use the fewest extra sub-steps that give
+       ! dt*LambdaMax < 1 (no change if the bound already holds)
+       if(dtIn*LambdaMax >= real(nStep)) then
+          nStep = int(dtIn*LambdaMax) + 1
+          dt = dtIn/real(nStep)
+       end if
 
        ! Output test information
        if(DoTestDPerp) &
             write(*,*) 'DPerp: Stable (Used) dt=', dt, 'with nStep=', nStep
     end if
+    ! Smallest grid f before and during the sub-steps (diagnostic)
+    DistrMinGrid = minval(DistrPerp_5D(1:nP,:,:,:,:))
 
     ! Time stepping: Diffusion in 3D by FVM
     DIFFUSE3D:do iStep = 1, nStep
@@ -501,9 +580,66 @@ contains
        source_5D(1:nP,:,:,:,:) = source_5D(1:nP,:,:,:,:) + sourceIncrement_5D
        DistrPerp_5D(1:nP,:,:,:,:) = DistrPerp_5D(1:nP,:,:,:,:) + &
             sourceIncrement_5D*dt   ! f^{n+1} = f^{n} + (df/dt)*delta_t
+       DistrMinGrid = min(DistrMinGrid, minval(DistrPerp_5D(1:nP,:,:,:,:)))
     end do DIFFUSE3D
+    ! Average df/dt over the nStep sub-steps, so that source_5D*dtIn
+    ! equals the change of DistrPerp_5D over the full time step dtIn
+    source_5D(1:nP,:,:,:,:) = source_5D(1:nP,:,:,:,:)/real(nStep)
+
+    ! Report the smallest grid f over all shells and sub-steps
+    if(DoTestDPerp) then
+       if(nProc > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, DistrMinGrid, 1, &
+            MPI_REAL, MPI_MIN, iComm, iError)
+       if(iProc == 0) write(*,*) &
+            'DPerp pos: grid min f over all sub-steps=', DistrMinGrid
+    end if
 
   contains
+    !==========================================================================
+    subroutine calc_lambda_max
+      ! LambdaMax = max over cells and (p, mu) of the sum, over the faces
+      ! with a nonzero gradient, of DPerp_face*Area_face/(dX_face*Volume),
+      ! exactly as used in calc_fvm_netflux. The update
+      ! f_c + dt*sum_f c_f*(f_nb - f_c) = (1 - dt*Lambda_c)*f_c + dt*sum ...
+      ! keeps f >= 0 if dt*LambdaMax <= 1 (all c_f >= 0 since Dperp >= 0).
+      ! Zero-gradient faces (radial ends, theta=0 and pi) are skipped.
+
+      integer :: kP, kM
+      real    :: Lambda_II(nP, nMu)
+      !------------------------------------------------------------------------
+      LambdaMax = 0.0
+      do i = 1, nRPerp
+         do j = 1, nThetaPerp
+            do k = 1, nPhiPerp
+               Lambda_II = 0.0
+               ! Radial faces (i, i+1) and (i-1, i)
+               if(i < nRPerp) Lambda_II = Lambda_II + &
+                    0.5*(DPerp_5D(:,:,k,j,i) + DPerp_5D(:,:,k,j,i+1)) &
+                    /dRPerpMesh_I(i)*AreaR_IIF(k,j,i+1)
+               if(i > 1) Lambda_II = Lambda_II + &
+                    0.5*(DPerp_5D(:,:,k,j,i) + DPerp_5D(:,:,k,j,i-1)) &
+                    /dRPerpMesh_I(i-1)*AreaR_IIF(k,j,i)
+               ! Theta faces (j, j+1) and (j-1, j)
+               if(j < nThetaPerp) Lambda_II = Lambda_II + &
+                    0.5*(DPerp_5D(:,:,k,j,i) + DPerp_5D(:,:,k,j+1,i)) &
+                    /(RPerp_C(i)*dThetaPerp)*AreaTheta_IFI(k,j+1,i)
+               if(j > 1) Lambda_II = Lambda_II + &
+                    0.5*(DPerp_5D(:,:,k,j-1,i) + DPerp_5D(:,:,k,j,i)) &
+                    /(RPerp_C(i)*dThetaPerp)*AreaTheta_IFI(k,j,i)
+               ! Phi faces (periodic)
+               kP = mod(k,nPhiPerp)+1
+               kM = mod(k-2+nPhiPerp,nPhiPerp)+1
+               Lambda_II = Lambda_II + &
+                    (0.5*(DPerp_5D(:,:,k,j,i) + DPerp_5D(:,:,kP,j,i)) &
+                    *AreaPhi_FII(kP,j,i) &
+                    + 0.5*(DPerp_5D(:,:,kM,j,i) + DPerp_5D(:,:,k,j,i)) &
+                    *AreaPhi_FII(kM,j,i)) &
+                    /(RPerp_C(i)*ThetaPerpSin_C(j)*dPhiPerp)
+               LambdaMax = max(LambdaMax, maxval(Lambda_II)/Volume_CB(k,j,i))
+            end do
+         end do
+      end do
+    end subroutine calc_lambda_max
     !==========================================================================
     subroutine exchange_ghostVDF
       ! Exchange ghostVDF: iProcPrev |<=| (Start) iProc (End) |=>| iProcNext
@@ -541,6 +677,8 @@ contains
 
       integer :: jPlus, jMinus, kPlus, kMinus
       real    :: VolumeInv
+      ! radial distance used in gradF at face(i, ip) and face(im, i)
+      real    :: dRPlus, dRMinus
       real, dimension(1:nP, 1:nMu) :: DPerpPlus_II, DPerpMinus_II
       real, dimension(0:nP+1, 1:nMu) :: DistrPlus_II, DistrMinus_II
       !------------------------------------------------------------------------
@@ -568,32 +706,40 @@ contains
                   DistrMinus_II = DistrPrevProc_G(:,:,k,j)
                end if
                ! DPerp coefficient at face(i, i+1)
+               ! gradF at an inner face uses the centre-to-centre spacing
+               ! (conservative flux); at the outer boundary face the
+               ! gradient is zero (Neumann BC), so keep the cell width
                if(i < nRPerp) then
                   DPerpPlus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
                        + Dperp_5D(:,:,k,j,i+1))
+                  dRPlus = dRPerpMesh_I(i)
                else
                   DPerpPlus_II = Dperp_5D(:,:,k,j,i) + &
                        0.5*(Dperp_5D(:,:,k,j,i) - Dperp_5D(:,:,k,j,i-1))
+                  dRPlus = dRPerpFace_I(i)
                end if
                ! DPerp coefficient at face(i-1, i)
+               ! (same spacing choice; zero gradient at the inner boundary)
                if(i > 1) then
                   DPerpMinus_II = 0.5*(Dperp_5D(:,:,k,j,i) &
                        + Dperp_5D(:,:,k,j,i-1))
+                  dRMinus = dRPerpMesh_I(i-1)
                else
                   DPerpMinus_II = Dperp_5D(:,:,k,j,i) - &
                        0.5*(Dperp_5D(:,:,k,j,i+1) - Dperp_5D(:,:,k,j,i))
+                  dRMinus = dRPerpFace_I(i)
                end if
                ! FVM net flux: sourceIncrement_5D += (flux_ip - flux_im)
                sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)+ &
                     DPerpPlus_II &        ! + DPerp at face(i, ip)
                     *(DistrPlus_II(1:nP,:) - DistrPerp_5D(1:nP,:,k,j,i))&
-                    /dRPerpFace_I(i) &    ! * gradF at face(i, ip)
+                    /dRPlus &             ! * gradF at face(i, ip)
                     *AreaR_IIF(k,j,i+1) & ! * area of face(i, ip)
                     *VolumeInv            ! / volume of (k, j, i)
                sourceIncrement_5D(:,:,k,j,i) = sourceIncrement_5D(:,:,k,j,i)- &
                     DPerpMinus_II &       ! - DPerp at face(im, i)
                     *(DistrPerp_5D(1:nP,:,k,j,i) - DistrMinus_II(1:nP,:))&
-                    /dRPerpFace_I(i) &    ! * gradF at face(im, i)
+                    /dRMinus &            ! * gradF at face(im, i)
                     *AreaR_IIF(k,j,i) &   ! * area of face(im, i)
                     *VolumeInv            ! / volume of (k, j, i)
 
@@ -662,19 +808,21 @@ contains
     !==========================================================================
   end subroutine solver_fvm_diffuse3d
   !============================================================================
-  subroutine interp_source_intersect(source_5D, source_IV)
-    ! Interpolate the df/dt source term from the uniform grid to
-    ! all intersection points of the lines and multiple slices
+  subroutine interp_source_intersect(Gain_5D, LossRel_5D, Gain_IV, LossRel_IV)
+    ! Interpolate the gain and relative loss rates from the uniform grid to
+    ! all intersection points of the lines and multiple slices, bilinearly
+    ! in (lon, colat) with convex weights: each in [0,1], summing to 1
 
     use ModCoordTransform, ONLY: xyz_to_rlonlat
     use SP_ModTriangulate, ONLY: XyzOrig_DII
-    real, intent(in) :: source_5D(0:nP+1, nMu, nPhiPerp, nThetaPerp, &
-         iRPerpStart_I(iProc):iRPerpEnd_I(iProc))
-    real, intent(out):: source_IV(nP, nMu, nLineAll, nRPerp)
-    integer :: iRPerp, iLine, iPE
-    integer :: iTheta1, iTheta2, iPhi1, iPhi2
-    real    :: XyzPoint_D(X_:Z_), rPoint, lonPoint, latPoint, phiPoint
-    real    :: thetaFrac, phiFrac
+    real, intent(in), dimension(nP, nMu, nPhiPerp, nThetaPerp, &
+         iRPerpStart_I(iProc):iRPerpEnd_I(iProc)) :: Gain_5D, LossRel_5D
+    real, intent(out), dimension(nP, nMu, nLineAll, nRPerp) :: &
+         Gain_IV, LossRel_IV
+    integer :: iRPerp, iLine, iPE, nSize
+    integer :: iLon1, iLon2, iColat1, iColat2
+    real    :: XyzPoint_D(X_:Z_), rPoint, lonPoint, latPoint, colatPoint
+    real    :: lonFrac, colatFrac, Weight_I(4)
     character(len=*), parameter:: NameSub = 'interp_source_intersect'
     !--------------------------------------------------------------------------
     do iRPerp = iRPerpStart_I(iProc), iRPerpEnd_I(iProc)
@@ -682,48 +830,59 @@ contains
           ! Extract the intersection point coordinates
           XyzPoint_D = XyzOrig_DII(:, iLine, iRPerp)
           if(sum(XyzPoint_D**2) > cTiny) then
-             ! CoordTransform: XyzPoint_D => (rPoint, lonPoint, phiPoint)
+             ! CoordTransform: XyzPoint_D => (rPoint, lonPoint, latPoint)
              call xyz_to_rlonlat(XyzPoint_D, rPoint, lonPoint, latPoint)
-             phiPoint = 0.5*cPi - latPoint
+             colatPoint = 0.5*cPi - latPoint
 
-             ! Find the indices of the quadrilateral vertices
-             iTheta1 = floor(mod(lonPoint-PhiPerp_C(1), cTwoPi)/dPhiPerp) + 1
-             iTheta2 = iTheta1 + 1
-             iPhi1 = floor((phiPoint - ThetaPerp_C(1))/dThetaPerp) + 1
-             iPhi2 = iPhi1 + 1
-             ! Handle periodicity in the theta (longitude) direction
-             if(iTheta2 > nPhiPerp) iTheta2 = 1  ! Wrap around
-             ! Ensure indices are within bounds
-             iTheta1 = max(1, min(iTheta1, nPhiPerp))
-             iTheta2 = max(1, min(iTheta2, nPhiPerp))
-             iPhi1 = max(1, min(iPhi1, nThetaPerp))
-             iPhi2 = max(1, min(iPhi2, nThetaPerp))
+             ! Longitude (periodic; cell centres PhiPerp_C): measure from
+             ! PhiPerp_C(1) with modulo, so that a point at
+             ! lon < PhiPerp_C(1) lies between nPhiPerp and 1 (lon seam)
+             lonFrac = modulo(lonPoint - PhiPerp_C(1), cTwoPi)/dPhiPerp
+             iLon1 = min(max(floor(lonFrac), 0), nPhiPerp-1)
+             lonFrac = min(max(lonFrac - real(iLon1), 0.0), 1.0)
+             iLon1 = iLon1 + 1
+             iLon2 = mod(iLon1, nPhiPerp) + 1
 
-             ! Compute fractional distances for interpolation
-             thetaFrac = (lonPoint - PhiPerp_C(iTheta1))/dPhiPerp
-             phiFrac = (phiPoint - ThetaPerp_C(iPhi1))/dThetaPerp
-             ! Perform bilinear interpolation on the uniform LON-LAT grid
-             source_IV(:,:,iLine,iRPerp) = (1.0-thetaFrac)*(1.0-phiFrac)* &
-                  source_5D(1:nP, :, iTheta1, iPhi1, iRPerp) + &  ! value11
-                  (1.0-thetaFrac)*phiFrac* &
-                  source_5D(1:nP, :, iTheta1, iPhi2, iRPerp) + &  ! value12
-                  thetaFrac * (1.0-phiFrac)* &
-                  source_5D(1:nP, :, iTheta2, iPhi1, iRPerp) + &  ! value21
-                  thetaFrac*phiFrac* &
-                  source_5D(1:nP, :, iTheta2, iPhi2, iRPerp)      ! value22
+             ! Colatitude (not periodic): in the polar caps outside
+             ! ThetaPerp_C(1) ... ThetaPerp_C(nThetaPerp) the fraction is
+             ! clamped to [0,1], i.e. the nearest ring is used
+             colatFrac = (colatPoint - ThetaPerp_C(1))/dThetaPerp
+             iColat1 = min(max(floor(colatFrac), 0), nThetaPerp-2)
+             colatFrac = min(max(colatFrac - real(iColat1), 0.0), 1.0)
+             iColat1 = iColat1 + 1
+             iColat2 = iColat1 + 1
+
+             ! Convex bilinear weights on the uniform LON-COLAT grid
+             Weight_I = [(1.0-lonFrac)*(1.0-colatFrac), &
+                  (1.0-lonFrac)*colatFrac, lonFrac*(1.0-colatFrac), &
+                  lonFrac*colatFrac]
+             Gain_IV(:,:,iLine,iRPerp) = &
+                  Weight_I(1)*Gain_5D(:,:,iLon1,iColat1,iRPerp) + &
+                  Weight_I(2)*Gain_5D(:,:,iLon1,iColat2,iRPerp) + &
+                  Weight_I(3)*Gain_5D(:,:,iLon2,iColat1,iRPerp) + &
+                  Weight_I(4)*Gain_5D(:,:,iLon2,iColat2,iRPerp)
+             LossRel_IV(:,:,iLine,iRPerp) = &
+                  Weight_I(1)*LossRel_5D(:,:,iLon1,iColat1,iRPerp) + &
+                  Weight_I(2)*LossRel_5D(:,:,iLon1,iColat2,iRPerp) + &
+                  Weight_I(3)*LossRel_5D(:,:,iLon2,iColat1,iRPerp) + &
+                  Weight_I(4)*LossRel_5D(:,:,iLon2,iColat2,iRPerp)
           else
-             source_IV(:,:,iLine,iRPerp) = 0.0
+             Gain_IV(:,:,iLine,iRPerp) = 0.0
+             LossRel_IV(:,:,iLine,iRPerp) = 0.0
           end if
        end do
     end do
 
-    ! Broadcast source_IV (line intersections, uniform grid) to all processes
+    ! Broadcast Gain_IV and LossRel_IV (line intersections) to all processes
     if(nProc > 1) then
        do iPE = 0, nProc-1
-          call MPI_BCAST(source_IV(:,:,:,               &
+          nSize = (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)*nP*nMu*nLineAll
+          call MPI_BCAST(Gain_IV(:,:,:,                 &
                iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
-               (iRPerpEnd_I(iPE)-iRPerpStart_I(iPE)+1)* &
-               nP*nMu*nLineAll, MPI_REAL, iPE, iComm, iError)
+               nSize, MPI_REAL, iPE, iComm, iError)
+          call MPI_BCAST(LossRel_IV(:,:,:,              &
+               iRPerpStart_I(iPE):iRPerpEnd_I(iPE)),    &
+               nSize, MPI_REAL, iPE, iComm, iError)
        end do
     end if
     ! Check the error message from after interpolate_trmesh
@@ -734,18 +893,27 @@ contains
     end if
   end subroutine interp_source_intersect
   !============================================================================
-  subroutine interp_source_linenode(source_IV, dtIn_CB)
-    ! Interpolate the df/dt source term from the intersection points of the
-    ! lines and multiple slices to the original points along the field line
+  subroutine interp_source_linenode(Gain_IV, LossRel_IV, dtIn_CB)
+    ! Interpolate the gain and relative loss rates from the intersection
+    ! points of the lines and multiple slices to the original points along
+    ! the field line (convex radial weights), and update the VDF there as
+    !    f = f*max(0, 1 + dt*LossRel) + dt*Gain
+    ! which keeps f >= 0 for any Dperp, and leaves f unchanged for Dperp=0
 
     use SP_ModGrid, ONLY: Used_B, nVertex_B, iLineAll0
-    real, intent(in):: source_IV(nP, nMu, nLineAll, nRPerp)
+    real, intent(in), dimension(nP, nMu, nLineAll, nRPerp) :: &
+         Gain_IV, LossRel_IV
     real, intent(in):: dtIn_CB(nP, nMu, nVertexMax, nLine)
     integer :: iLine, iX, iPoint, iLineAll
     real :: rNode, r1, r2, Weight
-    real :: v1_II(nP, nMu), v2_II(nP, nMu)
+    real :: Gain_II(nP, nMu), LossRel_II(nP, nMu)
+    ! Diagnostics: smallest f right after the update (before check_dist_neg
+    ! drops a line); number of f < 0 values, flagged lines, unused lines
+    real :: DistrMin
+    integer :: nCount_I(3)
     character(len=*), parameter:: NameSub = 'interp_source_linenode'
     !--------------------------------------------------------------------------
+    DistrMin = huge(1.0); nCount_I = 0
     ! Loop over all field lines on this processor
     LINE:do iLine = 1, nLine
        if(.not.Used_B(iLine)) CYCLE LINE
@@ -755,37 +923,64 @@ contains
           ! Extract the radial coordinate of the current node
           rNode = State_VIB(R_, iX, iLine)*Io2Si_V(UnitX_)
 
-          ! Check that rNode is within grid range
-          if(rNode <= RPerp_C(nRPerp)) then
-             ! Find first index where grid radius exceeds rNode
-             iPoint = minloc(RPerp_C(1:nRPerp), DIM=1, &
-                  MASK = RPerp_C(1:nRPerp) > rNode)
+          ! Nodes above the last shell centre are not changed
+          if(rNode > RPerp_C(nRPerp)) CYCLE
+          ! Nodes below RMinGhostPerp (inner boundary) are not changed either
+          if(rNode < RMinGhostPerp*Io2Si_V(UnitX_)) CYCLE
 
-             if(iPoint > 1) then
-                ! rNode is between r1 and r2
-                r1 = RPerp_C(iPoint-1)
-                r2 = RPerp_C(iPoint)
-                ! Linear interpolation between r1 and r2
-                Weight = (rNode - r1)/(r2 - r1)
-                v1_II = source_IV(:, :, iLineAll, iPoint-1)
-                v2_II = source_IV(:, :, iLineAll, iPoint)
-                Distribution_CB(1:nP, :, iX, iLine) = &
-                     Distribution_CB(1:nP, :, iX, iLine) + &
-                     (v1_II+(v2_II-v1_II)*Weight)*dtIn_CB(:, :, iX, iLine)
-             else
-                ! rNode is at or below first grid point
-                Distribution_CB(1:nP, :, iX, iLine) = &
-                     Distribution_CB(1:nP, :, iX, iLine) + &
-                     source_IV(:, :, iLineAll, 1)*dtIn_CB(:, :, iX, iLine)
-             end if
+          if(rNode <= RPerp_C(1)) then
+             ! rNode is at or below the first shell centre: use shell 1
+             Gain_II    = Gain_IV(:, :, iLineAll, 1)
+             LossRel_II = LossRel_IV(:, :, iLineAll, 1)
+          else
+             ! RPerp_C(iPoint) < rNode <= RPerp_C(iPoint+1); this also
+             ! covers rNode = RPerp_C(nRPerp), which used to get shell 1
+             iPoint = count(RPerp_C(1:nRPerp) < rNode)
+             r1 = RPerp_C(iPoint)
+             r2 = RPerp_C(iPoint+1)
+             ! Linear interpolation between r1 and r2, weight in [0,1]
+             Weight = min(max((rNode - r1)/(r2 - r1), 0.0), 1.0)
+             Gain_II = (1.0 - Weight)*Gain_IV(:, :, iLineAll, iPoint) &
+                  + Weight*Gain_IV(:, :, iLineAll, iPoint+1)
+             LossRel_II = (1.0 - Weight)*LossRel_IV(:, :, iLineAll, iPoint) &
+                  + Weight*LossRel_IV(:, :, iLineAll, iPoint+1)
           end if
+          ! Positivity-preserving update: relative loss, then absolute gain
+          Distribution_CB(1:nP, :, iX, iLine) = &
+               Distribution_CB(1:nP, :, iX, iLine)* &
+               max(0.0, 1.0 + dtIn_CB(:, :, iX, iLine)*LossRel_II) + &
+               dtIn_CB(:, :, iX, iLine)*Gain_II
        end do
 
+       if(DoTestDPerp) then
+          ! Own check right after the perp update of this line
+          DistrMin = min(DistrMin, &
+               minval(Distribution_CB(:, :, 1:nVertex_B(iLine), iLine)))
+          nCount_I(1) = nCount_I(1) + &
+               count(Distribution_CB(:, :, 1:nVertex_B(iLine), iLine) < 0.0)
+       end if
        ! Check if the VDF includes negative values after Dperp
        call check_dist_neg(NameSub// &
             ' after perpendicular diffusion', 1, nVertex_B(iLine), iLine)
-       if(IsDistNeg) RETURN
+       if(.not.Used_B(iLine)) nCount_I(2) = nCount_I(2) + 1
+       ! Was RETURN, which skipped the perp update of all remaining lines
+       ! on this processor (rank-dependent results)
+       if(IsDistNeg) CYCLE LINE
     end do LINE
+
+    if(DoTestDPerp) then
+       ! Lines not in use (dropped now or earlier) on this processor
+       nCount_I(3) = count(.not.Used_B(1:nLine))
+       if(nProc > 1) then
+          call MPI_ALLREDUCE(MPI_IN_PLACE, DistrMin, 1, MPI_REAL, MPI_MIN, &
+               iComm, iError)
+          call MPI_ALLREDUCE(MPI_IN_PLACE, nCount_I, 3, MPI_INTEGER, &
+               MPI_SUM, iComm, iError)
+       end if
+       if(iProc == 0) write(*,*) 'DPerp pos: after perp update: min f=', &
+            DistrMin, ' nNegative=', nCount_I(1), ' nFlaggedLine=', &
+            nCount_I(2), ' nUnusedLine=', nCount_I(3)
+    end if
   end subroutine interp_source_linenode
   !============================================================================
 end module SP_ModPerpDiffusion
