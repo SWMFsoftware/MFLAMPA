@@ -905,6 +905,56 @@ T             UseDiffusion
 
 Used for testing, to disable diffusion, which by default is true.
 </command>
+
+<command name="DIFFUSIONPERP">
+  <parameter name="UseDiffusionPerp" type="logical" default="F" />
+  <if expr="$UseDiffusionPerp">
+    <parameter name="TypeDPerp" type="string" input="select">
+      <option name="UseDParaRatio" default="T" />
+    </parameter>
+    <parameter name="DParaRatio" type="real" min="0.0" max="1.0"
+	       default="0.01" />
+    <parameter name="nRPerp" type="integer" min="2" default="100" />
+    <parameter name="RMinPerp" type="real" min="0.0" default="1.2" />
+    <parameter name="RMaxPerp" type="real" min="$RMinPerp" default="240.0" />
+    <parameter name="ScaleRPerp" type="string" input="select">
+      <option name="Linear" value="Linear/linear" default="T" />
+      <option name="Exp"
+	      value="Exp/exp/Exponential/exponential" />
+      <option name="HalfExp"
+	      value="HalfExp/halfexp/HalfLinear/halflinear" />
+    </parameter>
+    <parameter name="nThetaPerp" type="integer" min="1" default="18" />
+    <parameter name="nPhiPerp" type="integer" min="1" default="36" />
+    <parameter name="DoTestDPerp" type="logical" default="F" />
+  </if>
+
+#DIFFUSIONPERP
+T			UseDiffusionPerp
+UseDParaRatio		TypeDPerp
+0.01			DParaRatio
+100			nRPerp
+2.0			RMinPerp
+240.0			RMaxPerp
+HalfExp			ScaleRPerp
+18			nThetaPerp
+36			nPhiPerp
+F			DoTestDPerp
+
+Perpendicular (cross-field) diffusion between the field lines. If
+UseDiffusionPerp is false (default), no other parameter is read.
+TypeDPerp='UseDParaRatio' reduces the parallel diffusion coefficient to
+(1-DParaRatio)*DPara and sets DPerp = DParaRatio times that reduced value,
+i.e. DPerp = DParaRatio*(1-DParaRatio)*DPara. The diffusion
+acts on nRPerp spherical shells between RMinPerp and RMaxPerp [Rs], with
+Linear, Exp (geometric) or HalfExp (mean of the two) spacing; a line node
+is updated from the two nearest shell centres (from the first shell below
+the first centre, not at all above the last centre). nThetaPerp x nPhiPerp
+is the size of the uniform latitude-longitude grid on each shell used by
+the 'numerical' solver (an odd nThetaPerp is increased by 1). If nRPerp is less
+than the number of processors, it is set to the number of processors.
+DoTestDPerp prints test information at every perpendicular diffusion step.
+</command>
   
 </commandgroup>
 

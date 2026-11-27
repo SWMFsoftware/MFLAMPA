@@ -292,6 +292,10 @@ contains
        iLineReach_II(1,iR)                  = iSouthPoleTri_
        iLineReach_II(nTriMesh_I(iR),iR)     = iNorthPoleTri_
        DistrR_IIBI(:,:,2:nTriMesh_I(iR)-1,iR) = DistrR_IIBI(:,:,1:nReachR,iR)
+       ! Shift DPerp as DistrR, so node i carries the Dperp of its own line;
+       ! pole values are set by fix_state in build_trmesh(IsIncludeDPerpIn)
+       if(IsIncludeDPerp) DPerp_IIBI(:,:,2:nTriMesh_I(iR)-1,iR) = &
+            DPerp_IIBI(:,:,1:nReachR,iR)
     else
        nTriMesh_I(iR)= nReachR
     end if

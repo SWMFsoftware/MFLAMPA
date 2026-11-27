@@ -179,7 +179,9 @@ contains
     ! diffuse the distribution function with vector/local Dt, with the
     ! pitch-angle-dependent local time step, and lower and upper spectra
 
-    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx
+    use SP_ModTurbulence, ONLY: UseTurbulentSpectrum, set_dxx, Dxx, DPerp_CB
+    ! Needed to split the turbulent Dxx into along-line part and Dperp
+    use SP_ModPerpDiffusion, ONLY: UseDiffusionPerp, DParaRatio
 
     ! Variables as inputs
     ! Input Line, End (for how many particles), and Shock indices
@@ -271,6 +273,15 @@ contains
     if(UseTurbulentSpectrum) then
        DInnerSi_II(1:nX, 1:nP) = Dxx(nX, BSi_I(1:nX))/ &
             spread(DOuterSi_I(1:nX), DIM=2, NCOPIES=nP)
+       ! With Dperp, split Dxx as set_diffusion_coef splits the formula
+       ! coefficient, so that Dxx is not also diffused in full along B
+       if(UseDiffusionPerp) then
+          DInnerSi_II(1:nX, 1:nP) = DInnerSi_II(1:nX, 1:nP)*(1.0-DParaRatio)
+          do iP = 1, nP
+             DPerp_CB(iP, nMu, 1:nX, iLine) = DParaRatio* &
+                  DInnerSi_II(1:nX, iP)*DOuterSi_I(1:nX)
+          end do
+       end if
     else
        ! Lower limit to floor the spatial diffusion coefficient For a
        ! given spatial and temporal resolution, the value of the
