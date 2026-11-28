@@ -43,7 +43,7 @@ module ModTestDperp
   !   the solution is that of test_R2Sphere3d with different k in r and
   !   in angle
   ! The tests call the solvers of SP_ModPerpDiffusion (and the line solver
-  ! of SP_ModAdvancePoisson); they do not have a copy of them.
+  ! of SP_ModDiffusion); they do not have a copy of them.
 
   use ModMpi
   use ModNumConst, ONLY: cPi, cRadToDeg, cDegToRad
@@ -471,11 +471,12 @@ contains
     ! own r-theta-phi mesh (from init) with the exponential radial spacing
     ! (ScaleRPerp = Exp).
     !
-    ! Setup: f = 1 in the cell that contains the point (rSource,
-    ! ThetaSource, PhiSource) and f = 0 in all other cells, the same at
-    ! all momenta. Dperp = kDperp*r**2 at every cell center and at every
-    ! momentum (SI, r in m). One call of the solver advances f from t = 0
-    ! to tFinal with its own stable sub-steps (time accurate mode).
+    ! Setup: deposit the same mass M at the same point on both grids.
+    ! Split M over neighboring cell centers with trilinear weights in
+    ! (ln(r), theta, phi), and divide each share by its cell volume.
+    ! This preserves M and the first moments in those coordinates. Use
+    ! the same f at all momenta and Dperp = kDperp*r**2 at each center
+    ! (SI, r in m). One call advances to tFinal with stable sub-steps.
     !
     ! Analytic solution: with D = k*r**2 and s = ln(r), d/dr = (1/r)d/ds,
     ! the radial part of div(D grad f) is
@@ -502,16 +503,15 @@ contains
     ! s is the mean of exp(3*s) for the Gaussian G,
     ! exp(3*(ln(rc) - 3*k*t) + 9*k*t) = rc**3, so the integral of f dV is
     ! M at all times.
-    ! The exact solution uses the center (rc, theta_c, phi_c) of the
-    ! source cell as the source point and M = its volume (f = 1 there).
-    ! Representing the source cell as a point is a part of the
-    ! discretization error, which is of 2nd order. The exact solution is
-    ! for all s, while the solver has no flux through the radial walls at
+    ! The exact solution uses the prescribed point and the same M on
+    ! both grids. The finite-resolution deposition still approximates
+    ! a delta source. The exact solution is for all s, while the solver
+    ! has no flux through the radial walls at
     ! RMin and RMax. The mass density f*r**3 of the exact solution is a
     ! Gaussian in s centered at ln(rc) + 3*k*t, about 1.9*sqrt(2*k*t)
     ! below ln(RMax) for rc = 40 Rs, so about 3% of M is beyond RMax in the
     ! exact solution and inside the mesh in the numerical one. The test
-    ! prints sum(fExact*V)/M - 1 (the exact mass outside the mesh).
+    ! prints the sampled relative mass deficit sum(fExact*V)/M - 1.
     !
     ! Outputs (on processor 0), as in test_UniSphere3d: a banner, then one
     ! block: the setup (k, t, k*t, nProc, the source point, M = sum(f*V)
@@ -522,11 +522,11 @@ contains
     ! (the same norms) and the mass error (sum(f*V) - M)/M at tFinal, and
     ! the order of convergence (2 is expected) for each pair of meshes.
     ! Files for each mesh (f, exact f and error):
-    !   test_R2Sphere3d_<nTheta>x<nPhi>.out       phi-theta map on
-    !                                             the source shell,
-    !   test_R2Sphere3d_<nTheta>x<nPhi>_r.out     cut along r and
-    !   test_R2Sphere3d_<nTheta>x<nPhi>_theta.out cut along theta
-    !                                             through the source.
+    !   test_R2Sphere3d_<nTheta>x<nPhi>.out       phi-theta map at rSource,
+    !   test_R2Sphere3d_<nTheta>x<nPhi>_r.out     cut at (ThetaSource,PhiSource),
+    !   test_R2Sphere3d_<nTheta>x<nPhi>_theta.out cut at (rSource,PhiSource).
+    ! Interpolate numerical f to these fixed cuts, without changing the
+    ! evaluation of the error norms at the cell centers.
     ! Any number of MPI processors, as in test_UniSphere3d.
 
     ! Units: lengths in Rs (the unit of the mesh in the #DIFFUSIONPERP
@@ -543,9 +543,9 @@ contains
     integer, parameter:: nPair = 1
     integer, parameter:: nCellBase_DI(3,nPair) = reshape( &
          [9, 10, 18], [3, nPair])
-    ! The source cell contains this point: r [Rs], theta (colatitude) and
-    ! phi [deg]. No face of the meshes is there.
+    ! Interior source point and fixed total mass in Rs^3 (f is dimensionless).
     real, parameter:: rSource = 40.0, ThetaSource = 52.0, PhiSource = 185.0
+    real, parameter:: MassSource = 1.0
 
     ! Relative max, L1, L2 and mass errors on the base and refined meshes
     real:: Error_VII(4,2,nPair)
@@ -562,9 +562,9 @@ contains
        write(*,'(a,f7.4,a,f6.2,a,f6.3,a,i0)') ' Dperp = k*r**2 with k =', &
             kDperp, ' 1/s, t =', tFinal, ' s, k*t =', kDperp*tFinal, &
             ', nProc = ', nProc
-       write(*,'(3(a,f0.1),a)') ' source cell of r = ', rSource, &
+       write(*,'(4(a,f0.1),a)') ' fixed source: r = ', rSource, &
             ' Rs, theta = ', ThetaSource, ', phi = ', PhiSource, &
-            ' deg: f = 1, M = sum(f*V)'
+            ' deg, M = ', MassSource, ' Rs^3 (weighted deposition)'
        write(*,'(a)') '   nR nTheta  nPhi wall[s] sum(fExV)/M-1      min f'// &
             ' max|f-f(p=1)| max|DfDt*t-Df|'
     end if
@@ -606,16 +606,16 @@ contains
 
       ! Shells of this processor: the same split as in init_dperp
       integer:: iRStart, iREnd, nRChunk, nRExtra
-      ! Indexes of the source cell
-      integer:: iR0, iTheta0, iPhi0
-      ! Center of the source cell: r [m], theta and phi [rad], and the
-      ! number of particles M in it (f = 1 times its volume [m^3])
+      ! Fixed source r [m], theta and phi [rad], and total mass [m^3].
       real:: r0, Theta0, Phi0, Mass0
+      ! Lower center and two interpolation weights for each coordinate
+      integer:: iRLo, iThetaLo, iPhiLo, iS, jS, kS
+      real:: WeightR_I(2), WeightTheta_I(2), WeightPhi_I(2)
       ! f on the shells of this processor at all momenta (with the ghost
       ! momenta 0 and nP+1), df/dt from the solver (averaged over its
       ! sub-steps), and Dperp on all shells (input of the solver)
       real, allocatable:: Distr_4D(:,:,:,:), DfDt_4D(:,:,:,:), &
-           Dperp_4D(:,:,:,:)
+           Dperp_4D(:,:,:,:), Distr0_III(:,:,:)
       ! Sums over the cells of each shell, zero for the shells of the other
       ! processors (so the sums do not depend on nProc): sum(f*V) at t = 0
       ! and t = tFinal, sum(|f - fExact|*V), sum(fExact*V),
@@ -627,8 +627,8 @@ contains
       ! max |DfDt*t - (f - f(t=0))| (DfDt*t is the change of f), and min f
       ! over all cells and momenta
       real:: Max_I(4), DistrMin
-      ! Plot data: f, fExact and f - fExact on the source shell, along r
-      ! and along theta through the source cell
+      ! Plot data: f, fExact and f - fExact at the fixed source radius,
+      ! along r and along theta through the prescribed source
       real, allocatable:: Plot_VII(:,:,:), PlotR_VI(:,:), PlotTheta_VI(:,:)
       ! Exact, numerical and initial f and volume of a cell, Rs [m],
       ! wall time [s]
@@ -648,15 +648,15 @@ contains
       iREnd   = iRStart + nRChunk - 1
       if(iProc < nRExtra) iREnd = iREnd + 1
 
-      ! The source cell: count the lower faces at or below the source point
-      Rs      = Io2Si_V(UnitX_)
-      iR0     = count(RPerp_F(1:nRPerp) <= rSource*Rs)
-      iTheta0 = count(ThetaPerp_F(1:nThetaPerp) <= ThetaSource*cDegToRad)
-      iPhi0   = count(PhiPerp_F(1:nPhiPerp) <= PhiSource*cDegToRad)
-      r0      = RPerp_C(iR0)
-      Theta0  = ThetaPerp_C(iTheta0)
-      Phi0    = PhiPerp_C(iPhi0)
-      Mass0   = Volume_CB(iPhi0,iTheta0,iR0)
+      ! Bracket the fixed physical source between adjacent centers.
+      Rs = Io2Si_V(UnitX_)
+      r0 = rSource*Rs
+      Theta0 = ThetaSource*cDegToRad
+      Phi0 = PhiSource*cDegToRad
+      Mass0 = MassSource*Rs**3
+      call bracket_r2_source(log(RPerp_C/r0), 0.0, iRLo, WeightR_I)
+      call bracket_r2_source(ThetaPerp_C, Theta0, iThetaLo, WeightTheta_I)
+      call bracket_r2_source(PhiPerp_C, Phi0, iPhiLo, WeightPhi_I)
 
       ! Dperp = k*r**2 [m^2/s] at the cell centers of all shells (input of
       ! the solver), the same at all momenta
@@ -669,8 +669,18 @@ contains
       allocate(Distr_4D(0:nP+1,nPhiPerp,nThetaPerp,iRStart:iREnd), &
            DfDt_4D(0:nP+1,nPhiPerp,nThetaPerp,iRStart:iREnd))
       Distr_4D = 0.0
-      if(iR0 >= iRStart .and. iR0 <= iREnd) &
-           Distr_4D(:,iPhi0,iTheta0,iR0) = 1.0
+      do iS = 1, 2
+         i = iRLo + iS - 1
+         if(i < iRStart .or. i > iREnd) CYCLE
+         do jS = 1, 2; do kS = 1, 2
+            j = iThetaLo + jS - 1
+            k = iPhiLo + kS - 1
+            Distr_4D(:,k,j,i) = Mass0/Volume_CB(k,j,i) &
+                 *WeightR_I(iS)*WeightTheta_I(jS)*WeightPhi_I(kS)
+         end do; end do
+      end do
+      allocate(Distr0_III(nPhiPerp,nThetaPerp,iRStart:iREnd))
+      Distr0_III = Distr_4D(1,:,:,:)
 
       ! Number of particles at t = 0 (= Mass0)
       allocate(Sum_VI(nSum,nRPerp))
@@ -697,8 +707,7 @@ contains
               r0, Theta0, Phi0, Mass0)
          Distr  = Distr_4D(1,k,j,i)
          Volume = Volume_CB(k,j,i)
-         Distr0 = 0.0
-         if(i == iR0 .and. j == iTheta0 .and. k == iPhi0) Distr0 = 1.0
+         Distr0 = Distr0_III(k,j,i)
          Sum_VI(2:nSum,i) = Sum_VI(2:nSum,i) + Volume*[Distr, &
               abs(Distr - Exact), Exact, (Distr - Exact)**2, Exact**2]
          Max_I(1) = max(Max_I(1), abs(Distr - Exact))
@@ -720,6 +729,8 @@ contains
            iComm, iError)
       call MPI_allreduce(MPI_IN_PLACE, DistrMin, 1, MPI_REAL, MPI_MIN, &
            iComm, iError)
+      if(abs(Sum_V(1)/Mass0 - 1.0) > 64*epsilon(1.0)) &
+           call CON_stop(NameSub//': initial deposition does not sum to M')
       ! Relative errors as in test_UniSphere3d: max |f - fExact|/max
       ! fExact, the L1 error over the L1 norm of fExact and the same for L2
       ! (sums weighted by the volume); relative mass error at tFinal
@@ -735,55 +746,27 @@ contains
          write(*,'(i5,i7,i6,f8.3,es14.3,es11.3,es14.3,es15.3)') nRPerp, &
               nThetaPerp, nPhiPerp, CpuTime, Sum_V(4)/Mass0 - 1, DistrMin, &
               Max_I(3:4)
-         ! The lines below are commented out: the row above has their
-         ! values, or they are redundant.
-         ! The mesh is in the row, nProc in the setup (test_R2Sphere3d)
-         ! write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub// &
-         !      ': mesh nR x nTheta x nPhi = ', nRPerp, ' x ', nThetaPerp, &
-         !      ' x ', nPhiPerp, ', nProc = ', nProc
-         ! The setup gives the source point; the center of its cell is in
-         ! the .out files (rShell of the map, Theta and Phi of the _r cut)
-         ! write(*,'(a,f8.3,a,2f8.3,a)') ' source cell at r =', r0/Rs, &
-         !      ' Rs, (theta, phi) =', Theta0*cRadToDeg, Phi0*cRadToDeg, ' deg'
-         ! The same on all meshes: in the setup (test_R2Sphere3d)
-         ! write(*,'(a,f7.4,a,f6.2,a,f6.3)') ' Dperp = k*r**2 with k =', &
-         !      kDperp, ' 1/s, t =', tFinal, ' s, k*t =', kDperp*tFinal
-         ! In the row (wall[s])
-         ! write(*,'(a,f9.3,a)') ' wall time of the solver   =', CpuTime, ' s'
-         ! Absolute sums: the table of errors has the mass error
-         ! write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t=0 (=M), t =', &
-         !      Sum_V(1:2)/Rs**3
-         ! The same as the mass error column of the table of errors
-         ! write(*,'(a,es11.3)') ' mass error (sum(f*V) - M)/M   =', Error_V(4)
-         ! In the row (sum(fExV)/M-1, min f, max|f-f(p=1)|, max|DfDt*t-Df|)
-         ! write(*,'(a,es11.3)') ' sum(fExact*V)/M - 1           =', &
-         !      Sum_V(4)/Mass0 - 1
-         ! write(*,'(a,es11.3)') ' min f                         =', DistrMin
-         ! write(*,'(a,es11.3)') ' max |f(p) - f(p=1)|, p=1..nP  =', Max_I(3)
-         ! write(*,'(a,es11.3)') ' max |DfDt*t - (f - f(t=0))|   =', Max_I(4)
-         ! The same as the table of errors (test_R2Sphere3d)
-         ! write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', &
-         !      Error_V(1:3)
+
+
       end if
 
-      ! Plots of f, exact f and error: phi-theta map on the source shell
-      ! (from the processor of that shell) and radial cut through the
-      ! source (from all processors), collected (summed with zeros) on all
-      ! processors; the theta cut through the source is taken from the map
-      ! (the meridian of the source cell). Processor 0 writes the files.
+      ! Collect the numerical cuts in the same physical locations on
+      ! both grids. Each rank contributes only its own radial shells.
       allocate(Plot_VII(3,nPhiPerp,nThetaPerp), PlotR_VI(3,nRPerp), &
            PlotTheta_VI(3,nThetaPerp))
       Plot_VII = 0.0; PlotR_VI = 0.0
-      if(iR0 >= iRStart .and. iR0 <= iREnd)then
-         do j = 1, nThetaPerp; do k = 1, nPhiPerp
-            Distr = Distr_4D(1,k,j,iR0)
-            Exact = exact_distr_r2(r0, ThetaPerp_C(j), PhiPerp_C(k), &
-                 r0, Theta0, Phi0, Mass0)
-            Plot_VII(:,k,j) = [Distr, Exact, Distr - Exact]
-         end do; end do
-      end if
+      do iS = 1, 2
+         i = iRLo + iS - 1
+         if(i < iRStart .or. i > iREnd) CYCLE
+         Plot_VII(1,:,:) = Plot_VII(1,:,:) + WeightR_I(iS)*Distr_4D(1,:,:,i)
+      end do
       do i = iRStart, iREnd
-         Distr = Distr_4D(1,iPhi0,iTheta0,i)
+         Distr = 0.0
+         do jS = 1, 2; do kS = 1, 2
+            j = iThetaLo + jS - 1
+            k = iPhiLo + kS - 1
+            Distr = Distr + WeightTheta_I(jS)*WeightPhi_I(kS)*Distr_4D(1,k,j,i)
+         end do; end do
          Exact = exact_distr_r2(RPerp_C(i), Theta0, Phi0, &
               r0, Theta0, Phi0, Mass0)
          PlotR_VI(:,i) = [Distr, Exact, Distr - Exact]
@@ -792,7 +775,20 @@ contains
            MPI_SUM, iComm, iError)
       call MPI_allreduce(MPI_IN_PLACE, PlotR_VI, size(PlotR_VI), MPI_REAL, &
            MPI_SUM, iComm, iError)
-      PlotTheta_VI = Plot_VII(:,iPhi0,:)
+      if(iProc == 0)then
+         do j = 1, nThetaPerp
+            do k = 1, nPhiPerp
+               Exact = exact_distr_r2(r0, ThetaPerp_C(j), PhiPerp_C(k), &
+                    r0, Theta0, Phi0, Mass0)
+               Plot_VII(2:3,k,j) = [Exact, Plot_VII(1,k,j) - Exact]
+            end do
+            Distr = dot_product(WeightPhi_I, Plot_VII(1,iPhiLo:iPhiLo+1,j))
+            Exact = exact_distr_r2(r0, ThetaPerp_C(j), Phi0, &
+                 r0, Theta0, Phi0, Mass0)
+            PlotTheta_VI(:,j) = [Distr, Exact, Distr - Exact]
+         end do
+      end if
+
       if(iProc == 0)then
          write(NameFile,'(a,i0,a,i0)') 'test_R2Sphere3d_', &
               nThetaPerp, 'x', nPhiPerp
@@ -820,10 +816,28 @@ contains
               Coord1In_I=ThetaPerp_C*cRadToDeg, VarIn_VI=PlotTheta_VI)
       end if
 
-      deallocate(Dperp_4D, Distr_4D, DfDt_4D, Sum_VI, Plot_VII, PlotR_VI, &
-           PlotTheta_VI)
+      deallocate(Dperp_4D, Distr_4D, DfDt_4D, Distr0_III, Sum_VI, &
+           Plot_VII, PlotR_VI, PlotTheta_VI)
 
     end subroutine run_R2Sphere3d
+    !==========================================================================
+    subroutine bracket_r2_source(Center_I, Target, iLo, Weight_I)
+
+      ! This test uses an interior source, away from the longitude seam.
+      real, intent(in):: Center_I(:), Target
+      integer, intent(out):: iLo
+      real, intent(out):: Weight_I(2)
+      integer:: n
+      !------------------------------------------------------------------------
+      n = size(Center_I)
+      if(n < 2) call CON_stop(NameSub//': need two centers per coordinate')
+      if(Target < Center_I(1) .or. Target > Center_I(n)) &
+           call CON_stop(NameSub//': source is outside the center grid')
+      iLo = min(n-1, count(Center_I <= Target))
+      Weight_I(2) = (Target - Center_I(iLo))/(Center_I(iLo+1) - Center_I(iLo))
+      Weight_I(1) = 1.0 - Weight_I(2)
+
+    end subroutine bracket_r2_source
     !==========================================================================
     real function exact_distr_r2(r, Theta, Phi, r0, Theta0, Phi0, Mass0)
 
@@ -929,9 +943,9 @@ contains
     ! (Dpara) and the 3D finite volume Dperp solver on the uniform
     ! r-theta-phi mesh, coupled in each time step as in the time-accurate
     ! advance of SP_ModAdvance (src/ModAdvance.f90):
-    !   1. on each line of this processor: advect_via_poisson_parker
-    !      (#ADVECTION T; here with no advection), which calls
-    !      diffuse_distribution (implicit Dpara along the line),
+    !   1. on each line of this processor: apply the boundary conditions,
+    !      then call diffuse_distribution (implicit Dpara along the line).
+    !      The test background is static, so there is no advection step.
     !   2. diffuseperp_distribution: f on the lines is interpolated to the
     !      mesh (intersections of the lines with the shells, triangulation
     !      of each shell), solver_fvm_diffuse3d advances the mesh f with
@@ -1036,15 +1050,16 @@ contains
     use SP_ModSize, ONLY: nVertexMax
     use SP_ModGrid, ONLY: nLat, nLon, nLineAll, iLineAll0, nMu, &
          nVertex_B, Used_B, MhData_VIB, State_VIB, LagrID_, X_, Z_, Rho_, &
-         Bx_, Bz_, nMhData, nVar, R_, D_, B_, NoShock_, &
+         Bx_, Bz_, nMhData, nVar, R_, B_, NoShock_, &
          ilineall_to_lon_lat, get_other_state_var
     use SP_ModDistribution, ONLY: init_dist => init, &
-         read_param_dist => read_param, Distribution_CB, IsDistNeg
-    use SP_ModBc, ONLY: read_param_bc => read_param
-    use SP_ModDiffusion, ONLY: DInnerSi_II, DOuterSi_I
+         read_param_dist => read_param, Distribution_CB, IsDistNeg, &
+         check_dist_neg
+    use SP_ModBc, ONLY: read_param_bc => read_param, set_momentum_bc, set_VDF2
+    use SP_ModDiffusion, ONLY: DInnerSi_II, DOuterSi_I, &
+         diffuse_distribution, UseDiffusion
     use SP_ModTurbulence, ONLY: DPerp_CB
     use SP_ModPerpDiffusion, ONLY: diffuseperp_distribution, DPerpRatio
-    use SP_ModAdvancePoisson, ONLY: advect_via_poisson_parker
 
     ! Coefficients [1/s] of the coupled case, start time t0 [s] with
     ! kPara*t0 = 0.05, and the run time [s]
@@ -1070,8 +1085,6 @@ contains
     real, parameter:: DPerpRatio_I(nCase) = [kPerp/kPara, 0.0, 1.0]
     ! Background along the lines at RMin: B [T] and density [m^-3]
     real, parameter:: B0 = 1e-5, Rho0 = 1e10
-    ! CFL number of the line solver (default of #CFL in SP_ModAdvance)
-    real, parameter:: Cfl = 0.9
     ! Floor of the initial f: it replaces the round-off of the Legendre
     ! sum (below 1e-15, also negative) where the exact f is tiny, and
     ! keeps the ghost f at the line ends above the background f (1e-203),
@@ -1174,10 +1187,8 @@ contains
       ! accumulated at t0 + tFinal
       real:: kDpara, Dt, TauR, TauA
       integer:: nStep, iStep
-      ! Data along one line in SI units, as in advance: distance to the
-      ! next node, density times the length of a node over B, density, B
-      ! and r
-      real, allocatable:: DsSi_I(:), Mass_C(:), nSi_I(:), BSi_I(:), rSi_I(:)
+      ! Density, B and radius along a line in SI units; f with ghosts
+      real, allocatable:: nSi_I(:), BSi_I(:), rSi_I(:), VDF_G(:,:)
       ! Time step of diffuseperp_distribution at the line nodes
       real, allocatable:: DtLine_CB(:,:,:)
       ! Sums over the nodes of each line, zero for the lines of the other
@@ -1230,8 +1241,8 @@ contains
       ! Time step of the Dperp update on the nodes in use
       allocate(DtLine_CB(nP,nVertexMax,nLine))
       DtLine_CB(:,1:nNode,:) = Dt
-      allocate(DsSi_I(nNode), Mass_C(nNode), nSi_I(nNode), BSi_I(nNode), &
-           rSi_I(nNode))
+      allocate(nSi_I(nNode), BSi_I(nNode), rSi_I(nNode), &
+           VDF_G(-1:nP+2,-1:nNode+2))
 
       ! Coupled steps, as advance does each time step
       call MPI_barrier(iComm, iError)
@@ -1241,15 +1252,7 @@ contains
          do iLine = 1, nLine
             if(.not.Used_B(iLine)) CYCLE
             iEnd = nVertex_B(iLine)
-            ! Data along the line in SI units, as in advance (the
-            ! background does not change: nOldSi_I = nSi_I, BOld = B)
-            DsSi_I(1:iEnd-1) = State_VIB(D_,1:iEnd-1,iLine)*Rs
-            Mass_C(2:iEnd-1) = 0.5*(DsSi_I(2:iEnd-1) + DsSi_I(1:iEnd-2)) &
-                 *MhData_VIB(Rho_,2:iEnd-1,iLine)/State_VIB(B_,2:iEnd-1,iLine)
-            Mass_C(1) = DsSi_I(1)*MhData_VIB(Rho_,1,iLine) &
-                 /State_VIB(B_,1,iLine)
-            Mass_C(iEnd) = DsSi_I(iEnd-1)*MhData_VIB(Rho_,iEnd,iLine) &
-                 /State_VIB(B_,iEnd,iLine)
+            ! Static background along the line, in SI units
             nSi_I = MhData_VIB(Rho_,1:iEnd,iLine)
             BSi_I = State_VIB(B_,1:iEnd,iLine)
             rSi_I = State_VIB(R_,1:iEnd,iLine)*Rs
@@ -1262,9 +1265,20 @@ contains
                     (1.0 - DPerpRatio)*kDpara*rSi_I**2/BSi_I
                DPerp_CB(iP,1:iEnd,iLine) = DPerpRatio*kDpara*rSi_I**2
             end do
-            ! Line solver of advance (#ADVECTION T, IsMuAvg)
-            call advect_via_poisson_parker(iLine, iEnd, NoShock_, Dt, Cfl, &
-                 nSi_I, nSi_I, BSi_I, Mass_C)
+            ! Keep the same momentum and spatial boundary conditions as
+            ! the Parker solver, with zero change in log density.
+            ! No advection here: its CFL estimate would divide by zero.
+            IsDistNeg = .false.
+            call set_momentum_bc(iLine, iEnd, nSi_I, NoShock_, &
+                 spread(0.0, 1, iEnd))
+            call set_VDF2(iLine, iEnd, VDF_G)
+            call check_dist_neg(NameSub, 1, iEnd, iLine)
+            if(UseDiffusion .and. .not.IsDistNeg)then
+               call diffuse_distribution(iLine, iEnd, NoShock_, nSi_I, &
+                    BSi_I, Dt, LowerEndSpectrumIn_I=VDF_G(1:nP,0), &
+                    UpperEndSpectrumIn_I=VDF_G(1:nP,iEnd+1))
+               call check_dist_neg(NameSub//' after diffusion', 1, iEnd, iLine)
+            end if
             if(IsDistNeg) write(*,*) NameSub//': f < 0 on line ', &
                  iLineAll0 + iLine
          end do
@@ -1440,7 +1454,7 @@ contains
          deallocate(Plot_VII, PlotR_VI, PlotTheta_VI)
       end if
 
-      deallocate(Sum_VI, DtLine_CB, DsSi_I, Mass_C, nSi_I, BSi_I, rSi_I)
+      deallocate(Sum_VI, DtLine_CB, nSi_I, BSi_I, rSi_I, VDF_G)
 
     end subroutine run_Line2Sphere3d
     !==========================================================================
