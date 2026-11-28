@@ -51,7 +51,7 @@ module ModTestDperp
   use ModIoUnit, ONLY: UnitTmp_
   use ModPlotFile, ONLY: save_plot_file
   use ModReadParam, ONLY: read_file, read_init, read_line, &
-       read_command, n_line_read, lStringLine
+       read_command, n_line_read, lStringLine, read_echo_set
   use SP_ModProc, ONLY: iComm, iProc, nProc, iError
   use SP_ModGrid, ONLY: nP, nLine
   use SP_ModUnit, ONLY: init_unit => init, Io2Si_V, UnitX_
@@ -115,12 +115,16 @@ contains
     ! The errors include the error of the explicit sub-steps, which partly
     ! cancels the spatial error (smaller sub-steps give larger errors).
     !
-    ! Outputs (on processor 0): for the base mesh and the 2x refined mesh
-    ! the number of particles sum(f*V) at t = 0 and tFinalTest, min f,
-    ! two checks of the solver output (the same f at all momenta, and its
-    ! df/dt times t = the change of f; both 0 up to round-off) and the
-    ! relative max, L1 and L2 errors, then a table of the errors and the
-    ! order of convergence (2 is expected). Files (f, exact f and error):
+    ! Outputs (on processor 0): a banner, then one block: the setup
+    ! (Dperp, t, the width, nProc and the source cell), a table with one
+    ! row per mesh (the base mesh and the 2x refined mesh): the wall time
+    ! of the solver, the relative change of the number of particles
+    ! sum(f*V) from t = 0 to tFinalTest, min f and two checks of the
+    ! solver output, both 0 up to round-off: the same f at all momenta
+    ! (max |f - f(p=1)|) and its df/dt times t = the change of f (max
+    ! |DfDt*t - Df|, Df = f - f(t=0)); then the table of the relative
+    ! max, L1 and L2 errors and the order of convergence (2 is expected).
+    ! Files (f, exact f and error):
     !   test_UniSphere3d.out     phi-theta map on the source shell,
     !   test_UniSphere3d_r.out   radial cut through the source,
     !                                 both on the base mesh
@@ -133,8 +137,24 @@ contains
     ! Relative max, L1 and L2 errors on the base and the refined meshes
     real:: Error_VI(3,nMesh)
     integer:: iMesh
+    ! Title of the banner
+    character(len=*), parameter:: NameTitle = 'test_UniSphere3d: '// &
+         'point source, Dperp = const, uniform spherical mesh'
     character(len=*), parameter:: NameSub = 'test_UniSphere3d'
     !--------------------------------------------------------------------------
+    ! Banner (as in SP_stand_alone), the setup (the same for all meshes)
+    ! and the header of the table of checks (run_UniSphere3d writes one
+    ! row per mesh)
+    if(iProc == 0)then
+       write(*,'(/,4x,a,/,4x,a)') NameTitle, repeat('-', len(NameTitle))
+       write(*,'(a,f6.3,a,f6.2,a,f6.3,a,i0)') ' Dperp =', DperpTest, &
+            ' Rs^2/s, t =', tFinalTest, ' s, width sqrt(4*Dperp*t) =', &
+            sqrt(4*DperpTest*tFinalTest), ' Rs, nProc = ', nProc
+       write(*,'(a)') ' source cell (nR/2+1, nTheta/2+1, nPhi/2+1): f = 1'
+       write(*,'(a)') '   nR nTheta  nPhi wall[s] dsum(fV)/sum      min f'// &
+            ' max|f-f(p=1)| max|DfDt*t-Df|'
+    end if
+
     ! Unit conversion: Io2Si_V(UnitX_) = Rs [m]
     call init_unit
     ! No field lines in this test (init_dperp allocates DPerp_CB with nLine)
@@ -145,7 +165,7 @@ contains
     end do
 
     if(iProc /= 0) RETURN
-    write(*,'(/,a)') NameSub//': relative errors at t = tFinalTest'
+    write(*,'(a)') NameSub//': relative errors at t = tFinalTest'
     write(*,'(a)') '   nR nTheta  nPhi   max error    L1 error    L2 error'
     do iMesh = 1, nMesh
        write(*,'(i5,i7,i6,3es12.4)') nRTest*2**(iMesh-1), &
@@ -197,7 +217,8 @@ contains
       real:: Exact, Distr, Distr0, Volume, Rs, CpuTime
       integer:: i, j, k
       character(len=40):: NameFile
-      character(len=*), parameter:: NameSub = 'run_UniSphere3d'
+      ! Only the commented-out mesh line used NameSub (unused parameter)
+      ! character(len=*), parameter:: NameSub = 'run_UniSphere3d'
       !------------------------------------------------------------------------
       call set_mesh_dperp(nRTest*nRefine, nThetaTest*nRefine, &
            nPhiTest*nRefine)
@@ -290,25 +311,41 @@ contains
       Error_V(3) = sqrt(Sum_V(5)/Sum_V(6))
 
       if(iProc == 0)then
-         write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub// &
-              ': mesh nR x nTheta x nPhi = ', nRPerp, ' x ', nThetaPerp, &
-              ' x ', nPhiPerp, ', nProc = ', nProc
-         write(*,'(a,f7.3,a,2f8.3,a)') ' source cell at r =', &
-              RPerp_C(iR0)/Rs, ' Rs, (theta, phi) =', &
-              ThetaPerp_C(iTheta0)*cRadToDeg, PhiPerp_C(iPhi0)*cRadToDeg, &
-              ' deg'
-         write(*,'(a,f6.3,a,f6.2,a,f6.3,a)') ' Dperp =', DperpTest, &
-              ' Rs^2/s, t =', tFinalTest, ' s, width sqrt(4*Dperp*t) =', &
-              sqrt(Width2)/Rs, ' Rs'
-         write(*,'(a,f9.3,a)') ' wall time of the solver   =', CpuTime, ' s'
-         write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t=0, t =', &
-              Sum_V(1:2)/Rs**3
-         write(*,'(a,es11.3)') ' relative change of sum(f*V)   =', &
-              (Sum_V(2) - Sum_V(1))/Sum_V(1)
-         write(*,'(a,es11.3)') ' min f                         =', DistrMin
-         write(*,'(a,es11.3)') ' max |f(p) - f(p=1)|, p=1..nP  =', Max_I(3)
-         write(*,'(a,es11.3)') ' max |DfDt*t - (f - f(t=0))|   =', Max_I(4)
-         write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', Error_V
+         ! One row of the table of checks (header in test_UniSphere3d):
+         ! the mesh, the wall time of the solver, the relative change of
+         ! sum(f*V), min f, max |f - f(p=1)| and max |DfDt*t - Df|
+         write(*,'(i5,i7,i6,f8.3,es13.3,es11.3,es14.3,es15.3)') nRPerp, &
+              nThetaPerp, nPhiPerp, CpuTime, (Sum_V(2) - Sum_V(1))/Sum_V(1), &
+              DistrMin, Max_I(3:4)
+         ! The lines below are commented out: the row above has their
+         ! values, or they are redundant.
+         ! The mesh is in the row, nProc in the setup (test_UniSphere3d)
+         ! write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub// &
+         !      ': mesh nR x nTheta x nPhi = ', nRPerp, ' x ', nThetaPerp, &
+         !      ' x ', nPhiPerp, ', nProc = ', nProc
+         ! The setup gives the source cell; its center is in the .out files
+         ! (rShell of the map, Theta and Phi of the _r cut)
+         ! write(*,'(a,f7.3,a,2f8.3,a)') ' source cell at r =', &
+         !      RPerp_C(iR0)/Rs, ' Rs, (theta, phi) =', &
+         !      ThetaPerp_C(iTheta0)*cRadToDeg, PhiPerp_C(iPhi0)*cRadToDeg, &
+         !      ' deg'
+         ! The same on all meshes: in the setup (test_UniSphere3d)
+         ! write(*,'(a,f6.3,a,f6.2,a,f6.3,a)') ' Dperp =', DperpTest, &
+         !      ' Rs^2/s, t =', tFinalTest, ' s, width sqrt(4*Dperp*t) =', &
+         !      sqrt(Width2)/Rs, ' Rs'
+         ! In the row (wall[s])
+         ! write(*,'(a,f9.3,a)') ' wall time of the solver   =', CpuTime, ' s'
+         ! Absolute sums: the row has their relative change (dsum(fV)/sum)
+         ! write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t=0, t =', &
+         !      Sum_V(1:2)/Rs**3
+         ! In the row (dsum(fV)/sum, min f, max|f-f(p=1)|, max|DfDt*t-Df|)
+         ! write(*,'(a,es11.3)') ' relative change of sum(f*V)   =', &
+         !      (Sum_V(2) - Sum_V(1))/Sum_V(1)
+         ! write(*,'(a,es11.3)') ' min f                         =', DistrMin
+         ! write(*,'(a,es11.3)') ' max |f(p) - f(p=1)|, p=1..nP  =', Max_I(3)
+         ! write(*,'(a,es11.3)') ' max |DfDt*t - (f - f(t=0))|   =', Max_I(4)
+         ! The same as the table of errors (test_UniSphere3d)
+         ! write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', Error_V
       end if
 
       ! Plots of f, exact f and error: phi-theta map on the source shell
@@ -399,10 +436,15 @@ contains
          write(UnitTmp_,'(a)')      'Linear'//StringTab//'ScaleRPerp'
          write(UnitTmp_,'(i0,a)')   nTheta, StringTab//'nThetaPerp'
          write(UnitTmp_,'(i0,a)')   nPhi, StringTab//'nPhiPerp'
-         write(UnitTmp_,'(a)')      'T'//StringTab//'DoTestDPerp'
+         ! F: T prints the sub-step and positivity diagnostics of
+         ! solver_fvm_diffuse3d at every call; set T to debug
+         write(UnitTmp_,'(a)')      'F'//StringTab//'DoTestDPerp'
          call close_file(NameCaller=NameSub)
       end if
-      call read_file(NameParamFile, iComm)
+      ! Quiet: no 'read and broadcast' line, and no echo of the
+      ! parameters (read_file turns the echo on, on processor 0)
+      call read_file(NameParamFile, iComm, IsVerbose=.false.)
+      call read_echo_set(.false.)
       if(iProc == 0)then
          call open_file(File=NameParamFile, Status='old', NameCaller=NameSub)
          call close_file(Status='delete', NameCaller=NameSub)
@@ -471,14 +513,15 @@ contains
     ! exact solution and inside the mesh in the numerical one. The test
     ! prints sum(fExact*V)/M - 1 (the exact mass outside the mesh).
     !
-    ! Outputs (on processor 0) for each mesh, as in test_UniSphere3d:
-    ! sum(f*V) at t = 0 (= M) and tFinal, min f, the two checks of the
-    ! solver output (the same f at all momenta, and its df/dt times t =
-    ! the change of f), the relative max, L1 and L2 errors (the same
-    ! norms), and also sum(fExact*V)/M - 1. The solver prints its number
-    ! of sub-steps nStep. Then a table of the errors and the order of
-    ! convergence (2 is expected) for each pair of meshes. Files for each
-    ! mesh (f, exact f and error):
+    ! Outputs (on processor 0), as in test_UniSphere3d: a banner, then one
+    ! block: the setup (k, t, k*t, nProc, the source point, M = sum(f*V)
+    ! at t = 0), a table with one row per mesh: the wall time of the
+    ! solver, sum(fExact*V)/M - 1, min f and the two checks of the solver
+    ! output (max |f - f(p=1)| and max |DfDt*t - Df|, both 0 up to
+    ! round-off); then the table of the relative max, L1 and L2 errors
+    ! (the same norms) and the mass error (sum(f*V) - M)/M at tFinal, and
+    ! the order of convergence (2 is expected) for each pair of meshes.
+    ! Files for each mesh (f, exact f and error):
     !   test_R2Sphere3d_<nTheta>x<nPhi>.out       phi-theta map on
     !                                             the source shell,
     !   test_R2Sphere3d_<nTheta>x<nPhi>_r.out     cut along r and
@@ -507,8 +550,25 @@ contains
     ! Relative max, L1, L2 and mass errors on the base and refined meshes
     real:: Error_VII(4,2,nPair)
     integer:: iPair, iLevel
+    ! Title of the banner
+    character(len=*), parameter:: NameTitle = 'test_R2Sphere3d: '// &
+         'point source, Dperp = k*r**2, Exp spherical mesh'
     character(len=*), parameter:: NameSub = 'test_R2Sphere3d'
     !--------------------------------------------------------------------------
+    ! Banner, the setup (the same for all meshes) and the header of the
+    ! table of checks (run_R2Sphere3d writes one row per mesh)
+    if(iProc == 0)then
+       write(*,'(/,4x,a,/,4x,a)') NameTitle, repeat('-', len(NameTitle))
+       write(*,'(a,f7.4,a,f6.2,a,f6.3,a,i0)') ' Dperp = k*r**2 with k =', &
+            kDperp, ' 1/s, t =', tFinal, ' s, k*t =', kDperp*tFinal, &
+            ', nProc = ', nProc
+       write(*,'(3(a,f0.1),a)') ' source cell of r = ', rSource, &
+            ' Rs, theta = ', ThetaSource, ', phi = ', PhiSource, &
+            ' deg: f = 1, M = sum(f*V)'
+       write(*,'(a)') '   nR nTheta  nPhi wall[s] sum(fExV)/M-1      min f'// &
+            ' max|f-f(p=1)| max|DfDt*t-Df|'
+    end if
+
     ! Unit conversion: Io2Si_V(UnitX_) = Rs [m]
     call init_unit
     ! No field lines in this test (init_dperp allocates DPerp_CB with nLine)
@@ -520,7 +580,7 @@ contains
     end do; end do
 
     if(iProc /= 0) RETURN
-    write(*,'(/,a)') NameSub//': relative errors at t = tFinal'
+    write(*,'(a)') NameSub//': relative errors at t = tFinal'
     write(*,'(a)') '   nR nTheta  nPhi   max error    L1 error    L2 error'// &
          '  mass error'
     do iPair = 1, nPair
@@ -575,7 +635,8 @@ contains
       real:: Exact, Distr, Distr0, Volume, Rs, CpuTime
       integer:: i, j, k
       character(len=60):: NameFile
-      character(len=*), parameter:: NameSub = 'run_R2Sphere3d'
+      ! Only the commented-out mesh line used NameSub (unused parameter)
+      ! character(len=*), parameter:: NameSub = 'run_R2Sphere3d'
       !------------------------------------------------------------------------
       call set_mesh_dperp_r2(nCell_D(1), nCell_D(2), nCell_D(3))
 
@@ -668,24 +729,41 @@ contains
       Error_V(4) = (Sum_V(2) - Mass0)/Mass0
 
       if(iProc == 0)then
-         write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub// &
-              ': mesh nR x nTheta x nPhi = ', nRPerp, ' x ', nThetaPerp, &
-              ' x ', nPhiPerp, ', nProc = ', nProc
-         write(*,'(a,f8.3,a,2f8.3,a)') ' source cell at r =', r0/Rs, &
-              ' Rs, (theta, phi) =', Theta0*cRadToDeg, Phi0*cRadToDeg, ' deg'
-         write(*,'(a,f7.4,a,f6.2,a,f6.3)') ' Dperp = k*r**2 with k =', &
-              kDperp, ' 1/s, t =', tFinal, ' s, k*t =', kDperp*tFinal
-         write(*,'(a,f9.3,a)') ' wall time of the solver   =', CpuTime, ' s'
-         write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t=0 (=M), t =', &
-              Sum_V(1:2)/Rs**3
-         write(*,'(a,es11.3)') ' mass error (sum(f*V) - M)/M   =', Error_V(4)
-         write(*,'(a,es11.3)') ' sum(fExact*V)/M - 1           =', &
-              Sum_V(4)/Mass0 - 1
-         write(*,'(a,es11.3)') ' min f                         =', DistrMin
-         write(*,'(a,es11.3)') ' max |f(p) - f(p=1)|, p=1..nP  =', Max_I(3)
-         write(*,'(a,es11.3)') ' max |DfDt*t - (f - f(t=0))|   =', Max_I(4)
-         write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', &
-              Error_V(1:3)
+         ! One row of the table of checks (header in test_R2Sphere3d): the
+         ! mesh, the wall time of the solver, sum(fExact*V)/M - 1, min f,
+         ! max |f - f(p=1)| and max |DfDt*t - Df|
+         write(*,'(i5,i7,i6,f8.3,es14.3,es11.3,es14.3,es15.3)') nRPerp, &
+              nThetaPerp, nPhiPerp, CpuTime, Sum_V(4)/Mass0 - 1, DistrMin, &
+              Max_I(3:4)
+         ! The lines below are commented out: the row above has their
+         ! values, or they are redundant.
+         ! The mesh is in the row, nProc in the setup (test_R2Sphere3d)
+         ! write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub// &
+         !      ': mesh nR x nTheta x nPhi = ', nRPerp, ' x ', nThetaPerp, &
+         !      ' x ', nPhiPerp, ', nProc = ', nProc
+         ! The setup gives the source point; the center of its cell is in
+         ! the .out files (rShell of the map, Theta and Phi of the _r cut)
+         ! write(*,'(a,f8.3,a,2f8.3,a)') ' source cell at r =', r0/Rs, &
+         !      ' Rs, (theta, phi) =', Theta0*cRadToDeg, Phi0*cRadToDeg, ' deg'
+         ! The same on all meshes: in the setup (test_R2Sphere3d)
+         ! write(*,'(a,f7.4,a,f6.2,a,f6.3)') ' Dperp = k*r**2 with k =', &
+         !      kDperp, ' 1/s, t =', tFinal, ' s, k*t =', kDperp*tFinal
+         ! In the row (wall[s])
+         ! write(*,'(a,f9.3,a)') ' wall time of the solver   =', CpuTime, ' s'
+         ! Absolute sums: the table of errors has the mass error
+         ! write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t=0 (=M), t =', &
+         !      Sum_V(1:2)/Rs**3
+         ! The same as the mass error column of the table of errors
+         ! write(*,'(a,es11.3)') ' mass error (sum(f*V) - M)/M   =', Error_V(4)
+         ! In the row (sum(fExV)/M-1, min f, max|f-f(p=1)|, max|DfDt*t-Df|)
+         ! write(*,'(a,es11.3)') ' sum(fExact*V)/M - 1           =', &
+         !      Sum_V(4)/Mass0 - 1
+         ! write(*,'(a,es11.3)') ' min f                         =', DistrMin
+         ! write(*,'(a,es11.3)') ' max |f(p) - f(p=1)|, p=1..nP  =', Max_I(3)
+         ! write(*,'(a,es11.3)') ' max |DfDt*t - (f - f(t=0))|   =', Max_I(4)
+         ! The same as the table of errors (test_R2Sphere3d)
+         ! write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', &
+         !      Error_V(1:3)
       end if
 
       ! Plots of f, exact f and error: phi-theta map on the source shell
@@ -816,10 +894,15 @@ contains
          write(UnitTmp_,'(a)')      'Exp'//StringTab//'ScaleRPerp'
          write(UnitTmp_,'(i0,a)')   nTheta, StringTab//'nThetaPerp'
          write(UnitTmp_,'(i0,a)')   nPhi, StringTab//'nPhiPerp'
-         write(UnitTmp_,'(a)')      'T'//StringTab//'DoTestDPerp'
+         ! F: T prints the sub-step and positivity diagnostics of
+         ! solver_fvm_diffuse3d at every call; set T to debug
+         write(UnitTmp_,'(a)')      'F'//StringTab//'DoTestDPerp'
          call close_file(NameCaller=NameSub)
       end if
-      call read_file(NameParamFile, iComm)
+      ! Quiet: no 'read and broadcast' line, and no echo of the
+      ! parameters (read_file turns the echo on, on processor 0)
+      call read_file(NameParamFile, iComm, IsVerbose=.false.)
+      call read_echo_set(.false.)
       if(iProc == 0)then
          call open_file(File=NameParamFile, Status='old', NameCaller=NameSub)
          call close_file(Status='delete', NameCaller=NameSub)
@@ -896,7 +979,8 @@ contains
     !   5 steps (Dt = 1 s) with the base lines and 20 steps with the
     !   refined lines (the line solver is first order in time). The line
     !   solver makes one step of Dt per coupled step (no advection, so no
-    !   CFL limit); solver_fvm_diffuse3d prints its sub-steps (DoTestDPerp).
+    !   CFL limit); solver_fvm_diffuse3d makes its own stable sub-steps
+    !   (printed if DoTestDPerp is T in set_param_line).
     !
     ! Exact solution: in s = ln(r) the 3D operator is
     !   kR*(f_ss + 3*f_s) + kA*Lap_S f
@@ -916,16 +1000,20 @@ contains
     ! the exact f of the coupled case at r = 2 (240) Rs is 6.4e-3 (1.6e-3)
     ! of its maximum along the same line, so the ends add errors.
     !
-    ! Outputs (on processor 0) for each case and set of lines: sum(f*V) at
-    ! t0 and t0 + tFinal and sum(fExact*V), min f, max |f(p) - f(p=1)| over
-    ! the momenta, the number of lines in use, the number of steps, the
-    ! wall time of the steps, and the relative max, L1 and L2 errors over
+    ! Outputs (on processor 0), as in test_UniSphere3d: a banner, then one
+    ! block: the setup (the base lines and mesh, nProc, the source point,
+    ! tFinal, TauR and TauA of f(t0), M0 = sum(f*V) at t0, and for each
+    ! case the Dpara of the lines and Dperp over r**2 and TauR and TauA at
+    ! t0 + tFinal), a table with one row per case and set of lines: nNode,
+    ! the number of steps, the wall time of the steps, the number of lines
+    ! in use, sum(fExact*V)/M0 - 1, min f and max |f(p) - f(p=1)| over the
+    ! momenta; then the table of the relative max, L1 and L2 errors over
     ! all line nodes at t0 + tFinal: max |f - fExact|/max fExact and the
     ! sums of |f - fExact| and (f - fExact)**2 over those of fExact and
     ! fExact**2, weighted by the volume V = r**3*dln(r)*dOmega of each node
-    ! (half at the line ends; dOmega of the lat-lon cell of the line). Then
-    ! a table of the errors and the orders of convergence (base ->
-    ! refined). Files for the coupled case (f, exact f and error):
+    ! (half at the line ends; dOmega of the lat-lon cell of the line), and
+    ! the relative change of sum(f*V), with the orders of convergence
+    ! (base -> refined). Files for the coupled case (f, exact f and error):
     !   test_Line2Sphere3d_<nThetaLine>x<nPhiLine>.out       phi-theta map
     !                                        at the node nearest to rc,
     !   test_Line2Sphere3d_<nThetaLine>x<nPhiLine>_r.out     along the line
@@ -1002,8 +1090,39 @@ contains
     ! each case on the base and refined lines
     real:: Error_VII(4,nCase,2)
     integer:: iCase, iLevel
+    ! Title of the banner
+    character(len=*), parameter:: NameTitle = 'test_Line2Sphere3d: '// &
+         'radial lines (Dpara) coupled with Exp mesh (Dperp)'
     character(len=*), parameter:: NameSub = 'test_Line2Sphere3d'
     !--------------------------------------------------------------------------
+    ! Banner, the setup (the same for all runs), the cases and the header
+    ! of the table of checks (run_Line2Sphere3d writes one row per run)
+    if(iProc == 0)then
+       write(*,'(/,4x,a,/,4x,a)') NameTitle, repeat('-', len(NameTitle))
+       write(*,'(7(a,i0))') ' lines ', nThetaLineBase, ' x ', &
+            nPhiLineBase, ' with ', nNodeBase, ' nodes, mesh ', &
+            nCellBase_D(1), ' x ', nCellBase_D(2), ' x ', nCellBase_D(3), &
+            '; refined 2x in all; nProc = ', nProc
+       write(*,'(3(a,f0.1),a,f0.2,a)') ' source point r = ', rSource, &
+            ' Rs, theta = ', ThetaSource, ', phi = ', PhiSource, &
+            ' deg, tFinal = ', tFinal, ' s'
+       write(*,'(a,2f8.4,a)') ' f(t0) = exact f (peak 1) at TauR, TauA =', &
+            kPara*tStart, kPerp*tStart, '; M0 = sum(f(t0)*V)'
+       ! Each case: the Dpara of the lines and Dperp (as in
+       ! run_Line2Sphere3d) over r**2, TauR and TauA at t0 + tFinal
+       write(*,'(a)') ' case       line Dpara/r**2, Dperp/r**2 [1/s], '// &
+            'TauR, TauA at t0 + tFinal'
+       do iCase = 1, nCase
+          write(*,'(1x,a,4f8.4)') NameCase_I(iCase), &
+               (1 - DPerpRatio_I(iCase))*kDpara_I(iCase), &
+               DPerpRatio_I(iCase)*kDpara_I(iCase), &
+               kPara*tStart + kDpara_I(iCase)*tFinal, &
+               kPerp*tStart + DPerpRatio_I(iCase)*kDpara_I(iCase)*tFinal
+       end do
+       write(*,'(a)') ' case       nNode nStep wall[s] lines '// &
+            'sum(fExV)/M0-1       min f max|f-f(p=1)|'
+    end if
+
     ! Unit conversion: Io2Si_V(UnitX_) = Rs [m]
     call init_unit
     IsLineAllocated = .false.
@@ -1024,7 +1143,7 @@ contains
     nLine = 0
 
     if(iProc /= 0) RETURN
-    write(*,'(/,a)') NameSub//': relative errors at t0 + tFinal on the '// &
+    write(*,'(a)') NameSub//': relative errors at t0 + tFinal on the '// &
          'line nodes (L1, L2 weighted by V = r**3*dln(r)*dOmega)'
     write(*,'(a)') ' case        nNode nTheta  nPhi   max error'// &
          '    L1 error    L2 error dsum(fV)/sum'
@@ -1204,33 +1323,53 @@ contains
       Error_V(4) = (Sum_V(2) - Sum_V(1))/Sum_V(1)
 
       if(iProc == 0)then
-         write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub//' ('// &
-              trim(NameCase_I(iCase))//'): lines nNode x nTheta x nPhi = ', &
-              nNode, ' x ', nThetaLine, ' x ', nPhiLine, ', nProc = ', nProc
-         write(*,'(a,i0,a,i0,a,i0)') ' mesh nR x nTheta x nPhi = ', &
-              nRPerp, ' x ', nThetaPerp, ' x ', nPhiPerp
-         write(*,'(a,f7.4,a,f7.4,a)') ' line Dpara = ', &
-              (1 - DPerpRatio)*kDpara, '*r**2, Dperp = ', &
-              DPerpRatio*kDpara, '*r**2 [m^2/s], r in m'
-         write(*,'(a,2f8.4,a,2f8.4)') ' TauR, TauA at t0 =', &
-              kPara*tStart, kPerp*tStart, ', at t0 + tFinal =', TauR, TauA
-         write(*,'(a,i0,a,f6.3,a)') ' coupled steps: ', nStep, &
-              ' of Dt = ', Dt, ' s (one line solver step each)'
-         write(*,'(a,f9.3,a)') ' wall time of the steps    =', CpuTime, ' s'
-         write(*,'(a,i0,a,i0)') ' lines in use              = ', &
-              nLineUsed, ' of ', nLineAll
-         write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t0, t0 + tFinal =', &
-              Sum_V(1:2)
-         write(*,'(a,es11.3)') ' relative change of sum(f*V)   =', &
-              Error_V(4)
-         write(*,'(a,es11.3)') ' sum(fExact*V)/sum(f(t0)*V) - 1 =', &
-              Sum_V(4)/Sum_V(1) - 1
-         write(*,'(a,es12.3e3)') ' min f                         =', &
-              DistrMin
-         write(*,'(a,es12.3e3)') ' max |f(p) - f(p=1)|, p=1..nP  =', &
-              Max_I(3)
-         write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', &
-              Error_V(1:3)
+         ! One row of the table of checks (header in test_Line2Sphere3d):
+         ! the case, nNode, the coupled steps, the wall time of the steps,
+         ! the lines in use, sum(fExact*V)/sum(f(t0)*V) - 1, min f and
+         ! max |f(p) - f(p=1)|
+         write(*,'(1x,a,2i6,f8.3,i6,es15.3,es12.3e3,es14.3e3)') &
+              NameCase_I(iCase), nNode, nStep, CpuTime, nLineUsed, &
+              Sum_V(4)/Sum_V(1) - 1, DistrMin, Max_I(3)
+         ! The lines below are commented out: the row above has their
+         ! values, or they are redundant.
+         ! The case and nNode are in the row, the base lines (nThetaLine x
+         ! nPhiLine, refined 2x) and nProc in the setup (test_Line2Sphere3d)
+         ! write(*,'(/,a,i0,a,i0,a,i0,a,i0)') NameSub//' ('// &
+         !      trim(NameCase_I(iCase))//'): lines nNode x nTheta x nPhi = ', &
+         !      nNode, ' x ', nThetaLine, ' x ', nPhiLine, ', nProc = ', nProc
+         ! The same for all cases: the setup gives the base mesh (refined 2x)
+         ! write(*,'(a,i0,a,i0,a,i0)') ' mesh nR x nTheta x nPhi = ', &
+         !      nRPerp, ' x ', nThetaPerp, ' x ', nPhiPerp
+         ! The same for both sets of lines: the setup has them (the table
+         ! of the cases, and TauR, TauA at t0 in the f(t0) line)
+         ! write(*,'(a,f7.4,a,f7.4,a)') ' line Dpara = ', &
+         !      (1 - DPerpRatio)*kDpara, '*r**2, Dperp = ', &
+         !      DPerpRatio*kDpara, '*r**2 [m^2/s], r in m'
+         ! write(*,'(a,2f8.4,a,2f8.4)') ' TauR, TauA at t0 =', &
+         !      kPara*tStart, kPerp*tStart, ', at t0 + tFinal =', TauR, TauA
+         ! nStep is in the row and tFinal (Dt = tFinal/nStep) in the setup
+         ! write(*,'(a,i0,a,f6.3,a)') ' coupled steps: ', nStep, &
+         !      ' of Dt = ', Dt, ' s (one line solver step each)'
+         ! In the row (wall[s], and lines: nLineAll = nThetaLine*nPhiLine)
+         ! write(*,'(a,f9.3,a)') ' wall time of the steps    =', CpuTime, ' s'
+         ! write(*,'(a,i0,a,i0)') ' lines in use              = ', &
+         !      nLineUsed, ' of ', nLineAll
+         ! Absolute sums: the table of errors has their relative change
+         ! write(*,'(a,2es22.14)') ' sum(f*V) [Rs^3] at t0, t0 + tFinal =', &
+         !      Sum_V(1:2)
+         ! The same as the dsum(fV)/sum column of the table of errors
+         ! write(*,'(a,es11.3)') ' relative change of sum(f*V)   =', &
+         !      Error_V(4)
+         ! In the row (sum(fExV)/M0-1, min f, max|f-f(p=1)|)
+         ! write(*,'(a,es11.3)') ' sum(fExact*V)/sum(f(t0)*V) - 1 =', &
+         !      Sum_V(4)/Sum_V(1) - 1
+         ! write(*,'(a,es12.3e3)') ' min f                         =', &
+         !      DistrMin
+         ! write(*,'(a,es12.3e3)') ' max |f(p) - f(p=1)|, p=1..nP  =', &
+         !      Max_I(3)
+         ! The same as the table of errors (test_Line2Sphere3d)
+         ! write(*,'(a,3es11.3)') ' relative errors: max, L1, L2  =', &
+         !      Error_V(1:3)
       end if
 
       if(iCase == 1)then
@@ -1477,7 +1616,10 @@ contains
          write(UnitTmp_,'(a)')      'Exp'//StringTab//'ScaleRPerp'
          write(UnitTmp_,'(i0,a)')   nCell_D(2), StringTab//'nThetaPerp'
          write(UnitTmp_,'(i0,a)')   nCell_D(3), StringTab//'nPhiPerp'
-         write(UnitTmp_,'(a)')      'T'//StringTab//'DoTestDPerp'
+         ! F: T prints the sub-step and positivity diagnostics of
+         ! solver_fvm_diffuse3d and diffuseperp_distribution at every
+         ! call; set T to debug
+         write(UnitTmp_,'(a)')      'F'//StringTab//'DoTestDPerp'
          write(UnitTmp_,'(/,a)')    '#MOMENTUMBC'
          write(UnitTmp_,'(a)')      'float'//StringTab//'TypeMomentumMinBc'
          write(UnitTmp_,'(a)')      'float'//StringTab//'TypeMomentumMaxBc'
@@ -1489,7 +1631,10 @@ contains
          write(UnitTmp_,'(a)')      '1e-200'//StringTab//'FluxInitIo'
          call close_file(NameCaller=NameSub)
       end if
-      call read_file(NameParamFile, iComm)
+      ! Quiet: no 'read and broadcast' line, and no echo of the
+      ! parameters (read_file turns the echo on, on processor 0)
+      call read_file(NameParamFile, iComm, IsVerbose=.false.)
+      call read_echo_set(.false.)
       if(iProc == 0)then
          call open_file(File=NameParamFile, Status='old', NameCaller=NameSub)
          call close_file(Status='delete', NameCaller=NameSub)
